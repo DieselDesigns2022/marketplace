@@ -53,6 +53,7 @@ $router->match(['GET','POST'], '/checkout', [CartController::class, 'checkout'])
 $router->get('/admin', [AdminController::class, 'home']);
 $router->match(['GET','POST'], '/admin/users', [AdminController::class, 'users']);
 $router->match(['GET','POST'], '/admin/applications', [AdminController::class, 'applications']);
+$router->match(['GET','POST'], '/admin/applications/{id}', [AdminController::class, 'applications']);
 $router->match(['GET','POST'], '/admin/designers', [AdminController::class, 'designers']);
 $router->match(['GET','POST'], '/admin/products', [AdminController::class, 'products']);
 $router->match(['GET','POST'], '/admin/categories', [AdminController::class, 'categories']);
