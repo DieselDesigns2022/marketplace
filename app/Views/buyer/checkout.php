@@ -1,0 +1,1 @@
+<h1>Sandbox Checkout</h1><p>Stripe Connect-ready checkout placeholder. Click below to simulate a successful payment.</p><form method="post"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn">Simulate successful payment</button></form>
