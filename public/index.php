@@ -39,6 +39,7 @@ $router->match(['GET','POST'], '/seller/store', [SellerController::class, 'store
 $router->get('/seller/products', [SellerController::class, 'products']);
 $router->match(['GET','POST'], '/seller/product/new', [SellerController::class, 'editProduct']);
 $router->match(['GET','POST'], '/seller/product/{id}', [SellerController::class, 'editProduct']);
+$router->post('/seller/product/{id}/submit', [SellerController::class, 'submitProduct']);
 $router->post('/seller/product/{id}/disable', [SellerController::class, 'disableProduct']);
 $router->get('/seller/sales', [SellerController::class, 'sales']);
 $router->get('/seller/referrals', [SellerController::class, 'referrals']);
@@ -56,6 +57,7 @@ $router->match(['GET','POST'], '/admin/applications', [AdminController::class, '
 $router->match(['GET','POST'], '/admin/applications/{id}', [AdminController::class, 'applications']);
 $router->match(['GET','POST'], '/admin/designers', [AdminController::class, 'designers']);
 $router->match(['GET','POST'], '/admin/products', [AdminController::class, 'products']);
+$router->match(['GET','POST'], '/admin/products/{id}', [AdminController::class, 'productDetail']);
 $router->match(['GET','POST'], '/admin/categories', [AdminController::class, 'categories']);
 $router->get('/admin/orders', [AdminController::class, 'orders']);
 $router->get('/admin/referrals', [AdminController::class, 'referrals']);
