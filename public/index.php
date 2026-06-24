@@ -28,6 +28,7 @@ $router->match(['GET','POST'], '/account', [AuthController::class, 'account']);
 $router->get('/dashboard', [BuyerController::class, 'home']);
 $router->get('/dashboard/purchases', [BuyerController::class, 'purchases']);
 $router->get('/dashboard/downloads', [BuyerController::class, 'downloads']);
+$router->get('/dashboard/order/{id}', [BuyerController::class, 'order']);
 $router->get('/download/{file}', [BuyerController::class, 'download']);
 $router->get('/dashboard/wishlist', [BuyerController::class, 'wishlist']);
 $router->get('/dashboard/following', [BuyerController::class, 'following']);
@@ -48,7 +49,7 @@ $router->get('/seller/rank', [SellerController::class, 'rank']);
 $router->get('/cart', [CartController::class, 'show']);
 $router->post('/cart/add/{id}', [CartController::class, 'add']);
 $router->post('/cart/remove/{id}', [CartController::class, 'remove']);
-$router->post('/cart/license/{id}', [CartController::class, 'license']);
+$router->post('/cart/update', [CartController::class, 'update']);
 $router->match(['GET','POST'], '/checkout', [CartController::class, 'checkout']);
 
 $router->get('/admin', [AdminController::class, 'home']);
@@ -60,6 +61,7 @@ $router->match(['GET','POST'], '/admin/products', [AdminController::class, 'prod
 $router->match(['GET','POST'], '/admin/products/{id}', [AdminController::class, 'productDetail']);
 $router->match(['GET','POST'], '/admin/categories', [AdminController::class, 'categories']);
 $router->get('/admin/orders', [AdminController::class, 'orders']);
+$router->get('/admin/order/{id}', [AdminController::class, 'orderDetail']);
 $router->get('/admin/referrals', [AdminController::class, 'referrals']);
 $router->match(['GET','POST'], '/admin/homepage', [AdminController::class, 'homepage']);
 $router->match(['GET','POST'], '/admin/ads', [AdminController::class, 'ads']);
