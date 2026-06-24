@@ -1,0 +1,1 @@
+<h1>Purchases & Downloads</h1><table><tr><th>Date</th><th>Product</th><th>License</th><th>Download</th></tr><?php foreach($items as $i):?><tr><td><?=$i['created_at']?></td><td><a href="/product/<?=$i['slug']?>"><?=H::e($i['title'])?></a></td><td><?=$i['license_type']?></td><td><a class="btn" href="/download/<?=$i['file_id']?>">Download</a></td></tr><?php endforeach;?></table>
