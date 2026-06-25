@@ -83,25 +83,9 @@
 <?=nl2br(H::e($p['description']))?>
 </p>
 <h2>More From This Designer</h2>
-<div class="grid">
-    <?php foreach($more as $m):?>
-        <a class="card" href="/product/<?=H::e($m['slug'])?>">
-        <?=H::e($m['title'])?>
-        <br>
-        <?=H::money($m['price'])?>
-        </a>
-    <?php endforeach;?>
-</div>
+<?php $products=$more; include app_path('app/Views/public/product_grid.php');?>
 <h2>Related Products</h2>
-<div class="grid">
-    <?php foreach($related as $r):?>
-        <a class="card" href="/product/<?=H::e($r['slug'])?>">
-        <?=H::e($r['title'])?>
-        <br>
-        <?=H::money($r['price'])?>
-        </a>
-    <?php endforeach;?>
-</div>
+<?php $products=$related; include app_path('app/Views/public/product_grid.php');?>
 <?php if(!$related):?>
     <p class="muted">No related products are available yet.</p>
 <?php endif;?>
