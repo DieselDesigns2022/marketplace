@@ -1,23 +1,258 @@
 <?php
+
 namespace App\Controllers;
-use App\Core\Database as DB; use App\Core\Helpers as H; use Throwable;
-class AdminController { private function gate(){H::requireRole('admin');}
- private function applicationById($id){ return DB::row('select da.*,u.name user_name,u.email user_email,u.status user_status,u.role user_role from designer_applications da join users u on u.id=da.user_id where da.id=?',[$id]); }
- private function slugTakenByOther(string $slug, int $userId): bool { $d=DB::row('select id from designers where store_slug=? and user_id<>? limit 1',[$slug,$userId]); return (bool)$d; }
- private function log(string $action, string $entityType, int $entityId, array $metadata=[]): void { DB::exec('insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)',[H::user()['id'],$action,$entityType,$entityId,json_encode($metadata)]); }
- private function approveApplication(int $id): void { $a=$this->applicationById($id); if(!$a){H::flash('error','Application not found.'); return;} if(!in_array($a['status'],['pending','denied'],true)){H::flash('warning','Only pending or denied applications can be approved.'); return;} if($a['user_status']==='disabled'){H::flash('error','Disabled users cannot be approved as designers.'); return;} if($this->slugTakenByOther($a['desired_slug'],(int)$a['user_id'])){H::flash('error','That store URL is already taken. Please choose another.'); return;} try{DB::begin(); $existing=DB::row('select * from designers where user_id=?',[$a['user_id']]); if($existing){DB::exec('update designers set display_name=?,store_slug=?,bio=?,social_links=?,status="approved",creator_rank=coalesce(creator_rank,"Bronze"),rank_override=0,is_featured=0,updated_at=now() where id=?',[$a['display_name'],$a['desired_slug'],$a['bio'],$a['social_links'],$existing['id']]); $designerId=$existing['id'];} else {DB::exec('insert into designers (user_id,display_name,store_slug,bio,social_links,status,creator_rank,rank_override,is_featured) values (?,?,?,?,?,?,?,?,?)',[$a['user_id'],$a['display_name'],$a['desired_slug'],$a['bio'],$a['social_links'],'approved','Bronze',0,0]); $designerId=DB::id();} DB::exec('update designer_applications set status="approved",denial_reason=null,updated_at=now() where id=?',[$id]); DB::exec('update users set role="designer",updated_at=now() where id=?',[$a['user_id']]); $this->log('approved_designer_application','designer_application',$id,['user_id'=>$a['user_id'],'designer_id'=>$designerId]); DB::commit(); H::flash('success','Designer application approved.');} catch(Throwable $e){DB::rollBack(); H::flash('error','Approval failed. Please try again.');}}
- private function denyApplication(int $id, string $reason, string $notes=''): void { $a=$this->applicationById($id); if(!$a){H::flash('error','Application not found.'); return;} if(mb_strlen(trim($reason))<5){H::flash('error','Denial reason must be at least 5 characters.'); return;} DB::exec('update designer_applications set status="denied",denial_reason=?,admin_notes=?,updated_at=now() where id=?',[$reason,$notes,$id]); $this->log('denied_designer_application','designer_application',$id,['user_id'=>$a['user_id']]); H::flash('success','Designer application denied.'); }
- public function home(){ $this->gate(); H::view('admin/home',['s'=>DB::row('select (select count(*) from users) users,(select count(*) from designers) designers,(select count(*) from designer_applications where status="pending") apps,(select count(*) from products where status="pending_review") products,(select count(*) from orders) orders,(select coalesce(sum(total),0) from orders) gross,(select coalesce(sum(commission_amount),0) from platform_commissions) commission')]);}
- public function users(){ $this->gate(); if($_POST) DB::exec('update users set status=? where id=?',[$_POST['status'],$_POST['id']]); H::view('admin/table',['title'=>'Users','rows'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);}
- public function applications($id=null){ $this->gate(); if($_POST){$id=(int)($_POST['id']??0); if(($_POST['action']??'')==='approve') $this->approveApplication($id); if(($_POST['action']??'')==='deny') $this->denyApplication($id, trim($_POST['reason']??''), trim($_POST['admin_notes']??'')); H::redirect('/admin/applications');} if($id){H::view('admin/application_detail',['app'=>$this->applicationById($id)??H::abort(404)]); return;} $status=$_GET['status']??'pending'; $where=''; $params=[]; if(in_array($status,['pending','approved','denied'],true)){$where=' where da.status=?'; $params[]=$status;} H::view('admin/applications',['status'=>$status,'apps'=>DB::rows('select da.*,u.name user_name,u.email user_email from designer_applications da join users u on u.id=da.user_id'.$where.' order by field(da.status,"pending","approved","denied"), da.created_at desc',$params)]);}
- public function designers(){ $this->gate(); if($_POST) DB::exec('update designers set creator_rank=? where id=?',[$_POST['creator_rank'],$_POST['id']]); H::view('admin/designers',['designers'=>DB::rows('select d.*,u.email from designers d join users u on u.id=d.user_id')]);}
- public function products(){ $this->gate(); if($_POST){$this->moderateProduct((int)$_POST['id'],$_POST['action']??'',trim($_POST['reason']??'')); H::redirect('/admin/products');} $status=$_GET['status']??'pending_review'; $allowed=['pending_review','approved','rejected','disabled']; $where=''; $params=[]; if(in_array($status,$allowed,true)){ $where=' where p.status=?'; $params[]=$status; } H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);}
- private function moderateProduct(int $id, string $action, string $reason=''): void { $status=['approve'=>'approved','reject'=>'rejected','disable'=>'disabled'][$action]??''; if(!$status){H::flash('error','Invalid product action.'); return;} if($status==='rejected' && mb_strlen($reason)<5){H::flash('error','Rejection Reason is required.'); return;} DB::exec('update products set status=?, rejection_reason=?, updated_at=now() where id=?',[$status,$status==='rejected'?$reason:null,$id]); $this->log($status.'_product','product',$id); H::flash('success','Product status updated.'); }
- public function productDetail($id){ $this->gate(); if($_POST){$this->moderateProduct((int)$id,$_POST['action']??'',trim($_POST['reason']??'')); H::redirect('/admin/products/'.(int)$id);} $p=DB::row('select p.*,d.display_name,d.store_slug,d.user_id,u.email designer_email,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id left join categories c on c.id=p.category_id where p.id=?',[$id])??H::abort(404); H::view('admin/product_detail',['p'=>$p,'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id])]);}
- public function categories(){ $this->gate(); if($_POST) DB::exec('insert into categories (name,slug,description,is_active) values (?,?,?,1) on duplicate key update name=values(name),description=values(description),is_active=values(is_active)',[$_POST['name'],H::slug($_POST['slug']),$_POST['description']]); H::view('admin/categories',['cats'=>DB::rows('select * from categories')]);}
- public function orders(){ $this->gate(); H::view('admin/orders',['orders'=>DB::rows('select o.*,u.email buyer_email from orders o join users u on u.id=o.user_id order by o.created_at desc')]);}
- public function orderDetail($id){ $this->gate(); $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404); $items=DB::rows('select oi.*,p.title,d.display_name designer_name,u.email designer_email,se.seller_earning,pc.commission_amount from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id where oi.order_id=?',[$order['id']]); H::view('admin/order_detail',['order'=>$order,'items'=>$items]);}
- public function referrals(){ $this->gate(); H::view('admin/table',['title'=>'Referrals','rows'=>DB::rows('select * from referrals order by created_at desc')]);}
- public function homepage(){ $this->gate(); if($_POST){DB::exec('insert into homepage_features (feature_type,feature_id,sort_order,is_active) values (?,?,?,1)',[$_POST['feature_type'],$_POST['feature_id'],$_POST['sort_order']]);} H::view('admin/homepage',['features'=>DB::rows('select * from homepage_features')]);}
- public function ads(){ $this->gate(); if($_POST) DB::exec('insert into ads (product_id,designer_id,placement,start_date,end_date,status) values (?,?,?,?,?,?)',[$_POST['product_id'],$_POST['designer_id'],$_POST['placement'],$_POST['start_date'],$_POST['end_date'],$_POST['status']]); H::view('admin/ads',['ads'=>DB::rows('select * from ads')]);}
+use App\Core\Database as DB;
+use App\Core\Helpers as H;
+use Throwable;
+class AdminController
+{
+    private function gate()
+    {
+        H::requireRole('admin');
+
+    }
+    private function applicationById($id)
+    {
+        return DB::row('select da.*,u.name user_name,u.email user_email,u.status user_status,u.role user_role from designer_applications da join users u on u.id=da.user_id where da.id=?',[$id]);
+
+    }
+    private function slugTakenByOther(string $slug, int $userId): bool
+    {
+        $d=DB::row('select id from designers where store_slug=? and user_id<>? limit 1',[$slug,$userId]);
+        return (bool)$d;
+
+    }
+    private function log(string $action, string $entityType, int $entityId, array $metadata=[]): void
+    {
+        DB::exec('insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)',[H::user()['id'],$action,$entityType,$entityId,json_encode($metadata)]);
+
+    }
+    private function approveApplication(int $id): void
+    {
+        $a=$this->applicationById($id);
+        if(!$a)
+        {
+           H::flash('error','Application not found.');
+            return;
+
+        }
+        if(!in_array($a['status'],['pending','denied'],true))
+        {
+           H::flash('warning','Only pending or denied applications can be approved.');
+            return;
+
+        }
+        if($a['user_status']==='disabled')
+        {
+           H::flash('error','Disabled users cannot be approved as designers.');
+            return;
+
+        }
+        if($this->slugTakenByOther($a['desired_slug'],(int)$a['user_id']))
+        {
+           H::flash('error','That store URL is already taken. Please choose another.');
+            return;
+
+        }
+        try
+        {
+           DB::begin();
+            $existing=DB::row('select * from designers where user_id=?',[$a['user_id']]);
+            if($existing)
+           {
+               DB::exec('update designers set display_name=?,store_slug=?,bio=?,social_links=?,status="approved",creator_rank=coalesce(creator_rank,"Bronze"),rank_override=0,is_featured=0,updated_at=now() where id=?',[$a['display_name'],$a['desired_slug'],$a['bio'],$a['social_links'],$existing['id']]);
+                $designerId=$existing['id'];
+
+           }
+            else
+           {
+               DB::exec('insert into designers (user_id,display_name,store_slug,bio,social_links,status,creator_rank,rank_override,is_featured) values (?,?,?,?,?,?,?,?,?)',[$a['user_id'],$a['display_name'],$a['desired_slug'],$a['bio'],$a['social_links'],'approved','Bronze',0,0]);
+                $designerId=DB::id();
+
+           }
+            DB::exec('update designer_applications set status="approved",denial_reason=null,updated_at=now() where id=?',[$id]);
+            DB::exec('update users set role="designer",updated_at=now() where id=?',[$a['user_id']]);
+            $this->log('approved_designer_application','designer_application',$id,['user_id'=>$a['user_id'],'designer_id'=>$designerId]);
+            DB::commit();
+            H::flash('success','Designer application approved.');
+
+        }
+        catch(Throwable $e)
+        {
+           DB::rollBack();
+            H::flash('error','Approval failed. Please try again.');
+
+        }
+
+    }
+    private function denyApplication(int $id, string $reason, string $notes=''): void
+    {
+        $a=$this->applicationById($id);
+        if(!$a)
+        {
+           H::flash('error','Application not found.');
+            return;
+
+        }
+        if(mb_strlen(trim($reason))<5)
+        {
+           H::flash('error','Denial reason must be at least 5 characters.');
+            return;
+
+        }
+        DB::exec('update designer_applications set status="denied",denial_reason=?,admin_notes=?,updated_at=now() where id=?',[$reason,$notes,$id]);
+        $this->log('denied_designer_application','designer_application',$id,['user_id'=>$a['user_id']]);
+        H::flash('success','Designer application denied.');
+
+    }
+    public function home()
+    {
+        $this->gate();
+        H::view('admin/home',['s'=>DB::row('select (select count(*) from users) users,(select count(*) from designers) designers,(select count(*) from designer_applications where status="pending") apps,(select count(*) from products where status="pending_review") products,(select count(*) from orders) orders,(select coalesce(sum(total),0) from orders) gross,(select coalesce(sum(commission_amount),0) from platform_commissions) commission')]);
+
+    }
+    public function users()
+    {
+        $this->gate();
+        if($_POST) DB::exec('update users set status=? where id=?',[$_POST['status'],$_POST['id']]);
+        H::view('admin/table',['title'=>'Users','rows'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
+
+    }
+    public function applications($id=null)
+    {
+        $this->gate();
+        if($_POST)
+        {
+           $id=(int)($_POST['id']??0);
+            if(($_POST['action']??'')==='approve') $this->approveApplication($id);
+            if(($_POST['action']??'')==='deny') $this->denyApplication($id, trim($_POST['reason']??''), trim($_POST['admin_notes']??''));
+            H::redirect('/admin/applications');
+
+        }
+        if($id)
+        {
+           H::view('admin/application_detail',['app'=>$this->applicationById($id)??H::abort(404)]);
+            return;
+
+        }
+        $status=$_GET['status']??'pending';
+        $where='';
+        $params=[];
+        if(in_array($status,['pending','approved','denied'],true))
+        {
+           $where=' where da.status=?';
+            $params[]=$status;
+
+        }
+        H::view('admin/applications',['status'=>$status,'apps'=>DB::rows('select da.*,u.name user_name,u.email user_email from designer_applications da join users u on u.id=da.user_id'.$where.' order by field(da.status,"pending","approved","denied"), da.created_at desc',$params)]);
+
+    }
+    public function designers()
+    {
+        $this->gate();
+        if($_POST) DB::exec('update designers set creator_rank=? where id=?',[$_POST['creator_rank'],$_POST['id']]);
+        H::view('admin/designers',['designers'=>DB::rows('select d.*,u.email from designers d join users u on u.id=d.user_id')]);
+
+    }
+    public function products()
+    {
+        $this->gate();
+        if($_POST)
+        {
+           $this->moderateProduct((int)$_POST['id'],$_POST['action']??'',trim($_POST['reason']??''));
+            H::redirect('/admin/products');
+
+        }
+        $status=$_GET['status']??'pending_review';
+        $allowed=['pending_review','approved','rejected','disabled'];
+        $where='';
+        $params=[];
+        if(in_array($status,$allowed,true))
+        {
+            $where=' where p.status=?';
+            $params[]=$status;
+
+        }
+        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);
+
+    }
+    private function moderateProduct(int $id, string $action, string $reason=''): void
+    {
+        $status=['approve'=>'approved','reject'=>'rejected','disable'=>'disabled'][$action]??'';
+        if(!$status)
+        {
+           H::flash('error','Invalid product action.');
+            return;
+
+        }
+        if($status==='rejected' && mb_strlen($reason)<5)
+        {
+           H::flash('error','Rejection Reason is required.');
+            return;
+
+        }
+        DB::exec('update products set status=?, rejection_reason=?, updated_at=now() where id=?',[$status,$status==='rejected'?$reason:null,$id]);
+        $this->log($status.'_product','product',$id);
+        H::flash('success','Product status updated.');
+
+    }
+    public function productDetail($id)
+    {
+        $this->gate();
+        if($_POST)
+        {
+           $this->moderateProduct((int)$id,$_POST['action']??'',trim($_POST['reason']??''));
+            H::redirect('/admin/products/'.(int)$id);
+
+        }
+        $p=DB::row('select p.*,d.display_name,d.store_slug,d.user_id,u.email designer_email,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id left join categories c on c.id=p.category_id where p.id=?',[$id])??H::abort(404);
+        H::view('admin/product_detail',['p'=>$p,'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id])]);
+
+    }
+    public function categories()
+    {
+        $this->gate();
+        if($_POST) DB::exec('insert into categories (name,slug,description,is_active) values (?,?,?,1) on duplicate key update name=values(name),description=values(description),is_active=values(is_active)',[$_POST['name'],H::slug($_POST['slug']),$_POST['description']]);
+        H::view('admin/categories',['cats'=>DB::rows('select * from categories')]);
+
+    }
+    public function orders()
+    {
+        $this->gate();
+        H::view('admin/orders',['orders'=>DB::rows('select o.*,u.email buyer_email from orders o join users u on u.id=o.user_id order by o.created_at desc')]);
+
+    }
+    public function orderDetail($id)
+    {
+        $this->gate();
+        $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404);
+        $items=DB::rows('select oi.*,p.title,d.display_name designer_name,u.email designer_email,se.seller_earning,pc.commission_amount from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id where oi.order_id=?',[$order['id']]);
+        H::view('admin/order_detail',['order'=>$order,'items'=>$items]);
+
+    }
+    public function referrals()
+    {
+        $this->gate();
+        H::view('admin/table',['title'=>'Referrals','rows'=>DB::rows('select * from referrals order by created_at desc')]);
+
+    }
+    public function homepage()
+    {
+        $this->gate();
+        if($_POST)
+        {
+           DB::exec('insert into homepage_features (feature_type,feature_id,sort_order,is_active) values (?,?,?,1)',[$_POST['feature_type'],$_POST['feature_id'],$_POST['sort_order']]);
+
+        }
+        H::view('admin/homepage',['features'=>DB::rows('select * from homepage_features')]);
+
+    }
+    public function ads()
+    {
+        $this->gate();
+        if($_POST) DB::exec('insert into ads (product_id,designer_id,placement,start_date,end_date,status) values (?,?,?,?,?,?)',[$_POST['product_id'],$_POST['designer_id'],$_POST['placement'],$_POST['start_date'],$_POST['end_date'],$_POST['status']]);
+        H::view('admin/ads',['ads'=>DB::rows('select * from ads')]);
+
+    }
+
 }

@@ -1,1 +1,48 @@
-<h1>Ads / Sponsored Listings Skeleton</h1><form method="post" class="card form"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input name="product_id" placeholder="Product ID"><input name="designer_id" placeholder="Designer ID"><input name="placement" placeholder="Placement"><input type="date" name="start_date"><input type="date" name="end_date"><select name="status"><option>draft</option><option>active</option><option>paused</option><option>ended</option></select><button>Save ad</button></form><table><tr><th>Product</th><th>Designer</th><th>Placement</th><th>Status</th><th>Impressions</th><th>Clicks</th></tr><?php foreach($ads as $a):?><tr><td><?=$a['product_id']?></td><td><?=$a['designer_id']?></td><td><?=$a['placement']?></td><td><?=$a['status']?></td><td><?=$a['impressions']?></td><td><?=$a['clicks']?></td></tr><?php endforeach;?></table>
+<h1>Ads / Sponsored Listings Skeleton</h1>
+<form method="post" class="card form">
+    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+    <input name="product_id" placeholder="Product ID">
+    <input name="designer_id" placeholder="Designer ID">
+    <input name="placement" placeholder="Placement">
+    <input type="date" name="start_date">
+    <input type="date" name="end_date">
+    <select name="status">
+    <option>draft</option>
+    <option>active</option>
+    <option>paused</option>
+    <option>ended</option>
+    </select>
+    <button>Save ad</button>
+</form>
+<table>
+    <tr>
+        <th>Product</th>
+        <th>Designer</th>
+        <th>Placement</th>
+        <th>Status</th>
+        <th>Impressions</th>
+        <th>Clicks</th>
+    </tr>
+    <?php foreach($ads as $a):?>
+        <tr>
+           <td>
+           <?=$a['product_id']?>
+           </td>
+           <td>
+           <?=$a['designer_id']?>
+           </td>
+           <td>
+           <?=$a['placement']?>
+           </td>
+           <td>
+           <?=$a['status']?>
+           </td>
+           <td>
+           <?=$a['impressions']?>
+           </td>
+           <td>
+           <?=$a['clicks']?>
+           </td>
+        </tr>
+    <?php endforeach;?>
+</table>

@@ -1,5 +1,77 @@
 <h1>Seller Dashboard → Products</h1>
-<p><a class="btn" href="/seller/product/new">Create Product</a></p>
-<nav class="tabs"><?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Approved','rejected'=>'Rejected','disabled'=>'Disabled'] as $key=>$label): ?><a class="<?=($status??'all')===$key?'active':''?>" href="/seller/products<?=$key==='all'?'':'?status='.$key?>"><?=H::e($label)?></a><?php endforeach; ?></nav>
-<?php if(!$products): ?><div class="card empty"><h2>No products yet.</h2><p>Create your first product draft and submit it for review when it is ready.</p><a class="btn" href="/seller/product/new">Create Product</a></div><?php else: ?>
-<table><tr><th>Thumbnail</th><th>Product Name</th><th>Status</th><th>Price</th><th>Category</th><th>Updated Date</th><th>Actions</th></tr><?php foreach($products as $p):?><tr><td><?php if($p['thumbnail']):?><img class="thumb" src="<?=H::e($p['thumbnail'])?>" alt="<?=H::e($p['title'])?> thumbnail"><?php else:?><span class="thumb">No image</span><?php endif;?></td><td><?=H::e($p['title'])?><?php if($p['rejection_reason']):?><br><small>Rejected: <?=H::e($p['rejection_reason'])?></small><?php endif;?></td><td><span class="badge"><?=H::e(ucwords(str_replace('_',' ',$p['status'])))?></span></td><td><?=H::money($p['price'])?></td><td><?=H::e($p['category_name']??'Uncategorized')?></td><td><?=H::e($p['updated_at'])?></td><td><a href="/seller/product/<?=$p['id']?>">Edit</a><?php if($p['status']==='approved'):?> <a href="/product/<?=H::e($p['slug'])?>">View Public Page</a><?php endif;?><form method="post" action="/seller/product/<?=$p['id']?>/submit"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Submit For Review</button></form><form method="post" action="/seller/product/<?=$p['id']?>/disable"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Disable Product</button></form></td></tr><?php endforeach;?></table><?php endif; ?>
+<p>
+<a class="btn" href="/seller/product/new">Create Product</a>
+</p>
+<nav class="tabs">
+    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Approved','rejected'=>'Rejected','disabled'=>'Disabled'] as $key=>$label): ?>
+    <a class="<?=($status??'all')===$key?'active':''?>" href="/seller/products<?=$key==='all'?'':'?status='.$key?>">
+    <?=H::e($label)?>
+    </a>
+<?php endforeach; ?>
+</nav>
+<?php if(!$products): ?>
+<div class="card empty">
+    <h2>No products yet.</h2>
+    <p>Create your first product draft and submit it for review when it is ready.</p>
+    <a class="btn" href="/seller/product/new">Create Product</a>
+</div>
+<?php else: ?>
+    <table>
+        <tr>
+           <th>Thumbnail</th>
+           <th>Product Name</th>
+           <th>Status</th>
+           <th>Price</th>
+           <th>Category</th>
+           <th>Updated Date</th>
+           <th>Actions</th>
+        </tr>
+        <?php foreach($products as $p):?>
+           <tr>
+               <td>
+               <?php if($p['thumbnail']):?>
+                   <img class="thumb" src="<?=H::e($p['thumbnail'])?>" alt="<?=H::e($p['title'])?> thumbnail">
+               <?php else:?>
+                   <span class="thumb">No image</span>
+               <?php endif;?>
+               </td>
+               <td>
+               <?=H::e($p['title'])?>
+               <?php if($p['rejection_reason']):?>
+                   <br>
+                   <small>Rejected: <?=H::e($p['rejection_reason'])?>
+                   </small>
+               <?php endif;?>
+               </td>
+               <td>
+               <span class="badge">
+               <?=H::e(ucwords(str_replace('_',' ',$p['status'])))?>
+               </span>
+               </td>
+               <td>
+               <?=H::money($p['price'])?>
+               </td>
+               <td>
+               <?=H::e($p['category_name']??'Uncategorized')?>
+               </td>
+               <td>
+               <?=H::e($p['updated_at'])?>
+               </td>
+               <td>
+               <a href="/seller/product/<?=$p['id']?>">Edit</a>
+               <?php if($p['status']==='approved'):?>
+                   <a href="/product/<?=H::e($p['slug'])?>">View Public Page</a>
+               <?php endif;?>
+               <form method="post" action="/seller/product/<?=$p['id']?>/submit">
+                   <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                   <button>Submit For Review</button>
+               </form>
+               <form method="post" action="/seller/product/<?=$p['id']?>/disable">
+                   <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                   <button>Disable Product</button>
+               </form>
+               </td>
+           </tr>
+        <?php endforeach;?>
+    </table>
+<?php endif; ?>
