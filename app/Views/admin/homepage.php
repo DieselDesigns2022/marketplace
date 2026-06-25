@@ -1,1 +1,17 @@
-<h1>Homepage Management</h1><form method="post" class="card form"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><select name="feature_type"><option>product</option><option>designer</option><option>category</option></select><input name="feature_id" placeholder="ID"><input name="sort_order" value="0"><button>Add feature</button></form><?php foreach($features as $f):?><p><?=$f['feature_type']?> #<?=$f['feature_id']?></p><?php endforeach;?>
+<h1>Homepage Management</h1>
+<form method="post" class="card form">
+    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+    <select name="feature_type">
+    <option>product</option>
+    <option>designer</option>
+    <option>category</option>
+    </select>
+    <input name="feature_id" placeholder="ID">
+    <input name="sort_order" value="0">
+    <button>Add feature</button>
+</form>
+<?php foreach($features as $f):?>
+    <p>
+    <?=$f['feature_type']?> #<?=$f['feature_id']?>
+    </p>
+<?php endforeach;?>
