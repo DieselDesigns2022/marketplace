@@ -1,1 +1,96 @@
-<h1><?= $p?'Edit':'Create' ?> Product</h1><?php foreach($errors??[] as $error):?><div class="notice error"><?=H::e($error)?></div><?php endforeach;?><form method="post" enctype="multipart/form-data" class="form card"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><h2>Basic Information</h2><label>Product Name<input name="title" required value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source></label><label>Product Slug<input name="slug" required value="<?=H::e($_POST['slug']??$p['slug']??'') ?>" data-slug-target></label><label>Short Description<textarea name="short_description"><?=H::e($_POST['short_description']??$p['short_description']??'')?></textarea></label><label>Full Description<textarea name="description" required><?=H::e($_POST['description']??$p['description']??'')?></textarea></label><h2>Product Preview Images</h2><?php foreach($images as $img):?><div class="inline"><img class="thumb" src="<?=H::e($img['image_path'])?>" alt="<?=H::e($img['alt_text']??'Product preview')?>"><span><?=H::e($img['alt_text']??'')?></span><button name="delete_image" value="<?=$img['id']?>">Delete image</button></div><?php endforeach;?><label>Upload preview images<input type="file" name="preview_images[]" multiple accept="image/*" data-preview-images></label><div data-preview-alt-fields><p class="muted">Select preview images to add separate alt text for each image.</p></div><h2>Product Files</h2><?php foreach($files as $file):?><div class="inline"><span><?=H::e($file['original_name'])?> (<?=number_format(($file['file_size']??0)/1024,1)?> KB)</span><button name="delete_file" value="<?=$file['id']?>">Delete file</button></div><?php endforeach;?><label>Protected downloadable files<input type="file" name="product_files[]" multiple></label><h2>Pricing</h2><label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>"></label><label><input type="checkbox" name="commercial_license_enabled" <?=(!isset($p)||$p['commercial_license_enabled'])?'checked':''?>> Enable Commercial License</label><label>Commercial License Price<input type="number" step="0.01" name="commercial_license_price" value="<?=H::e($_POST['commercial_license_price']??$p['commercial_license_price']??'5.00')?>"></label><label><input type="checkbox" name="pod_allowed" <?=($p['pod_allowed']??false)?'checked':''?>> POD Usage Allowed</label><p>Digital Resale: always prohibited.</p><h2>Product Details</h2><label>Category<select name="category_id"><option value="">None</option><?php foreach($cats as $c):?><option value="<?=$c['id']?>" <?=(string)($p['category_id']??'')===(string)$c['id']?'selected':''?>><?=H::e($c['name'])?></option><?php endforeach;?></select></label><label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>"></label><fieldset><legend>File Types</legend><?php $selected=$_POST['file_types']??array_filter(array_map('trim',explode(',',$p['file_types']??''))); foreach(['SVG','PNG','PSD','Canva Template','Procreate Brush','Seamless Pattern','Font'] as $ft):?><label><input type="checkbox" name="file_types[]" value="<?=$ft?>" <?=in_array($ft,$selected,true)?'checked':''?>> <?=$ft?></label><?php endforeach;?></fieldset><label>AI Disclosure<select name="ai_disclosure" required><?php foreach(['No AI Used','AI Assisted','AI Generated'] as $ai):?><option <?=($_POST['ai_disclosure']??$p['ai_disclosure']??'')===$ai?'selected':''?>><?=$ai?></option><?php endforeach;?></select></label><h2>SEO Section</h2><label>SEO Title<input name="seo_title" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>"></label><label>SEO Description<textarea name="seo_description"><?=H::e($_POST['seo_description']??$p['seo_description']??'')?></textarea></label><button name="action" value="draft">Save Draft</button><button class="btn" name="action" value="review">Submit For Review</button></form>
+<h1>
+<?= $p?'Edit':'Create' ?> Product</h1>
+<?php foreach($errors??[] as $error):?>
+    <div class="notice error">
+        <?=H::e($error)?>
+    </div>
+<?php endforeach;?>
+<form method="post" enctype="multipart/form-data" class="form card">
+    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+    <h2>Basic Information</h2>
+    <label>Product Name<input name="title" required value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source>
+    </label>
+    <label>Product Slug<input name="slug" required value="<?=H::e($_POST['slug']??$p['slug']??'') ?>" data-slug-target>
+    </label>
+    <label>Short Description<textarea name="short_description">
+    <?=H::e($_POST['short_description']??$p['short_description']??'')?>
+    </textarea>
+    </label>
+    <label>Full Description<textarea name="description" required>
+    <?=H::e($_POST['description']??$p['description']??'')?>
+    </textarea>
+    </label>
+    <h2>Product Preview Images</h2>
+    <?php foreach($images as $img):?>
+        <div class="inline">
+           <img class="thumb" src="<?=H::e($img['image_path'])?>" alt="<?=H::e($img['alt_text']??'Product preview')?>">
+           <span>
+           <?=H::e($img['alt_text']??'')?>
+           </span>
+           <button name="delete_image" value="<?=$img['id']?>">Delete image</button>
+        </div>
+    <?php endforeach;?>
+    <label>Upload preview images<input type="file" name="preview_images[]" multiple accept="image/*" data-preview-images>
+    </label>
+    <div data-preview-alt-fields>
+        <p class="muted">Select preview images to add separate alt text for each image.</p>
+    </div>
+    <h2>Product Files</h2>
+    <?php foreach($files as $file):?>
+        <div class="inline">
+           <span>
+           <?=H::e($file['original_name'])?> (<?=number_format(($file['file_size']??0)/1024,1)?> KB)</span>
+           <button name="delete_file" value="<?=$file['id']?>">Delete file</button>
+        </div>
+    <?php endforeach;?>
+    <label>Protected downloadable files<input type="file" name="product_files[]" multiple>
+    </label>
+    <h2>Pricing</h2>
+    <label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>">
+    </label>
+    <label>
+    <input type="checkbox" name="commercial_license_enabled" <?=(!isset($p)||$p['commercial_license_enabled'])?'checked':''?>> Enable Commercial License</label>
+    <label>Commercial License Price<input type="number" step="0.01" name="commercial_license_price" value="<?=H::e($_POST['commercial_license_price']??$p['commercial_license_price']??'5.00')?>">
+    </label>
+    <label>
+    <input type="checkbox" name="pod_allowed" <?=($p['pod_allowed']??false)?'checked':''?>> POD Usage Allowed</label>
+    <p>Digital Resale: always prohibited.</p>
+    <h2>Product Details</h2>
+    <label>Category<select name="category_id">
+    <option value="">None</option>
+    <?php foreach($cats as $c):?>
+        <option value="<?=$c['id']?>" <?=(string)($p['category_id']??'')===(string)$c['id']?'selected':''?>>
+        <?=H::e($c['name'])?>
+        </option>
+    <?php endforeach;?>
+    </select>
+    </label>
+    <label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>">
+    </label>
+    <fieldset>
+    <legend>File Types</legend>
+    <?php $selected=$_POST['file_types']??array_filter(array_map('trim',explode(',',$p['file_types']??''))); foreach(['SVG','PNG','PSD','Canva Template','Procreate Brush','Seamless Pattern','Font'] as $ft):?>
+    <label>
+    <input type="checkbox" name="file_types[]" value="<?=$ft?>" <?=in_array($ft,$selected,true)?'checked':''?>>
+    <?=$ft?>
+    </label>
+<?php endforeach;?>
+</fieldset>
+<label>AI Disclosure<select name="ai_disclosure" required>
+<?php foreach(['No AI Used','AI Assisted','AI Generated'] as $ai):?>
+    <option <?=($_POST['ai_disclosure']??$p['ai_disclosure']??'')===$ai?'selected':''?>>
+    <?=$ai?>
+    </option>
+<?php endforeach;?>
+</select>
+</label>
+<h2>SEO Section</h2>
+<label>SEO Title<input name="seo_title" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>">
+</label>
+<label>SEO Description<textarea name="seo_description">
+<?=H::e($_POST['seo_description']??$p['seo_description']??'')?>
+</textarea>
+</label>
+<button name="action" value="draft">Save Draft</button>
+<button class="btn" name="action" value="review">Submit For Review</button>
+</form>
