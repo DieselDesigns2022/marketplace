@@ -4,6 +4,14 @@
 
 Digital Design Marketplace is a custom PHP marketplace application for selling digital design products such as SVG cut files, fonts, and Canva templates. The current implementation includes public browsing, buyer accounts, designer applications, seller storefronts, product management, cart checkout, orders, protected downloads, and admin moderation.
 
+## Current Project Status
+
+- Development Status: active documentation and marketplace feature development.
+- Current Phase: Phase 5 — Project Documentation.
+- Default Branch: `main`.
+- Source of Truth: GitHub.
+- Deployment Target: Ubuntu VPS at `https://marketplace.dieseldesigns.co`.
+
 ## Marketplace Purpose
 
 The long-term product vision is a curated digital design marketplace where independent designers can apply to sell, manage branded storefronts, upload downloadable products, and earn revenue while buyers discover, purchase, wishlist, follow, and download digital products.
@@ -11,6 +19,8 @@ The long-term product vision is a curated digital design marketplace where indep
 Features from the original blueprint that are not implemented in the current codebase are treated as **Planned / Future Phase** items and are not documented as currently working features.
 
 ## Current Implementation Status
+
+These features represent the current implemented and tested functionality in the codebase.
 
 ### Implemented now
 
@@ -32,34 +42,37 @@ Features from the original blueprint that are not implemented in the current cod
 - Production-grade notification and email flows.
 - More complete ad campaign management and analytics.
 
+## Project Principles
+
+- GitHub is the source of truth.
+- VPS is used only for deployment and testing.
+- All work is completed on feature branches.
+- Every change requires a Pull Request.
+- Every Pull Request is manually reviewed before merging.
+- Production changes require backups before deployment.
+
 ## Quick Start
 
-For local or VPS development, use GitHub as the source of truth and work from a dedicated branch.
+To run the project in a local or VPS environment:
 
-```bash
-git branch --show-current
-git status --short
-```
-
-Recommended development flow:
-
-1. Confirm the current branch and scope.
-2. Create backups before each phase.
-3. Make focused changes only within the approved scope.
-4. Run the required checks for the files changed.
-5. Commit changes and open a PR only after the required review/approval workflow is satisfied.
-6. Deploy to the VPS only after merge and testing.
+1. Clone the repository from GitHub.
+2. Configure `.env` with the required database connection settings and environment values.
+3. Import `database/schema.sql` into MariaDB.
+4. Configure Nginx so the document root points to the project `public/` directory.
+5. Ensure public upload folders and protected upload folders exist and are writable by the web server/PHP runtime user.
+6. Launch the application through the configured web server.
+7. Verify the homepage, login/register pages, browse page, cart, dashboards, and protected download workflow as appropriate for the environment.
 
 ## Technology Stack
 
-- PHP 8.3 target runtime.
-- MariaDB database.
-- Nginx web server.
+- PHP 8.3.
+- MariaDB.
+- Nginx.
 - Ubuntu VPS.
-- Custom PHP MVC-style architecture.
-- PDO prepared statements.
-- Session-based authentication.
-- Server-rendered PHP views.
+- Server-rendered PHP.
+- PDO.
+- Session authentication.
+- Custom MVC-style application structure.
 - Plain CSS and JavaScript assets.
 
 ## Server / VPS Info
@@ -75,27 +88,77 @@ Recommended development flow:
 
 ```text
 app/
-  Controllers/       Request handlers for public, auth, buyer, seller, cart, and admin flows
-  Core/              Router, Database, and Helpers classes
-  Views/             Layout and page templates
+    Controllers/
+    Core/
+    Views/
+
 assets/
-  css/               Application styles
-  js/                Application JavaScript
+    css/
+    js/
+
 database/
-  schema.sql         Current baseline schema
-  migrations/        Phase migration files
+    schema.sql
+    migrations/
+
+docs/
+
 public/
-  index.php          Front controller and route registration
-docs/                Project documentation
 ```
+
+### Important folders
+
+- `app/`: Application source for controllers, core routing/database/helper classes, and server-rendered views.
+- `assets/`: Public CSS and JavaScript assets used by the application.
+- `database/`: Current baseline schema and phase migration files.
+- `docs/`: Project documentation for architecture, database, deployment, testing, routes, security, SEO, workflows, and troubleshooting.
+- `public/`: Web document root and front controller entrypoint.
 
 ## Main Workflows
 
-- Visitor workflow: browse marketplace, view products, view stores, and read static pages.
-- Buyer workflow: register/login, wishlist products, follow stores, add products to cart, checkout, view orders, and download purchased files.
-- Seller workflow: apply to sell, wait for approval, manage storefront, create/edit products, upload previews/files, submit products for review, and view sales/rank/referrals.
-- Admin workflow: approve applications, moderate products, manage categories/designers/users/homepage/ads, and review orders/referrals.
-- Deployment workflow: develop on a branch, test, open PR, review, merge, pull to VPS, run migrations, and verify smoke tests.
+### Visitor Workflow
+
+- Visit the homepage.
+- Browse products.
+- View categories.
+- View product detail pages.
+- View designer store pages.
+- Read public static pages.
+- Visit the sell landing page.
+
+### Buyer Workflow
+
+- Register or log in.
+- Browse products.
+- Wishlist products.
+- Follow designers.
+- Add products to cart.
+- Purchase products through checkout.
+- Download purchases.
+- View order history.
+- Manage account details.
+
+### Seller Workflow
+
+- Submit a designer application.
+- Wait for admin approval.
+- Manage storefront settings.
+- Create and edit products.
+- Upload preview images and protected product files.
+- Submit products for admin review.
+- View sales.
+- Review referrals and creator rank.
+
+### Admin Workflow
+
+- Review marketplace dashboard.
+- Manage users.
+- Approve or deny designer applications.
+- Manage designers.
+- Moderate products.
+- Manage categories.
+- Review orders and order details.
+- Manage homepage features and ads.
+- Review referrals.
 
 ## Documentation Index
 
@@ -112,17 +175,3 @@ docs/                Project documentation
 - [Development Guide](DEVELOPMENT.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
-
-## Current Completed Phases
-
-- Original MVP completed 2026-06-22.
-- Phase 1 — Designer Applications.
-- Phase 2 — Storefront Management.
-- Phase 3 — Product Management.
-- Phase 4 — Shopping Cart, Orders & Downloads / Marketplace Polish.
-- Phase 4.5 — Codebase Standardization.
-- Phase 5 — Project Documentation.
-
-## Future Roadmap Summary
-
-Future phases should continue the blueprint carefully, marking unimplemented blueprint ideas as planned until code exists. Likely roadmap areas include production payments, payout automation, deeper SEO, advanced discovery, notifications, reviews, analytics, ads, operations hardening, and continued documentation maintenance.
