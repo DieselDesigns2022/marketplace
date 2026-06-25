@@ -7,7 +7,7 @@ class PublicController
 {
     public function home()
     {
-        H::view('public/home',['cats'=>DB::rows('select * from categories where is_active=1 order by sort_order,name limit 8'),'products'=>DB::rows("select p.*,d.display_name,d.store_slug from products p join designers d on d.id=p.designer_id where p.status='approved' and p.is_featured=1 order by p.updated_at desc limit 8"),'designers'=>DB::rows('select * from designers where status="approved" and is_featured=1 limit 6')]);
+        H::view('public/home',['cats'=>DB::rows('select * from categories where is_active=1 order by sort_order,name limit 8'),'products'=>DB::rows("select p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id where p.status='approved' and p.is_featured=1 order by p.updated_at desc limit 8"),'designers'=>DB::rows('select * from designers where status="approved" and is_featured=1 limit 6')]);
 
     }
     public function browse()
@@ -47,7 +47,12 @@ class PublicController
         }
         $sort=['popular'=>'p.sales_count desc','price_asc'=>'p.price asc','price_desc'=>'p.price desc'];
         $order=$sort[$_GET['sort']??'']??'p.created_at desc';
-        H::view('public/browse',['products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where '.implode(' and ',$w).' order by '.$order,$q),'cats'=>DB::rows('select * from categories where is_active=1')]);
+        H::view('public/browse',['products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where '.implode(' and ',$w).' order by '.$order,$q),'cats'=>DB::rows('select * from categories where is_active=1')]);
+
+    }
+    public function sell()
+    {
+        H::view('public/sell',['meta'=>['title'=>'Sell Digital Designs','description'=>'Apply to sell digital design products from your own storefront.']]);
 
     }
     public function category($slug)
@@ -64,13 +69,13 @@ class PublicController
         $description=$p['seo_description'] ?: ($p['short_description'] ?: mb_substr(strip_tags($p['description']),0,160));
         $canonical=($_ENV['APP_URL']??'').'/product/'.$p['slug'];
         $owned=H::user()?(bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where o.user_id=? and oi.product_id=? and o.status in ("paid","completed") limit 1',[H::user()['id'],$p['id']]):false;
-        H::view('public/product',['p'=>$p,'owned'=>$owned,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$p['id']]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select id,title,slug,price from products where designer_id=? and status="approved" and id<>? order by updated_at desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select id,title,slug,price from products where category_id <=> ? and status="approved" and id<>? order by updated_at desc limit 4',[$p['category_id'],$p['id']]),'meta'=>['title'=>$title,'description'=>$description,'canonical'=>$canonical,'og_title'=>$title,'og_description'=>$description]]);
+        H::view('public/product',['p'=>$p,'owned'=>$owned,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$p['id']]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select p.id,p.title,p.slug,p.price,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id where p.designer_id=? and p.status="approved" and p.id<>? order by p.updated_at desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select p.id,p.title,p.slug,p.price,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id where p.category_id <=> ? and p.status="approved" and p.id<>? order by p.updated_at desc limit 4',[$p['category_id'],$p['id']]),'meta'=>['title'=>$title,'description'=>$description,'canonical'=>$canonical,'og_title'=>$title,'og_description'=>$description]]);
 
     }
     public function store($slug)
     {
         $d=DB::row('select * from designers where store_slug=? and status="approved"',[$slug])??H::abort(404);
-        $products=DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" order by p.created_at desc',[$d['id']]);
+        $products=DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" order by p.created_at desc',[$d['id']]);
         $followerCount=DB::row('select count(*) c from follows where designer_id=?',[$d['id']])['c']??0;
         DB::exec('update designers set follower_count=? where id=?',[$followerCount,$d['id']]);
         $isFollowing=false;
