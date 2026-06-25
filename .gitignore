@@ -1,0 +1,27 @@
+# Environment
+.env
+.env.*
+
+# Runtime uploads
+public/uploads/
+storage/protected_uploads/
+
+# Logs & cache
+*.log
+storage/logs/
+storage/cache/
+storage/sessions/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Composer
+/vendor/
+
+# Node
+/node_modules/
+npm-debug.log*
+yarn-error.log*
