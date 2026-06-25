@@ -1,1 +1,15 @@
-<h1>Credits & Referrals</h1><p>Your buyer referral link: <code>/register?ref=<?=H::e(H::user()['id'])?></code></p><p>Credit balance: <?=H::money($credits['balance']??0)?></p><h2>Transactions</h2><?php foreach($tx as $t):?><p><?=$t['type']?> <?=H::money($t['amount'])?> — <?=$t['description']?></p><?php endforeach;?><h2>Referred buyers</h2><p class="muted">Skeleton tracking placeholder.</p>
+<h1>Credits & Referrals</h1>
+<p>Your buyer referral link: <code>/register?ref=<?=H::e(H::user()['id'])?>
+</code>
+</p>
+<p>Credit balance: <?=H::money($credits['balance']??0)?>
+</p>
+<h2>Transactions</h2>
+<?php foreach($tx as $t):?>
+    <p>
+    <?=$t['type']?>
+    <?=H::money($t['amount'])?> — <?=$t['description']?>
+    </p>
+<?php endforeach;?>
+<h2>Referred buyers</h2>
+<p class="muted">Skeleton tracking placeholder.</p>

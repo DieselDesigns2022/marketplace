@@ -1,1 +1,7 @@
-<h1>Account settings</h1><form method="post" class="card form"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><label>Name<input name="name" value="<?=H::e(H::user()['name'])?>"></label><button>Save</button></form>
+<h1>Account settings</h1>
+<form method="post" class="card form">
+    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+    <label>Name<input name="name" value="<?=H::e(H::user()['name'])?>">
+    </label>
+    <button>Save</button>
+</form>

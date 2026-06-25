@@ -1,1 +1,33 @@
-<h1>Sales</h1><table><tr><th>Product</th><th>Buyer</th><th>Gross</th><th>Commission</th><th>Earning</th><th>Date</th></tr><?php foreach($sales as $s):?><tr><td><?=$s['title']?></td><td><?=$s['email']?></td><td><?=H::money($s['gross_sale'])?></td><td><?=H::money($s['marketplace_commission'])?></td><td><?=H::money($s['seller_earning'])?></td><td><?=$s['created_at']?></td></tr><?php endforeach;?></table>
+<h1>Sales</h1>
+<table>
+    <tr>
+        <th>Product</th>
+        <th>Buyer</th>
+        <th>Gross</th>
+        <th>Commission</th>
+        <th>Earning</th>
+        <th>Date</th>
+    </tr>
+    <?php foreach($sales as $s):?>
+        <tr>
+           <td>
+           <?=$s['title']?>
+           </td>
+           <td>
+           <?=$s['email']?>
+           </td>
+           <td>
+           <?=H::money($s['gross_sale'])?>
+           </td>
+           <td>
+           <?=H::money($s['marketplace_commission'])?>
+           </td>
+           <td>
+           <?=H::money($s['seller_earning'])?>
+           </td>
+           <td>
+           <?=$s['created_at']?>
+           </td>
+        </tr>
+    <?php endforeach;?>
+</table>

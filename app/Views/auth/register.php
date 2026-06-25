@@ -1,1 +1,11 @@
-<h1>Create account</h1><form method="post" class="card form"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><label>Name<input name="name" required></label><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" required></label><button class="btn">Register</button></form>
+<h1>Create account</h1>
+<form method="post" class="card form">
+    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+    <label>Name<input name="name" required>
+    </label>
+    <label>Email<input type="email" name="email" required>
+    </label>
+    <label>Password<input type="password" name="password" required>
+    </label>
+    <button class="btn">Register</button>
+</form>
