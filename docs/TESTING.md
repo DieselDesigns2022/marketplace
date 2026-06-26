@@ -1,0 +1,106 @@
+# Testing
+
+## Public visitor testing
+
+- Open homepage.
+- Open browse page.
+- Open category pages.
+- Open approved product pages.
+- Open designer store pages.
+- Open sell and static pages.
+- Confirm public pages do not expose draft/rejected/disabled products.
+
+## Buyer testing
+
+- Register a buyer.
+- Log in and out.
+- Update account details.
+- Wishlist/unwishlist an approved product.
+- Follow/unfollow a designer store.
+- View buyer dashboard, wishlist, following, referrals, purchases, and order detail.
+
+## Seller testing
+
+- Submit designer application.
+- Verify pending application state.
+- Approve application as admin.
+- Access seller dashboard.
+- Edit storefront settings.
+- Create/edit products.
+- Upload preview images.
+- Upload protected product files.
+- Submit products for review.
+- View sales, referrals, and rank pages.
+
+## Admin testing
+
+- Log in as admin.
+- Review admin dashboard.
+- Approve/deny applications.
+- Moderate products.
+- Manage categories.
+- Review designers/users.
+- Review orders/order detail.
+- Review homepage features and ads pages.
+
+## Database verification
+
+- Confirm migrations apply cleanly.
+- Confirm expected tables and columns exist.
+- Confirm status fields contain expected values.
+- Confirm order checkout creates order, order item, seller earning, and platform commission rows.
+- Confirm downloads table logs download attempts.
+
+## Upload testing
+
+- Test accepted preview image upload.
+- Test rejected invalid upload.
+- Test replacing/deleting previews where supported.
+- Test protected file upload.
+- Confirm protected files are not directly public.
+
+## Checkout/download testing
+
+- Add product to cart.
+- Switch license type where commercial license is enabled.
+- Checkout successfully.
+- Confirm cart clears after checkout.
+- Confirm order appears in purchases.
+- Confirm authorized download works.
+- Confirm unauthorized user cannot download the file.
+
+## Mobile/responsive testing
+
+- Check homepage, browse, product, store, cart, checkout, dashboards, and admin pages at mobile widths.
+- Confirm navigation remains usable.
+- Confirm forms remain readable and submit buttons are accessible.
+
+## Regression testing
+
+Before merge, smoke test:
+
+- Public home/browse/product/store.
+- Register/login/logout.
+- Buyer dashboard.
+- Seller dashboard.
+- Admin dashboard.
+- Cart and checkout.
+- Purchased download.
+
+## Formatting-only PR testing rules
+
+- Confirm no intentional behavior changes.
+- Run syntax checks for touched PHP files.
+- Use `git diff --check`.
+- Manually smoke test any area affected by reformatted templates/controllers.
+
+## Required smoke test before merge
+
+At minimum before merge:
+
+```bash
+git diff --check
+php -l <modified-php-file>
+```
+
+Then manually verify public, buyer, seller, admin, cart, checkout, and download workflows on the appropriate test target.
