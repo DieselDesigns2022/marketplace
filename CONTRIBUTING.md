@@ -47,6 +47,24 @@
 4. Push the branch to GitHub.
 5. Open a PR against the intended target branch only after review/approval workflow requirements are satisfied.
 
+## Developer Workflow
+
+1. Confirm current branch and status.
+2. Create verified backups before phase work begins.
+3. Create or switch to the correct feature/phase branch.
+4. Make only the requested changes.
+5. Run required checks.
+6. Test the changed workflow.
+7. Run regression testing for previous completed phases.
+8. Update all affected documentation.
+9. Request completion review before PR creation.
+10. Review changed files before PR creation.
+11. Create PR only after approval.
+12. Merge only after review and testing.
+13. Pull merged branch/main onto VPS.
+14. Run final smoke tests.
+15. Confirm documentation and changelog/phase history are current.
+
 ## PR workflow
 
 - Summarize what changed.
@@ -78,6 +96,49 @@ Before each phase:
 4. Store backups outside committed source control.
 5. Verify backups exist before beginning phase work.
 
+## Phase Completion Checklist
+
+A phase is NOT complete until all of the following are done:
+
+- Feature implementation complete.
+- Manual testing complete.
+- Regression testing complete.
+- Database migrations verified, if applicable.
+- Upload folders and permissions verified, if applicable.
+- VPS deployment verified.
+- Documentation reviewed and updated.
+- `README.md` updated, if applicable.
+- `CHANGELOG.md` updated, if applicable.
+- `DEVELOPMENT.md` updated, if applicable.
+- `docs/PHASE_HISTORY.md` updated.
+- `docs/DATABASE.md` updated, if applicable.
+- `docs/ROUTES.md` updated, if applicable.
+- `docs/DEPLOYMENT.md` updated, if applicable.
+- `docs/TESTING.md` updated, if applicable.
+- `docs/TROUBLESHOOTING.md` updated, if applicable.
+- Pull Request reviewed.
+- Pull Request merged into the correct target branch.
+- VPS synchronized with GitHub.
+- Final smoke test passed.
+
 ## Documentation requirement
 
-After every completed development phase, documentation must be reviewed and updated before the phase is considered complete. Future phases must update the relevant documentation files when behavior, workflows, routes, database structure, deployment steps, testing expectations, security posture, or troubleshooting guidance changes.
+Documentation is part of the project and is not optional. After every completed development phase, all documentation must be reviewed, and any affected documentation must be updated before the phase is considered complete.
+
+Documentation must reflect the current codebase. It must clearly distinguish implemented functionality from planned or future functionality, and it must not claim planned/future features are currently implemented.
+
+Future phases must update the relevant documentation files when behavior, workflows, routes, database structure, deployment steps, testing expectations, security posture, troubleshooting guidance, phase history, or changelog entries change.
+
+## Lessons Learned
+
+- Verify the current Git branch before making changes.
+- Verify the Pull Request target branch before merging.
+- Formatting-only changes can still introduce regressions.
+- Public pages must be smoke tested after routing/controller/view changes.
+- GitHub is always the source of truth.
+- The VPS is the deployment/testing target.
+- Codex is temporary and may use an internal `work` branch.
+- Never assume Codex's internal branch equals the GitHub branch.
+- Always verify GitHub commits and PR contents before merging.
+- Always create verified backups before beginning phase work.
+- Do not continue a phase if branch state, PR state, or deployment state is unclear.
