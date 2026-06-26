@@ -80,4 +80,4 @@ Before each phase:
 
 ## Documentation requirement
 
-Future phases must update the relevant documentation files when behavior, workflows, routes, database structure, deployment steps, testing expectations, security posture, or troubleshooting guidance changes.
+After every completed development phase, documentation must be reviewed and updated before the phase is considered complete. Future phases must update the relevant documentation files when behavior, workflows, routes, database structure, deployment steps, testing expectations, security posture, or troubleshooting guidance changes.
