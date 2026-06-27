@@ -104,3 +104,7 @@ php -l <modified-php-file>
 ```
 
 Then manually verify public, buyer, seller, admin, cart, checkout, and download workflows on the appropriate test target.
+
+## Phase 6 SEO testing
+
+Run `git diff --check` and `php -l` for modified PHP files. Inspect rendered source for public pages to confirm titles, descriptions, canonicals, Open Graph, Twitter tags, robots meta, and JSON-LD. Verify `/browse` is indexable while filtered browse URLs render `noindex,follow` and canonicalize to `/browse`. Verify `/sitemap.xml` returns valid XML and excludes private routes, filtered browse URLs, and unapproved products/stores. Verify `public/robots.txt` disallows private route groups without blocking public marketplace pages.

@@ -1,14 +1,13 @@
 <h1>Apply to Sell</h1>
 <section class="card application-intro">
-    <h2>Become a designer on [MARKETPLACE NAME TBD]</h2>
+    <h2>Become a designer on Asset Moth</h2>
     <ul>
         <li>Designers can create a public storefront after approval.</li>
         <li>Approved designers can upload digital products for admin review.</li>
-        <li>There is no upfront fee, startup fee, monthly fee, or listing fee.</li>
-        <li>The marketplace only earns a percentage when you make a sale.</li>
+        <li>The application form collects your store name, bio, portfolio, design types, and AI-use disclosure.</li>
         <li>Applications are manually reviewed by an admin.</li>
         <li>Only upload original work or work you have the legal right to sell.</li>
-        <li>AI disclosure will be required on products later.</li>
+        <li>AI disclosure is required on product submissions.</li>
     </ul>
 </section>
 <?php if (!empty($application) && $application['status'] === 'pending'): ?>

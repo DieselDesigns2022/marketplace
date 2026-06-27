@@ -1,16 +1,17 @@
-# Digital Design Marketplace
+# Asset Moth
 
 ## Project Overview
 
-Digital Design Marketplace is a custom PHP marketplace application for selling digital design products such as SVG cut files, fonts, and Canva templates. The current implementation includes public browsing, buyer accounts, designer applications, seller storefronts, product management, cart checkout, orders, protected downloads, and admin moderation.
+Asset Moth is a custom PHP marketplace application for selling digital design products such as SVG cut files, fonts, and Canva templates. The current implementation includes public browsing, buyer accounts, designer applications, seller storefronts, product management, cart checkout, orders, protected downloads, and admin moderation.
 
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 5 — Project Documentation.
+- Current Phase: Phase 6 — SEO Foundation, Indexing & Public Launch Content.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
-- Deployment Target: Ubuntu VPS at `https://marketplace.dieseldesigns.co`.
+- Current build/test URL: `https://marketplace.dieseldesigns.co`.
+- Future planned domain after purchase/migration: `https://assetmoth.com`.
 
 ## Marketplace Purpose
 
@@ -38,7 +39,7 @@ These features represent the current implemented and tested functionality in the
 - Automated payouts and tax/reporting workflows.
 - Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
-- Complete SEO execution, including sitemap and robots automation where not already implemented.
+- Advanced SEO iteration after launch data is available.
 - Production-grade notification and email flows.
 - More complete ad campaign management and analytics.
 
@@ -175,3 +176,7 @@ public/
 - [Development Guide](DEVELOPMENT.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
+
+## Phase 6 SEO launch foundation
+
+The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.

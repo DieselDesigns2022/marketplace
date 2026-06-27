@@ -905,3 +905,7 @@ After every completed development phase, documentation must be reviewed and upda
 - Documentation structure exists for architecture, database, deployment, testing, phase history, routes, security, SEO, Codex workflow, and troubleshooting.
 - Detailed development history now lives in this file.
 - Concise release summaries remain in `CHANGELOG.md`.
+
+## Phase 6 — SEO Foundation, Indexing & Public Launch Content — implemented in branch work
+
+Phase 6 adds public-launch SEO foundations and content: Asset Moth branding, dynamic metadata, canonical URLs, robots meta, browse noindex rules, robots.txt, dynamic sitemap.xml, conservative structured data, improved public copy, internal links, and documentation updates. This entry documents implementation work only and does not claim deployment, merge, Search Console verification, or legal review completion.

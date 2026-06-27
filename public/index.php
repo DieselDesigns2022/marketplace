@@ -10,6 +10,7 @@ use App\Controllers\CartController;
  $router->get('/', [PublicController::class, 'home']);
  $router->get('/browse', [PublicController::class, 'browse']);
  $router->get('/sell', [PublicController::class, 'sell']);
+ $router->get('/sitemap.xml', [PublicController::class, 'sitemap']);
  $router->get('/category/{slug}', [PublicController::class, 'category']);
  $router->get('/product/{slug}', [PublicController::class, 'product']);
  $router->post('/product/{id}/wishlist', [BuyerController::class, 'toggleWishlist']);

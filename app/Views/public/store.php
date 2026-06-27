@@ -7,7 +7,7 @@
     <section class="storefront-hero">
         <div class="storefront-banner" <?php if(!empty($d['banner_path'])):?>style="background-image:url('<?=H::e($d['banner_path'])?>')"<?php endif; ?>>
            <?php if(empty($d['banner_path'])):?>
-               <span>This designer is setting up their shop.</span>
+               <span>Store banner artwork has not been added yet.</span>
            <?php endif;?>
         </div>
         <div class="storefront-profile">
@@ -29,7 +29,7 @@
                <span class="badge rank">
                <?=H::e($d['creator_rank'] ?: 'Bronze')?>
                </span>
-               <span class="badge ok">Verified seller</span>
+               <span class="badge ok">Approved seller</span>
            </div>
            <div class="follow-box">
                <?php if($isOwner): ?>
@@ -83,7 +83,7 @@
 <section class="card" itemprop="about">
     <h2>About this designer</h2>
     <p>
-    <?=nl2br(H::e($d['bio'] ?: 'This designer is setting up their shop.'))?>
+    <?=nl2br(H::e($d['bio'] ?: 'This approved designer has not added a public bio yet. Browse their available digital products below.'))?>
     </p>
     <?php if(!empty($d['website_url'])):?>
         <p>
@@ -104,7 +104,7 @@
     <h2>Featured products</h2>
     <?php if(empty($products)): ?>
     <div class="card empty-state">
-        <p>This designer has not added public products yet.</p>
+        <p>This approved storefront does not have public products right now. Browse other designers while new products are reviewed.</p>
     </div>
 <?php else: ?>
     <?php include app_path('app/Views/public/product_grid.php');?>
@@ -114,7 +114,7 @@
     <h2>Newest products</h2>
     <?php if(empty($products)): ?>
     <div class="card empty-state">
-        <p>No public products yet. Check back soon.</p>
+        <p>This store has no approved products available at the moment.</p>
     </div>
 <?php else: ?>
     <?php include app_path('app/Views/public/product_grid.php');?>
@@ -124,7 +124,7 @@
     <h2>Store categories</h2>
     <?php $cats=[]; foreach($products as $p){ if(!empty($p['category_slug'])) $cats[$p['category_slug']]=$p['category_name']; } if(!$cats): ?>
     <div class="card empty-state">
-        <p>Store categories will appear after this designer publishes products.</p>
+        <p>Store category links appear after products are approved for this designer.</p>
     </div>
 <?php else: ?>
     <div class="grid">

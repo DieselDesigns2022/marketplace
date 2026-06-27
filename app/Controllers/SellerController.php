@@ -183,7 +183,7 @@ class SellerController
            }
 
         }
-        H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, ]);
+        H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, 'meta' => ['title' => 'Apply to Sell | Asset Moth', 'description' => 'Apply for a reviewed designer storefront on Asset Moth.', 'canonical' => H::canonical('/apply'), 'robots' => 'noindex,follow'] ]);
 
     }
     public function home()
