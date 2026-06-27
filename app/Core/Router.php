@@ -22,7 +22,8 @@ class Router
     public function dispatch(string $method,string $path): void
     {
         Helpers::verifyCsrf();
-        foreach ($this->routes as $r) if (in_array($method,$r['m'],true))
+        $routeMethod = $method === 'HEAD' ? 'GET' : $method;
+        foreach ($this->routes as $r) if (in_array($routeMethod,$r['m'],true))
         {
             $pattern = '#^' . preg_replace('#\{[^/]+\}#', '([^/]+)', $r['p']) . '$#';
             if (preg_match($pattern, $path, $matches))
