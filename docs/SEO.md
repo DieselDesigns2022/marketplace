@@ -10,15 +10,12 @@ Implemented foundations:
 
 - Clean public URLs for products, stores, categories, and static pages.
 - Product and designer/store schema fields include SEO title and SEO description columns.
-- Public product/store/category pages exist and can be expanded with dynamic metadata.
-
-Planned / Future Phase:
-
-- Complete dynamic metadata across all public page types if not fully rendered in current views.
-- Automated sitemap generation.
-- `robots.txt` review/finalization.
-- Structured data implementation.
-- More complete noindex rules for dashboards, auth pages, cart, checkout, admin, and seller pages.
+- Dynamic metadata across public page types.
+- Absolute canonical URL handling with an `APP_URL` setting and `https://marketplace.dieseldesigns.co` fallback for the current build/test deployment.
+- Dynamic `/sitemap.xml` generation for public indexable URLs only.
+- `public/robots.txt` rules with a production sitemap reference.
+- Conservative structured data for public pages.
+- Noindex controls for filtered browse URLs and private/utility workflows.
 
 ## Dynamic metadata
 
@@ -26,7 +23,7 @@ Product and store tables include SEO fields. Public page rendering should prefer
 
 ## Canonicals
 
-Future SEO work should add canonical URLs for public product, store, category, browse, and static pages to prevent duplicate indexing.
+Canonical URLs are implemented for public product, store, category, browse, sell, homepage, and static pages to reduce duplicate indexing risk.
 
 ## Product SEO
 
@@ -36,7 +33,7 @@ Product pages should use:
 - Short description or SEO description.
 - Preview image where available.
 - Canonical product URL.
-- Product structured data in a future phase.
+- Conservative Product structured data where current product data supports it.
 
 ## Store SEO
 
@@ -58,11 +55,11 @@ Category pages should use:
 
 ## Sitemap
 
-Sitemap generation is planned. It should include public indexable pages only: homepage, browse/category pages, approved products, approved designers/stores, and selected static pages.
+Sitemap generation is implemented dynamically at `/sitemap.xml`. It includes public indexable URLs only: homepage, browse/category pages, approved products, approved designers/stores, sell page, and selected static pages. It excludes filtered browse URLs and private workflow routes.
 
 ## `robots.txt`
 
-`robots.txt` should allow public marketplace pages and disallow private/dashboard/admin/cart/checkout routes where appropriate.
+`public/robots.txt` is implemented. It allows public marketplace pages, disallows private/dashboard/admin/cart/checkout/download/auth/apply routes where appropriate, and points crawlers to `https://marketplace.dieseldesigns.co/sitemap.xml`.
 
 ## Noindex rules
 
@@ -75,6 +72,23 @@ Private and utility pages should be noindexed:
 - Cart/checkout.
 - Download routes.
 
-## Phase 5 SEO work still planned
+## Phase 5 and Phase 6 SEO status
 
-Phase 5 created documentation only. It did not implement SEO code. Future SEO work should update this document when metadata, canonicals, sitemap, robots, structured data, or noindex behavior changes.
+Phase 5 created documentation only and did not implement SEO code. Phase 6 implemented the SEO foundation documented below, including metadata, canonicals, sitemap generation, robots rules, structured data, and noindex behavior. Future SEO updates should keep this document synchronized with actual code changes and should not claim deployment, Search Console submission, indexing approval, or legal review unless those steps are completed.
+
+## Phase 6 implemented SEO behavior
+
+The shared layout now renders dynamic titles, descriptions, absolute canonicals, robots meta, Open Graph tags, Twitter Card tags, and JSON-LD when controllers provide metadata. Existing `title`, `description`, `canonical`, and `og_image` metadata remains supported; newer fields include `robots`, Twitter-specific fields, `schema`, and `json_ld`.
+
+Canonical URLs use `APP_URL` when configured and fall back to `https://marketplace.dieseldesigns.co` for the current build/test deployment. Public indexable routes include `/`, `/browse`, `/category/{slug}`, `/product/{slug}`, `/store/{slug}`, `/sell`, `/about`, `/contact`, `/terms`, `/privacy`, `/licensing-help`, `/buyer-faq`, and `/seller-faq`. Filtered browse URLs such as `?q=`, `?file_type=`, `?sort=`, `?ai=`, and `?pod=` render `noindex,follow` and canonicalize to `/browse`.
+
+Private and utility routes render or inherit `noindex,follow` in the layout, including auth, account, dashboard, seller, admin, cart, checkout, apply, and protected download paths. `public/robots.txt` allows public marketplace pages, disallows private/utility route groups, and points crawlers to `https://marketplace.dieseldesigns.co/sitemap.xml`.
+
+`/sitemap.xml` is generated dynamically and includes only public indexable URLs: static public pages, active categories, approved products, and approved designer stores. It excludes filtered browse URLs and private workflow routes.
+
+Structured data is intentionally conservative: WebSite, CollectionPage, Product with price Offer when price exists, ProfilePage for stores, WebPage/AboutPage/ContactPage/PrivacyPolicy, and FAQPage metadata only for FAQ-style pages. No fake ratings, reviews, address, phone, founder, shipping, or SKU data is generated.
+
+
+## Future domain migration
+
+Asset Moth is the public brand name. `https://assetmoth.com` is the planned future domain after purchase, DNS setup, deployment migration, and verification. Until then, current runtime canonical, sitemap, robots, deployment, and smoke-test examples should use `https://marketplace.dieseldesigns.co` unless `APP_URL` is explicitly configured otherwise.

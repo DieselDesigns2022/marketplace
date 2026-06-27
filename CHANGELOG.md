@@ -110,3 +110,19 @@ Major completed items:
 Bug fixes:
 
 - Documentation-only phase; no application bug fixes were made.
+
+## Phase 6 — SEO Foundation, Indexing & Public Launch Content
+
+Major completed items:
+
+- Rebranded public-facing marketplace copy to Asset Moth.
+- Added shared metadata support for title, description, canonical URLs, robots meta, Open Graph, Twitter Cards, and JSON-LD.
+- Added absolute canonical handling with APP_URL support and current deployment fallback to https://marketplace.dieseldesigns.co, with assetmoth.com noted as a future domain target.
+- Added public launch copy for homepage, sell, static legal/help/FAQ pages, apply page, public empty states, and internal links.
+- Added dynamic sitemap.xml and production robots.txt rules for public and private routes.
+- Added browse noindex rules for filtered/search/sort URLs and indexable category URLs.
+- Added product, store, category, browse, homepage, and static-page structured data without fake ratings/reviews/company details.
+
+Bug fixes:
+
+- Removed public placeholder branding and skeleton launch copy from shared layout and static pages.

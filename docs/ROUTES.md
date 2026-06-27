@@ -88,3 +88,11 @@ Routes are registered in `public/index.php`.
 | POST | `/cart/update` | `CartController::update` | Protected |
 | GET/POST | `/checkout` | `CartController::checkout` | Protected |
 | GET | `/download/{file}` | `BuyerController::download` | Protected purchased-file access |
+
+## SEO and indexing routes
+
+| Method | Route | Controller | Protection | Indexing |
+|---|---|---|---|---|
+| GET | `/sitemap.xml` | `PublicController::sitemap` | Public | XML sitemap of public indexable URLs only |
+
+Filtered `/browse` URLs are public but render `noindex,follow` and canonicalize to `/browse`. Private auth, account, dashboard, seller, admin, cart, checkout, apply, and download routes are treated as noindex/private workflow routes.

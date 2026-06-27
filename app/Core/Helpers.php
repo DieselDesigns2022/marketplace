@@ -3,6 +3,39 @@
 namespace App\Core;
 class Helpers
 {
+    public const SITE_NAME = 'Asset Moth';
+    public const SITE_SHORT_NAME = 'Asset Moth';
+    public const DEFAULT_DESCRIPTION = 'Shop digital designs, templates, graphics, and creative files from independent designers on Asset Moth.';
+
+    public static function baseUrl(): string
+    {
+        $url = trim($_ENV['APP_URL'] ?? '');
+        return rtrim($url !== '' ? $url : 'https://marketplace.dieseldesigns.co', '/');
+
+    }
+
+    public static function canonical(string $path = '/'): string
+    {
+        $path = '/' . ltrim($path, '/');
+        if ($path !== '/' && str_ends_with($path, '/')) {
+            $path = rtrim($path, '/');
+        }
+        return self::baseUrl() . $path;
+
+    }
+
+    public static function assetUrl(?string $path): string
+    {
+        if (!$path) {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+        return self::baseUrl() . '/' . ltrim($path, '/');
+
+    }
+
      public static function e(?string $v): string
     {
         return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');

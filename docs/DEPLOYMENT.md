@@ -68,3 +68,7 @@ sudo tail -n 100 /var/log/nginx/marketplace.error.log
 - Database rollback: restore the last known good database `.sql` backup.
 - Always capture current broken state/logs before rollback if possible.
 - After rollback, smoke test public, auth, buyer, seller, admin, cart, checkout, and downloads.
+
+## Phase 6 SEO deployment notes
+
+Before requesting indexing, set `APP_URL=https://marketplace.dieseldesigns.co` in the current build/test deployment or rely on the current fallback. After deployment, verify `https://marketplace.dieseldesigns.co/robots.txt`, `https://marketplace.dieseldesigns.co/sitemap.xml`, public canonicals, and noindex behavior for private workflow pages. Treat `https://assetmoth.com` as the future domain migration target after purchase and DNS/application migration. Submit the sitemap in Google Search Console only after production content, support process, and owner legal/privacy review are complete.
