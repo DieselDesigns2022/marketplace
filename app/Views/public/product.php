@@ -1,3 +1,4 @@
+<nav class="breadcrumbs"><a href="/">Home</a> / <a href="/browse">Browse</a> / <?php if($p['category_slug']):?><a href="/category/<?=H::e($p['category_slug'])?>"><?=H::e($p['category_name'])?></a> / <?php endif;?><?=H::e($p['title'])?></nav>
 <h1>
 <?=H::e($p['title'])?>
 </h1>
@@ -7,7 +8,7 @@
            <img src="<?=H::e($i['image_path'])?>" alt="<?=H::e($i['alt_text']??$p['title'])?>">
         <?php endforeach;?>
         <?php if(!$images):?>
-           <div class="thumb big">Preview images coming soon</div>
+           <div class="thumb big">Preview images are not available for this digital product yet.</div>
         <?php endif;?>
     </div>
     <aside class="card">
@@ -34,9 +35,7 @@
         </p>
         <p>Commercial License: <?=$p['commercial_license_enabled']?'Available for '.H::money($p['commercial_license_price']):'Not available'?>
         </p>
-        <p>Digital resale is prohibited.</p>
-        <p>File Types: <?=H::e($p['file_types'])?>
-        </p>
+        <p>Digital resale, file sharing, and redistribution are prohibited. Review the license details before purchase.</p>
         <p>Tags: <?php if($tags): ?>
         <?php foreach($tags as $tag): ?>
         <a class="badge" href="/browse?q=<?=H::e(urlencode($tag['name']))?>">
@@ -71,6 +70,7 @@
     </form>
 </aside>
 </div>
+<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is included unless the product page states otherwise. Commercial license availability, POD permission, and AI disclosure are shown before purchase.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
 <h2>Description</h2>
 <?php if($p['short_description']):?>
     <p>
