@@ -926,4 +926,10 @@ Phase 7 should focus on public marketplace content, launch polish, empty states,
 
 Phase 7 should not implement the full licensing system. Licensing Help should remain basic until the dedicated licensing phase is completed. A dedicated Phase 8.5 Licensing System phase should cover multiple license types such as commercial, wholesale, POD, fabric, and other license options before cart/order/download logic is finalized.
 
-Phase 7 implementation should start with inspection and planning before code changes. Codex should review current public pages, dashboards, storefronts, product pages, browse/category pages, and unfinished/placeholder areas, then propose a precise implementation plan for approval before making changes.
+Phase 7 was prepared by documenting the approved scope before implementation. After the phase branch was created, implementation was expected to proceed from one comprehensive Codex implementation prompt: verify branch/status, review documentation, inspect current code, implement the approved scope, update documentation, run checks, and report results. Codex should not stop after inspection unless a real blocker requires owner approval.
+
+## Phase 7 — Marketplace Content & Launch Polish
+
+Phase 7 focused on launch-readiness polish rather than new marketplace systems. The shared layout now supports a local Asset Moth logo at `public/assets/img/asset-moth-logo.png` with text fallback, and the footer includes only existing public routes. Public marketplace pages received clearer copy, CTA consistency, better empty states, and mobile/layout refinements. Buyer, seller, and admin dashboards received wording improvements so current capabilities are clearer without implying unfinished systems are live.
+
+Postponed by design: the full licensing system remains Phase 8.5, and cart/orders/payments expansion, emails, referrals, creator ranks, sponsored listings, bundle events, advanced search, and new review systems remain later phases.

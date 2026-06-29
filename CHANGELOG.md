@@ -138,3 +138,20 @@ Bug fixes:
 - Upgraded public static launch pages for About, Privacy, Terms, and Contact.
 - Removed duplicate static page H1 output on upgraded static pages.
 - Archived temporary phase backup files, created a fresh completed Phase 6 backup, committed final changes, and pushed the phase branch.
+
+## Phase 7 — Marketplace Content & Launch Polish
+
+Major completed items:
+
+- Polished shared header/footer content, including a local logo image slot at `public/assets/img/asset-moth-logo.png` with a safe text fallback when the file is missing.
+- Updated homepage copy, CTAs, category messaging, featured product/designer sections, and launch-ready empty states.
+- Improved browse/category page headings, filter labels, category explanations, and no-results messaging without adding advanced search or reintroducing File Types UI.
+- Polished product page CTAs, trust notes, and empty states for more-from-designer and related products while keeping licensing limited to existing fields.
+- Refined sell landing page wording around reviewed storefronts, protected files, product review, SEO fields, categories, tags, POD permission, commercial license availability, and AI disclosure.
+- Improved buyer, seller, and admin dashboard copy, including clearer seller product status guidance and admin review context.
+- Added targeted CSS for logo sizing, footer layout, CTA rows, tabs, empty states, and mobile spacing.
+
+Intentionally postponed:
+
+- Full licensing system remains postponed to Phase 8.5.
+- Advanced search/filtering, real payments, production email/notification flows, referrals/credits polish, creator ranks, sponsored listings, and bundle events remain future-phase work.

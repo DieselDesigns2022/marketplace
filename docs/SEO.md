@@ -96,3 +96,7 @@ Asset Moth is the public brand name. `https://assetmoth.com` is the planned futu
 ## Phase 6 VPS closeout notes
 
 After the initial Phase 6 implementation, additional VPS validation and refinement were completed. The live deployment now confirms valid sitemap XML, working sitemap HEAD/GET behavior, public static page metadata/schema, filtered browse `noindex,follow`, static page content upgrades, and duplicate H1 cleanup for upgraded static pages. Current runtime examples remain based on `https://marketplace.dieseldesigns.co`; `https://assetmoth.com` remains the future production domain target.
+
+## Phase 7 content polish note
+
+Phase 7 kept the Phase 6 indexing, canonical, robots, sitemap, and structured-data behavior intact. Public-facing copy was improved on the homepage, browse/category pages, product pages, storefronts, and sell landing page to better describe Asset Moth as a digital design marketplace. No private dashboard/admin pages were made indexable. The expected local logo path for launch polish is `public/assets/img/asset-moth-logo.png`; upload the final logo asset there before production launch if it is not already present.
