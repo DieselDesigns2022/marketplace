@@ -61,7 +61,8 @@
                <label>
                <input type="radio" name="license_type" value="commercial"> Add commercial license (+<?=H::money($p['commercial_license_price'])?>)</label>
            <?php endif;?>
-           <button class="btn">Add To Cart</button>
+           <button class="btn">Add to cart</button>
+           <p class="help-text">Review the product details, license options, POD permission, and AI disclosure before adding this digital item.</p>
         </form>
     <?php endif;?>
     <form method="post" action="/product/<?=$p['id']?>/wishlist">
@@ -82,10 +83,7 @@
 <p>
 <?=nl2br(H::e($p['description']))?>
 </p>
-<h2>More From This Designer</h2>
-<?php $products=$more; include app_path('app/Views/public/product_grid.php');?>
-<h2>Related Products</h2>
-<?php $products=$related; include app_path('app/Views/public/product_grid.php');?>
-<?php if(!$related):?>
-    <p class="muted">No related products are available yet.</p>
-<?php endif;?>
+<h2>More from this designer</h2>
+<?php if(!$more):?><div class="card empty-state"><p>This designer does not have other approved products available yet.</p><a href="/store/<?=H::e($p['store_slug'])?>">Visit designer storefront</a></div><?php else: $products=$more; include app_path('app/Views/public/product_grid.php'); endif;?>
+<h2>Related products</h2>
+<?php if(!$related):?><div class="card empty-state"><p>No related approved products are available yet. Try browsing all digital designs.</p><a class="btn" href="/browse">Browse Digital Designs</a></div><?php else: $products=$related; include app_path('app/Views/public/product_grid.php'); endif;?>

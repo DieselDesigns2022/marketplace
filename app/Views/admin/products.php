@@ -1,4 +1,5 @@
 <h1>Admin → Products</h1>
+<p class="muted">Review submitted products for catalog quality, ownership concerns, and complete buyer-facing details before approval.</p>
 <nav class="tabs">
     <?php foreach(['pending_review'=>'Pending Review','approved'=>'Approved','rejected'=>'Rejected','disabled'=>'Disabled'] as $key=>$label):?>
         <a class="<?=($status??'pending_review')===$key?'active':''?>" href="/admin/products?status=<?=$key?>">
@@ -43,4 +44,7 @@
            </td>
         </tr>
     <?php endforeach;?>
+    <?php if(!$products):?>
+        <tr><td colspan="5" class="muted">No products found for this status filter.</td></tr>
+    <?php endif;?>
 </table>

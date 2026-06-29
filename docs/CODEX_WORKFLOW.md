@@ -87,4 +87,4 @@ If Codex state appears disconnected from GitHub or VPS:
 
 ## Phase 7 Codex workflow note
 
-For Phase 7, Codex must not jump directly into broad redesign work. The first Codex task should be inspection and planning only: identify launch-polish issues, placeholder copy, confusing empty states, unfinished public content, and dashboard clarity problems. After inspection, Codex should provide a proposed file-by-file scope for approval before implementation.
+For Phase 7, Codex should proceed from one comprehensive implementation prompt after the phase branch and approved scope are ready. The implementation prompt should tell Codex to verify branch/status, review documentation, inspect current code, implement the approved Phase 7 scope, update affected documentation, run checks, and report results. Codex should not stop after inspection unless a real blocker requires owner approval.
