@@ -11,5 +11,9 @@
     <label>Password<input type="password" name="password">
     </label>
     <button class="btn">Login</button>
+    <div style="border-top:1px solid var(--line); padding-top:14px; text-align:center;">
+        <p class="muted" style="margin:0 0 10px;">New to Asset Moth?</p>
+        <a class="btn alt" href="/register">Create account</a>
+    </div>
+    <p style="margin:0; text-align:center;"><a href="/forgot-password">Forgot password?</a></p>
 </form>
-<a href="/forgot-password">Forgot password?</a>

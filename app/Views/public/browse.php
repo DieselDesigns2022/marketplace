@@ -9,7 +9,6 @@
 <form class="filters" action="/browse" method="get">
     <input name="q" value="<?=H::e($_GET['q']??'')?>" placeholder="Keyword">
     <select name="category"><option value="">All categories</option><?php foreach($cats as $c):?><option value="<?=H::e($c['slug'])?>" <?=$selectedCategory===$c['slug']?'selected':''?>><?=H::e($c['name'])?></option><?php endforeach;?></select>
-    <select name="file_type"><option value="">Any file</option><?php foreach(['PNG','SVG','JPG','PDF','ZIP','Canva Template','Procreate File','Font'] as $o):?><option <?=($_GET['file_type']??'')===$o?'selected':''?>><?=H::e($o)?></option><?php endforeach;?></select>
     <select name="ai"><option value="">Any AI disclosure</option><?php foreach(['No AI Used','AI Assisted','AI Generated'] as $o):?><option <?=($_GET['ai']??'')===$o?'selected':''?>><?=H::e($o)?></option><?php endforeach;?></select>
     <select name="pod"><option value="">POD permission</option><option value="1" <?=($_GET['pod']??'')==='1'?'selected':''?>>Allowed</option><option value="0" <?=($_GET['pod']??'')==='0'?'selected':''?>>Not allowed</option></select>
     <select name="sort"><option value="newest" <?=$selectedSort==='newest'?'selected':''?>>Newest</option><option value="popular" <?=$selectedSort==='popular'?'selected':''?>>Popular</option><option value="price_asc" <?=$selectedSort==='price_asc'?'selected':''?>>Price low-high</option><option value="price_desc" <?=$selectedSort==='price_desc'?'selected':''?>>Price high-low</option></select>

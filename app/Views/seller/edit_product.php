@@ -48,10 +48,12 @@
     <h2>Pricing</h2>
     <label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>">
     </label>
-    <label>
-    <input type="checkbox" name="commercial_license_enabled" <?=(!isset($p)||$p['commercial_license_enabled'])?'checked':''?>> Enable Commercial License</label>
-    <label>Commercial License Price<input type="number" step="0.01" name="commercial_license_price" value="<?=H::e($_POST['commercial_license_price']??$p['commercial_license_price']??'5.00')?>">
-    </label>
+    <div class="inline-license-row">
+        <label>
+        <input type="checkbox" name="commercial_license_enabled" <?=(!isset($p)||$p['commercial_license_enabled'])?'checked':''?>> Enable Commercial License</label>
+        <label>Commercial License Price<input type="number" step="0.01" name="commercial_license_price" value="<?=H::e($_POST['commercial_license_price']??$p['commercial_license_price']??'5.00')?>">
+        </label>
+    </div>
     <label>
     <input type="checkbox" name="pod_allowed" <?=($p['pod_allowed']??false)?'checked':''?>> POD Usage Allowed</label>
     <p>Digital Resale: always prohibited.</p>
@@ -67,15 +69,6 @@
     </label>
     <label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>">
     </label>
-    <fieldset>
-    <legend>File Types</legend>
-    <?php $selected=$_POST['file_types']??array_filter(array_map('trim',explode(',',$p['file_types']??''))); foreach(['SVG','PNG','PSD','Canva Template','Procreate Brush','Seamless Pattern','Font'] as $ft):?>
-    <label>
-    <input type="checkbox" name="file_types[]" value="<?=$ft?>" <?=in_array($ft,$selected,true)?'checked':''?>>
-    <?=$ft?>
-    </label>
-<?php endforeach;?>
-</fieldset>
 <label>AI Disclosure<select name="ai_disclosure" required>
 <?php foreach(['No AI Used','AI Assisted','AI Generated'] as $ai):?>
     <option <?=($_POST['ai_disclosure']??$p['ai_disclosure']??'')===$ai?'selected':''?>>

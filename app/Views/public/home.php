@@ -9,7 +9,7 @@
 </section>
 <section>
     <h2>Explore popular categories</h2>
-    <p>Start with curated category pages, then use filters on browse results to narrow by file type, license needs, AI disclosure, or POD permission.</p>
+    <p>Start with curated category pages, then use filters on browse results to narrow by license needs, AI disclosure, or POD permission.</p>
     <div class="grid">
         <?php foreach($cats as $c):?><a class="card" href="/category/<?=H::e($c['slug'])?>"><h3><?=H::e($c['name'])?></h3><p><?=H::e($c['description'] ?: 'Browse approved digital products in this category.')?></p></a><?php endforeach;?>
     </div>
@@ -28,5 +28,5 @@
 </section>
 <section class="card">
     <h2>For buyers and designers</h2>
-    <div class="grid"><div><h3>Buy with clear licensing</h3><p>Product pages display personal use, optional commercial license availability, POD permission, file types, and AI disclosure when provided.</p><a href="/licensing-help">Read licensing help</a></div><div><h3>Apply to sell</h3><p>Designers can apply for a reviewed storefront, upload products, set SEO fields, and submit products for marketplace review.</p><a href="/seller-faq">Read seller FAQ</a></div></div>
+    <div class="grid"><div><h3>Buy with clear licensing</h3><p>Product pages display personal use, optional commercial license availability, POD permission, and AI disclosure when provided.</p><a href="/licensing-help">Read licensing help</a></div><div><h3>Apply to sell</h3><p>Designers can apply for a reviewed storefront, upload products, set SEO fields, and submit products for marketplace review.</p><a href="/seller-faq">Read seller FAQ</a></div></div>
 </section>

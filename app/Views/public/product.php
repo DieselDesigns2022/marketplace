@@ -36,8 +36,6 @@
         <p>Commercial License: <?=$p['commercial_license_enabled']?'Available for '.H::money($p['commercial_license_price']):'Not available'?>
         </p>
         <p>Digital resale, file sharing, and redistribution are prohibited. Review the license details before purchase.</p>
-        <p>File Types: <?=H::e($p['file_types'])?>
-        </p>
         <p>Tags: <?php if($tags): ?>
         <?php foreach($tags as $tag): ?>
         <a class="badge" href="/browse?q=<?=H::e(urlencode($tag['name']))?>">
@@ -72,7 +70,7 @@
     </form>
 </aside>
 </div>
-<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is included unless the product page states otherwise. Commercial license availability, POD permission, file types, and AI disclosure are shown before purchase.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
+<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is included unless the product page states otherwise. Commercial license availability, POD permission, and AI disclosure are shown before purchase.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
 <h2>Description</h2>
 <?php if($p['short_description']):?>
     <p>

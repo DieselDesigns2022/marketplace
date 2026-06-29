@@ -8,10 +8,10 @@ use App\Core\Helpers as H;
 class PublicController
 {
     private array $staticPages = [
-        'about' => ['About Asset Moth', 'Learn how Asset Moth connects buyers with independent designers selling digital downloads.', 'AboutPage'],
-        'contact' => ['Contact Asset Moth', 'Find buyer, seller, account, order, download, and general support guidance for Asset Moth.', 'ContactPage'],
-        'terms' => ['Terms of Use', 'Read practical marketplace terms for accounts, purchases, licenses, seller responsibilities, moderation, and support.', 'WebPage'],
-        'privacy' => ['Privacy Policy', 'Learn what information Asset Moth collects, how it is used, and the choices available to marketplace users.', 'PrivacyPolicy'],
+        'about' => ['About Asset Moth', 'Asset Moth is a digital design marketplace built for buyers shopping creative files and independent designers selling downloadable products.', 'AboutPage'],
+        'contact' => ['Contact Asset Moth', 'Find general support, buyer support, seller support, account help, order guidance, download help, and marketplace contact information for Asset Moth.', 'ContactPage'],
+        'terms' => ['Terms & Conditions', 'Read the rules for using Asset Moth, including accounts, digital purchases, downloads, licensing, seller responsibilities, refunds, and marketplace content.', 'WebPage'],
+        'privacy' => ['Privacy Policy', 'Learn how Asset Moth collects, uses, protects, and stores marketplace account, buyer, seller, order, upload, and download information.', 'PrivacyPolicy'],
         'licensing-help' => ['Digital Product Licensing Help', 'Understand personal use, commercial use, print-on-demand permission, and digital resale limits on Asset Moth.', 'WebPage'],
         'buyer-faq' => ['Buyer FAQ', 'Answers for buyers about finding products, accounts, purchases, downloads, licenses, POD use, refunds, and support.', 'FAQPage'],
         'seller-faq' => ['Seller FAQ', 'Answers for sellers about applying, storefronts, product review, SEO fields, licensing, AI disclosure, uploads, and support.', 'FAQPage'],
@@ -46,11 +46,10 @@ class PublicController
     {
         $w = ["p.status='approved'"];
         $q = [];
-        foreach (['q','category','file_type','ai','pod'] as $key) {
+        foreach (['q','category','ai','pod'] as $key) {
             if (($_GET[$key] ?? '') === '') continue;
             if ($key === 'q') { $w[]='(p.title like ? or p.description like ?)'; $q[]='%'.$_GET[$key].'%'; $q[]='%'.$_GET[$key].'%'; }
             if ($key === 'category') { $w[]='c.slug=?'; $q[]=$_GET[$key]; }
-            if ($key === 'file_type') { $w[]='p.file_types like ?'; $q[]='%'.$_GET[$key].'%'; }
             if ($key === 'ai') { $w[]='p.ai_disclosure=?'; $q[]=$_GET[$key]; }
             if ($key === 'pod') { $w[]='p.pod_allowed=?'; $q[]=(int)$_GET[$key]; }
         }
@@ -58,7 +57,7 @@ class PublicController
         $order = $sort[$_GET['sort'] ?? ''] ?? 'p.created_at desc';
         $products = DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where '.implode(' and ', $w).' order by '.$order, $q);
         $cats = DB::rows('select * from categories where is_active=1 order by sort_order,name');
-        $filtered = array_intersect(array_keys($_GET), ['q','file_type','sort','ai','pod','category']) !== [];
+        $filtered = array_intersect(array_keys($_GET), ['q','sort','ai','pod','category']) !== [];
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>'Browse digital designs','url'=>H::canonical('/browse')];
         H::view('public/browse', ['products'=>$products, 'cats'=>$cats, 'category'=>null, 'meta'=>$this->pageMeta('Browse Digital Designs', 'Browse digital designs, templates, graphics, fonts, and creative files from independent designers on Asset Moth.', '/browse', $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
     }
