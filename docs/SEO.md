@@ -92,3 +92,7 @@ Structured data is intentionally conservative: WebSite, CollectionPage, Product 
 ## Future domain migration
 
 Asset Moth is the public brand name. `https://assetmoth.com` is the planned future domain after purchase, DNS setup, deployment migration, and verification. Until then, current runtime canonical, sitemap, robots, deployment, and smoke-test examples should use `https://marketplace.dieseldesigns.co` unless `APP_URL` is explicitly configured otherwise.
+
+## Phase 6 VPS closeout notes
+
+After the initial Phase 6 implementation, additional VPS validation and refinement were completed. The live deployment now confirms valid sitemap XML, working sitemap HEAD/GET behavior, public static page metadata/schema, filtered browse `noindex,follow`, static page content upgrades, and duplicate H1 cleanup for upgraded static pages. Current runtime examples remain based on `https://marketplace.dieseldesigns.co`; `https://assetmoth.com` remains the future production domain target.

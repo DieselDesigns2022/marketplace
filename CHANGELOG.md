@@ -126,3 +126,15 @@ Major completed items:
 Bug fixes:
 
 - Removed public placeholder branding and skeleton launch copy from shared layout and static pages.
+
+### Phase 6 VPS closeout updates
+
+- Verified Phase 6 on the VPS deployment at `https://marketplace.dieseldesigns.co`.
+- Fixed HEAD requests for GET routes so `/sitemap.xml` returns HTTP 200 for HEAD checks as well as GET requests.
+- Fixed logout fallback behavior so `/logout` safely redirects instead of showing a 419/404-style workflow issue.
+- Added a create-account call to action on the login page for new seller applicants.
+- Removed visible File Types UI/copy from active marketplace forms and public pages after product categorization rules changed.
+- Improved seller product form checkbox alignment and commercial license price layout.
+- Upgraded public static launch pages for About, Privacy, Terms, and Contact.
+- Removed duplicate static page H1 output on upgraded static pages.
+- Archived temporary phase backup files, created a fresh completed Phase 6 backup, committed final changes, and pushed the phase branch.

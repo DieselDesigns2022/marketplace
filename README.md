@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 6 — SEO Foundation, Indexing & Public Launch Content.
+- Current Phase: Phase 6 complete — SEO Foundation, Indexing & Public Launch Content. Next planned phase: Phase 7 — Marketplace Content & Launch Polish.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.

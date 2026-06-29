@@ -108,3 +108,7 @@ Then manually verify public, buyer, seller, admin, cart, checkout, and download 
 ## Phase 6 SEO testing
 
 Run `git diff --check` and `php -l` for modified PHP files. Inspect rendered source for public pages to confirm titles, descriptions, canonicals, Open Graph, Twitter tags, robots meta, and JSON-LD. Verify `/browse` is indexable while filtered browse URLs render `noindex,follow` and canonicalize to `/browse`. Verify `/sitemap.xml` returns valid XML and excludes private routes, filtered browse URLs, and unapproved products/stores. Verify `public/robots.txt` disallows private route groups without blocking public marketplace pages.
+
+## Phase 6 closeout validation
+
+Phase 6 closeout validation included PHP syntax checks for modified controllers/views, `/sitemap.xml` HEAD and XML checks, static page source checks for About, Privacy, Terms, Contact, Buyer FAQ, Seller FAQ, and Licensing Help, duplicate H1 checks, filtered browse noindex checks, logout redirect checks, login create-account CTA checks, File Types UI removal checks, and seller product form browser testing.

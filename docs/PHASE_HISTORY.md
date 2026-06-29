@@ -909,3 +909,11 @@ After every completed development phase, documentation must be reviewed and upda
 ## Phase 6 — SEO Foundation, Indexing & Public Launch Content — implemented in branch work
 
 Phase 6 adds public-launch SEO foundations and content: Asset Moth branding, dynamic metadata, canonical URLs, robots meta, browse noindex rules, robots.txt, dynamic sitemap.xml, conservative structured data, improved public copy, internal links, and documentation updates. This entry documents implementation work only and does not claim deployment, merge, Search Console verification, or legal review completion.
+
+## Phase 6 closeout — VPS validation, public page upgrades, and final sync
+
+Phase 6 was completed on branch `phase-6-seo-foundation-indexing` after the Codex implementation and additional VPS validation/refinement. The final branch includes the original SEO foundation plus manual closeout fixes: sitemap HEAD support, logout fallback support, login create-account CTA, File Types UI/copy removal, seller product form layout cleanup, upgraded About/Privacy/Terms/Contact pages, duplicate static page H1 cleanup, and final validation of public SEO behavior.
+
+Final verified items included PHP syntax checks, sitemap HTTP 200/XML validation, public canonical/meta/schema checks, filtered browse noindex behavior, static page checks, browser validation of seller/product/application workflows, and clean Git status. Temporary phase backup files were archived and removed from the working project. A completed Phase 6 backup was created on the VPS before moving toward Phase 7 planning.
+
+Final pushed commits included `28d3fa2` for the completed Phase 6 SEO/static page work and `b38bf33` for duplicate static page heading cleanup.
