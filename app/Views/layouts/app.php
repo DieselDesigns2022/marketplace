@@ -80,7 +80,7 @@ if ($json && json_decode($json) !== null):
 <body>
 <header class="top">
     <a class="brand brand-logo" href="/" aria-label="Asset Moth home">
-        <img src="/assets/img/asset-moth-logo.png" alt="Asset Moth" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+        <img src="/assets/img/asset-moth-logo.png" alt="Asset Moth" width="190" height="42" style="display:block;max-height:42px;width:auto;max-width:190px;object-fit:contain;" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
         <span hidden>Asset Moth</span>
     </a>
     <nav>
