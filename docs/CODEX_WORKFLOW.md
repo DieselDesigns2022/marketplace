@@ -84,3 +84,7 @@ If Codex state appears disconnected from GitHub or VPS:
 8. Report status.
 9. PR only when approved by the governing workflow.
 10. Merge only after review/testing.
+
+## Phase 7 Codex workflow note
+
+For Phase 7, Codex must not jump directly into broad redesign work. The first Codex task should be inspection and planning only: identify launch-polish issues, placeholder copy, confusing empty states, unfinished public content, and dashboard clarity problems. After inspection, Codex should provide a proposed file-by-file scope for approval before implementation.
