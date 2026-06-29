@@ -1,4 +1,6 @@
+<?php if(!in_array($page, ['about', 'privacy', 'terms', 'contact'], true)): ?>
 <h1><?=H::e($title)?></h1>
+<?php endif; ?>
 <?php if($page === 'about'): ?>
 <section class="page-hero about-hero">
     <p class="eyebrow">About Asset Moth</p>
