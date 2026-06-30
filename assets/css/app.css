@@ -710,3 +710,9 @@ img.thumb {
     padding: 36px 18px;
   }
 }
+
+/* Phase 7 VPS validation fix: keep logo fallback text hidden while image loads */
+.brand-logo span[hidden],
+.brand-logo img[hidden] {
+  display: none;
+}
