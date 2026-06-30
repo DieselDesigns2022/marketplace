@@ -16,6 +16,7 @@
         <?php if(empty($cats)):?><div class="card empty-state"><h3>Categories are being prepared</h3><p>Marketplace categories will appear here as the catalog is organized.</p></div><?php endif;?>
     </div>
 </section>
+<?php $featuredProducts = $products ?? []; ?>
 <section class="page-section">
     <h2>Featured products</h2>
     <p class="muted">Reviewed public listings appear here when products are featured for launch.</p>
@@ -28,6 +29,12 @@
         <?php foreach($designers as $d):?><a class="card" href="/store/<?=H::e($d['store_slug'])?>"><span class="badge rank"><?=H::e($d['creator_rank'])?></span><h3><?=H::e($d['display_name'])?></h3><p><?=H::e($d['bio'] ?: 'Visit this designer’s storefront to browse approved digital products.')?></p></a><?php endforeach;?>
         <?php if(empty($designers)):?><div class="card empty-state"><h3>No featured designers yet</h3><p>Designer storefronts will appear after applications and stores are approved.</p><a class="btn alt" href="/sell">Apply to Sell</a></div><?php endif;?>
     </div>
+</section>
+
+<section class="page-section">
+    <h2>Recently added</h2>
+    <p class="muted">Newest approved products from reviewed creators, shown with real marketplace data only.</p>
+    <?php $products = $recentProducts ?? []; if(empty($products)):?><div class="card empty-state"><h3>No recent products yet</h3><p>Recently approved products will appear here after marketplace review.</p></div><?php else: include app_path('app/Views/public/product_grid.php'); endif; $products = $featuredProducts; ?>
 </section>
 <section class="card page-section">
     <h2>Built for buyers and designers</h2>

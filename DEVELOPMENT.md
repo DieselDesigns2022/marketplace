@@ -170,3 +170,9 @@ Each phase should include:
 6. Re-pull GitHub source of truth.
 7. Re-run migrations only when safe.
 8. Smoke test public, buyer, seller, admin, cart, checkout, and downloads.
+
+## Phase 8 search/browse implementation
+
+Public search and browsing now live in `App\Controllers\PublicController` through `browseState()`, `browseCountWhere()`, and `browseQuery()`. Filtering, weighted search scoring, sorting, and pagination are performed in SQL with bound parameters and approved public product/designer constraints. The page size is controlled by `BROWSE_PAGE_SIZE`.
+
+The public browse UI preserves filters, sort, and pagination parameters. Category routes keep the category in `/category/{slug}` and pass other filters as query parameters. Do not add fake best-selling, fake rating, or Phase 8.5 licensing behavior to these paths.

@@ -716,3 +716,49 @@ img.thumb {
 .brand-logo img[hidden] {
   display: none;
 }
+
+/* Phase 8 search and browsing */
+.browse-filters {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+.browse-filters .wide {
+  grid-column: span 2;
+}
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.browse-summary,
+.pagination {
+  margin: 18px 0;
+}
+.pagination {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pagination a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: white;
+}
+.pagination a.active {
+  background: var(--ink);
+  color: white;
+}
+.product-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+@media (max-width: 760px) {
+  .browse-filters .wide {
+    grid-column: auto;
+  }
+}
