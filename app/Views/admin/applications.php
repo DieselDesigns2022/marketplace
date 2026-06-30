@@ -1,4 +1,5 @@
 <h1>Designer Applications</h1>
+<p class="muted">Filter applications by status and open each detail page before approving or denying a designer.</p>
 <nav class="tabs">
     <a class="badge <?=$status==='pending'?'ok':''?>" href="/admin/applications?status=pending">Pending</a>
     <a class="badge <?=$status==='approved'?'ok':''?>" href="/admin/applications?status=approved">Approved</a>

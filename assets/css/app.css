@@ -490,3 +490,229 @@ label:has(input[type="radio"]) {
   background: var(--pink);
   color: white;
 }
+
+
+/* Phase 7 launch polish */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 1.25rem;
+}
+.brand-logo span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.brand-logo img {
+  display: block;
+  max-height: 42px;
+  width: auto;
+  max-width: 190px;
+  object-fit: contain;
+}
+.site-footer {
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+.site-footer > div {
+  max-width: 360px;
+}
+.site-footer p {
+  margin: 6px 0 0;
+}
+.site-footer nav {
+  justify-content: flex-end;
+}
+.breadcrumbs {
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+.product-meta {
+  display: block;
+  margin-top: 10px;
+}
+.cta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.help-text {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-top: 4px;
+}
+.empty,
+.empty-state {
+  border: 1px dashed #d8cfe6;
+  background: rgba(255, 255, 255, 0.72);
+}
+.thumb img,
+img.thumb {
+  width: 100%;
+  object-fit: cover;
+}
+.tabs a {
+  display: inline-block;
+  margin: 3px 6px 3px 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid var(--line);
+}
+.tabs a.active {
+  background: var(--ink);
+  color: white;
+}
+@media (max-width: 760px) {
+  .top {
+    padding: 12px 16px;
+  }
+  .brand-logo img {
+    max-height: 36px;
+    max-width: 160px;
+  }
+  .site-footer,
+  .site-footer nav {
+    display: grid;
+    justify-content: stretch;
+    text-align: center;
+  }
+  .site-footer nav {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .brand-logo span {
+    min-height: 36px;
+    font-size: 1.15rem;
+  }
+  .hero,
+  .page-hero {
+    padding: 44px 18px;
+  }
+}
+
+/* Phase 7 VPS validation fix: restore polished static page presentation */
+.policy-content,
+.contact-content,
+.terms-content {
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.75;
+}
+
+.policy-content h2,
+.contact-content h2,
+.terms-content h2 {
+  margin-top: 32px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.policy-content h2:first-child,
+.contact-content h2:first-child,
+.terms-content h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.policy-content h3,
+.contact-content h3,
+.terms-content h3 {
+  margin-top: 24px;
+}
+
+.policy-date {
+  display: inline-block;
+  padding: 12px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.about-hero,
+.contact-hero,
+.terms-hero,
+.privacy-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.about-hero::after,
+.contact-hero::after,
+.terms-hero::after,
+.privacy-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -80px -120px auto;
+  width: 240px;
+  height: 240px;
+  border-radius: 999px;
+  background: rgba(255, 77, 166, 0.16);
+  pointer-events: none;
+}
+
+.page-section.card,
+.page-section .card,
+.split-grid .card {
+  box-shadow: 0 14px 34px rgba(35, 25, 66, 0.08);
+}
+
+.page-section ul,
+.page-section ol,
+.policy-content ul,
+.policy-content ol,
+.contact-content ul,
+.contact-content ol {
+  padding-left: 24px;
+}
+
+.page-section li,
+.policy-content li,
+.contact-content li {
+  margin: 8px 0;
+}
+
+.contact-content ul {
+  margin-top: 14px;
+}
+
+.page-cta {
+  margin-top: 28px;
+  padding: 44px 28px;
+  border-radius: 30px;
+  box-shadow: 0 20px 50px rgba(35, 25, 66, 0.16);
+}
+
+@media (max-width: 760px) {
+  .policy-content,
+  .contact-content,
+  .terms-content {
+    line-height: 1.65;
+  }
+
+  .policy-content h2,
+  .contact-content h2,
+  .terms-content h2 {
+    margin-top: 24px;
+  }
+
+  .page-cta {
+    padding: 36px 18px;
+  }
+}
+
+/* Phase 7 VPS validation fix: keep logo fallback text hidden while image loads */
+.brand-logo span[hidden],
+.brand-logo img[hidden] {
+  display: none;
+}

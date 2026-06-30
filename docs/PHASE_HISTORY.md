@@ -917,3 +917,19 @@ Phase 6 was completed on branch `phase-6-seo-foundation-indexing` after the Code
 Final verified items included PHP syntax checks, sitemap HTTP 200/XML validation, public canonical/meta/schema checks, filtered browse noindex behavior, static page checks, browser validation of seller/product/application workflows, and clean Git status. Temporary phase backup files were archived and removed from the working project. A completed Phase 6 backup was created on the VPS before moving toward Phase 7 planning.
 
 Final pushed commits included `28d3fa2` for the completed Phase 6 SEO/static page work and `b38bf33` for duplicate static page heading cleanup.
+
+## Phase 7 — Marketplace Content & Launch Polish — planning started
+
+Phase 7 begins after Phase 6 was merged into `main`, the VPS working copy was updated from `origin/main`, a post-merge Phase 6 backup was created, and branch `phase-7-marketplace-content-launch-polish` was created from the updated main baseline.
+
+Phase 7 should focus on public marketplace content, launch polish, empty states, page clarity, dashboard clarity, and user-facing copy that can be finalized before cart, checkout, payments, notifications, referrals, creator ranks, sponsored listings, and bundle events are fully implemented.
+
+Phase 7 should not implement the full licensing system. Licensing Help should remain basic until the dedicated licensing phase is completed. A dedicated Phase 8.5 Licensing System phase should cover multiple license types such as commercial, wholesale, POD, fabric, and other license options before cart/order/download logic is finalized.
+
+Phase 7 was prepared by documenting the approved scope before implementation. After the phase branch was created, implementation was expected to proceed from one comprehensive Codex implementation prompt: verify branch/status, review documentation, inspect current code, implement the approved scope, update documentation, run checks, and report results. Codex should not stop after inspection unless a real blocker requires owner approval.
+
+## Phase 7 — Marketplace Content & Launch Polish
+
+Phase 7 focused on launch-readiness polish rather than new marketplace systems. The shared layout now supports a local Asset Moth logo at `public/assets/img/asset-moth-logo.png` with text fallback, and the footer includes only existing public routes. Public marketplace pages received clearer copy, CTA consistency, better empty states, and mobile/layout refinements. Buyer, seller, and admin dashboards received wording improvements so current capabilities are clearer without implying unfinished systems are live.
+
+Postponed by design: the full licensing system remains Phase 8.5, and cart/orders/payments expansion, emails, referrals, creator ranks, sponsored listings, bundle events, advanced search, and new review systems remain later phases.

@@ -84,3 +84,7 @@ If Codex state appears disconnected from GitHub or VPS:
 8. Report status.
 9. PR only when approved by the governing workflow.
 10. Merge only after review/testing.
+
+## Phase 7 Codex workflow note
+
+For Phase 7, Codex should proceed from one comprehensive implementation prompt after the phase branch and approved scope are ready. The implementation prompt should tell Codex to verify branch/status, review documentation, inspect current code, implement the approved Phase 7 scope, update affected documentation, run checks, and report results. Codex should not stop after inspection unless a real blocker requires owner approval.

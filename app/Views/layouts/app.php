@@ -79,7 +79,10 @@ if ($json && json_decode($json) !== null):
 </head>
 <body>
 <header class="top">
-    <a class="brand" href="/">Asset Moth</a>
+    <a class="brand brand-logo" href="/" aria-label="Asset Moth home">
+        <img src="/assets/img/asset-moth-logo.png" alt="Asset Moth" width="190" height="42" style="display:block;max-height:42px;width:auto;max-width:190px;object-fit:contain;" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+        <span hidden>Asset Moth</span>
+    </a>
     <nav>
         <a href="/browse">Browse</a>
         <a href="/sell">Sell</a>
@@ -100,16 +103,22 @@ if ($json && json_decode($json) !== null):
 <?php foreach (H::flashes() as $flash): ?><div class="notice <?=H::e($flash['type'])?>"><?=H::e($flash['message'])?></div><?php endforeach; ?>
 <?php require app_path('app/Views/'.$view.'.php'); ?>
 </main>
-<footer>
-    <a href="/browse">Browse</a>
-    <a href="/sell">Sell</a>
-    <a href="/about">About</a>
-    <a href="/contact">Contact</a>
-    <a href="/licensing-help">Licensing Help</a>
-    <a href="/buyer-faq">Buyer FAQ</a>
-    <a href="/seller-faq">Seller FAQ</a>
-    <a href="/terms">Terms</a>
-    <a href="/privacy">Privacy</a>
+<footer class="site-footer">
+    <div>
+        <strong>Asset Moth</strong>
+        <p class="muted">A digital design marketplace for downloadable creative files from reviewed independent designers.</p>
+    </div>
+    <nav aria-label="Footer navigation">
+        <a href="/browse">Browse</a>
+        <a href="/sell">Sell</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/buyer-faq">Buyer FAQ</a>
+        <a href="/seller-faq">Seller FAQ</a>
+        <a href="/licensing-help">Licensing Help</a>
+    </nav>
 </footer>
 </body>
 </html>

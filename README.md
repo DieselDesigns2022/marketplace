@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 6 complete — SEO Foundation, Indexing & Public Launch Content. Next planned phase: Phase 7 — Marketplace Content & Launch Polish.
+- Current Phase: Phase 7 — Marketplace Content & Launch Polish.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -42,6 +42,11 @@ These features represent the current implemented and tested functionality in the
 - Advanced SEO iteration after launch data is available.
 - Production-grade notification and email flows.
 - More complete ad campaign management and analytics.
+
+
+### Phase 7 launch polish
+
+Phase 7 improves marketplace clarity and launch readiness across the shared layout, homepage, browse/category pages, product pages, storefronts, sell landing page, and buyer/seller/admin dashboards. The header expects a local logo at `public/assets/img/asset-moth-logo.png` and safely falls back to visible text if the image is missing. Phase 7 intentionally does not add the future full licensing system, advanced search, real payment processing, production emails, referral/rank systems, sponsored listings, or bundle events.
 
 ## Project Principles
 

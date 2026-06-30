@@ -1,4 +1,5 @@
 <h1>Admin Dashboard</h1>
+<p class="muted">Review marketplace activity, applications, products, and catalog operations from this admin area.</p>
 <div class="dash">
     <?php foreach($s as $k=>$v):?>
         <div class="card">
