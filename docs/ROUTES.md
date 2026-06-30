@@ -101,3 +101,22 @@ Filtered `/browse` URLs are public but render `noindex,follow` and canonicalize 
 ## Phase 7 route note
 
 No new routes were added for Phase 7. Header and footer polish use existing routes only: `/`, `/browse`, `/sell`, `/about`, `/contact`, `/terms`, `/privacy`, `/buyer-faq`, `/seller-faq`, and `/licensing-help`.
+
+## Phase 8 browse/search query parameters
+
+`GET /browse` and `GET /category/{slug}` support SQL-backed public browsing of approved products only. Supported query parameters are:
+
+- `q`: keyword search. Multi-word terms are split and matched partially across title, short description, description, tags, category, file types, and creator/store fields.
+- `category`: category slug on `/browse`; category route paths keep their category in the path.
+- `creator`: approved designer `store_slug`.
+- `min_price` / `max_price`: numeric price range. Inverted ranges return an empty result safely.
+- `ai`: one of the existing product AI disclosure values.
+- `pod`: `1` for POD allowed or `0` for no POD.
+- `featured`: `1` for featured products.
+- `new`: `1` for products created in the last 30 days.
+- `file_type`: matches existing `products.file_types` text.
+- `commercial`: `1` for the existing `commercial_license_enabled` product flag.
+- `sort`: `relevance`, `newest`, `oldest`, `price_asc`, `price_desc`, `title_asc`, `title_desc`, or `featured`.
+- `page`: one-based pagination page.
+
+Filtered or paginated browse/category URLs remain public but should render `noindex,follow` with canonical URLs to the base browse/category route.

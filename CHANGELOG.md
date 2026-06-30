@@ -155,3 +155,12 @@ Intentionally postponed:
 
 - Full licensing system remains postponed to Phase 8.5.
 - Advanced search/filtering, real payments, production email/notification flows, referrals/credits polish, creator ranks, sponsored listings, and bundle events remain future-phase work.
+
+## Phase 8 - Search & Browsing
+
+- Added weighted public marketplace search across product titles, descriptions, tags, categories, file types, and creator/store names.
+- Added browse/category filters for keyword, category, price range, AI disclosure, POD permission, creator/store, featured, recently added, file type, and existing commercial-license availability.
+- Added stable sorting, SQL-backed pagination, result counts, active filter summaries, and no-results guidance.
+- Added real-data discovery sections for featured products/creators, recently added products, related products, and more from the same creator.
+- Added Phase 8 browse/search database indexes.
+- Postponed full licensing, fake popularity, fake best-seller/rating sorts, cart/order/payment/download changes, sponsored listings, and review/rating work to later phases.
