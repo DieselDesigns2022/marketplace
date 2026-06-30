@@ -185,3 +185,6 @@ public/
 ## Phase 6 SEO launch foundation
 
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
+
+
+Current phase: Phase 8 — Search & Browsing
