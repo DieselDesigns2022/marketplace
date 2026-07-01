@@ -187,6 +187,6 @@ public/
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
-## Current phase: Phase 8 — Search & Browsing
+## Current phase: Phase 8.5 — Licensing System
 
-Phase 8 adds the public marketplace browsing foundation: weighted keyword search, filters, stable sorting, SQL-backed pagination, result summaries, no-results guidance, category browsing improvements, product-card metadata, and real-data discovery areas such as related products, more from creator, featured products/creators, and recently added products. Full licensing remains scheduled for Phase 8.5.
+Phase 8.5 will build the marketplace licensing foundation before cart, orders, checkout, payments, and downloads are finalized. This phase should add flexible license types, seller license controls, buyer-facing license selection/explanation, license-aware product display, and database support for future license expansion without building unrelated later-phase systems.

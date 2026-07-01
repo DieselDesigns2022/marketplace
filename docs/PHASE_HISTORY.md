@@ -948,3 +948,20 @@ Initial scope will be finalized before Codex implementation. Phase 8 should focu
 Phase 8 implements the marketplace browsing foundation. Public browse and category pages now use SQL-backed keyword search, filters, sorting, pagination, result summaries, active filter chips, and clear no-results guidance. Search relevance weights title and phrase matches highest, then tag/category/creator signals, then description matches. Discovery uses real approved product/designer data for featured products, featured creators, recently added products, related products, and more from the same creator.
 
 Intentionally postponed: the full license system remains Phase 8.5; cart, checkout, orders, payments, downloads, sponsored listings, fake popularity, best-selling/rating sorts without real data, and review/rating features remain later-phase work.
+
+## Phase 8.5 — Licensing System — planning started
+
+Phase 8.5 begins after Phase 8 Search & Browsing was reviewed, tested on the VPS, merged into `main`, synced back to the VPS, smoke-tested, SEO-checked, and backed up.
+
+Goal:
+Build the marketplace licensing foundation before cart, orders, checkout, payments, and downloads are finalized.
+
+Planned Phase 8.5 focus:
+- License types such as Personal, Commercial, POD, Wholesale, Fabric, VA, Extended Commercial, and future license support.
+- Seller controls to enable or disable license options per product, set custom license prices, choose default licenses, control license descriptions, and define display ordering.
+- Product-page license selection, license comparison/explanation, visible price updates, and links to licensing help/FAQ content.
+- Cart/order readiness so selected license information can later be stored, priced, and tied to purchases/downloads during the upcoming cart/orders phase.
+- Admin visibility for product license options and pricing during review.
+- Flexible database architecture so new license types can be added later without redesigning the schema.
+
+Phase 8.5 should not build payments, real checkout processing, final order fulfillment, protected download licensing enforcement, emails, referrals, creator ranks, sponsored listings, or bundle events. Those remain future phases.
