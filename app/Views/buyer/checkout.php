@@ -6,7 +6,7 @@
     <ul>
         <?php foreach($items as $p):?>
            <li>
-           <?=H::e($p['title'])?> — <?=H::e($p['license_type'])?> — <?=H::money($p['line_total'])?>
+           <?=H::e($p['title'])?> — <?=H::e($p['license_name'] ?? $p['license_type'])?> — <?=H::money($p['line_total'])?>
            </li>
         <?php endforeach;?>
     </ul>

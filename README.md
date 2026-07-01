@@ -189,4 +189,4 @@ The application now includes Asset Moth public branding, shared metadata renderi
 
 ## Current phase: Phase 8.5 — Licensing System
 
-Phase 8.5 will build the marketplace licensing foundation before cart, orders, checkout, payments, and downloads are finalized. This phase should add flexible license types, seller license controls, buyer-facing license selection/explanation, license-aware product display, and database support for future license expansion without building unrelated later-phase systems.
+Phase 8.5 adds the marketplace licensing foundation: platform license types, seller-controlled per-product enabled licenses, default licenses, custom license prices/descriptions/sort order, buyer-facing license selection, cart license updates, purchased license snapshots on order items, and admin review visibility. The license schema uses flexible license keys and linked records so future license types can be added without adding product columns.

@@ -9,7 +9,7 @@
         <tr>
            <th>Product</th>
            <th>Designer</th>
-           <th>Base</th>
+           <th>Price</th>
            <th>License</th>
            <th>POD / AI</th>
            <th>Total</th>
@@ -31,18 +31,18 @@
                </a>
                </td>
                <td>
-               <?=H::money($p['price'])?>
+               <?php if(!empty($p['license_invalid'])):?><span class="muted">Unavailable</span><?php else:?><?=H::money($p['license_price'] ?? $p['line_total'])?><?php endif;?>
                </td>
                <td>
                <form method="post" action="/cart/update">
                    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
                    <select name="license_type[<?=$p['cart_item_id']?>]">
-                   <option value="personal">Personal use included</option>
-                   <?php if($p['commercial_license_enabled']):?>
-                       <option value="commercial" <?=$p['commercial_selected']?'selected':''?>>Commercial +<?=H::money($p['commercial_license_price'])?>
-                       </option>
-                   <?php endif;?>
+                   <?php foreach($p['licenses'] as $license):?>
+                       <option value="<?=H::e($license['license_key'])?>" <?=$p['license_key']===$license['license_key']?'selected':''?>><?=H::e($license['name'])?> — <?=H::money($license['price'])?></option>
+                   <?php endforeach;?>
                    </select>
+                   <?php if(!empty($p['license_invalid'])):?><p class="notice error">This license is no longer available. Please choose another license.</p><?php endif;?>
+                   <?php if($p['license_description']):?><p class="help-text"><?=H::e($p['license_description'])?></p><?php endif;?>
                    <button>Update</button>
                </form>
                </td>

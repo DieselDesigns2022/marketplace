@@ -45,17 +45,44 @@
     <?php endforeach;?>
     <label>Protected downloadable files<input type="file" name="product_files[]" multiple>
     </label>
-    <h2>Pricing</h2>
+    <h2>Pricing and Licenses</h2>
     <label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>">
     </label>
-    <div class="inline-license-row">
-        <label>
-        <input type="checkbox" name="commercial_license_enabled" <?=(!isset($p)||$p['commercial_license_enabled'])?'checked':''?>> Enable Commercial License</label>
-        <label>Commercial License Price<input type="number" step="0.01" name="commercial_license_price" value="<?=H::e($_POST['commercial_license_price']??$p['commercial_license_price']??'5.00')?>">
-        </label>
-    </div>
-    <label>
-    <input type="checkbox" name="pod_allowed" <?=($p['pod_allowed']??false)?'checked':''?>> POD Usage Allowed</label>
+    <p class="help-text">Enable at least one license. License prices are full buyer-facing prices, not add-ons.</p>
+    <?php
+        $configured = [];
+        foreach (($productLicenses ?? []) as $license) $configured[$license['license_key']] = $license;
+        $postedEnabled = $_POST['license_enabled'] ?? null;
+        $postedDefault = $_POST['default_license_key'] ?? null;
+    ?>
+    <table>
+        <tr>
+            <th>Enabled</th>
+            <th>Default</th>
+            <th>License type</th>
+            <th>Price</th>
+            <th>Sort</th>
+            <th>Description</th>
+        </tr>
+        <?php foreach($licenseTypes as $type):
+            $key = $type['license_key'];
+            $existing = $configured[$key] ?? null;
+            $enabled = $postedEnabled !== null ? isset($postedEnabled[$key]) : ($existing ? true : ($key === 'personal' || ($key === 'pod' && !empty($p['pod_allowed']))));
+            $default = $postedDefault !== null ? $postedDefault === $key : ($existing['is_default'] ?? $key === 'personal');
+            $price = $_POST['license_price'][$key] ?? $existing['price'] ?? ($key === 'personal' ? ($_POST['price']??$p['price']??'5.00') : ($_POST['price']??$p['price']??'5.00'));
+            $description = $_POST['license_description'][$key] ?? $existing['description'] ?? $type['description'] ?? '';
+            $sort = $_POST['license_sort_order'][$key] ?? $existing['sort_order'] ?? $type['sort_order'] ?? 0;
+        ?>
+            <tr>
+                <td><label><input type="checkbox" name="license_enabled[<?=H::e($key)?>]" value="1" <?=$enabled?'checked':''?>> Enable</label></td>
+                <td><label><input type="radio" name="default_license_key" value="<?=H::e($key)?>" <?=$default?'checked':''?>> Default</label></td>
+                <td><strong><?=H::e($type['name'])?></strong><br><span class="muted"><?=H::e($key)?></span></td>
+                <td><input type="number" step="0.01" min="0" name="license_price[<?=H::e($key)?>]" value="<?=H::e($price)?>"></td>
+                <td><input type="number" step="1" name="license_sort_order[<?=H::e($key)?>]" value="<?=H::e($sort)?>"></td>
+                <td><textarea name="license_description[<?=H::e($key)?>]"><?=H::e($description)?></textarea></td>
+            </tr>
+        <?php endforeach;?>
+    </table>
     <p>Digital Resale: always prohibited.</p>
     <h2>Product Details</h2>
     <label>Category<select name="category_id">

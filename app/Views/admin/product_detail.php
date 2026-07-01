@@ -24,6 +24,16 @@
         <p>Rejection Reason: <?=H::e($p['rejection_reason'])?>
         </p>
     <?php endif;?>
+    <h2>Enabled licenses</h2>
+    <?php if(empty($licenses)):?>
+        <p class="muted">No custom license records were found; the product falls back to its base personal license.</p>
+    <?php else:?>
+        <ul>
+        <?php foreach($licenses as $license):?>
+            <li><strong><?=H::e($license['name'])?></strong> <?=H::money($license['price'])?><?=!empty($license['is_default'])?' · default':''?><?php if($license['description']):?><br><span class="muted"><?=H::e($license['description'])?></span><?php endif;?></li>
+        <?php endforeach;?>
+        </ul>
+    <?php endif;?>
     <h2>Product information</h2>
     <p>
     <?=nl2br(H::e($p['description']))?>

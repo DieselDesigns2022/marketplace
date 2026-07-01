@@ -164,3 +164,9 @@ Intentionally postponed:
 - Added real-data discovery sections for featured products/creators, recently added products, related products, and more from the same creator.
 - Added Phase 8 browse/search database indexes.
 - Postponed full licensing, fake popularity, fake best-seller/rating sorts, cart/order/payment/download changes, sponsored listings, and review/rating work to later phases.
+
+## Phase 8.5 - Licensing System
+- Added platform license types and per-product license configuration for Personal, Commercial, POD, Wholesale, Fabric, VA, and Extended Commercial licenses.
+- Added seller product controls for enabled licenses, default license, license prices, descriptions, and display order.
+- Updated product, cart, checkout, buyer order, and admin review screens to show selected or purchased license details.
+- Added order item license snapshots so historical purchases keep the purchased license name, key, price, and description after seller edits.
