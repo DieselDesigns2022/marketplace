@@ -52,6 +52,7 @@ The repository should ignore environment files, public uploads, protected upload
 
 ## Phase 8.5 licensing security
 - Seller license saves continue to load products by both product id and designer id before editing.
-- Buyer-submitted license keys are validated server-side against enabled product licenses during add-to-cart and cart update.
-- Checkout recalculates line totals from stored product license configuration and writes a purchased license snapshot; client-provided prices are not trusted.
+- Licenses are included permissions, not paid add-ons: product base price is the only buyer-facing price and `license_price` is retained as `0.00` compatibility/snapshot data.
+- Buyer-submitted license key lists are normalized and validated server-side against enabled product licenses during add-to-cart and cart update, with Personal always included.
+- Checkout validates every selected license again, recalculates line totals from product base prices only, and writes snapshots for all selected included licenses; client-provided prices are not trusted.
 - Disabled or missing licenses are not purchasable, and existing products fall back to a safe Personal license if custom rows are missing.

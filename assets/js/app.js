@@ -30,9 +30,3 @@ document.addEventListener("change", (e) => {
     fields.appendChild(sort);
   });
 });
-
-document.addEventListener("change", (e) => {
-  if (!e.target.matches('[data-license-options] input[name="license_type"]')) return;
-  const price = document.querySelector("[data-license-price]");
-  if (price) price.textContent = e.target.dataset.licensePrice || price.textContent;
-});

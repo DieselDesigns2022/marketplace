@@ -105,6 +105,14 @@ button,
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
 }
+.grid.products {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+  justify-content: start;
+}
+.product {
+  width: 100%;
+  max-width: 280px;
+}
 .card {
   background: white;
   border: 1px solid var(--line);
@@ -127,6 +135,14 @@ button,
   place-items: center;
   color: #6b6478;
 }
+
+.product .thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  object-fit: cover;
+}
+
 .big {
   height: 330px;
 }

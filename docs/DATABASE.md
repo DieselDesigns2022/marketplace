@@ -149,7 +149,9 @@ Indexes added for browsing performance:
 
 ## Phase 8.5 licensing tables
 - `license_types` stores platform-level license definitions using a stable `license_key`, display name, description, active flag, and sort order so future license types can be added without changing the product schema.
-- `product_license_types` links products to enabled seller license options, including price, default flag, description override, and display order.
-- `cart_items.license_type` and `order_items.license_type` are flexible `VARCHAR(80)` keys instead of a two-value enum.
-- `order_items` now stores `license_name`, `license_price`, `license_description`, and `license_snapshot` to preserve purchased license history after later seller edits.
-- Migration: `database/migrations/2026_07_01_phase_8_5_licensing_system.sql` seeds the initial license types and backfills existing products with a default Personal license plus Commercial where the legacy commercial add-on was enabled.
+- `product_license_types` links products to enabled seller license permissions with description override and display order. The `price` column is retained for compatibility but included licenses should store `0.00`; it is not buyer-facing pricing.
+- License types are included permissions/use-case options. Personal is always included, and sellers enable or disable additional included permissions such as Commercial, POD, Wholesale, Fabric, VA, and Extended Commercial. Product price is the only buyer-facing price.
+- `cart_items.license_type` and `order_items.license_type` are flexible `VARCHAR(80)` fields that may contain a normalized comma-separated list of selected license keys. Buyers can select multiple included licenses.
+- Checkout validates every selected license server-side and does not silently substitute invalid licenses.
+- `order_items` stores `license_name`, `license_price`, `license_description`, and `license_snapshot` to preserve all selected included licenses after later seller edits; `license_price` should be `0.00` for included licenses.
+- Migration: `database/migrations/2026_07_01_phase_8_5_licensing_system.sql` seeds the initial license types and backfills existing products. Corrective migration `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` zeros existing product license prices and sets the price default to `0.00` after the original Phase 8.5 migration.

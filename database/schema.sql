@@ -81,7 +81,7 @@ CREATE TABLE products
     tags_text TEXT,
     file_types VARCHAR(255),
     commercial_license_enabled BOOLEAN DEFAULT 0,
-    commercial_license_price DECIMAL(10,2) DEFAULT 5.00,
+    commercial_license_price DECIMAL(10,2) DEFAULT 0.00,
     pod_allowed BOOLEAN DEFAULT 0,
     digital_resale_prohibited BOOLEAN DEFAULT 1,
     ai_disclosure ENUM('No AI Used','AI Assisted','AI Generated') NOT NULL,
@@ -95,6 +95,8 @@ CREATE TABLE products
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Phase 8.5 licenses are included permissions/use-case options, not paid add-ons.
+-- Product price is the only buyer-facing price; Personal is always included.
 CREATE TABLE license_types
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -116,6 +118,7 @@ INSERT INTO license_types (license_key,name,description,sort_order,is_active) VA
 ('va','VA','Virtual assistant use is allowed under the seller-provided product terms.',60,1),
 ('extended-commercial','Extended Commercial','Expanded commercial use is allowed under the seller-provided product terms.',70,1);
 
+-- price is retained for compatibility and should remain 0.00 for included licenses.
 CREATE TABLE product_license_types
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -173,6 +176,7 @@ CREATE TABLE product_tags
     PRIMARY KEY(product_id,tag_id)
 );
 
+-- cart_items.license_type may store a normalized comma-separated selected license key list.
 CREATE TABLE cart_items
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -198,6 +202,7 @@ CREATE TABLE orders
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- order_items retain selected included license snapshots; license_price should be 0.00.
 CREATE TABLE order_items
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

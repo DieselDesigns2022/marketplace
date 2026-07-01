@@ -134,7 +134,7 @@ Bug fixes:
 - Fixed logout fallback behavior so `/logout` safely redirects instead of showing a 419/404-style workflow issue.
 - Added a create-account call to action on the login page for new seller applicants.
 - Removed visible File Types UI/copy from active marketplace forms and public pages after product categorization rules changed.
-- Improved seller product form checkbox alignment and commercial license price layout.
+- Improved seller product form checkbox alignment and legacy commercial license field layout.
 - Upgraded public static launch pages for About, Privacy, Terms, and Contact.
 - Removed duplicate static page H1 output on upgraded static pages.
 - Archived temporary phase backup files, created a fresh completed Phase 6 backup, committed final changes, and pushed the phase branch.
@@ -166,7 +166,9 @@ Intentionally postponed:
 - Postponed full licensing, fake popularity, fake best-seller/rating sorts, cart/order/payment/download changes, sponsored listings, and review/rating work to later phases.
 
 ## Phase 8.5 - Licensing System
-- Added platform license types and per-product license configuration for Personal, Commercial, POD, Wholesale, Fabric, VA, and Extended Commercial licenses.
-- Added seller product controls for enabled licenses, default license, license prices, descriptions, and display order.
-- Updated product, cart, checkout, buyer order, and admin review screens to show selected or purchased license details.
-- Added order item license snapshots so historical purchases keep the purchased license name, key, price, and description after seller edits.
+- Added platform license types and per-product license configuration for Personal, Commercial, POD, Wholesale, Fabric, VA, and Extended Commercial permissions.
+- Corrected licensing so license types are included use-case permissions rather than paid add-ons: product price is the only buyer-facing price, Personal is always included, and sellers enable or disable additional included permissions.
+- Updated product, cart, checkout, buyer order, and admin review screens for multi-license selection with no buyer-facing license pricing.
+- Cart items store selected licenses as normalized key lists, checkout validates every selected license server-side, and order item snapshots preserve all selected included licenses.
+- Retained `license_price` for compatibility/snapshots but set included license pricing to `0.00`; added `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` to zero existing product license prices after the original Phase 8.5 migration.
+- Fixed product listing card/image CSS so single-product sections no longer stretch or distort previews.

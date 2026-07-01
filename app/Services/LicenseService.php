@@ -22,6 +22,21 @@ class LicenseService
         ];
     }
 
+
+    private static function personalIncludedLicense(): array
+    {
+        return [
+            'product_license_id' => null,
+            'license_type_id' => 0,
+            'license_key' => self::PERSONAL_KEY,
+            'name' => 'Personal',
+            'description' => 'Personal use for one buyer. Digital resale, sharing, and redistribution are prohibited.',
+            'price' => 0.00,
+            'is_default' => true,
+            'sort_order' => 10,
+        ];
+    }
+
     private static function missingTable(Throwable $e): bool
     {
         return $e instanceof PDOException && (($e->errorInfo[0] ?? null) === '42S02' || str_contains($e->getMessage(), "Base table or view not found"));
@@ -46,31 +61,33 @@ class LicenseService
             if (!self::missingTable($e)) throw $e;
             $rows = [];
         }
+        $personal = self::personalIncludedLicense();
         if ($rows) {
-            return array_map(function ($row) {
+            $licenses = array_map(function ($row) {
                 return [
                     'product_license_id' => (int)$row['id'],
                     'license_type_id' => (int)$row['license_type_id'],
                     'license_key' => $row['license_key'],
                     'name' => $row['custom_name'] ?: $row['platform_name'],
                     'description' => $row['description'] ?: $row['platform_description'],
-                    'price' => (float)$row['price'],
-                    'is_default' => (int)$row['is_default'] === 1,
+                    'price' => 0.00,
+                    'is_default' => $row['license_key'] === self::PERSONAL_KEY,
                     'sort_order' => (int)$row['sort_order'],
                 ];
             }, $rows);
+            $ordered = [];
+            foreach ($licenses as $license) {
+                if ($license['license_key'] === self::PERSONAL_KEY) {
+                    $personal = $license;
+                    $personal['is_default'] = true;
+                    continue;
+                }
+                $ordered[] = $license;
+            }
+            array_unshift($ordered, $personal);
+            return $ordered;
         }
 
-        $personal = [
-            'product_license_id' => null,
-            'license_type_id' => 0,
-            'license_key' => self::PERSONAL_KEY,
-            'name' => 'Personal',
-            'description' => 'Personal use for one buyer. Digital resale, sharing, and redistribution are prohibited.',
-            'price' => (float)($product['price'] ?? 0),
-            'is_default' => true,
-            'sort_order' => 10,
-        ];
         $licenses = [$personal];
         if (!empty($product['commercial_license_enabled'])) {
             $licenses[] = [
@@ -79,7 +96,7 @@ class LicenseService
                 'license_key' => 'commercial',
                 'name' => 'Commercial',
                 'description' => 'Commercial use is allowed under this product license. Digital resale, sharing, and redistribution are prohibited.',
-                'price' => (float)($product['price'] ?? 0) + (float)($product['commercial_license_price'] ?? 0),
+                'price' => 0.00,
                 'is_default' => false,
                 'sort_order' => 20,
             ];
@@ -89,20 +106,73 @@ class LicenseService
 
     public static function defaultLicense(array $product): array
     {
-        $licenses = self::productLicenses($product);
-        foreach ($licenses as $license) if ($license['is_default']) return $license;
-        return $licenses[0];
+        return self::selectedLicenses($product, [self::PERSONAL_KEY])[0];
+    }
+
+    public static function normalizeLicenseKeys(mixed $licenseKeys): array
+    {
+        if (is_string($licenseKeys)) $licenseKeys = preg_split('/[,\s]+/', $licenseKeys) ?: [];
+        if (!is_array($licenseKeys)) $licenseKeys = [];
+        $keys = [self::PERSONAL_KEY];
+        foreach ($licenseKeys as $key) {
+            $key = trim((string)$key);
+            if ($key !== '' && !in_array($key, $keys, true)) $keys[] = $key;
+        }
+        return $keys;
+    }
+
+    public static function selectedLicenses(array $product, mixed $licenseKeys): array
+    {
+        $requested = self::normalizeLicenseKeys($licenseKeys);
+        $available = [];
+        foreach (self::productLicenses($product) as $license) $available[$license['license_key']] = $license;
+        if (!isset($available[self::PERSONAL_KEY])) $available[self::PERSONAL_KEY] = self::personalIncludedLicense();
+        $selected = [];
+        foreach ($requested as $key) {
+            if (!isset($available[$key])) return [];
+            $selected[] = $available[$key];
+        }
+        return $selected;
     }
 
     public static function purchasableLicense(int $productId, ?string $licenseKey): ?array
     {
+        $licenses = self::purchasableLicenses($productId, $licenseKey);
+        return $licenses[0] ?? null;
+    }
+
+    public static function purchasableLicenses(int $productId, mixed $licenseKeys): array
+    {
         $product = DB::row('select * from products where id=? and status="approved"', [$productId]);
-        if (!$product) return null;
-        $licenseKey = trim((string)$licenseKey);
-        $licenses = self::productLicenses($product);
-        if ($licenseKey === '') return self::defaultLicense($product);
-        foreach ($licenses as $license) if ($license['license_key'] === $licenseKey) return $license;
-        return null;
+        if (!$product) return [];
+        return self::selectedLicenses($product, $licenseKeys);
+    }
+
+    public static function keyList(array $licenses): string
+    {
+        return implode(',', array_column($licenses, 'license_key'));
+    }
+
+    public static function nameList(array $licenses): string
+    {
+        return implode(', ', array_column($licenses, 'name'));
+    }
+
+    public static function descriptionList(array $licenses): string
+    {
+        return implode("\n", array_values(array_filter(array_map(static fn($license) => $license['name'].': '.($license['description'] ?? ''), $licenses))));
+    }
+
+    public static function snapshot(array $licenses): string
+    {
+        $snapshot = json_encode(array_map(static fn($license) => [
+            'key' => $license['license_key'],
+            'name' => $license['name'],
+            'description' => $license['description'] ?? '',
+            'included' => true,
+            'price' => 0.00,
+        ], $licenses), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return $snapshot === false ? '[]' : $snapshot;
     }
 
     public static function normalizePosted(array $product, array $post): array
@@ -112,28 +182,23 @@ class LicenseService
             return [[], ['License settings are temporarily unavailable until the licensing database migration has been run.']];
         }
         $enabled = $post['license_enabled'] ?? [];
-        $prices = $post['license_price'] ?? [];
         $descriptions = $post['license_description'] ?? [];
         $orders = $post['license_sort_order'] ?? [];
-        $default = trim((string)($post['default_license_key'] ?? self::PERSONAL_KEY));
         $licenses = [];
         $errors = [];
         foreach ($types as $type) {
             $key = $type['license_key'];
-            if (!isset($enabled[$key])) continue;
-            $price = $prices[$key] ?? $product['price'] ?? '0.00';
-            if (!is_numeric($price) || (float)$price < 0) $errors[] = $type['name'].' license price must be a valid non-negative amount.';
+            if ($key !== self::PERSONAL_KEY && !isset($enabled[$key])) continue;
             $licenses[$key] = [
                 'license_type_id' => (int)$type['id'],
                 'license_key' => $key,
-                'price' => number_format((float)$price, 2, '.', ''),
+                'price' => '0.00',
                 'description' => trim((string)($descriptions[$key] ?? '')),
                 'sort_order' => (int)($orders[$key] ?? $type['sort_order'] ?? 0),
-                'is_default' => $key === $default,
+                'is_default' => $key === self::PERSONAL_KEY,
             ];
         }
-        if (!$licenses) $errors[] = 'At least one license must be enabled.';
-        if (!isset($licenses[$default])) $errors[] = 'Default license must be one of the enabled licenses.';
+        if (!isset($licenses[self::PERSONAL_KEY])) $errors[] = 'Personal license must be available.';
         return [$licenses, $errors];
     }
 

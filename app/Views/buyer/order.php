@@ -5,7 +5,7 @@
 <table>
     <tr>
         <th>Product</th>
-        <th>License</th>
+        <th>Included permissions</th>
         <th>Price</th>
         <th>Download</th>
     </tr>

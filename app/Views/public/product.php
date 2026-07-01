@@ -22,7 +22,7 @@
         </a>
     <?php else:?>Uncategorized<?php endif;?>
         </p>
-        <h2 data-license-price><?=H::money($defaultLicense['price'] ?? $p['price'])?></h2>
+        <h2><?=H::money($p['price'])?></h2>
         <p>
         <span class="badge ai">
         <?=H::e($p['ai_disclosure'])?>
@@ -31,8 +31,8 @@
         <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
         </span>
         </p>
-        <p>Available licenses: <?=H::e(implode(', ', array_column($licenses, 'name')))?></p>
-        <p>Digital resale, file sharing, and redistribution are prohibited. Review the license details before purchase.</p>
+        <p>Included permissions: <?=H::e(implode(', ', array_column($licenses, 'name')))?></p>
+        <p>License permissions are included with the product price. Digital resale, file sharing, and redistribution are prohibited.</p>
         <p>Tags: <?php if($tags): ?>
         <?php foreach($tags as $tag): ?>
         <a class="badge" href="/browse?q=<?=H::e(urlencode($tag['name']))?>">
@@ -53,17 +53,18 @@
         <form method="post" action="/cart/add/<?=$p['id']?>">
            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
            <fieldset class="license-options" data-license-options>
-               <legend>Choose a license</legend>
+               <legend>Choose included permissions</legend>
                <?php foreach($licenses as $license):?>
                    <label>
-                       <input type="radio" name="license_type" value="<?=H::e($license['license_key'])?>" data-license-price="<?=H::e(H::money($license['price']))?>" <?=($license['license_key']===($defaultLicense['license_key']??''))?'checked':''?>>
-                       <strong><?=H::e($license['name'])?></strong> — <?=H::money($license['price'])?>
+                       <input type="checkbox" name="license_type[]" value="<?=H::e($license['license_key'])?>" <?=$license['license_key']==='personal'?'checked disabled':''?>>
+                       <?php if($license['license_key']==='personal'):?><input type="hidden" name="license_type[]" value="personal"><?php endif;?>
+                       <strong><?=H::e($license['name'])?></strong> <span class="muted">included</span>
                        <?php if($license['description']):?><span class="help-text"><?=H::e($license['description'])?></span><?php endif;?>
                    </label>
                <?php endforeach;?>
            </fieldset>
            <button class="btn">Add to cart</button>
-           <p class="help-text">Review the product details, license options, POD permission, and AI disclosure before adding this digital item.</p>
+           <p class="help-text">Review the product details, included permissions, POD permission, and AI disclosure before adding this digital item.</p>
         </form>
     <?php endif;?>
     <form method="post" action="/product/<?=$p['id']?>/wishlist">
@@ -72,7 +73,7 @@
     </form>
 </aside>
 </div>
-<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is included unless the product page states otherwise. Commercial license availability, POD permission, and AI disclosure are shown before purchase.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
+<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is always included. Seller-enabled commercial, POD, wholesale, fabric, VA, and extended commercial permissions are included when shown, with no license add-on pricing.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
 <h2>Description</h2>
 <?php if($p['short_description']):?>
     <p>

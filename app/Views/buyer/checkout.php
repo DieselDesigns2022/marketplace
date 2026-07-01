@@ -6,7 +6,7 @@
     <ul>
         <?php foreach($items as $p):?>
            <li>
-           <?=H::e($p['title'])?> — <?=H::e($p['license_name'] ?? $p['license_type'])?> — <?=H::money($p['line_total'])?>
+           <?=H::e($p['title'])?> — <?=H::money($p['line_total'])?><br><span class="muted">Included permissions: <?=H::e($p['license_name'] ?? $p['license_type'])?></span>
            </li>
         <?php endforeach;?>
     </ul>

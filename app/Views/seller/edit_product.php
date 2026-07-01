@@ -48,19 +48,16 @@
     <h2>Pricing and Licenses</h2>
     <label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>">
     </label>
-    <p class="help-text">Enable at least one license. License prices are full buyer-facing prices, not add-ons.</p>
+    <p class="help-text">Personal is always included. Enable any additional permissions that are included with this product at no added license price.</p>
     <?php
         $configured = [];
         foreach (($productLicenses ?? []) as $license) $configured[$license['license_key']] = $license;
         $postedEnabled = $_POST['license_enabled'] ?? null;
-        $postedDefault = $_POST['default_license_key'] ?? null;
     ?>
     <table>
         <tr>
             <th>Enabled</th>
-            <th>Default</th>
             <th>License type</th>
-            <th>Price</th>
             <th>Sort</th>
             <th>Description</th>
         </tr>
@@ -68,16 +65,12 @@
             $key = $type['license_key'];
             $existing = $configured[$key] ?? null;
             $enabled = $postedEnabled !== null ? isset($postedEnabled[$key]) : ($existing ? true : ($key === 'personal' || ($key === 'pod' && !empty($p['pod_allowed']))));
-            $default = $postedDefault !== null ? $postedDefault === $key : ($existing['is_default'] ?? $key === 'personal');
-            $price = $_POST['license_price'][$key] ?? $existing['price'] ?? ($key === 'personal' ? ($_POST['price']??$p['price']??'5.00') : ($_POST['price']??$p['price']??'5.00'));
             $description = $_POST['license_description'][$key] ?? $existing['description'] ?? $type['description'] ?? '';
             $sort = $_POST['license_sort_order'][$key] ?? $existing['sort_order'] ?? $type['sort_order'] ?? 0;
         ?>
             <tr>
-                <td><label><input type="checkbox" name="license_enabled[<?=H::e($key)?>]" value="1" <?=$enabled?'checked':''?>> Enable</label></td>
-                <td><label><input type="radio" name="default_license_key" value="<?=H::e($key)?>" <?=$default?'checked':''?>> Default</label></td>
-                <td><strong><?=H::e($type['name'])?></strong><br><span class="muted"><?=H::e($key)?></span></td>
-                <td><input type="number" step="0.01" min="0" name="license_price[<?=H::e($key)?>]" value="<?=H::e($price)?>"></td>
+                <td><label><input type="checkbox" name="license_enabled[<?=H::e($key)?>]" value="1" <?=$enabled?'checked':''?> <?=$key==='personal'?'checked disabled':''?>> <?=$key==='personal'?'Always included':'Enable'?></label><?php if($key==='personal'):?><input type="hidden" name="license_enabled[personal]" value="1"><?php endif;?></td>
+                <td><strong><?=H::e($type['name'])?></strong><br><span class="muted"><?=H::e($key)?> · included/free</span></td>
                 <td><input type="number" step="1" name="license_sort_order[<?=H::e($key)?>]" value="<?=H::e($sort)?>"></td>
                 <td><textarea name="license_description[<?=H::e($key)?>]"><?=H::e($description)?></textarea></td>
             </tr>
