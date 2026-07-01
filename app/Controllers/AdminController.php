@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
+use App\Services\WatermarkService;
 use Throwable;
 class AdminController
 {
@@ -202,7 +203,16 @@ class AdminController
         $this->gate();
         if($_POST)
         {
-           $this->moderateProduct((int)$id,$_POST['action']??'',trim($_POST['reason']??''));
+           if (($_POST['action'] ?? '') === 'regenerate_watermark') {
+               $img = DB::row('select * from product_images where id=? and product_id=?', [(int)($_POST['image_id'] ?? 0), (int)$id]);
+               if ($img && !empty($img['original_image_path'])) {
+                   $result = WatermarkService::regenerate($img['original_image_path'], $img['image_path']);
+                   DB::exec('update product_images set watermark_status=?,watermark_error=?,updated_at=now() where id=? and product_id=?', [$result['ok'] ? WatermarkService::STATUS_WATERMARKED : WatermarkService::STATUS_FAILED, $result['ok'] ? null : $result['message'], (int)$img['id'], (int)$id]);
+                   H::flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Watermark regenerated from the private original preview.' : 'Watermark regeneration failed: ' . $result['message']);
+               } else H::flash('error', 'Original private preview image is unavailable.');
+           } else {
+               $this->moderateProduct((int)$id,$_POST['action']??'',trim($_POST['reason']??''));
+           }
             H::redirect('/admin/products/'.(int)$id);
 
         }

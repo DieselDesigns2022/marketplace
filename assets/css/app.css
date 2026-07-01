@@ -905,3 +905,5 @@ body.license-modal-open {
 .license-options {
   margin-bottom: 18px;
 }
+
+.share-actions,.social-link-list{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}.btn.small{padding:.45rem .75rem;font-size:.9rem}.social-link{display:inline-flex;border:1px solid var(--border,#ddd);border-radius:999px;padding:.35rem .7rem;text-decoration:none;font-weight:700}.help-text{color:var(--muted,#666);font-size:.92rem}

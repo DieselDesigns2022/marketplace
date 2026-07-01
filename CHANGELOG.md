@@ -168,7 +168,13 @@ Intentionally postponed:
 ## Phase 8.5 - Licensing System
 - Added platform license types and per-product license configuration for Personal, Commercial, POD, Wholesale, Fabric, VA, and Extended Commercial permissions.
 - Corrected Phase 8.5 licensing so Personal is always included/free while seller-enabled add-on permissions may be free (`$0.00`) or paid, with buyer/cart/order/admin snapshots reflecting selected licenses and prices.
-- Updated product, cart, checkout, buyer order, and admin review screens for multi-license selection with no buyer-facing license pricing.
-- Cart items store selected licenses as normalized key lists, checkout validates every selected license server-side, and order item snapshots preserve all selected included licenses.
-- Retained `license_price` for compatibility/snapshots but set included license pricing to `0.00`; added `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` to zero existing product license prices after the original Phase 8.5 migration.
+- Updated product, cart, checkout, buyer order, and admin review screens for multi-license selection with visible add-on license pricing where paid permissions are selected.
+- Cart items store selected licenses as normalized key lists, checkout validates every selected license server-side, recalculates totals from product base price plus selected paid add-on license prices, and order item snapshots preserve selected licenses.
+- Retained `license_price` for compatibility/snapshots; Personal/included licenses remain `0.00`, while selected paid add-on licenses snapshot their configured add-on prices. Kept `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` as a compatibility no-op after the add-on pricing correction superseded the earlier included-license-only pricing fix.
 - Fixed product listing card/image CSS so single-product sections no longer stretch or distort previews.
+
+## Phase 8.75 — Marketplace Protection, Sharing & Store Polish
+- Added server-side preview image watermarking for seller-uploaded public product previews. Watermarking only applies to public preview images; protected purchased/download files are not watermarked or altered.
+- Added private original preview retention for newly uploaded product preview images, plus seller/admin watermark regeneration from the private original.
+- Added product page share actions for Facebook, X/Twitter, clean copy link, and Instagram-friendly copy text, using existing Open Graph/Twitter metadata patterns and watermarked public preview images when present.
+- Added optional storefront social link fields for Facebook, Instagram, TikTok, Pinterest, Etsy, Shopify, and website with http/https validation and safe public external link attributes.

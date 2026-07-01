@@ -176,3 +176,9 @@ Each phase should include:
 Public search and browsing now live in `App\Controllers\PublicController` through `browseState()`, `browseCountWhere()`, and `browseQuery()`. Filtering, weighted search scoring, sorting, and pagination are performed in SQL with bound parameters and approved public product/designer constraints. The page size is controlled by `BROWSE_PAGE_SIZE`.
 
 The public browse UI preserves filters, sort, and pagination parameters. Category routes keep the category in `/category/{slug}` and pass other filters as query parameters. Do not add fake best-selling, fake rating, or Phase 8.5 licensing behavior to these paths.
+
+## Phase 8.75 development notes
+- Watermark source: place a PNG/JPG/WEBP watermark at `storage/app/private/branding/watermark.png` or set `WATERMARK_SOURCE_PATH` in the server environment. Do not commit production watermark uploads or generated product preview files.
+- The PHP GD extension is used for local image processing. If GD is unavailable, uploads fail gracefully to a public original fallback and record `watermark_status`/`watermark_error` for seller/admin review.
+- Regenerate watermark actions use `product_images.original_image_path` as the source and write to the existing public preview path, avoiding repeated watermarking.
+- Storefront social links must be http/https URLs and are optional.
