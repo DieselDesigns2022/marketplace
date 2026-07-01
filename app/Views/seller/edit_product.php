@@ -24,13 +24,14 @@
     <?php foreach($images as $img):?>
         <div class="inline">
            <img class="thumb" src="<?=H::e($img['image_path'])?>" alt="<?=H::e($img['alt_text']??'Product preview')?>">
-           <span>
-           <?=H::e($img['alt_text']??'')?>
-           </span>
+           <span><?=H::e($img['alt_text']??'')?> · <?=H::e($img['watermark_status'] ?? 'legacy preview')?></span>
+           <?php if(!empty($img['original_image_path'])):?><button name="regenerate_image" value="<?=$img['id']?>">Regenerate watermark</button><?php endif;?>
            <button name="delete_image" value="<?=$img['id']?>">Delete image</button>
+           <?php if(!empty($img['watermark_error'])):?><small class="help-text">Watermark note: <?=H::e($img['watermark_error'])?></small><?php endif;?>
         </div>
     <?php endforeach;?>
-    <label>Upload preview images<input type="file" name="preview_images[]" multiple accept="image/*" data-preview-images>
+    <p class="help-text">Public preview images are watermarked automatically. Purchased/downloadable files below are never watermarked or altered.</p>
+    <label>Upload preview images<input type="file" name="preview_images[]" multiple accept=".jpg,.jpeg,.png,.webp" data-preview-images>
     </label>
     <div data-preview-alt-fields>
         <p class="muted">Select preview images to add separate alt text for each image.</p>

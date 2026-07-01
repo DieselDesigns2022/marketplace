@@ -30,3 +30,22 @@ document.addEventListener("change", (e) => {
     fields.appendChild(sort);
   });
 });
+
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-copy-link]');
+  if (!button) return;
+  const text = button.getAttribute('data-copy-link') || '';
+  const originalHtml = button.dataset.copyOriginalHtml || button.innerHTML;
+  button.dataset.copyOriginalHtml = originalHtml;
+  try {
+    await navigator.clipboard.writeText(text);
+    button.classList.add('copied');
+    button.innerHTML = '<span aria-hidden="true">✓</span><span class="sr-only">Copied</span>';
+    setTimeout(() => {
+      button.innerHTML = originalHtml;
+      button.classList.remove('copied');
+    }, 1800);
+  } catch (error) {
+    window.prompt('Copy this link:', text);
+  }
+});

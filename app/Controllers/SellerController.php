@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
+use App\Services\WatermarkService;
 class SellerController
 {
     private function d()
@@ -51,6 +52,24 @@ class SellerController
         return $url;
 
     }
+
+    private function normalizeSocialUrl(string $url, string $label, array &$errors): string
+    {
+        $url = $this->normalizeUrl($url);
+        if ($url === '') return '';
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !in_array(strtolower(parse_url($url, PHP_URL_SCHEME) ?: ''), ['http','https'], true)) {
+            $errors[] = $label . ' URL must be a valid http or https link.';
+            return '';
+        }
+        return $url;
+    }
+    private function socialValues(array &$errors): array
+    {
+        $labels = ['facebook_url'=>'Facebook','instagram_url'=>'Instagram','tiktok_url'=>'TikTok','pinterest_url'=>'Pinterest','etsy_url'=>'Etsy','shopify_url'=>'Shopify'];
+        $values = [];
+        foreach ($labels as $field => $label) $values[$field] = $this->normalizeSocialUrl($_POST[$field] ?? '', $label, $errors);
+        return $values;
+    }
     private function uploadPublicImage(string $field, string $folder, array &$errors): ?string
     {
         if (empty($_FILES[$field]['tmp_name']))
@@ -64,9 +83,9 @@ class SellerController
             return null;
 
         }
-        if (($_FILES[$field]['size'] ?? 0) > 2 * 1024 * 1024)
+        if (($_FILES[$field]['size'] ?? 0) > 15 * 1024 * 1024)
         {
-            $errors[] = ucfirst($field) . ' must be 2MB or smaller.';
+            $errors[] = ucfirst($field) . ' must be 15MB or smaller.';
             return null;
 
         }
@@ -217,8 +236,9 @@ class SellerController
             $display = trim($_POST['display_name'] ?? '');
             $slug = trim($_POST['store_slug'] ?? '');
             $bio = trim($_POST['bio'] ?? '');
-            $website = $this->normalizeUrl($_POST['website_url'] ?? '');
+            $website = $this->normalizeSocialUrl($_POST['website_url'] ?? '', 'Website', $errors);
             $social = trim($_POST['social_links'] ?? '');
+            $socialFields = $this->socialValues($errors);
             $announcement = trim($_POST['announcement'] ?? '');
             $seoTitle = trim($_POST['seo_title'] ?? '');
             $seoDescription = trim($_POST['seo_description'] ?? '');
@@ -252,16 +272,12 @@ class SellerController
                 $errors[] = 'SEO description must be 170 characters or fewer.';
 
            }
-            if ($website && !filter_var($website, FILTER_VALIDATE_URL))
-           {
-                $errors[] = 'Website URL must be a valid link.';
 
-           }
             $avatar = $this->uploadPublicImage('avatar', 'store_avatars', $errors);
             $banner = $this->uploadPublicImage('banner', 'store_banners', $errors);
             if (!$errors)
            {
-                DB::exec( 'update designers set display_name=?,store_slug=?,bio=?,website_url=?,social_links=?,announcement=?,seo_title=?,seo_description=?,avatar_path=coalesce(?,avatar_path),banner_path=coalesce(?,banner_path),updated_at=now() where id=? and user_id=?', [ $display, $slug, $bio, $website, $social, $announcement, $seoTitle, $seoDescription, $avatar, $banner, $d['id'], H::user()['id'], ] );
+                DB::exec( 'update designers set display_name=?,store_slug=?,bio=?,website_url=?,social_links=?,facebook_url=?,instagram_url=?,tiktok_url=?,pinterest_url=?,etsy_url=?,shopify_url=?,announcement=?,seo_title=?,seo_description=?,avatar_path=coalesce(?,avatar_path),banner_path=coalesce(?,banner_path),updated_at=now() where id=? and user_id=?', [ $display, $slug, $bio, $website, $social, $socialFields['facebook_url'], $socialFields['instagram_url'], $socialFields['tiktok_url'], $socialFields['pinterest_url'], $socialFields['etsy_url'], $socialFields['shopify_url'], $announcement, $seoTitle, $seoDescription, $avatar, $banner, $d['id'], H::user()['id'], ] );
                 H::flash('success', 'Store settings updated.');
                 H::redirect('/seller/store');
 
@@ -344,43 +360,23 @@ class SellerController
     }
     private function savePreviewImages(int $productId, array &$errors): void
     {
-        if (empty($_FILES['preview_images']['name'][0]))
-        {
-            return;
-
-        }
-        $dir = public_path('uploads/product_previews');
-        if (!is_dir($dir))
-        {
-            mkdir($dir, 0755, true);
-
-        }
-        foreach ($_FILES['preview_images']['name'] as $idx => $original)
-        {
-            if (($_FILES['preview_images']['error'][$idx] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK)
-           {
-                continue;
-
-           }
-            $tmp = $_FILES['preview_images']['tmp_name'][$idx];
-            $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
-            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || !@getimagesize($tmp))
-           {
-                $errors[] = 'Preview images must be JPG, PNG, or WEBP files.';
-                continue;
-
-           }
-            $name = bin2hex(random_bytes(12)) . '.' . $ext;
-            if (move_uploaded_file($tmp, $dir . '/' . $name))
-           {
-                $alt = trim($_POST['preview_alt'][$idx] ?? pathinfo($original, PATHINFO_FILENAME));
+        if (empty($_FILES['preview_images']['name'][0])) return;
+        foreach ($_FILES['preview_images']['name'] as $idx => $original) {
+            if (($_FILES['preview_images']['error'][$idx] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+            $file = [
+                'name' => $original,
+                'tmp_name' => $_FILES['preview_images']['tmp_name'][$idx] ?? '',
+                'error' => $_FILES['preview_images']['error'][$idx] ?? UPLOAD_ERR_NO_FILE,
+                'size' => $_FILES['preview_images']['size'][$idx] ?? 0,
+                'type' => $_FILES['preview_images']['type'][$idx] ?? '',
+            ];
+            $saved = WatermarkService::applyUploadedPreview($file, 'product_previews', $errors);
+            if ($saved) {
+                $alt = trim($_POST['preview_alt'][$idx] ?? pathinfo((string)$original, PATHINFO_FILENAME));
                 $sort = (int) ($_POST['preview_sort'][$idx] ?? $idx);
-                DB::exec( 'insert into product_images (product_id,image_path,alt_text,sort_order) values (?,?,?,?)', [$productId, '/uploads/product_previews/' . $name, $alt, $sort] );
-
-           }
-
+                DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)', [$productId, $saved['image_path'], $saved['original_image_path'], $saved['watermark_status'], $saved['watermark_error'], $alt, $sort]);
+            }
         }
-
     }
     private function syncTags(int $productId, string $tagsText): void
     {
@@ -412,7 +408,7 @@ class SellerController
     }
     private function deletePreviewImage(int $imageId, int $productId): void
     {
-        $img = DB::row('select image_path from product_images where id=? and product_id=?', [$imageId, $productId]);
+        $img = DB::row('select image_path,original_image_path from product_images where id=? and product_id=?', [$imageId, $productId]);
         if ($img)
         {
             $path = public_path(ltrim($img['image_path'], '/'));
@@ -423,10 +419,25 @@ class SellerController
                 @unlink($real);
 
            }
+            if (!empty($img['original_image_path'])) {
+                $originalPath = app_path('storage/app/private/' . ltrim($img['original_image_path'], '/'));
+                $originalBase = realpath(app_path('storage/app/private/product_previews'));
+                $originalReal = realpath($originalPath);
+                if ($originalBase && $originalReal && is_file($originalReal) && str_starts_with($originalReal, $originalBase)) @unlink($originalReal);
+            }
             DB::exec('delete from product_images where id=? and product_id=?', [$imageId, $productId]);
 
         }
 
+    }
+
+    private function regeneratePreviewImage(int $imageId, int $productId): void
+    {
+        $img = DB::row('select * from product_images where id=? and product_id=?', [$imageId, $productId]);
+        if (!$img || empty($img['original_image_path'])) { H::flash('error', 'Original private preview image is unavailable.'); return; }
+        $result = WatermarkService::regenerate($img['original_image_path'], $img['image_path']);
+        DB::exec('update product_images set watermark_status=?,watermark_error=?,updated_at=now() where id=? and product_id=?', [$result['ok'] ? WatermarkService::STATUS_WATERMARKED : WatermarkService::STATUS_FAILED, $result['ok'] ? null : $result['message'], $imageId, $productId]);
+        H::flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Watermark regenerated from the private original preview.' : 'Watermark regeneration failed: ' . $result['message']);
     }
     private function deleteProductFile(int $fileId, int $productId): bool
     {
@@ -570,6 +581,12 @@ class SellerController
             if (($_POST['delete_image'] ?? ''))
            {
                 $this->deletePreviewImage((int) $_POST['delete_image'], (int) $p['id']);
+                H::redirect('/seller/product/' . $p['id']);
+
+           }
+            if (($_POST['regenerate_image'] ?? ''))
+           {
+                $this->regeneratePreviewImage((int) $_POST['regenerate_image'], (int) $p['id']);
                 H::redirect('/seller/product/' . $p['id']);
 
            }

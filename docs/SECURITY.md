@@ -54,5 +54,15 @@ The repository should ignore environment files, public uploads, protected upload
 - Seller license saves continue to load products by both product id and designer id before editing.
 - License pricing is server-authoritative: Personal is always included/free, seller-enabled add-on licenses may be free (`$0.00`) or paid, cart totals are recalculated server-side, and order items snapshot selected licenses plus their prices.
 - Buyer-submitted license key lists are normalized and validated server-side against enabled product licenses during add-to-cart and cart update, with Personal always included.
-- Checkout validates every selected license again, recalculates line totals from product base prices only, and writes snapshots for all selected included licenses; client-provided prices are not trusted.
+- Checkout validates every selected license again, recalculates line totals from product base price plus selected paid add-on license prices, and writes snapshots for selected licenses, selected names/descriptions, and selected paid add-on prices; client-provided prices are not trusted.
 - Disabled or missing licenses are not purchasable, and existing products fall back to a safe Personal license if custom rows are missing.
+
+## Phase 8.75 upload, watermark, and external-link security
+- Product preview image uploads are validated by extension, MIME type, image metadata, and size before storage. Filenames are random server-generated values; original upload names are not trusted for storage paths.
+- Watermarking applies only to public product preview images. Protected purchased/download files in `storage/protected_uploads/products` are not processed by the watermark service.
+- Newly uploaded preview originals are retained under `storage/app/private/product_previews/` for seller/admin regeneration and are not served as public product images when a watermarked public version exists.
+- The watermark source image can be placed at `storage/app/private/branding/watermark.png` or overridden with `WATERMARK_SOURCE_PATH`. If GD or the configured source is unavailable, the app fails gracefully and records a seller/admin-safe status message instead of breaking product pages.
+- Storefront social links are normalized to http/https URLs, reject dangerous schemes such as `javascript:`, and render publicly with `target="_blank"` and `rel="noopener noreferrer nofollow ugc"`.
+
+- Phase 8.75 live testing raised seller preview/avatar/banner image validation to 15MB while keeping extension, MIME, image metadata, and server-generated filename checks. PHP upload handling is capped through `public/.user.ini`; Nginx dotfile protection was verified so `.user.ini` returns 403 publicly.
+- Legacy public preview images were backfilled by copying the existing public preview into private preview storage first, then generating a watermarked public preview from that retained private original.

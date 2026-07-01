@@ -45,9 +45,13 @@
     <?=H::e($d['bio'])?>
     </textarea>
     </label>
-    <label>Website URL<input name="website_url" value="<?=H::e($d['website_url']??'')?>" placeholder="dieseldesigns.net">
-    </label>
-    <label>Social links<textarea name="social_links">
+    <label>Website URL<input name="website_url" value="<?=H::e($d['website_url']??'')?>" placeholder="https://example.com"></label>
+    <h2>Storefront social links</h2>
+    <p class="help-text">Optional public links must be valid http/https URLs. Empty links are hidden from your storefront.</p>
+    <?php foreach(['facebook_url'=>'Facebook','instagram_url'=>'Instagram','tiktok_url'=>'TikTok','pinterest_url'=>'Pinterest','etsy_url'=>'Etsy','shopify_url'=>'Shopify'] as $field=>$label):?>
+        <label><?=$label?> URL<input name="<?=$field?>" value="<?=H::e($d[$field]??'')?>" placeholder="https://"></label>
+    <?php endforeach;?>
+    <label>Legacy social notes<textarea name="social_links">
     <?=H::e($d['social_links'])?>
     </textarea>
     </label>
@@ -61,10 +65,10 @@
     <?=H::e($d['seo_description']??'')?>
     </textarea>
     </label>
-    <label>Avatar/logo upload <small>JPG, PNG, or WEBP up to 2MB.</small>
+    <label>Avatar/logo upload <small>JPG, PNG, or WEBP up to 15MB.</small>
     <input type="file" name="avatar" accept=".jpg,.jpeg,.png,.webp">
     </label>
-    <label>Banner image upload <small>JPG, PNG, or WEBP up to 2MB.</small>
+    <label>Banner image upload <small>JPG, PNG, or WEBP up to 15MB.</small>
     <input type="file" name="banner" accept=".jpg,.jpeg,.png,.webp">
     </label>
     <button class="btn">Save Store Settings</button>

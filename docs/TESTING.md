@@ -140,3 +140,14 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 - Run PHP syntax checks for changed PHP files after editing licensing code.
 - Run `git diff --check` to catch whitespace issues.
 - Manual coverage should confirm Personal is always included/free; sellers can enable/disable Basic, Commercial, POD, Wholesale, Fabric with overseas printing, Fabric without overseas printing, VA, Reseller with credit required, Reseller with no credit required, and Extended Commercial add-ons; sellers can save `$0.00` and paid add-on prices; buyers can select multiple licenses; guest cart add/update/remove works before login; checkout requires login and returns users to the saved cart; cart totals include base price plus selected paid add-ons; order items snapshot selected licenses and prices; buyer/admin displays show selected license details; disabled license rejection and fallback behavior work; tooltips/modals are readable; Licensing Help shows current terms; and single-product listing cards/images do not stretch or distort.
+
+## Phase 8.75 testing notes
+- Upload JPG, PNG, and WEBP preview images from the seller product form and confirm the public `product_images.image_path` points to a watermarked `/uploads/product_previews/*-wm.*` file when GD succeeds.
+- Confirm `product_images.original_image_path` points to `storage/app/private/product_previews/` and is used by seller/admin watermark regeneration, rather than applying a second watermark to an already-watermarked public image.
+- Confirm protected product files remain in `storage/protected_uploads/products` and are not modified by preview watermarking.
+- Confirm product pages render share controls, copy buttons work in browsers with Clipboard API support, and Open Graph/Twitter image metadata uses the public preview image.
+- Confirm seller storefront social fields reject invalid or dangerous URLs, valid links display publicly, and public links include safe external-link attributes.
+
+- Phase 8.75 live testing confirmed 15MB seller preview/avatar/banner uploads, active web PHP upload limits of `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`, and verified `public/.user.ini` is blocked from public access with HTTP 403.
+- Live testing confirmed transparent PNG watermarks render without black rectangles, use bottom-left placement at 50% opacity, regenerate correctly from retained private originals, and legacy preview images were backfilled to watermarked public previews with `watermark_status = watermarked` and no errors.
+- Live testing confirmed product share controls render as clickable icon buttons under the wishlist action, copy/share actions work, storefront social links normalize seller-entered domain-only URLs to HTTPS, and license trust notes display below the product description.
