@@ -130,3 +130,19 @@ Product images are public preview assets. Product files are protected downloadab
 ## Orders, earnings, and commissions
 
 Orders contain one or more order items. Each order item can produce seller earning and platform commission records. The default commission rate in `order_items` is `.2000`, representing a 20% platform commission unless changed by future business logic.
+
+## Phase 8 search and browsing data usage
+
+Phase 8 uses existing product, category, designer/store, tag, AI disclosure, POD permission, featured, price, file type, and existing commercial-license fields. It does not add Phase 8.5 licensing schema or cart/order license changes.
+
+Added migration: `database/migrations/2026_06_30_phase_8_search_browsing_indexes.sql`. It uses `CREATE INDEX IF NOT EXISTS` so the index step is safe to re-run/idempotent in database environments that support this syntax.
+
+Indexes added for browsing performance:
+
+- `idx_products_public_browse` on `products(status, is_featured, created_at, id)`.
+- `idx_products_category_status` on `products(category_id, status, created_at)`.
+- `idx_products_designer_status` on `products(designer_id, status, created_at)`.
+- `idx_products_price_status` on `products(status, price)`.
+- `idx_products_ai_pod_status` on `products(status, ai_disclosure, pod_allowed)`.
+- `idx_designers_status_slug` on `designers(status, store_slug)`.
+- `idx_product_tags_tag_product` on `product_tags(tag_id, product_id)`.

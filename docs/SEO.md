@@ -100,3 +100,7 @@ After the initial Phase 6 implementation, additional VPS validation and refineme
 ## Phase 7 content polish note
 
 Phase 7 kept the Phase 6 indexing, canonical, robots, sitemap, and structured-data behavior intact. Public-facing copy was improved on the homepage, browse/category pages, product pages, storefronts, and sell landing page to better describe Asset Moth as a digital design marketplace. No private dashboard/admin pages were made indexable. The expected local logo path for launch polish is `public/assets/img/asset-moth-logo.png`; upload the final logo asset there before production launch if it is not already present.
+
+## Phase 8 browse/search SEO behavior
+
+Phase 8 preserves Phase 6 SEO rules. Unfiltered `/browse` and clean `/category/{slug}` pages use canonical base URLs and remain public indexable collection pages. Search, filtered, sorted, or paginated browse/category URLs render `noindex,follow` and canonicalize to the base browse/category route to avoid indexing duplicate or thin result combinations. The sitemap continues to include only base public routes, active categories, approved products, approved stores, and selected static pages; it does not include filtered search URLs.

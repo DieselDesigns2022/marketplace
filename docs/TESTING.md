@@ -116,3 +116,22 @@ Phase 6 closeout validation included PHP syntax checks for modified controllers/
 ## Phase 7 launch polish checks
 
 Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks for modified PHP files, source/route checks for `/`, `/browse`, `/sell`, `/about`, `/privacy`, `/terms`, `/contact`, `/buyer-faq`, `/seller-faq`, and `/licensing-help`, and confirmation that the header logo slot either loads `public/assets/img/asset-moth-logo.png` or falls back to visible `Asset Moth` text. Browser smoke tests should verify homepage, browse/category, sample product, sample storefront, seller dashboard, buyer dashboard, and admin review pages where environment data is available.
+
+## Phase 8 manual testing checklist
+
+- Keyword search on `/browse?q=...`.
+- Multi-word search and partial keyword search.
+- Category filter on `/browse` and category route browsing on `/category/{slug}`.
+- Price min/max filters, including min greater than max.
+- AI disclosure filter using existing values.
+- POD permission filter.
+- Creator/store filter.
+- Featured, recently added, file type, and commercial-available filters where data exists.
+- Sort by relevance, newest, oldest, price low/high, title A/Z, and featured first.
+- Pagination with filters and sort preserved.
+- Clear filters links.
+- No-results state and browse-all guidance.
+- Related products and more-from-creator sections on product detail pages.
+- Homepage featured products, featured creators, and recently added products.
+- SEO checks: filtered browse/category pages render `noindex,follow`; unfiltered category pages remain canonical/indexable; sitemap excludes filtered URLs.
+- Mobile layout checks for filters, cards, and pagination.

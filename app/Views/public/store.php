@@ -24,8 +24,6 @@
                <h1 itemprop="name">
                <?=H::e($d['display_name'])?>
                </h1>
-               <p class="muted">/store/<?=H::e($d['store_slug'])?>
-               </p>
                <span class="badge rank">
                <?=H::e($d['creator_rank'] ?: 'Bronze')?>
                </span>

@@ -933,3 +933,18 @@ Phase 7 was prepared by documenting the approved scope before implementation. Af
 Phase 7 focused on launch-readiness polish rather than new marketplace systems. The shared layout now supports a local Asset Moth logo at `public/assets/img/asset-moth-logo.png` with text fallback, and the footer includes only existing public routes. Public marketplace pages received clearer copy, CTA consistency, better empty states, and mobile/layout refinements. Buyer, seller, and admin dashboards received wording improvements so current capabilities are clearer without implying unfinished systems are live.
 
 Postponed by design: the full licensing system remains Phase 8.5, and cart/orders/payments expansion, emails, referrals, creator ranks, sponsored listings, bundle events, advanced search, and new review systems remain later phases.
+
+## Phase 8 — Search & Browsing
+
+Status: Started.
+
+Goal:
+Improve marketplace discovery and browsing so buyers can more easily find digital products through search, category browsing, sorting, filters, and clearer browsing states.
+
+Initial scope will be finalized before Codex implementation. Phase 8 should focus on search and browsing only. It should not build licensing, checkout, orders, payments, emails, referrals, ranks, sponsored listings, or bundle events.
+
+## Phase 8 — Search & Browsing
+
+Phase 8 implements the marketplace browsing foundation. Public browse and category pages now use SQL-backed keyword search, filters, sorting, pagination, result summaries, active filter chips, and clear no-results guidance. Search relevance weights title and phrase matches highest, then tag/category/creator signals, then description matches. Discovery uses real approved product/designer data for featured products, featured creators, recently added products, related products, and more from the same creator.
+
+Intentionally postponed: the full license system remains Phase 8.5; cart, checkout, orders, payments, downloads, sponsored listings, fake popularity, best-selling/rating sorts without real data, and review/rating features remain later-phase work.
