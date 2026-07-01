@@ -22,9 +22,7 @@
         </a>
     <?php else:?>Uncategorized<?php endif;?>
         </p>
-        <h2>
-        <?=H::money($p['price'])?>
-        </h2>
+        <h2 data-license-price><?=H::money($defaultLicense['price'] ?? $p['price'])?></h2>
         <p>
         <span class="badge ai">
         <?=H::e($p['ai_disclosure'])?>
@@ -33,8 +31,7 @@
         <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
         </span>
         </p>
-        <p>Commercial License: <?=$p['commercial_license_enabled']?'Available for '.H::money($p['commercial_license_price']):'Not available'?>
-        </p>
+        <p>Available licenses: <?=H::e(implode(', ', array_column($licenses, 'name')))?></p>
         <p>Digital resale, file sharing, and redistribution are prohibited. Review the license details before purchase.</p>
         <p>Tags: <?php if($tags): ?>
         <?php foreach($tags as $tag): ?>
@@ -55,12 +52,16 @@
     <?php else:?>
         <form method="post" action="/cart/add/<?=$p['id']?>">
            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-           <label>
-           <input type="radio" name="license_type" value="personal" checked> Personal use included</label>
-           <?php if($p['commercial_license_enabled']):?>
-               <label>
-               <input type="radio" name="license_type" value="commercial"> Add commercial license (+<?=H::money($p['commercial_license_price'])?>)</label>
-           <?php endif;?>
+           <fieldset class="license-options" data-license-options>
+               <legend>Choose a license</legend>
+               <?php foreach($licenses as $license):?>
+                   <label>
+                       <input type="radio" name="license_type" value="<?=H::e($license['license_key'])?>" data-license-price="<?=H::e(H::money($license['price']))?>" <?=($license['license_key']===($defaultLicense['license_key']??''))?'checked':''?>>
+                       <strong><?=H::e($license['name'])?></strong> — <?=H::money($license['price'])?>
+                       <?php if($license['description']):?><span class="help-text"><?=H::e($license['description'])?></span><?php endif;?>
+                   </label>
+               <?php endforeach;?>
+           </fieldset>
            <button class="btn">Add to cart</button>
            <p class="help-text">Review the product details, license options, POD permission, and AI disclosure before adding this digital item.</p>
         </form>

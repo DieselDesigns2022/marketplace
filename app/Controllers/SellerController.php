@@ -3,6 +3,7 @@
 namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
+use App\Services\LicenseService;
 class SellerController
 {
     private function d()
@@ -272,7 +273,24 @@ class SellerController
     }
     private function productValues(array $existing = []): array
     {
-        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => H::slug(trim($_POST['slug'] ?? $existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $_POST['price'] ?? ($existing['price'] ?? '0.00'), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => (int) isset($_POST['commercial_license_enabled']), 'commercial_license_price' => $_POST['commercial_license_price'] ?? ($existing['commercial_license_price'] ?? '0.00'), 'pod_allowed' => (int) isset($_POST['pod_allowed']), 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
+        $price = $_POST['price'] ?? ($existing['price'] ?? '0.00');
+        $commercialEnabled = isset($_POST['commercial_license_enabled']) || isset($_POST['license_enabled']['commercial']);
+        $commercialLicensePrice = '0.00';
+        if ($commercialEnabled)
+        {
+            if (isset($_POST['license_price']['commercial']) && is_numeric($_POST['license_price']['commercial']) && is_numeric($price))
+            {
+                $commercialLicensePrice = number_format(max(0, (float) $_POST['license_price']['commercial'] - (float) $price), 2, '.', '');
+
+            }
+            else
+            {
+                $commercialLicensePrice = $_POST['commercial_license_price'] ?? ($existing['commercial_license_price'] ?? '0.00');
+
+            }
+
+        }
+        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => H::slug(trim($_POST['slug'] ?? $existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
     }
     private function validateProduct(array $v, ?int $ignoreId = null): array
@@ -577,6 +595,8 @@ class SellerController
            }
             $values = $this->productValues($p ?: []);
             $errors = $this->validateProduct($values, $p ? (int) $p['id'] : null);
+            [$postedLicenses, $licenseErrors] = LicenseService::normalizePosted($values, $_POST);
+            $errors = array_merge($errors, $licenseErrors);
             if (!$errors)
            {
                 if ($p)
@@ -599,6 +619,7 @@ class SellerController
 
                }
                 $this->syncTags($productId, $values['tags']);
+                LicenseService::syncProductLicenses($productId, $postedLicenses);
                 $this->savePreviewImages($productId, $errors);
                 if (!$p)
                {
@@ -616,7 +637,7 @@ class SellerController
 
         }
         $productId = $p['id'] ?? 0;
-        H::view('seller/edit_product', [ 'p' => $p, 'errors' => $errors, 'cats' => DB::rows('select * from categories where is_active=1'), 'images' => $productId ? DB::rows( 'select * from product_images where product_id=? order by sort_order,id', [$productId] ) : [], 'files' => $productId ? DB::rows( 'select * from product_files where product_id=? order by created_at desc', [$productId] ) : [], 'tagText' => $productId ? $this->tagText((int) $productId) : '', ]);
+        H::view('seller/edit_product', [ 'p' => $p, 'errors' => $errors, 'cats' => DB::rows('select * from categories where is_active=1'), 'images' => $productId ? DB::rows( 'select * from product_images where product_id=? order by sort_order,id', [$productId] ) : [], 'files' => $productId ? DB::rows( 'select * from product_files where product_id=? order by created_at desc', [$productId] ) : [], 'tagText' => $productId ? $this->tagText((int) $productId) : '', 'licenseTypes' => LicenseService::platformTypes(), 'productLicenses' => $p ? LicenseService::productLicenses($p) : [], ]);
 
     }
     public function submitProduct($id)

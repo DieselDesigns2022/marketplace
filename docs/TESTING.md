@@ -135,3 +135,8 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 - Homepage featured products, featured creators, and recently added products.
 - SEO checks: filtered browse/category pages render `noindex,follow`; unfiltered category pages remain canonical/indexable; sitemap excludes filtered URLs.
 - Mobile layout checks for filters, cards, and pagination.
+
+## Phase 8.5 licensing checks
+- Run PHP syntax checks for changed PHP files after editing licensing code.
+- Run `git diff --check` to catch whitespace issues.
+- Manual coverage should include seller validation for zero enabled licenses and disabled default licenses, product license selector display, cart license update and pricing, checkout license snapshot storage, buyer order/download license display, admin product/order review, disabled license rejection, and fallback behavior for existing products.

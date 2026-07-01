@@ -49,3 +49,9 @@ Product files must not be directly public. Download routes must verify the curre
 ## `.gitignore` protections
 
 The repository should ignore environment files, public uploads, protected uploads, backups, logs, and other generated artifacts. If new generated folders are added, update `.gitignore` before committing work.
+
+## Phase 8.5 licensing security
+- Seller license saves continue to load products by both product id and designer id before editing.
+- Buyer-submitted license keys are validated server-side against enabled product licenses during add-to-cart and cart update.
+- Checkout recalculates line totals from stored product license configuration and writes a purchased license snapshot; client-provided prices are not trusted.
+- Disabled or missing licenses are not purchasable, and existing products fall back to a safe Personal license if custom rows are missing.

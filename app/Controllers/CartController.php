@@ -3,6 +3,7 @@
 namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
+use App\Services\LicenseService;
 use Throwable;
 class CartController
 {
@@ -21,10 +22,15 @@ class CartController
         $subtotal=0;
         foreach($items as &$p)
         {
-            $p['commercial_selected']=$p['license_type']==='commercial';
-            $p['commercial_addon']=$p['commercial_selected']?(float)$p['commercial_license_price']:0;
-            $p['line_total']=(float)$p['price']+$p['commercial_addon'];
-            $subtotal+=$p['line_total'];
+            $license = LicenseService::purchasableLicense((int)$p['id'], $p['license_type']);
+            $p['licenses'] = LicenseService::productLicenses($p);
+            $p['license_invalid'] = !$license;
+            $p['license_key'] = $license['license_key'] ?? (string)$p['license_type'];
+            $p['license_name'] = $license['name'] ?? 'Unavailable license';
+            $p['license_description'] = $license['description'] ?? 'This license is no longer available. Please choose an available license before checkout.';
+            $p['license_price'] = $license['price'] ?? 0;
+            $p['line_total'] = $license ? $license['price'] : 0;
+            if ($license) $subtotal += $p['line_total'];
 
         }
         return [$items,$subtotal];
@@ -54,8 +60,12 @@ class CartController
             H::redirect('/product/'.$p['slug']);
 
         }
-        $license=($_POST['license_type']??'personal')==='commercial' && (int)$p['commercial_license_enabled']===1 ? 'commercial':'personal';
-        DB::exec('insert ignore into cart_items (user_id,product_id,license_type) values (?,?,?)',[H::user()['id'],$id,$license]);
+        $license = LicenseService::purchasableLicense($id, $_POST['license_type'] ?? '');
+        if (!$license) {
+            H::flash('error','Please choose an available license for this product.');
+            H::redirect('/product/'.$p['slug']);
+        }
+        DB::exec('insert ignore into cart_items (user_id,product_id,license_type) values (?,?,?)',[H::user()['id'],$id,$license['license_key']]);
         H::redirect('/cart');
 
     }
@@ -71,11 +81,16 @@ class CartController
         H::requireLogin();
         foreach(($_POST['license_type']??[]) as $cartId=>$license)
         {
-            $item=DB::row('select ci.*,p.commercial_license_enabled from cart_items ci join products p on p.id=ci.product_id where ci.id=? and ci.user_id=?',[(int)$cartId,H::user()['id']]);
+            $item=DB::row('select ci.*,p.slug from cart_items ci join products p on p.id=ci.product_id where ci.id=? and ci.user_id=?',[(int)$cartId,H::user()['id']]);
             if($item)
            {
-               $new=$license==='commercial' && (int)$item['commercial_license_enabled']===1?'commercial':'personal';
-                DB::exec('update cart_items set license_type=? where id=? and user_id=?',[$new,(int)$cartId,H::user()['id']]);
+               $selected = LicenseService::purchasableLicense((int)$item['product_id'], (string)$license);
+               if($selected)
+               {
+                   $duplicate = DB::row('select id from cart_items where user_id=? and product_id=? and license_type=? and id<>? limit 1',[H::user()['id'],$item['product_id'],$selected['license_key'],(int)$cartId]);
+                   if($duplicate) DB::exec('delete from cart_items where id=? and user_id=?',[(int)$cartId,H::user()['id']]);
+                   else DB::exec('update cart_items set license_type=? where id=? and user_id=?',[$selected['license_key'],(int)$cartId,H::user()['id']]);
+               }
 
            }
 
@@ -89,6 +104,14 @@ class CartController
         [$items,$total]=$this->totals($this->items());
         if($_POST && $items)
         {
+            foreach($items as $p)
+            {
+                if(!empty($p['license_invalid']))
+                {
+                    H::flash('error','A license in your cart is no longer available. Please choose an available license before checkout.');
+                    H::redirect('/cart');
+                }
+            }
             try
            {
                DB::begin();
@@ -111,7 +134,7 @@ class CartController
                 foreach($valid as $p)
                {
                    $comm=round($p['line_total']*.20,2);
-                    DB::exec('insert into order_items (order_id,product_id,designer_id,license_type,unit_price,commercial_license_price,total_price,commission_rate) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['license_type'],$p['price'],$p['commercial_addon'],$p['line_total'],.20]);
+                    DB::exec('insert into order_items (order_id,product_id,designer_id,license_type,license_name,license_price,license_description,license_snapshot,unit_price,commercial_license_price,total_price,commission_rate) values (?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],json_encode(['key'=>$p['license_key'],'name'=>$p['license_name'],'price'=>$p['license_price'],'description'=>$p['license_description']]),$p['license_price'],0,$p['line_total'],.20]);
                     DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$p['line_total'],$comm,$p['line_total']-$comm,'available']);
                     DB::exec('insert into platform_commissions (order_id,product_id,designer_id,gross_sale,commission_amount,referral_commission_placeholder) values (?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['line_total'],$comm,0]);
                     DB::exec('update products set sales_count=sales_count+1 where id=?',[$p['id']]);

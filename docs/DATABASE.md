@@ -146,3 +146,10 @@ Indexes added for browsing performance:
 - `idx_products_ai_pod_status` on `products(status, ai_disclosure, pod_allowed)`.
 - `idx_designers_status_slug` on `designers(status, store_slug)`.
 - `idx_product_tags_tag_product` on `product_tags(tag_id, product_id)`.
+
+## Phase 8.5 licensing tables
+- `license_types` stores platform-level license definitions using a stable `license_key`, display name, description, active flag, and sort order so future license types can be added without changing the product schema.
+- `product_license_types` links products to enabled seller license options, including price, default flag, description override, and display order.
+- `cart_items.license_type` and `order_items.license_type` are flexible `VARCHAR(80)` keys instead of a two-value enum.
+- `order_items` now stores `license_name`, `license_price`, `license_description`, and `license_snapshot` to preserve purchased license history after later seller edits.
+- Migration: `database/migrations/2026_07_01_phase_8_5_licensing_system.sql` seeds the initial license types and backfills existing products with a default Personal license plus Commercial where the legacy commercial add-on was enabled.
