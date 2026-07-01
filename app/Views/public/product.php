@@ -31,8 +31,10 @@
         <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
         </span>
         </p>
-        <p>Included permissions: <?=H::e(implode(', ', array_column($licenses, 'name')))?></p>
-        <p>License permissions are included with the product price. Digital resale, file sharing, and redistribution are prohibited.</p>
+        <?php $globalLicenseTerms = str_replace('\\n', "\n", 'All licenses are non-exclusive and non-transferable. Purchasing a file gives you permission to use the file under the license purchased. It does not give you ownership of the design.\n\nAll designs remain the intellectual property of the original designer or seller.\n\nYou may not share, gift, trade, copy, upload, transfer, resell, modify for resale, or distribute the digital files unless the purchased license specifically allows it.\n\nYou may not claim the design as your own, copyright it, trademark it, register it, or use it as a logo or main brand identity.\n\nFiles must remain private and protected at all times.\n\nVisible watermarks are required on mockups, product previews, listing images, customer previews, and promotional images when displaying the design online.\n\nAny violation may result in revoked access, removal from the platform, denied future purchases, DMCA takedowns, account reports, and/or legal action.'); ?>
+        <p>All license types follow Asset Moth global terms <span class="license-help" role="button" tabindex="0" aria-label="Global license terms"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($globalLicenseTerms)?></span></span></p>
+        <p>Personal use is included with the product base price.</p>
+        <p>Select any additional permissions you need before adding to cart. Digital resale, file sharing, and redistribution are prohibited.</p>
         <p>Tags: <?php if($tags): ?>
         <?php foreach($tags as $tag): ?>
         <a class="badge" href="/browse?q=<?=H::e(urlencode($tag['name']))?>">
@@ -53,27 +55,28 @@
         <form method="post" action="/cart/add/<?=$p['id']?>">
            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
            <fieldset class="license-options" data-license-options>
-               <legend>Choose included permissions</legend>
+               <legend>Select additional permissions</legend>
+               <p class="help-text license-help-note">Hover over ? for a quick preview or click ? to open the full license details.</p>
                <?php foreach($licenses as $license):?>
                    <label>
                        <input type="checkbox" name="license_type[]" value="<?=H::e($license['license_key'])?>" <?=$license['license_key']==='personal'?'checked disabled':''?>>
                        <?php if($license['license_key']==='personal'):?><input type="hidden" name="license_type[]" value="personal"><?php endif;?>
-                       <strong><?=H::e($license['name'])?></strong> <span class="muted">included</span>
-                       <?php if($license['description']):?><span class="help-text"><?=H::e($license['description'])?></span><?php endif;?>
+                       <strong><?=H::e($license['name'])?></strong> <?php if($license['license_key']==='personal'):?><span class="muted">included/free</span><?php else:?><span class="muted">+<?=H::money($license['price'])?></span><?php endif;?>
+                       <?php if($license['description']):?><span class="license-help" role="button" tabindex="0" aria-label="<?=H::e($license['name'])?> license details"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($license['description'])?></span></span><?php endif;?>
                    </label>
                <?php endforeach;?>
            </fieldset>
            <button class="btn">Add to cart</button>
-           <p class="help-text">Review the product details, included permissions, POD permission, and AI disclosure before adding this digital item.</p>
+           <p class="help-text">Review the product details, selected permissions, POD permission, and AI disclosure before adding this digital item.</p>
         </form>
     <?php endif;?>
     <form method="post" action="/product/<?=$p['id']?>/wishlist">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-        <button>Wishlist</button>
+        <button>Add to Wishlist</button>
     </form>
 </aside>
 </div>
-<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is always included. Seller-enabled commercial, POD, wholesale, fabric, VA, and extended commercial permissions are included when shown, with no license add-on pricing.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
+<section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is always included. Seller-enabled basic, commercial, POD, wholesale, fabric, VA, reseller, and extended commercial permissions may be selected as add-ons when available.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
 <h2>Description</h2>
 <?php if($p['short_description']):?>
     <p>
@@ -89,3 +92,5 @@
 <?php if(!$more):?><div class="card empty-state"><p>This designer does not have other approved products available yet.</p><a href="/store/<?=H::e($p['store_slug'])?>">Visit designer storefront</a></div><?php else: $products=$more; include app_path('app/Views/public/product_grid.php'); endif;?>
 <h2>Related products</h2>
 <?php if(!$related):?><div class="card empty-state"><p>No related approved products are available yet. Try browsing all digital designs.</p><a class="btn" href="/browse">Browse Digital Designs</a></div><?php else: $products=$related; include app_path('app/Views/public/product_grid.php'); endif;?>
+
+<?php require __DIR__.'/../partials/license_help_modal.php'; ?>

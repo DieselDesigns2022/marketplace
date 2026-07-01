@@ -48,31 +48,32 @@
     <h2>Pricing and Licenses</h2>
     <label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>">
     </label>
-    <p class="help-text">Personal is always included. Enable any additional permissions that are included with this product at no added license price.</p>
+    <p class="help-text">Personal use is included with the base product price. Enable any additional paid license permissions and set the add-on price for each one.</p>
     <?php
         $configured = [];
         foreach (($productLicenses ?? []) as $license) $configured[$license['license_key']] = $license;
         $postedEnabled = $_POST['license_enabled'] ?? null;
     ?>
+    <p class="help-text license-help-note">Hover over ? for a quick preview or click ? to open the full license details.</p>
     <table>
         <tr>
             <th>Enabled</th>
             <th>License type</th>
-            <th>Sort</th>
-            <th>Description</th>
+            <th>Add-on price</th>
         </tr>
         <?php foreach($licenseTypes as $type):
             $key = $type['license_key'];
             $existing = $configured[$key] ?? null;
             $enabled = $postedEnabled !== null ? isset($postedEnabled[$key]) : ($existing ? true : ($key === 'personal' || ($key === 'pod' && !empty($p['pod_allowed']))));
-            $description = $_POST['license_description'][$key] ?? $existing['description'] ?? $type['description'] ?? '';
-            $sort = $_POST['license_sort_order'][$key] ?? $existing['sort_order'] ?? $type['sort_order'] ?? 0;
+            $price = $key === 'personal' ? '0.00' : ($_POST['license_price'][$key] ?? $existing['price'] ?? '0.00');
+            $postedDescription = $_POST['license_description'][$key] ?? null;
+            $existingDescription = $existing['description'] ?? '';
+            $description = $postedDescription ?? ($existingDescription !== '' ? $existingDescription : ($type['description'] ?? ''));
         ?>
             <tr>
                 <td><label><input type="checkbox" name="license_enabled[<?=H::e($key)?>]" value="1" <?=$enabled?'checked':''?> <?=$key==='personal'?'checked disabled':''?>> <?=$key==='personal'?'Always included':'Enable'?></label><?php if($key==='personal'):?><input type="hidden" name="license_enabled[personal]" value="1"><?php endif;?></td>
-                <td><strong><?=H::e($type['name'])?></strong><br><span class="muted"><?=H::e($key)?> · included/free</span></td>
-                <td><input type="number" step="1" name="license_sort_order[<?=H::e($key)?>]" value="<?=H::e($sort)?>"></td>
-                <td><textarea name="license_description[<?=H::e($key)?>]"><?=H::e($description)?></textarea></td>
+                <td><strong><?=H::e($type['name'])?></strong><?php if($description):?><span class="license-help" role="button" tabindex="0" aria-label="<?=H::e($type['name'])?> license details"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($description)?></span></span><?php endif;?><br><span class="muted"><?=H::e($key)?><?=$key==='personal'?' · included/free':' · optional add-on'?></span></td>
+                <td><?php if($key==='personal'):?><span class="muted">$0.00 included</span><input type="hidden" name="license_price[personal]" value="0.00"><?php else:?><input type="number" step="0.01" min="0" name="license_price[<?=H::e($key)?>]" value="<?=H::e($price)?>"><?php endif;?><input type="hidden" name="license_description[<?=H::e($key)?>]" value=""></td>
             </tr>
         <?php endforeach;?>
     </table>
@@ -107,3 +108,5 @@
 <button name="action" value="draft">Save Draft</button>
 <button class="btn" name="action" value="review">Submit For Review</button>
 </form>
+
+<?php require __DIR__.'/../partials/license_help_modal.php'; ?>

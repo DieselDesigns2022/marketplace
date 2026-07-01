@@ -13,7 +13,7 @@ class PublicController
         'contact' => ['Contact Asset Moth', 'Find general support, buyer support, seller support, account help, order guidance, download help, and marketplace contact information for Asset Moth.', 'ContactPage'],
         'terms' => ['Terms & Conditions', 'Read the rules for using Asset Moth, including accounts, digital purchases, downloads, licensing, seller responsibilities, refunds, and marketplace content.', 'WebPage'],
         'privacy' => ['Privacy Policy', 'Learn how Asset Moth collects, uses, protects, and stores marketplace account, buyer, seller, order, upload, and download information.', 'PrivacyPolicy'],
-        'licensing-help' => ['Digital Product Licensing Help', 'Understand personal use, commercial use, print-on-demand permission, and digital resale limits on Asset Moth.', 'WebPage'],
+        'licensing-help' => ['Digital Product Licensing Help', 'Understand Asset Moth personal, basic, commercial, POD, wholesale, fabric, VA, reseller, and extended commercial license permissions.', 'WebPage'],
         'buyer-faq' => ['Buyer FAQ', 'Answers for buyers about finding products, accounts, purchases, downloads, licenses, POD use, refunds, and support.', 'FAQPage'],
         'seller-faq' => ['Seller FAQ', 'Answers for sellers about applying, storefronts, product review, SEO fields, licensing, AI disclosure, uploads, and support.', 'FAQPage'],
     ];

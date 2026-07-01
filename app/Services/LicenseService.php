@@ -70,7 +70,7 @@ class LicenseService
                     'license_key' => $row['license_key'],
                     'name' => $row['custom_name'] ?: $row['platform_name'],
                     'description' => $row['description'] ?: $row['platform_description'],
-                    'price' => 0.00,
+                    'price' => $row['license_key'] === self::PERSONAL_KEY ? 0.00 : (float)$row['price'],
                     'is_default' => $row['license_key'] === self::PERSONAL_KEY,
                     'sort_order' => (int)$row['sort_order'],
                 ];
@@ -96,7 +96,7 @@ class LicenseService
                 'license_key' => 'commercial',
                 'name' => 'Commercial',
                 'description' => 'Commercial use is allowed under this product license. Digital resale, sharing, and redistribution are prohibited.',
-                'price' => 0.00,
+                'price' => (float)($product['commercial_license_price'] ?? 0),
                 'is_default' => false,
                 'sort_order' => 20,
             ];
@@ -163,14 +163,23 @@ class LicenseService
         return implode("\n", array_values(array_filter(array_map(static fn($license) => $license['name'].': '.($license['description'] ?? ''), $licenses))));
     }
 
+    public static function priceTotal(array $licenses): float
+    {
+        $total = 0.00;
+        foreach ($licenses as $license) {
+            if (($license['license_key'] ?? '') !== self::PERSONAL_KEY) $total += (float)($license['price'] ?? 0);
+        }
+        return round($total, 2);
+    }
+
     public static function snapshot(array $licenses): string
     {
         $snapshot = json_encode(array_map(static fn($license) => [
             'key' => $license['license_key'],
             'name' => $license['name'],
             'description' => $license['description'] ?? '',
-            'included' => true,
-            'price' => 0.00,
+            'included' => $license['license_key'] === self::PERSONAL_KEY,
+            'price' => $license['license_key'] === self::PERSONAL_KEY ? 0.00 : (float)($license['price'] ?? 0),
         ], $licenses), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return $snapshot === false ? '[]' : $snapshot;
     }
@@ -183,18 +192,30 @@ class LicenseService
         }
         $enabled = $post['license_enabled'] ?? [];
         $descriptions = $post['license_description'] ?? [];
-        $orders = $post['license_sort_order'] ?? [];
+        $prices = $post['license_price'] ?? [];
         $licenses = [];
         $errors = [];
         foreach ($types as $type) {
             $key = $type['license_key'];
             if ($key !== self::PERSONAL_KEY && !isset($enabled[$key])) continue;
+
+            $price = '0.00';
+            if ($key !== self::PERSONAL_KEY) {
+                $rawPrice = trim((string)($prices[$key] ?? '0.00'));
+                if ($rawPrice === '') $rawPrice = '0.00';
+                if (!is_numeric($rawPrice) || (float)$rawPrice < 0) {
+                    $errors[] = ($type['name'] ?? $key) . ' license price must be a valid non-negative amount.';
+                    $rawPrice = '0.00';
+                }
+                $price = number_format((float)$rawPrice, 2, '.', '');
+            }
+
             $licenses[$key] = [
                 'license_type_id' => (int)$type['id'],
                 'license_key' => $key,
-                'price' => '0.00',
+                'price' => $price,
                 'description' => trim((string)($descriptions[$key] ?? '')),
-                'sort_order' => (int)($orders[$key] ?? $type['sort_order'] ?? 0),
+                'sort_order' => (int)($type['sort_order'] ?? 0),
                 'is_default' => $key === self::PERSONAL_KEY,
             ];
         }

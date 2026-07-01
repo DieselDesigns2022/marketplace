@@ -167,7 +167,7 @@ Intentionally postponed:
 
 ## Phase 8.5 - Licensing System
 - Added platform license types and per-product license configuration for Personal, Commercial, POD, Wholesale, Fabric, VA, and Extended Commercial permissions.
-- Corrected licensing so license types are included use-case permissions rather than paid add-ons: product price is the only buyer-facing price, Personal is always included, and sellers enable or disable additional included permissions.
+- Corrected Phase 8.5 licensing so Personal is always included/free while seller-enabled add-on permissions may be free (`$0.00`) or paid, with buyer/cart/order/admin snapshots reflecting selected licenses and prices.
 - Updated product, cart, checkout, buyer order, and admin review screens for multi-license selection with no buyer-facing license pricing.
 - Cart items store selected licenses as normalized key lists, checkout validates every selected license server-side, and order item snapshots preserve all selected included licenses.
 - Retained `license_price` for compatibility/snapshots but set included license pricing to `0.00`; added `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` to zero existing product license prices after the original Phase 8.5 migration.

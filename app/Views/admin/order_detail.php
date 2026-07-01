@@ -7,7 +7,7 @@
     <tr>
         <th>Product</th>
         <th>Designer</th>
-        <th>Included permissions</th>
+        <th>Purchased permissions</th>
         <th>Item Total</th>
         <th>Commission</th>
         <th>Seller Earning</th>

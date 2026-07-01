@@ -958,8 +958,8 @@ Build the marketplace licensing foundation and connect selected licenses to prod
 
 Implemented Phase 8.5 focus:
 - License types such as Personal, Commercial, POD, Wholesale, Fabric, VA, Extended Commercial, and future license support.
-- Corrected license model: license types are included permissions/use-case options, not paid add-ons; product price is the only buyer-facing price.
-- Personal is always included, and sellers enable or disable additional included permissions per product while controlling descriptions and display ordering.
+- Corrected license model: Personal is always included/free, while seller-enabled add-on permissions may be free (`$0.00`) or paid and are included in cart/order totals.
+- Expanded active license types to include Basic, Commercial, POD, Wholesale, two Fabric options, VA, two Reseller options, and Extended Commercial, with readable tooltip/modal license details.
 - Product-page and cart license selection supports multiple included licenses with no visible license-price changes.
 - Cart items store selected license keys in a normalized format; mock checkout validates every selected license server-side.
 - Order items store normalized selected keys, joined names/descriptions, `license_price` as `0.00`, and JSON snapshots for all selected included licenses.

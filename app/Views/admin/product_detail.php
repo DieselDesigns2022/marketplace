@@ -30,7 +30,7 @@
     <?php else:?>
         <ul>
         <?php foreach($licenses as $license):?>
-            <li><strong><?=H::e($license['name'])?></strong> <span class="muted">included</span><?php if($license['description']):?><br><span class="muted"><?=H::e($license['description'])?></span><?php endif;?></li>
+            <li><strong><?=H::e($license['name'])?></strong> <?php if($license['license_key']==='personal'):?><span class="muted">included/free</span><?php else:?><span class="muted"><?=H::money($license['price'])?> add-on</span><?php endif;?><?php if($license['description']):?><br><span class="muted"><?=H::e($license['description'])?></span><?php endif;?></li>
         <?php endforeach;?>
         </ul>
     <?php endif;?>

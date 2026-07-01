@@ -275,7 +275,7 @@ class SellerController
     {
         $price = $_POST['price'] ?? ($existing['price'] ?? '0.00');
         $commercialEnabled = isset($_POST['license_enabled']['commercial']);
-        $commercialLicensePrice = '0.00';
+        $commercialLicensePrice = $_POST['license_price']['commercial'] ?? ($existing['commercial_license_price'] ?? '0.00');
         return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => H::slug(trim($_POST['slug'] ?? $existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
     }
