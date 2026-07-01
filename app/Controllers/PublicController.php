@@ -156,7 +156,7 @@ class PublicController
         $cats = DB::rows('select * from categories where is_active=1 order by sort_order,name');
         $creators = DB::rows('select id,display_name,store_slug from designers where status="approved" order by display_name limit 100');
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
-        $filtered = array_filter($state['filters'], fn($v) => $v !== '') || $state['sort'] !== 'newest' || $result['page'] > 1;
+        $filtered = array_filter($state['filters'], fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>'Browse digital designs','url'=>H::canonical('/browse')];
         H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>null, 'meta'=>$this->pageMeta('Browse Digital Designs', 'Browse digital designs, templates, graphics, fonts, and creative files from independent designers on Asset Moth.', '/browse', $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
     }
@@ -171,7 +171,7 @@ class PublicController
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
         $description = $cat['description'] ?: 'Shop approved digital design products in the '.$cat['name'].' category on Asset Moth.';
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>$cat['name'],'description'=>$description,'url'=>H::canonical('/category/'.$cat['slug'])];
-        $filtered = array_filter(array_diff_key($state['filters'], ['category'=>true]), fn($v) => $v !== '') || $state['sort'] !== 'newest' || $result['page'] > 1;
+        $filtered = array_filter(array_diff_key($state['filters'], ['category'=>true]), fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
         H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>$cat, 'meta'=>$this->pageMeta($cat['name'].' Digital Designs', mb_substr(strip_tags($description), 0, 160), '/category/'.$cat['slug'], $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
     }
 
