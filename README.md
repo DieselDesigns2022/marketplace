@@ -187,6 +187,13 @@ public/
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
-## Current phase: Phase 8.5 — Licensing System
+## Current phase: Phase 8.75 — Marketplace Protection, Sharing & Store Polish
+
+### Phase 8.5 licensing capability
 
 Phase 8.5 adds the marketplace licensing foundation with Personal always included/free and seller-enabled add-on permissions that may be free (`$0.00`) or paid. Sellers can enable Basic, Commercial, POD, Wholesale, Fabric with overseas printing, Fabric without overseas printing, VA, Reseller with credit required, Reseller with no credit required, and Extended Commercial licenses; buyers can select multiple permissions; guest carts persist until checkout/login; carts and orders store normalized selected license keys plus license price snapshots; and order/admin/buyer views show the selected license details clearly. The product page, cart, seller edit form, and Licensing Help page now use license detail tooltips/modals so long terms stay readable without cluttering the listing.
+
+### Phase 8.75 marketplace protection and sharing
+Asset Moth watermarks seller-uploaded public product preview images server-side. Watermarking is limited to public preview images; purchased/downloadable files are stored separately and are not watermarked or altered. Newly uploaded preview originals are retained privately for regeneration. The default watermark source path is `storage/app/private/branding/watermark.png`, with optional override via `WATERMARK_SOURCE_PATH`.
+
+Product pages include buyer-friendly social sharing controls and Open Graph/Twitter preview metadata. Seller storefronts support optional validated website, Facebook, Instagram, TikTok, Pinterest, Etsy, and Shopify links rendered with safe external-link attributes.

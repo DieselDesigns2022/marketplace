@@ -123,8 +123,14 @@ Filtered or paginated browse/category URLs remain public but should render `noin
 
 ## Phase 8.5 licensing behavior
 - `GET|POST /seller/product/new` and `GET|POST /seller/product/{id}` include seller license configuration fields for enabled licenses and add-on prices. Personal is always included/free; sellers enable or disable Basic, Commercial, POD, Wholesale, Fabric, VA, Reseller, and Extended Commercial add-on permissions and may price any add-on at `$0.00` or higher.
-- `GET /product/{slug}` displays enabled included license options with product base price only and posts one or more selected license keys to `POST /cart/add/{id}`.
-- `POST /cart/update` can update a cart item's selected included licenses; cart storage uses normalized selected license keys.
-- Checkout validates every selected license server-side and order items snapshot all selected included licenses with `license_price` retained as `0.00` compatibility data.
-- `GET /dashboard/order/{id}` and `GET /admin/order/{id}` show purchased included license snapshot details without buyer-facing license pricing.
+- `GET /product/{slug}` displays enabled license options, including selected add-on prices where applicable, and posts one or more selected license keys to `POST /cart/add/{id}`.
+- `POST /cart/update` can update a cart item's selected licenses; cart storage uses normalized selected license keys.
+- Checkout validates every selected license server-side, recalculates totals using product base price plus selected paid add-on license prices, and order items snapshot selected licenses, names/descriptions, and paid add-on price snapshots where applicable.
+- `GET /dashboard/order/{id}` and `GET /admin/order/{id}` show purchased license snapshot details and selected paid add-on pricing where applicable.
 - `GET|POST /admin/products/{id}` shows enabled product license permissions for admin review.
+
+## Phase 8.75 route behavior
+- Existing seller product create/edit routes now watermark uploaded public preview images and offer a POST-backed regenerate action from the edit form.
+- Existing admin product detail route now supports a CSRF-protected `regenerate_watermark` action for product preview images with retained private originals.
+- Public product pages include Facebook, X/Twitter, copy-link, and Instagram-friendly share controls without requiring login or adding third-party scripts.
+- Public storefront pages render validated seller social links as safe external links and omit empty/invalid fields.

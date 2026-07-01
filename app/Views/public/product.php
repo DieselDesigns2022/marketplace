@@ -76,6 +76,17 @@
     </form>
 </aside>
 </div>
+
+<section class="card share-card">
+    <h2>Share this product</h2>
+    <div class="share-actions">
+        <a class="btn small" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/sharer/sharer.php?u=<?=H::e(rawurlencode($shareUrl))?>">Facebook</a>
+        <a class="btn small" target="_blank" rel="noopener noreferrer" href="https://twitter.com/intent/tweet?url=<?=H::e(rawurlencode($shareUrl))?>&text=<?=H::e(rawurlencode($shareText))?>">X/Twitter</a>
+        <button type="button" class="btn small" data-copy-link="<?=H::e($shareUrl)?>">Copy link</button>
+        <button type="button" class="btn small" data-copy-link="<?=H::e($shareText . ' ' . $shareUrl)?>">Copy for Instagram</button>
+    </div>
+    <p class="help-text">Sharing uses the public product URL and watermarked preview image when available.</p>
+</section>
 <section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is always included. Seller-enabled basic, commercial, POD, wholesale, fabric, VA, reseller, and extended commercial permissions may be selected as add-ons when available.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
 <h2>Description</h2>
 <?php if($p['short_description']):?>

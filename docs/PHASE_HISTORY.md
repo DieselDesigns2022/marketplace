@@ -960,12 +960,15 @@ Implemented Phase 8.5 focus:
 - License types such as Personal, Commercial, POD, Wholesale, Fabric, VA, Extended Commercial, and future license support.
 - Corrected license model: Personal is always included/free, while seller-enabled add-on permissions may be free (`$0.00`) or paid and are included in cart/order totals.
 - Expanded active license types to include Basic, Commercial, POD, Wholesale, two Fabric options, VA, two Reseller options, and Extended Commercial, with readable tooltip/modal license details.
-- Product-page and cart license selection supports multiple included licenses with no visible license-price changes.
+- Product-page and cart license selection supports multiple selected licenses, with selected add-on prices visible where paid permissions are enabled.
 - Cart items store selected license keys in a normalized format; mock checkout validates every selected license server-side.
-- Order items store normalized selected keys, joined names/descriptions, `license_price` as `0.00`, and JSON snapshots for all selected included licenses.
+- Order items store normalized selected keys, joined names/descriptions, selected paid add-on prices where applicable, and JSON snapshots for selected licenses.
 - Corrective migration `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` zeroes existing product license prices after the original Phase 8.5 migration.
-- Admin visibility shows enabled and purchased license permissions without buyer-facing license prices.
+- Admin visibility shows enabled and purchased license permissions, including selected paid add-on pricing where applicable.
 - Product listing card/image CSS was corrected so single-product sections do not stretch or distort previews.
 - Flexible database architecture so new license types can be added later without redesigning the schema.
 
 Phase 8.5 does not build real payments, final production checkout processing, final order fulfillment, protected download license enforcement, emails, referrals, creator ranks, sponsored listings, or bundle events. Those remain future phases.
+
+## Phase 8.75 — Marketplace Protection, Sharing & Store Polish
+Implemented public preview watermarking, private preview original retention for regeneration, product page social sharing, structured storefront social links, and documentation for the upload/security behavior. Purchased/downloadable files remain outside the watermark workflow.

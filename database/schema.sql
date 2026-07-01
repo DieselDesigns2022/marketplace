@@ -41,6 +41,12 @@ CREATE TABLE designers
     avatar_path VARCHAR(255),
     social_links TEXT,
     website_url VARCHAR(255),
+    facebook_url VARCHAR(255),
+    instagram_url VARCHAR(255),
+    tiktok_url VARCHAR(255),
+    pinterest_url VARCHAR(255),
+    etsy_url VARCHAR(255),
+    shopify_url VARCHAR(255),
     announcement TEXT,
     status ENUM('approved','disabled') DEFAULT 'approved',
     creator_rank ENUM('Bronze','Silver','Gold','Platinum','Legend') DEFAULT 'Bronze',
@@ -96,7 +102,7 @@ CREATE TABLE products
 );
 
 -- Phase 8.5 licenses support Personal as included/free plus seller-enabled add-on permissions that may be free ($0.00) or paid.
--- Product price is the only buyer-facing price; Personal is always included.
+-- Buyers see product base price plus selected paid add-on license prices; Personal is always included/free.
 CREATE TABLE license_types
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -298,7 +304,7 @@ You may not claim the design as your own, trademark the design, copyright the de
 
 All mockups, product photos, customer previews, and promotional images must be visibly watermarked when the design is shown online.',110,1);
 
--- price is retained for compatibility and should remain 0.00 for included licenses.
+-- product_license_types.price stores seller-configured add-on pricing for enabled non-personal licenses; Personal/included permissions should remain 0.00, and buyers may see paid add-on license pricing where applicable.
 CREATE TABLE product_license_types
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -322,6 +328,9 @@ CREATE TABLE product_images
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     product_id BIGINT NOT NULL,
     image_path VARCHAR(255),
+    original_image_path VARCHAR(255),
+    watermark_status VARCHAR(40),
+    watermark_error VARCHAR(255),
     alt_text VARCHAR(255),
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -382,7 +391,7 @@ CREATE TABLE orders
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- order_items retain selected included license snapshots; license_price should be 0.00.
+-- order_items retain selected license snapshots; license_price is 0.00 for included/free permissions and stores selected paid add-on prices where applicable.
 CREATE TABLE order_items
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

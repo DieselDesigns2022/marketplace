@@ -40,7 +40,12 @@
     </p>
     <h2>Preview images</h2>
     <?php foreach($images as $img):?>
-        <img class="thumb" src="<?=H::e($img['image_path'])?>" alt="<?=H::e($img['alt_text']??'Product preview')?>">
+        <div class="inline">
+            <img class="thumb" src="<?=H::e($img['image_path'])?>" alt="<?=H::e($img['alt_text']??'Product preview')?>">
+            <span><?=H::e($img['watermark_status'] ?? 'legacy preview')?><?php if(!empty($img['original_image_path'])):?> · private original retained<?php endif;?></span>
+            <?php if(!empty($img['original_image_path'])):?><form method="post" class="inline"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="image_id" value="<?=$img['id']?>"><button name="action" value="regenerate_watermark">Regenerate watermark</button></form><?php endif;?>
+            <?php if(!empty($img['watermark_error'])):?><small class="help-text">Watermark note: <?=H::e($img['watermark_error'])?></small><?php endif;?>
+        </div>
     <?php endforeach;?>
     <h2>Product file metadata</h2>
     <ul>

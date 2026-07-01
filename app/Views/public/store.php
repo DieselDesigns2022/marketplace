@@ -83,13 +83,13 @@
     <p>
     <?=nl2br(H::e($d['bio'] ?: 'This approved designer has not added a public bio yet. Browse their available digital products below.'))?>
     </p>
-    <?php if(!empty($d['website_url'])):?>
-        <p>
-        <strong>Website:</strong>
-        <a rel="nofollow ugc" href="<?=H::e($d['website_url'])?>">
-        <?=H::e($d['website_url'])?>
-        </a>
-        </p>
+    <?php if(!empty($socialLinks)):?>
+        <h3>Connect with this seller</h3>
+        <div class="social-link-list">
+        <?php foreach($socialLinks as $link):?>
+            <a class="social-link" target="_blank" rel="noopener noreferrer nofollow ugc" href="<?=H::e($link['url'])?>"><?=H::e($link['label'])?></a>
+        <?php endforeach;?>
+        </div>
     <?php endif; ?>
     <?php if(!empty($d['social_links'])):?>
         <h3>Social links</h3>
