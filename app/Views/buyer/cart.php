@@ -9,8 +9,8 @@
         <tr>
            <th>Product</th>
            <th>Designer</th>
-           <th>Base</th>
-           <th>License</th>
+           <th>Base Price</th>
+           <th>Selected Permissions</th>
            <th>POD / AI</th>
            <th>Total</th>
            <th>Actions</th>
@@ -31,18 +31,17 @@
                </a>
                </td>
                <td>
-               <?=H::money($p['price'])?>
+               <?php if(!empty($p['license_invalid'])):?><span class="muted">Unavailable</span><?php else:?><?=H::money($p['price'])?><?php endif;?>
                </td>
                <td>
                <form method="post" action="/cart/update">
                    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-                   <select name="license_type[<?=$p['cart_item_id']?>]">
-                   <option value="personal">Personal use included</option>
-                   <?php if($p['commercial_license_enabled']):?>
-                       <option value="commercial" <?=$p['commercial_selected']?'selected':''?>>Commercial +<?=H::money($p['commercial_license_price'])?>
-                       </option>
-                   <?php endif;?>
-                   </select>
+                   <p class="help-text license-help-note">Hover over ? for a quick preview or click ? to open the full license details.</p>
+                    <?php foreach($p['licenses'] as $license):?>
+                       <label><input type="checkbox" name="license_type[<?=$p['cart_item_id']?>][]" value="<?=H::e($license['license_key'])?>" <?=in_array($license['license_key'], $p['selected_license_keys'] ?? [], true)?'checked':''?> <?=$license['license_key']==='personal'?'checked disabled':''?>> <?=H::e($license['name'])?> <?php if($license['license_key']==='personal'):?><span class="muted">included/free</span><?php else:?><span class="muted">+<?=H::money($license['price'])?></span><?php endif;?><?php if($license['description']):?><span class="license-help" role="button" tabindex="0" aria-label="<?=H::e($license['name'])?> license details"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($license['description'])?></span></span><?php endif;?></label>
+                       <?php if($license['license_key']==='personal'):?><input type="hidden" name="license_type[<?=$p['cart_item_id']?>][]" value="personal"><?php endif;?>
+                   <?php endforeach;?>
+                   <?php if(!empty($p['license_invalid'])):?><p class="notice error">This license is no longer available. Please choose another license.</p><?php endif;?>
                    <button>Update</button>
                </form>
                </td>
@@ -69,3 +68,5 @@
     </h2>
     <a class="btn" href="/checkout">Checkout</a>
 <?php endif;?>
+
+<?php require __DIR__.'/../partials/license_help_modal.php'; ?>

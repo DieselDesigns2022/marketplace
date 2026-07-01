@@ -413,7 +413,58 @@
     <p>If you have questions about this Privacy Policy or how your information is handled, visit the <a href="/contact">Contact page</a>.</p>
 </section>
 <?php elseif($page === 'licensing-help'): ?>
-<section class="card"><h2>Personal and commercial use</h2><p>Personal use is intended for non-commercial projects. If a product offers a commercial license, buyers may select it during purchase for qualifying business use shown on the product page.</p><h2>POD permission</h2><p>Product pages show whether print-on-demand use is allowed. If POD is not allowed, do not upload the design to POD services or use it on products sold through POD workflows.</p><h2>Allowed examples</h2><ul><li>Use a purchased SVG in a personal craft project.</li><li>Use a commercial-license product in business marketing when the listing allows it.</li><li>Use POD only when the product page says POD is allowed.</li></ul><h2>Not allowed</h2><ul><li>Resell, share, give away, or redistribute downloaded files.</li><li>Claim a designer's work as your own.</li><li>Use a product outside the permissions shown on its page.</li></ul><p>See the <a href="/buyer-faq">Buyer FAQ</a>, <a href="/seller-faq">Seller FAQ</a>, <a href="/terms">Terms</a>, or <a href="/browse">browse designs</a>.</p></section>
+<?php
+$globalLicenseTerms = [
+    'All licenses are non-exclusive and non-transferable. Purchasing a file gives you permission to use the file under the license purchased. It does not give you ownership of the design.',
+    'All designs remain the intellectual property of the original designer or seller.',
+    'You may not share, gift, trade, copy, upload, transfer, resell, modify for resale, or distribute the digital files unless the purchased license specifically allows it.',
+    'You may not claim the design as your own, copyright it, trademark it, register it, or use it as a logo or main brand identity.',
+    'Files must remain private and protected at all times.',
+    'Visible watermarks are required on mockups, product previews, listing images, customer previews, and promotional images when displaying the design online.',
+    'Any violation may result in revoked access, removal from the platform, denied future purchases, DMCA takedowns, account reports, and/or legal action.',
+];
+
+$licenseTypes = \App\Core\Database::rows('select license_key,name,description from license_types where is_active=1 order by sort_order,id');
+?>
+<section class="card">
+    <h2>Asset Moth Licensing Help</h2>
+    <p>Asset Moth products may include different license options depending on what the seller enables for that listing. Personal use is included with the product base price. Other license permissions may be offered as add-ons, and sellers may set those add-ons as free or paid.</p>
+    <p>Always review the product page, selected license options, order details, and seller-provided product information before using a file.</p>
+</section>
+
+<section class="card">
+    <h2>Global License Terms</h2>
+    <p>These terms apply to every license type unless a specific license clearly says otherwise.</p>
+    <ul>
+        <?php foreach($globalLicenseTerms as $term): ?>
+            <li><?=\App\Core\Helpers::e($term)?></li>
+        <?php endforeach; ?>
+    </ul>
+</section>
+
+<section class="card">
+    <h2>License Types</h2>
+    <p>The license descriptions below explain what each permission type allows and does not allow. Not every product will offer every license type.</p>
+
+    <?php foreach($licenseTypes as $license): ?>
+        <article class="license-help-entry">
+            <h3><?=\App\Core\Helpers::e($license['name'])?></h3>
+            <p><?=nl2br(\App\Core\Helpers::e($license['description']))?></p>
+        </article>
+    <?php endforeach; ?>
+</section>
+
+<section class="card">
+    <h2>Important Buyer Reminders</h2>
+    <ul>
+        <li>Only purchase the license permissions you actually need for your intended use.</li>
+        <li>If a license option is not available on a product, that permission is not included for that product.</li>
+        <li>A license price of $0.00 means the seller has chosen to include that permission for free on that product. It still must be selected when required.</li>
+        <li>Digital resale, file sharing, redistribution, claiming ownership, trademarking, and uploading files for unauthorized access are prohibited unless a purchased license specifically allows the exact use.</li>
+    </ul>
+    <p>Need help? Review the <a href="/buyer-faq">Buyer FAQ</a>, <a href="/seller-faq">Seller FAQ</a>, <a href="/terms">Terms</a>, or <a href="/contact">Contact page</a>.</p>
+</section>
+
 <?php elseif($page === 'buyer-faq'): ?>
 <section class="card"><h2>Buyer questions</h2><h3>How do I find products?</h3><p>Use <a href="/browse">Browse</a>, category pages, and product search filters.</p><h3>Do I need an account?</h3><p>An account is used for checkout, purchases, protected downloads, wishlists, and follows.</p><h3>Where are downloads?</h3><p>After checkout, log in and visit dashboard purchases or downloads.</p><h3>Can I use files commercially or for POD?</h3><p>Only when the product page and selected license allow it. Read <a href="/licensing-help">Licensing Help</a>.</p><h3>What if a file is missing or unclear?</h3><p>Use the <a href="/contact">Contact</a> page and include your order details, product name, account email, and a clear description of the missing file, unclear license, or download problem.</p><h3>Are refunds automatic?</h3><p>Refunds are not automatic. Digital product concerns are reviewed based on order details, download/access issues, duplicate purchase concerns, file problems, and the license information shown before purchase.</p></section>
 <?php elseif($page === 'seller-faq'): ?>

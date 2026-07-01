@@ -7,7 +7,7 @@
     <tr>
         <th>Product</th>
         <th>Designer</th>
-        <th>License</th>
+        <th>Purchased permissions</th>
         <th>Item Total</th>
         <th>Commission</th>
         <th>Seller Earning</th>
@@ -20,7 +20,7 @@
            <td>
            <?=H::e($i['designer_name'])?> (<?=H::e($i['designer_email'])?>)</td>
            <td>
-           <?=H::e($i['license_type'])?>
+           <?=H::e($i['license_name'] ?: $i['license_type'])?><?php if(!empty($i['license_description'])):?><br><span class="muted"><?=H::e($i['license_description'])?></span><?php endif;?>
            </td>
            <td>
            <?=H::money($i['total_price'])?>

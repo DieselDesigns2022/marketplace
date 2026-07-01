@@ -187,6 +187,6 @@ public/
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
-## Current phase: Phase 8 — Search & Browsing
+## Current phase: Phase 8.5 — Licensing System
 
-Phase 8 adds the public marketplace browsing foundation: weighted keyword search, filters, stable sorting, SQL-backed pagination, result summaries, no-results guidance, category browsing improvements, product-card metadata, and real-data discovery areas such as related products, more from creator, featured products/creators, and recently added products. Full licensing remains scheduled for Phase 8.5.
+Phase 8.5 adds the marketplace licensing foundation with Personal always included/free and seller-enabled add-on permissions that may be free (`$0.00`) or paid. Sellers can enable Basic, Commercial, POD, Wholesale, Fabric with overseas printing, Fabric without overseas printing, VA, Reseller with credit required, Reseller with no credit required, and Extended Commercial licenses; buyers can select multiple permissions; guest carts persist until checkout/login; carts and orders store normalized selected license keys plus license price snapshots; and order/admin/buyer views show the selected license details clearly. The product page, cart, seller edit form, and Licensing Help page now use license detail tooltips/modals so long terms stay readable without cluttering the listing.

@@ -49,3 +49,10 @@ Product files must not be directly public. Download routes must verify the curre
 ## `.gitignore` protections
 
 The repository should ignore environment files, public uploads, protected uploads, backups, logs, and other generated artifacts. If new generated folders are added, update `.gitignore` before committing work.
+
+## Phase 8.5 licensing security
+- Seller license saves continue to load products by both product id and designer id before editing.
+- License pricing is server-authoritative: Personal is always included/free, seller-enabled add-on licenses may be free (`$0.00`) or paid, cart totals are recalculated server-side, and order items snapshot selected licenses plus their prices.
+- Buyer-submitted license key lists are normalized and validated server-side against enabled product licenses during add-to-cart and cart update, with Personal always included.
+- Checkout validates every selected license again, recalculates line totals from product base prices only, and writes snapshots for all selected included licenses; client-provided prices are not trusted.
+- Disabled or missing licenses are not purchasable, and existing products fall back to a safe Personal license if custom rows are missing.

@@ -5,13 +5,21 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 class AuthController
 {
+    private function afterLoginRedirect(): string
+    {
+        $to = $_SESSION['after_login_redirect'] ?? '/dashboard';
+        unset($_SESSION['after_login_redirect']);
+        return is_string($to) && str_starts_with($to, '/') && !str_starts_with($to, '//') ? $to : '/dashboard';
+
+    }
+
     public function register()
     {
         if($_POST)
         {
            DB::exec('insert into users (name,email,password_hash,role,referral_code) values (?,?,?,?,?)',[$_POST['name'],$_POST['email'],password_hash($_POST['password'],PASSWORD_DEFAULT),'buyer',bin2hex(random_bytes(4))]);
             $_SESSION['user']=DB::row('select id,name,email,role from users where id=?',[DB::id()]);
-            H::redirect('/dashboard');
+            H::redirect($this->afterLoginRedirect());
 
         }
         H::view('auth/register');
@@ -26,7 +34,7 @@ class AuthController
             if($u&&password_verify($_POST['password'],$u['password_hash']))
            {
                $_SESSION['user']=['id'=>$u['id'],'name'=>$u['name'],'email'=>$u['email'],'role'=>$u['role']];
-                H::redirect('/dashboard');
+                H::redirect($this->afterLoginRedirect());
 
            }
             $error='Invalid credentials';

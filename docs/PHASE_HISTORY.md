@@ -314,7 +314,7 @@ Created and pulled onto the VPS branch. Testing was still pending at this interm
 - Public preview image storage added at `public/uploads/product_previews/`.
 - Base price support added.
 - Commercial license support added.
-- Commercial license price support added.
+- Legacy commercial license compatibility field support added.
 - POD allowed / not allowed support added.
 - Digital resale prohibited behavior added.
 - Category support added.
@@ -444,7 +444,7 @@ Completed, deployed to the VPS, tested, bug fixed, and confirmed working on 2026
 
 - Base price support added.
 - Commercial license enable/disable support added.
-- Commercial license pricing support added.
+- Legacy commercial license compatibility field support added.
 - POD Allowed support added.
 - Digital Resale Prohibited support added.
 
@@ -948,3 +948,24 @@ Initial scope will be finalized before Codex implementation. Phase 8 should focu
 Phase 8 implements the marketplace browsing foundation. Public browse and category pages now use SQL-backed keyword search, filters, sorting, pagination, result summaries, active filter chips, and clear no-results guidance. Search relevance weights title and phrase matches highest, then tag/category/creator signals, then description matches. Discovery uses real approved product/designer data for featured products, featured creators, recently added products, related products, and more from the same creator.
 
 Intentionally postponed: the full license system remains Phase 8.5; cart, checkout, orders, payments, downloads, sponsored listings, fake popularity, best-selling/rating sorts without real data, and review/rating features remain later-phase work.
+
+## Phase 8.5 — Licensing System — implemented
+
+Phase 8.5 began after Phase 8 Search & Browsing was reviewed, tested on the VPS, merged into `main`, synced back to the VPS, smoke-tested, SEO-checked, and backed up.
+
+Goal:
+Build the marketplace licensing foundation and connect selected licenses to product pages, carts, mock checkout, order items, buyer order display, and admin order review while leaving real payments and final production fulfillment for later phases.
+
+Implemented Phase 8.5 focus:
+- License types such as Personal, Commercial, POD, Wholesale, Fabric, VA, Extended Commercial, and future license support.
+- Corrected license model: Personal is always included/free, while seller-enabled add-on permissions may be free (`$0.00`) or paid and are included in cart/order totals.
+- Expanded active license types to include Basic, Commercial, POD, Wholesale, two Fabric options, VA, two Reseller options, and Extended Commercial, with readable tooltip/modal license details.
+- Product-page and cart license selection supports multiple included licenses with no visible license-price changes.
+- Cart items store selected license keys in a normalized format; mock checkout validates every selected license server-side.
+- Order items store normalized selected keys, joined names/descriptions, `license_price` as `0.00`, and JSON snapshots for all selected included licenses.
+- Corrective migration `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` zeroes existing product license prices after the original Phase 8.5 migration.
+- Admin visibility shows enabled and purchased license permissions without buyer-facing license prices.
+- Product listing card/image CSS was corrected so single-product sections do not stretch or distort previews.
+- Flexible database architecture so new license types can be added later without redesigning the schema.
+
+Phase 8.5 does not build real payments, final production checkout processing, final order fulfillment, protected download license enforcement, emails, referrals, creator ranks, sponsored listings, or bundle events. Those remain future phases.

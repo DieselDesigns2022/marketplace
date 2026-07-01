@@ -135,3 +135,8 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 - Homepage featured products, featured creators, and recently added products.
 - SEO checks: filtered browse/category pages render `noindex,follow`; unfiltered category pages remain canonical/indexable; sitemap excludes filtered URLs.
 - Mobile layout checks for filters, cards, and pagination.
+
+## Phase 8.5 licensing checks
+- Run PHP syntax checks for changed PHP files after editing licensing code.
+- Run `git diff --check` to catch whitespace issues.
+- Manual coverage should confirm Personal is always included/free; sellers can enable/disable Basic, Commercial, POD, Wholesale, Fabric with overseas printing, Fabric without overseas printing, VA, Reseller with credit required, Reseller with no credit required, and Extended Commercial add-ons; sellers can save `$0.00` and paid add-on prices; buyers can select multiple licenses; guest cart add/update/remove works before login; checkout requires login and returns users to the saved cart; cart totals include base price plus selected paid add-ons; order items snapshot selected licenses and prices; buyer/admin displays show selected license details; disabled license rejection and fallback behavior work; tooltips/modals are readable; Licensing Help shows current terms; and single-product listing cards/images do not stretch or distort.

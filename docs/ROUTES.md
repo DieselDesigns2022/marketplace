@@ -120,3 +120,11 @@ No new routes were added for Phase 7. Header and footer polish use existing rout
 - `page`: one-based pagination page.
 
 Filtered or paginated browse/category URLs remain public but should render `noindex,follow` with canonical URLs to the base browse/category route.
+
+## Phase 8.5 licensing behavior
+- `GET|POST /seller/product/new` and `GET|POST /seller/product/{id}` include seller license configuration fields for enabled licenses and add-on prices. Personal is always included/free; sellers enable or disable Basic, Commercial, POD, Wholesale, Fabric, VA, Reseller, and Extended Commercial add-on permissions and may price any add-on at `$0.00` or higher.
+- `GET /product/{slug}` displays enabled included license options with product base price only and posts one or more selected license keys to `POST /cart/add/{id}`.
+- `POST /cart/update` can update a cart item's selected included licenses; cart storage uses normalized selected license keys.
+- Checkout validates every selected license server-side and order items snapshot all selected included licenses with `license_price` retained as `0.00` compatibility data.
+- `GET /dashboard/order/{id}` and `GET /admin/order/{id}` show purchased included license snapshot details without buyer-facing license pricing.
+- `GET|POST /admin/products/{id}` shows enabled product license permissions for admin review.

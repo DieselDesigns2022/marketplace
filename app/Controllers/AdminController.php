@@ -3,6 +3,7 @@
 namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
+use App\Services\LicenseService;
 use Throwable;
 class AdminController
 {
@@ -206,7 +207,7 @@ class AdminController
 
         }
         $p=DB::row('select p.*,d.display_name,d.store_slug,d.user_id,u.email designer_email,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id left join categories c on c.id=p.category_id where p.id=?',[$id])??H::abort(404);
-        H::view('admin/product_detail',['p'=>$p,'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id])]);
+        H::view('admin/product_detail',['p'=>$p,'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id]),'licenses'=>LicenseService::productLicenses($p)]);
 
     }
     public function categories()

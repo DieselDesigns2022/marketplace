@@ -146,3 +146,12 @@ Indexes added for browsing performance:
 - `idx_products_ai_pod_status` on `products(status, ai_disclosure, pod_allowed)`.
 - `idx_designers_status_slug` on `designers(status, store_slug)`.
 - `idx_product_tags_tag_product` on `product_tags(tag_id, product_id)`.
+
+## Phase 8.5 licensing tables
+- `license_types` stores platform-level license definitions using a stable `license_key`, display name, description, active flag, and sort order so future license types can be added without changing the product schema.
+- `product_license_types` links products to enabled seller license permissions with description override and display order. The `price` column is retained for compatibility but included licenses should store `0.00`; it is not buyer-facing pricing.
+- License types support Personal as the included/free default plus seller-enabled add-on permissions that may be free (`$0.00`) or paid. Active license types include Basic, Commercial, POD, Wholesale, two Fabric options, VA, two Reseller options, and Extended Commercial. Product totals include the product base price plus selected paid add-on license prices.
+- `cart_items.license_type` and `order_items.license_type` are flexible `VARCHAR(80)` fields that may contain a normalized comma-separated list of selected license keys. Buyers can select multiple included licenses.
+- Checkout validates every selected license server-side and does not silently substitute invalid licenses.
+- `order_items` stores `license_name`, `license_price`, `license_description`, and `license_snapshot` to preserve all selected included licenses after later seller edits; `license_price` should be `0.00` for included licenses.
+- Migration: `database/migrations/2026_07_01_phase_8_5_licensing_system.sql` seeds the initial license types and backfills existing products. Corrective migration `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` zeros existing product license prices and sets the price default to `0.00` after the original Phase 8.5 migration.
