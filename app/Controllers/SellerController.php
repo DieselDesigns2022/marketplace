@@ -83,9 +83,9 @@ class SellerController
             return null;
 
         }
-        if (($_FILES[$field]['size'] ?? 0) > 2 * 1024 * 1024)
+        if (($_FILES[$field]['size'] ?? 0) > 15 * 1024 * 1024)
         {
-            $errors[] = ucfirst($field) . ' must be 2MB or smaller.';
+            $errors[] = ucfirst($field) . ' must be 15MB or smaller.';
             return null;
 
         }

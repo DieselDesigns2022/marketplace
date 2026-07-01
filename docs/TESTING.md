@@ -147,3 +147,7 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 - Confirm protected product files remain in `storage/protected_uploads/products` and are not modified by preview watermarking.
 - Confirm product pages render share controls, copy buttons work in browsers with Clipboard API support, and Open Graph/Twitter image metadata uses the public preview image.
 - Confirm seller storefront social fields reject invalid or dangerous URLs, valid links display publicly, and public links include safe external-link attributes.
+
+- Phase 8.75 live testing confirmed 15MB seller preview/avatar/banner uploads, active web PHP upload limits of `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`, and verified `public/.user.ini` is blocked from public access with HTTP 403.
+- Live testing confirmed transparent PNG watermarks render without black rectangles, use bottom-left placement at 50% opacity, regenerate correctly from retained private originals, and legacy preview images were backfilled to watermarked public previews with `watermark_status = watermarked` and no errors.
+- Live testing confirmed product share controls render as clickable icon buttons under the wishlist action, copy/share actions work, storefront social links normalize seller-entered domain-only URLs to HTTPS, and license trust notes display below the product description.

@@ -65,10 +65,10 @@
     <?=H::e($d['seo_description']??'')?>
     </textarea>
     </label>
-    <label>Avatar/logo upload <small>JPG, PNG, or WEBP up to 2MB.</small>
+    <label>Avatar/logo upload <small>JPG, PNG, or WEBP up to 15MB.</small>
     <input type="file" name="avatar" accept=".jpg,.jpeg,.png,.webp">
     </label>
-    <label>Banner image upload <small>JPG, PNG, or WEBP up to 2MB.</small>
+    <label>Banner image upload <small>JPG, PNG, or WEBP up to 15MB.</small>
     <input type="file" name="banner" accept=".jpg,.jpeg,.png,.webp">
     </label>
     <button class="btn">Save Store Settings</button>

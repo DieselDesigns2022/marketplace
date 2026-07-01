@@ -35,14 +35,16 @@ document.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-copy-link]');
   if (!button) return;
   const text = button.getAttribute('data-copy-link') || '';
-  if (!button.dataset.copyOriginalText) {
-    button.dataset.copyOriginalText = button.textContent;
-  }
-  const originalText = button.dataset.copyOriginalText;
+  const originalHtml = button.dataset.copyOriginalHtml || button.innerHTML;
+  button.dataset.copyOriginalHtml = originalHtml;
   try {
     await navigator.clipboard.writeText(text);
-    button.textContent = 'Copied';
-    setTimeout(() => { button.textContent = originalText; }, 1800);
+    button.classList.add('copied');
+    button.innerHTML = '<span aria-hidden="true">✓</span><span class="sr-only">Copied</span>';
+    setTimeout(() => {
+      button.innerHTML = originalHtml;
+      button.classList.remove('copied');
+    }, 1800);
   } catch (error) {
     window.prompt('Copy this link:', text);
   }

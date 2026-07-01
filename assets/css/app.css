@@ -907,3 +907,61 @@ body.license-modal-open {
 }
 
 .share-actions,.social-link-list{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}.btn.small{padding:.45rem .75rem;font-size:.9rem}.social-link{display:inline-flex;border:1px solid var(--border,#ddd);border-radius:999px;padding:.35rem .7rem;text-decoration:none;font-weight:700}.help-text{color:var(--muted,#666);font-size:.92rem}
+
+
+/* Phase 8.75 social/share icon buttons */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+  align-items: center;
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #ddd);
+  background: var(--card, #fff);
+  color: var(--text, #111);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 900;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.icon-btn:hover,
+.icon-btn:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0,0,0,.12);
+  border-color: var(--accent, #7c3aed);
+  outline: none;
+}
+
+.icon-btn.copied {
+  border-color: var(--accent, #7c3aed);
+}
+
+
+/* Phase 8.75 sidebar share spacing */
+.product-aside .share-card,
+aside .share-card {
+  margin-top: 1rem;
+}

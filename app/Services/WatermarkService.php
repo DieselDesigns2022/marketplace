@@ -23,8 +23,8 @@ class WatermarkService
             $errors[] = 'Preview image upload failed.';
             return null;
         }
-        if (($file['size'] ?? 0) > 2 * 1024 * 1024) {
-            $errors[] = 'Preview images must be 2MB or smaller.';
+        if (($file['size'] ?? 0) > 15 * 1024 * 1024) {
+            $errors[] = 'Preview images must be 15MB or smaller.';
             return null;
         }
         $tmp = $file['tmp_name'] ?? '';
@@ -126,10 +126,11 @@ class WatermarkService
             imagealphablending($base, true);
             imagesavealpha($base, true);
             $bw = imagesx($base); $bh = imagesy($base);
-            $mark = self::watermarkImage(max(1, (int)round($bw * 0.18)), max(1, (int)round($bh * 0.12)));
+            $mark = self::watermarkImage(max(1, (int)round($bw * 0.238)), max(1, (int)round($bh * 0.159)));
+            $mark = self::applyOpacity($mark, 50);
             $mw = imagesx($mark); $mh = imagesy($mark);
             $pad = max(12, (int)round(min($bw, $bh) * 0.035));
-            imagecopymerge($base, $mark, max(0, $bw - $mw - $pad), max(0, $bh - $mh - $pad), 0, 0, $mw, $mh, 25);
+            imagecopy($base, $mark, $pad, max(0, $bh - $mh - $pad), 0, 0, $mw, $mh);
             if (!is_dir(dirname($destinationAbs))) mkdir(dirname($destinationAbs), 0755, true);
             $saved = self::saveImage($base, $destinationAbs, (int)$info[2]);
             imagedestroy($base); imagedestroy($mark);
@@ -147,6 +148,35 @@ class WatermarkService
             IMAGETYPE_WEBP => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
             default => false,
         };
+    }
+
+    private static function applyOpacity($image, int $opacityPercent)
+    {
+        $opacityPercent = max(0, min(100, $opacityPercent));
+        $w = imagesx($image);
+        $h = imagesy($image);
+        $out = imagecreatetruecolor($w, $h);
+        imagealphablending($out, false);
+        imagesavealpha($out, true);
+        $transparent = imagecolorallocatealpha($out, 255, 255, 255, 127);
+        imagefill($out, 0, 0, $transparent);
+
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $rgba = imagecolorat($image, $x, $y);
+                $a = ($rgba & 0x7F000000) >> 24;
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                $visible = 127 - $a;
+                $newAlpha = 127 - (int)round($visible * ($opacityPercent / 100));
+                $color = imagecolorallocatealpha($out, $r, $g, $b, max(0, min(127, $newAlpha)));
+                imagesetpixel($out, $x, $y, $color);
+            }
+        }
+
+        imagedestroy($image);
+        return $out;
     }
 
     private static function saveImage($image, string $path, int $type): bool

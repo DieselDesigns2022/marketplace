@@ -178,3 +178,5 @@ Intentionally postponed:
 - Added private original preview retention for newly uploaded product preview images, plus seller/admin watermark regeneration from the private original.
 - Added product page share actions for Facebook, X/Twitter, clean copy link, and Instagram-friendly copy text, using existing Open Graph/Twitter metadata patterns and watermarked public preview images when present.
 - Added optional storefront social link fields for Facebook, Instagram, TikTok, Pinterest, Etsy, Shopify, and website with http/https validation and safe public external link attributes.
+
+- Live testing polish: raised seller preview/avatar/banner image upload validation from 2MB to 15MB, added app-specific PHP upload settings through `public/.user.ini`, fixed transparent PNG watermark alpha handling, adjusted preview watermark placement to bottom-left at 50% opacity with a larger size, backfilled existing legacy preview images into watermarked previews with private originals retained, converted share/social links to clickable icon buttons, moved product sharing under the wishlist action, and moved license trust notes below the product description.
