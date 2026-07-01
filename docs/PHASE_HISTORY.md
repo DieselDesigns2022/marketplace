@@ -314,7 +314,7 @@ Created and pulled onto the VPS branch. Testing was still pending at this interm
 - Public preview image storage added at `public/uploads/product_previews/`.
 - Base price support added.
 - Commercial license support added.
-- Commercial license price support added.
+- Legacy commercial license compatibility field support added.
 - POD allowed / not allowed support added.
 - Digital resale prohibited behavior added.
 - Category support added.
@@ -444,7 +444,7 @@ Completed, deployed to the VPS, tested, bug fixed, and confirmed working on 2026
 
 - Base price support added.
 - Commercial license enable/disable support added.
-- Commercial license pricing support added.
+- Legacy commercial license compatibility field support added.
 - POD Allowed support added.
 - Digital Resale Prohibited support added.
 
@@ -958,10 +958,14 @@ Build the marketplace licensing foundation and connect selected licenses to prod
 
 Implemented Phase 8.5 focus:
 - License types such as Personal, Commercial, POD, Wholesale, Fabric, VA, Extended Commercial, and future license support.
-- Seller controls to enable or disable license options per product, set custom license prices, choose default licenses, control license descriptions, and define display ordering.
-- Product-page license selection, license comparison/explanation, visible price updates, and links to licensing help/FAQ content.
-- Cart, mock checkout, and order-item storage for selected license keys, full license prices, descriptions, and purchased license snapshots; buyer and admin order views show the purchased license details.
-- Admin visibility for product license options and pricing during review.
+- Corrected license model: license types are included permissions/use-case options, not paid add-ons; product price is the only buyer-facing price.
+- Personal is always included, and sellers enable or disable additional included permissions per product while controlling descriptions and display ordering.
+- Product-page and cart license selection supports multiple included licenses with no visible license-price changes.
+- Cart items store selected license keys in a normalized format; mock checkout validates every selected license server-side.
+- Order items store normalized selected keys, joined names/descriptions, `license_price` as `0.00`, and JSON snapshots for all selected included licenses.
+- Corrective migration `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` zeroes existing product license prices after the original Phase 8.5 migration.
+- Admin visibility shows enabled and purchased license permissions without buyer-facing license prices.
+- Product listing card/image CSS was corrected so single-product sections do not stretch or distort previews.
 - Flexible database architecture so new license types can be added later without redesigning the schema.
 
 Phase 8.5 does not build real payments, final production checkout processing, final order fulfillment, protected download license enforcement, emails, referrals, creator ranks, sponsored listings, or bundle events. Those remain future phases.

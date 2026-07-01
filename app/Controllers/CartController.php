@@ -22,15 +22,16 @@ class CartController
         $subtotal=0;
         foreach($items as &$p)
         {
-            $license = LicenseService::purchasableLicense((int)$p['id'], $p['license_type']);
+            $licenses = LicenseService::purchasableLicenses((int)$p['id'], $p['license_type']);
             $p['licenses'] = LicenseService::productLicenses($p);
-            $p['license_invalid'] = !$license;
-            $p['license_key'] = $license['license_key'] ?? (string)$p['license_type'];
-            $p['license_name'] = $license['name'] ?? 'Unavailable license';
-            $p['license_description'] = $license['description'] ?? 'This license is no longer available. Please choose an available license before checkout.';
-            $p['license_price'] = $license['price'] ?? 0;
-            $p['line_total'] = $license ? $license['price'] : 0;
-            if ($license) $subtotal += $p['line_total'];
+            $p['selected_license_keys'] = array_column($licenses, 'license_key');
+            $p['license_invalid'] = !$licenses;
+            $p['license_key'] = $licenses ? LicenseService::keyList($licenses) : (string)$p['license_type'];
+            $p['license_name'] = $licenses ? LicenseService::nameList($licenses) : 'Unavailable license';
+            $p['license_description'] = $licenses ? LicenseService::descriptionList($licenses) : 'One or more selected licenses are no longer available. Please choose available licenses before checkout.';
+            $p['license_price'] = 0.00;
+            $p['line_total'] = $licenses ? (float)$p['price'] : 0;
+            if ($licenses) $subtotal += $p['line_total'];
 
         }
         return [$items,$subtotal];
@@ -60,12 +61,12 @@ class CartController
             H::redirect('/product/'.$p['slug']);
 
         }
-        $license = LicenseService::purchasableLicense($id, $_POST['license_type'] ?? '');
-        if (!$license) {
+        $licenses = LicenseService::purchasableLicenses($id, $_POST['license_type'] ?? []);
+        if (!$licenses) {
             H::flash('error','Please choose an available license for this product.');
             H::redirect('/product/'.$p['slug']);
         }
-        DB::exec('insert ignore into cart_items (user_id,product_id,license_type) values (?,?,?)',[H::user()['id'],$id,$license['license_key']]);
+        DB::exec('insert ignore into cart_items (user_id,product_id,license_type) values (?,?,?)',[H::user()['id'],$id,LicenseService::keyList($licenses)]);
         H::redirect('/cart');
 
     }
@@ -84,13 +85,15 @@ class CartController
             $item=DB::row('select ci.*,p.slug from cart_items ci join products p on p.id=ci.product_id where ci.id=? and ci.user_id=?',[(int)$cartId,H::user()['id']]);
             if($item)
            {
-               $selected = LicenseService::purchasableLicense((int)$item['product_id'], (string)$license);
+               $selected = LicenseService::purchasableLicenses((int)$item['product_id'], $license);
                if($selected)
                {
-                   $duplicate = DB::row('select id from cart_items where user_id=? and product_id=? and license_type=? and id<>? limit 1',[H::user()['id'],$item['product_id'],$selected['license_key'],(int)$cartId]);
+                   $keyList = LicenseService::keyList($selected);
+                   $duplicate = DB::row('select id from cart_items where user_id=? and product_id=? and license_type=? and id<>? limit 1',[H::user()['id'],$item['product_id'],$keyList,(int)$cartId]);
                    if($duplicate) DB::exec('delete from cart_items where id=? and user_id=?',[(int)$cartId,H::user()['id']]);
-                   else DB::exec('update cart_items set license_type=? where id=? and user_id=?',[$selected['license_key'],(int)$cartId,H::user()['id']]);
+                   else DB::exec('update cart_items set license_type=? where id=? and user_id=?',[$keyList,(int)$cartId,H::user()['id']]);
                }
+               else H::flash('error','One or more selected licenses are no longer available. Please choose available licenses before checkout.');
 
            }
 
@@ -134,7 +137,7 @@ class CartController
                 foreach($valid as $p)
                {
                    $comm=round($p['line_total']*.20,2);
-                    DB::exec('insert into order_items (order_id,product_id,designer_id,license_type,license_name,license_price,license_description,license_snapshot,unit_price,commercial_license_price,total_price,commission_rate) values (?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],json_encode(['key'=>$p['license_key'],'name'=>$p['license_name'],'price'=>$p['license_price'],'description'=>$p['license_description']]),$p['license_price'],0,$p['line_total'],.20]);
+                    DB::exec('insert into order_items (order_id,product_id,designer_id,license_type,license_name,license_price,license_description,license_snapshot,unit_price,commercial_license_price,total_price,commission_rate) values (?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['license_key'],$p['license_name'],0.00,$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['price'],0,$p['line_total'],.20]);
                     DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$p['line_total'],$comm,$p['line_total']-$comm,'available']);
                     DB::exec('insert into platform_commissions (order_id,product_id,designer_id,gross_sale,commission_amount,referral_commission_placeholder) values (?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['line_total'],$comm,0]);
                     DB::exec('update products set sales_count=sales_count+1 where id=?',[$p['id']]);
