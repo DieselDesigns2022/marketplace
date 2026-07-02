@@ -44,15 +44,15 @@ Join table between products and tags.
 
 ### `cart_items`
 
-Stores buyer cart entries by user, product, and license type. License type is `personal` or `commercial`.
+Stores buyer cart entries by user, product, normalized selected license keys, quantity, and Phase 9 price/license/fulfillment snapshots.
 
 ### `orders`
 
-Stores buyer orders with status (`pending`, `paid`, `completed`, `failed`, `refunded`), payment processor/mode, subtotal, credits applied, and total.
+Stores buyer orders with statuses including `pending`, future `paid`/`failed`, `cancelled`, `refunded`, `partially_fulfilled`, and `fulfilled`; legacy `completed` remains accepted for existing data compatibility. Phase 9 also adds tax/coupon/fulfillment placeholders and pending-payment foundation metadata.
 
 ### `order_items`
 
-Stores purchased products in each order, including product, designer, license type, unit/commercial prices, total price, and commission rate.
+Stores purchased products in each order, including product/designer/license snapshots, unit and license prices, total price, commission rate, fulfillment type, manual-delivery fields, and download tracking placeholders.
 
 ### `downloads`
 
@@ -151,7 +151,7 @@ Indexes added for browsing performance:
 - `license_types` stores platform-level license definitions using a stable `license_key`, display name, description, active flag, and sort order so future license types can be added without changing the product schema.
 - `product_license_types` links products to enabled seller license permissions with description override, display order, and seller-configured add-on pricing. The `price` column stores seller-configured add-on pricing for enabled non-personal licenses; Personal/included licenses should remain `0.00`.
 - License types support Personal as the included/free default plus seller-enabled add-on permissions that may be free (`$0.00`) or paid. Active license types include Basic, Commercial, POD, Wholesale, two Fabric options, VA, two Reseller options, and Extended Commercial. Buyers see add-on license pricing when selecting paid add-on permissions, and cart/order totals include the product base price plus selected paid add-on license prices.
-- `cart_items.license_type` and `order_items.license_type` are flexible `VARCHAR(80)` fields that may contain a normalized comma-separated list of selected license keys. Buyers can select multiple licenses/permissions, including paid add-ons when enabled.
+- `cart_items.license_type` and `order_items.license_type` are flexible `VARCHAR(255)` fields that may contain a normalized comma-separated list of selected license keys. Buyers can select multiple licenses/permissions, including paid add-ons when enabled.
 - Checkout validates every selected license server-side and does not silently substitute invalid licenses.
 - `order_items` stores `license_name`, `license_price`, `license_description`, and `license_snapshot` to preserve selected licenses after later seller edits; `license_price` should be `0.00` for included/free permissions and should snapshot selected paid add-on prices where applicable.
 - Migration: `database/migrations/2026_07_01_phase_8_5_licensing_system.sql` seeds the initial license types and backfills existing products. Compatibility migration `database/migrations/2026_07_01_phase_8_5_license_included_multi_select_fix.sql` is retained as a no-op because add-on pricing and expanded license type corrections superseded the earlier included-license-only pricing correction.
@@ -161,3 +161,8 @@ Indexes added for browsing performance:
 - `product_images.watermark_status` and `product_images.watermark_error` record whether public preview watermarking succeeded, fell back to the original public preview, or failed.
 - `designers.facebook_url`, `instagram_url`, `tiktok_url`, `pinterest_url`, `etsy_url`, and `shopify_url` store optional validated storefront links. `website_url` remains the general website field.
 - Migration: `database/migrations/2026_07_01_phase_8_75_watermarks_social_links.sql`.
+
+## Phase 9 schema additions
+Phase 9 migration `2026_07_01_phase_9_cart_orders_downloads_delivery.sql` adds product `fulfillment_type` and `manual_delivery_instructions`; cart price/license/fulfillment snapshots; future-ready order tax/coupon/fulfillment fields; order item product, seller, license, fulfillment, Google Drive email, manual delivery status, delivery notes/timestamps, purchased file version, download count, and expiration placeholders; and download log order/order-item/status fields.
+
+`not_applicable` is used for downloadable products and other non-manual-delivery order items. Manual Google Drive delivery statuses are `pending_delivery`, `buyer_email_needed`, `ready_for_seller_delivery`, `delivered`, and `cancelled_refunded`. Order statuses include `pending`, future `paid`/`failed`, `cancelled`, `refunded`, `partially_fulfilled`, and `fulfilled`, while legacy `completed` remains accepted for existing data compatibility.

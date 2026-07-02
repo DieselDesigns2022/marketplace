@@ -37,7 +37,7 @@ class CartController
             $productId = (int)($cartItem['product_id'] ?? 0);
             $licenseType = (string)($cartItem['license_type'] ?? 'personal');
             if ($productId > 0) {
-                DB::exec('insert ignore into cart_items (user_id,product_id,license_type) values (?,?,?)',[H::user()['id'],$productId,$licenseType]);
+                DB::exec('insert ignore into cart_items (user_id,product_id,license_type,quantity) values (?,?,?,1)',[H::user()['id'],$productId,$licenseType]);
             }
         }
 
@@ -49,7 +49,7 @@ class CartController
     {
         if (H::user()) {
             $this->mergeGuestCart();
-            return DB::rows('select ci.id cart_item_id,ci.license_type,p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
+            return DB::rows('select ci.id cart_item_id,ci.license_type,ci.price_snapshot,ci.license_price_snapshot,ci.total_snapshot,p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
         }
 
         $items = [];
@@ -77,7 +77,10 @@ class CartController
             $p['license_name'] = $licenses ? LicenseService::nameList($licenses) : 'Unavailable license';
             $p['license_description'] = $licenses ? LicenseService::descriptionList($licenses) : 'One or more selected licenses are no longer available. Please choose available licenses before checkout.';
             $p['license_price'] = $licenses ? LicenseService::priceTotal($licenses) : 0.00;
+            $p['fulfillment_type'] = $p['fulfillment_type'] ?? 'downloadable';
+            $p['fulfillment_label'] = $p['fulfillment_type'] === 'google_drive' ? 'Google Drive / Manual Delivery' : 'Downloadable Product';
             $p['line_total'] = $licenses ? (float)$p['price'] + $p['license_price'] : 0;
+            if (!empty($p['cart_item_id']) && H::user() && $licenses) DB::exec('update cart_items set quantity=1, price_snapshot=?, license_price_snapshot=?, total_snapshot=?, fulfillment_type_snapshot=? where id=? and user_id=?', [$p['price'], $p['license_price'], $p['line_total'], $p['fulfillment_type'], $p['cart_item_id'], H::user()['id']]);
             if ($licenses) $subtotal += $p['line_total'];
 
         }
@@ -117,7 +120,7 @@ class CartController
         $keyList = LicenseService::keyList($licenses);
 
         if (H::user()) {
-            DB::exec('insert ignore into cart_items (user_id,product_id,license_type) values (?,?,?)',[H::user()['id'],$id,$keyList]);
+            DB::exec('insert ignore into cart_items (user_id,product_id,license_type,quantity,price_snapshot,license_price_snapshot,total_snapshot,fulfillment_type_snapshot) values (?,?,?,?,?,?,?,?)',[H::user()['id'],$id,$keyList,1,$p['price'],LicenseService::priceTotal($licenses),(float)$p['price']+LicenseService::priceTotal($licenses),$p['fulfillment_type'] ?? 'downloadable']);
         } else {
             $cart = $this->guestCart();
             foreach ($cart as $cartItem) {
@@ -196,6 +199,7 @@ class CartController
         {
             foreach($items as $p)
             {
+                if (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive' && !filter_var(trim($_POST['google_drive_email'] ?? ''), FILTER_VALIDATE_EMAIL)) { H::flash('error','A valid Google Drive email is required for manual delivery items.'); H::redirect('/checkout'); }
                 if(!empty($p['license_invalid']))
                 {
                     H::flash('error','A license in your cart is no longer available. Please choose an available license before checkout.');
@@ -219,15 +223,17 @@ class CartController
 
                }
                 $total=array_sum(array_column($valid,'line_total'));
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,subtotal,credits_applied,total) values (?,?,?,?,?,?,?)',[H::user()['id'],'completed','mock','mock',$total,0,$total]);
+                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,subtotal,tax_amount,credits_applied,coupon_discount,total,fulfillment_status,phase9_foundation_order) values (?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','phase9_foundation','pending_payment',$total,0,0,0,$total,'pending',1]);
                 $order=DB::id();
                 foreach($valid as $p)
                {
                    $comm=round($p['line_total']*.20,2);
-                    DB::exec('insert into order_items (order_id,product_id,designer_id,license_type,license_name,license_price,license_description,license_snapshot,unit_price,commercial_license_price,total_price,commission_rate) values (?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['price'],$p['license_price'],$p['line_total'],.20]);
-                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$p['line_total'],$comm,$p['line_total']-$comm,'available']);
-                    DB::exec('insert into platform_commissions (order_id,product_id,designer_id,gross_sale,commission_amount,referral_commission_placeholder) values (?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],$p['line_total'],$comm,0]);
-                    DB::exec('update products set sales_count=sales_count+1 where id=?',[$p['id']]);
+                    $manualEmail = trim($_POST['google_drive_email'] ?? '');
+                    $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
+                    $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
+                    $manualStatus = $isManualDelivery ? ($manualEmail === '' ? 'buyer_email_needed' : 'ready_for_seller_delivery') : 'not_applicable';
+                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$p['line_total'],.20,null]);
+                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$p['line_total'],$comm,$p['line_total']-$comm,'pending_payment']);
 
                }
                 DB::exec('delete from cart_items where user_id=?',[H::user()['id']]);

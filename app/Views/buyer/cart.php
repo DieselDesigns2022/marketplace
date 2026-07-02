@@ -11,6 +11,7 @@
            <th>Designer</th>
            <th>Base Price</th>
            <th>Selected Permissions</th>
+           <th>Fulfillment</th>
            <th>POD / AI</th>
            <th>Total</th>
            <th>Actions</th>
@@ -45,6 +46,7 @@
                    <button>Update</button>
                </form>
                </td>
+               <td><?=H::e($p['fulfillment_label'] ?? 'Downloadable Product')?></td>
                <td>
                <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
                <br>

@@ -7,7 +7,7 @@
         <th>Product</th>
         <th>Purchased permissions</th>
         <th>Price</th>
-        <th>Download</th>
+        <th>Fulfillment</th><th>Download / Delivery</th>
     </tr>
     <?php foreach($items as $i):?>
         <tr>
@@ -22,11 +22,14 @@
            <td>
            <?=H::money($i['total_price'])?>
            </td>
+           <td><?=($i['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></td>
            <td>
-           <?php if($i['file_id']):?>
-               <a class="btn" href="/download/<?=$i['file_id']?>">Download</a>
+           <?php if(($i['fulfillment_type'] ?? 'downloadable')==='downloadable'):?>
+             <?php if($i['file_id'] && in_array($order['status'], ['paid','fulfilled','completed'], true)):?><a class="btn" href="/download/<?=$i['file_id']?>">Download</a><?php else:?><span class="muted">Download access begins after future Phase 10 payment completion.</span><?php endif;?>
+             <br><span class="muted">Downloads: <?=number_format((int)($i['download_count'] ?? 0))?></span>
            <?php else:?>
-               <span class="muted">No file</span>
+             <span>Status: <?=H::e(str_replace('_',' ', $i['manual_delivery_status']))?></span><br>
+             <span class="muted">Google Drive email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?></span>
            <?php endif;?>
            </td>
         </tr>
