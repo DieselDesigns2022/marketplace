@@ -31,6 +31,15 @@
         <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
         </span>
         </p>
+        <?php $isManualDeliveryProduct = (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive'); ?>
+        <section class="notice <?= $isManualDeliveryProduct ? 'warning' : 'success' ?>">
+            <strong><?= $isManualDeliveryProduct ? 'Google Drive / Manual Delivery' : 'Downloadable Product' ?></strong>
+            <?php if($isManualDeliveryProduct):?>
+                <p>This product is delivered manually through Google Drive. Your Google Drive email will be collected during checkout so the seller can grant access outside Asset Moth.</p>
+            <?php else:?>
+                <p>This product uses protected download access after purchase/payment completion.</p>
+            <?php endif;?>
+        </section>
         <?php $globalLicenseTerms = str_replace('\\n', "\n", 'All licenses are non-exclusive and non-transferable. Purchasing a file gives you permission to use the file under the license purchased. It does not give you ownership of the design.\n\nAll designs remain the intellectual property of the original designer or seller.\n\nYou may not share, gift, trade, copy, upload, transfer, resell, modify for resale, or distribute the digital files unless the purchased license specifically allows it.\n\nYou may not claim the design as your own, copyright it, trademark it, register it, or use it as a logo or main brand identity.\n\nFiles must remain private and protected at all times.\n\nVisible watermarks are required on mockups, product previews, listing images, customer previews, and promotional images when displaying the design online.\n\nAny violation may result in revoked access, removal from the platform, denied future purchases, DMCA takedowns, account reports, and/or legal action.'); ?>
         <p>All license types follow Asset Moth global terms <span class="license-help" role="button" tabindex="0" aria-label="Global license terms"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($globalLicenseTerms)?></span></span></p>
         <p>Personal use is included with the product base price.</p>
@@ -67,7 +76,7 @@
                <?php endforeach;?>
            </fieldset>
            <button class="btn">Add to cart</button>
-           <p class="help-text">Review the product details, selected permissions, POD permission, and AI disclosure before adding this digital item.</p>
+           <p class="help-text"><?php if(($p['fulfillment_type'] ?? 'downloadable') === 'google_drive'):?>Review the product details, selected permissions, delivery instructions, POD permission, and AI disclosure before adding this manual-delivery item. Your Google Drive email is collected at checkout.<?php else:?>Review the product details, selected permissions, POD permission, and AI disclosure before adding this digital item.<?php endif;?></p>
         </form>
     <?php endif;?>
     <form method="post" action="/product/<?=$p['id']?>/wishlist">

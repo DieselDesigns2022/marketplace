@@ -340,7 +340,11 @@ class SellerController
             $errors[] = 'Base Price must be a valid amount.';
 
         }
-        if (($v['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen($v['manual_delivery_instructions'] ?? '') < 5) { $errors[] = 'Manual delivery instructions are required for Google Drive delivery products.'; }
+        $manualDeliveryInstructions = trim((string)($v['manual_delivery_instructions'] ?? ''));
+        if (($v['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen($manualDeliveryInstructions) < 5)
+        {
+            $errors[] = 'Manual delivery instructions are required for Google Drive delivery products.';
+        }
         if (!in_array($v['ai_disclosure'], ['No AI Used', 'AI Assisted', 'AI Generated'], true))
         {
             $errors[] = 'AI Disclosure is required.';
@@ -647,7 +651,14 @@ class SellerController
     public function submitProduct($id)
     {
         H::requireSeller();
-        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$id, $this->d()['id']] );
+        $d = $this->d();
+        $p = DB::row('select fulfillment_type,manual_delivery_instructions from products where id=? and designer_id=?', [(int)$id, $d['id']]) ?? H::abort(404);
+        if (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen(trim((string)($p['manual_delivery_instructions'] ?? ''))) < 5)
+        {
+            H::flash('error','Manual delivery instructions are required before submitting a Google Drive delivery product.');
+            H::redirect('/seller/product/'.(int)$id);
+        }
+        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$id, $d['id']] );
         H::redirect('/seller/products');
 
     }

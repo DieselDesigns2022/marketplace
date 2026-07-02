@@ -19,7 +19,7 @@
            <td>
            <?=H::money($s['total_price'])?>
            </td>
-           <td><?=H::e($s['fulfillment_type'])?></td>
+           <td><?=H::e(($s['fulfillment_type'] ?? '') === 'google_drive' ? 'Google Drive / Manual Delivery' : 'Downloadable Product')?></td>
            <td><?php if(($s['fulfillment_type'] ?? '')==='google_drive'):?><?=H::e(str_replace('_',' ',$s['manual_delivery_status'] ?? ''))?><?php else:?><span class="muted">Not manual delivery</span><?php endif;?></td>
            <td><?=$s['created_at']?> · <a href="/seller/order-item/<?=$s['id']?>">View</a></td>
         </tr>

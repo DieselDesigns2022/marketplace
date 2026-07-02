@@ -10,11 +10,17 @@
     <p>Buyer Google Drive email: <strong><?=H::e($item['buyer_google_drive_email'] ?: 'Needed')?></strong></p>
     <p>Status: <?=H::e(str_replace('_',' ', $item['manual_delivery_status']))?></p>
     <p>Instructions snapshot: <?=H::e($item['delivery_instructions_snapshot'] ?? '')?></p>
-    <form method="post" class="form">
-      <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-      <input type="hidden" name="action" value="mark_delivered">
-      <label>Delivery notes<textarea name="delivery_notes"><?=H::e($item['delivery_notes'] ?? '')?></textarea></label>
-      <button class="btn">Mark delivered</button>
-    </form>
+    <?php if(($item['manual_delivery_status'] ?? '') === 'delivered'):?>
+      <p class="notice success">This manual delivery item has been marked delivered.</p>
+      <?php if(!empty($item['delivered_at'])):?><p>Delivered at: <?=H::e($item['delivered_at'])?></p><?php endif;?>
+      <?php if(!empty($item['delivery_notes'])):?><p>Delivery notes:<br><?=nl2br(H::e($item['delivery_notes']))?></p><?php endif;?>
+    <?php else:?>
+      <form method="post" class="form">
+        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <input type="hidden" name="action" value="mark_delivered">
+        <label>Delivery notes<textarea name="delivery_notes"><?=H::e($item['delivery_notes'] ?? '')?></textarea></label>
+        <button class="btn">Mark delivered</button>
+      </form>
+    <?php endif;?>
   <?php endif;?>
 </div>
