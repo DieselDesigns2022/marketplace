@@ -48,7 +48,7 @@
 - Confirm migrations apply cleanly.
 - Confirm expected tables and columns exist.
 - Confirm status fields contain expected values.
-- Confirm order checkout creates order, order item, seller earning, and platform commission rows.
+- Confirm Phase 9 checkout creates pending-payment order and order item records, plus seller earning placeholder rows where applicable; platform commission/payment finalization remains future Phase 10 behavior.
 - Confirm downloads table logs download attempts.
 
 ## Upload testing
@@ -63,10 +63,10 @@
 
 - Add product to cart.
 - Switch license type where commercial license is enabled.
-- Checkout successfully.
+- Create a Phase 9 pending-payment foundation order from checkout; do not expect Stripe/payment collection.
 - Confirm cart clears after checkout.
 - Confirm order appears in purchases.
-- Confirm authorized download works.
+- Confirm authorized download works only for paid/fulfilled/completed orders and denied attempts are logged otherwise.
 - Confirm unauthorized user cannot download the file.
 
 ## Mobile/responsive testing
@@ -151,3 +151,6 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 - Phase 8.75 live testing confirmed 15MB seller preview/avatar/banner uploads, active web PHP upload limits of `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`, and verified `public/.user.ini` is blocked from public access with HTTP 403.
 - Live testing confirmed transparent PNG watermarks render without black rectangles, use bottom-left placement at 50% opacity, regenerate correctly from retained private originals, and legacy preview images were backfilled to watermarked public previews with `watermark_status = watermarked` and no errors.
 - Live testing confirmed product share controls render as clickable icon buttons under the wishlist action, copy/share actions work, storefront social links normalize seller-entered domain-only URLs to HTTPS, and license trust notes display below the product description.
+
+## Phase 9 manual test scenarios
+Verify downloadable and Google Drive products can be added to the cart, mixed carts show fulfillment type, duplicate product/license entries are prevented, licenses can be changed, removed items disappear, unavailable products/licenses block checkout, Google Drive products require seller delivery instructions before save/submit, public Google Drive product pages show the manual-delivery notice, checkout shows seller delivery instructions beside the Google Drive email field, Google Drive checkout requires a valid email, buyer order detail shows license proof/download or manual delivery status, sellers only see their own order items and can mark manual delivery delivered, delivered manual-delivery items no longer show the mark-delivered button, admins can view orders/download logs/manual delivery details and override fulfillment status, unauthorized buyers/sellers are blocked, and direct unauthorized downloads are denied/logged.

@@ -10,7 +10,7 @@
         <th>Purchased permissions</th>
         <th>Item Total</th>
         <th>Commission</th>
-        <th>Seller Earning</th>
+        <th>Seller Earning</th><th>Fulfillment</th><th>Admin override</th>
     </tr>
     <?php foreach($items as $i):?>
         <tr>
@@ -31,6 +31,8 @@
            <td>
            <?=H::money($i['seller_earning']??($i['total_price']-($i['total_price']*$i['commission_rate'])))?>
            </td>
+           <td><?=H::e($i['fulfillment_type'] ?? 'downloadable')?><?php if(($i['fulfillment_type'] ?? '')==='google_drive'):?><br>Email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?><br>Status: <?=H::e(str_replace('_',' ', $i['manual_delivery_status']))?><?php endif;?></td>
+           <td><?php if(($i['fulfillment_type'] ?? '')==='google_drive'):?><form method="post"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="override_fulfillment"><input type="hidden" name="order_item_id" value="<?=$i['id']?>"><select name="manual_delivery_status"><?php foreach(['pending_delivery','buyer_email_needed','ready_for_seller_delivery','delivered','cancelled_refunded'] as $st):?><option value="<?=$st?>" <?=$i['manual_delivery_status']===$st?'selected':''?>><?=H::e(str_replace('_',' ',$st))?></option><?php endforeach;?></select><input name="delivery_notes" value="<?=H::e($i['delivery_notes'] ?? '')?>"><button>Update</button></form><?php endif;?></td>
         </tr>
     <?php endforeach;?>
 </table>

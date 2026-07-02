@@ -236,10 +236,31 @@ class AdminController
     public function orderDetail($id)
     {
         $this->gate();
+        if ($_POST && ($_POST['action'] ?? '') === 'override_fulfillment') {
+            $status = $_POST['manual_delivery_status'] ?? '';
+            $orderItemId = (int)($_POST['order_item_id'] ?? 0);
+            $target = DB::row('select id from order_items where id=? and order_id=? and fulfillment_type="google_drive" limit 1', [$orderItemId, (int)$id]);
+            if (!$target) {
+                H::flash('error','Manual delivery item not found for this order.');
+                H::redirect('/admin/order/'.(int)$id);
+            }
+            if (in_array($status, ['pending_delivery','buyer_email_needed','ready_for_seller_delivery','delivered','cancelled_refunded'], true)) {
+                DB::exec('update order_items set manual_delivery_status=?, delivery_notes=?, delivered_at=case when ?="delivered" then coalesce(delivered_at,now()) else null end where id=? and order_id=? and fulfillment_type="google_drive"', [$status, trim($_POST['delivery_notes'] ?? ''), $status, $orderItemId, (int)$id]);
+                $this->log('overrode_fulfillment_status','order_item',$orderItemId,['status'=>$status]);
+                H::flash('success','Fulfillment status updated.');
+            }
+            H::redirect('/admin/order/'.(int)$id);
+        }
         $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404);
-        $items=DB::rows('select oi.*,p.title,d.display_name designer_name,u.email designer_email,se.seller_earning,pc.commission_amount from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,u.email designer_email,se.seller_earning,pc.commission_amount from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id where oi.order_id=?',[$order['id']]);
         H::view('admin/order_detail',['order'=>$order,'items'=>$items]);
 
+    }
+
+    public function downloads()
+    {
+        $this->gate();
+        H::view('admin/table',['title'=>'Download logs','rows'=>DB::rows('select dl.id,dl.order_id,dl.order_item_id,dl.product_id,dl.product_file_id,dl.status,dl.message,u.email user_email,dl.ip_address,dl.created_at from downloads dl join users u on u.id=dl.user_id order by dl.created_at desc limit 200')]);
     }
     public function referrals()
     {

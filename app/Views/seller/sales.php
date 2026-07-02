@@ -3,31 +3,25 @@
     <tr>
         <th>Product</th>
         <th>Buyer</th>
-        <th>Gross</th>
-        <th>Commission</th>
-        <th>Earning</th>
+        <th>Total</th>
+        <th>Fulfillment</th>
+        <th>Delivery</th>
         <th>Date</th>
     </tr>
     <?php foreach($sales as $s):?>
         <tr>
            <td>
-           <?=$s['title']?>
+           <?=H::e($s['product_title'] ?: ('Product #'.$s['product_id']))?>
            </td>
            <td>
-           <?=$s['email']?>
+           <?=H::e($s['email'])?>
            </td>
            <td>
-           <?=H::money($s['gross_sale'])?>
+           <?=H::money($s['total_price'])?>
            </td>
-           <td>
-           <?=H::money($s['marketplace_commission'])?>
-           </td>
-           <td>
-           <?=H::money($s['seller_earning'])?>
-           </td>
-           <td>
-           <?=$s['created_at']?>
-           </td>
+           <td><?=H::e(($s['fulfillment_type'] ?? '') === 'google_drive' ? 'Google Drive / Manual Delivery' : 'Downloadable Product')?></td>
+           <td><?php if(($s['fulfillment_type'] ?? '')==='google_drive'):?><?=H::e(str_replace('_',' ',$s['manual_delivery_status'] ?? ''))?><?php else:?><span class="muted">Not manual delivery</span><?php endif;?></td>
+           <td><?=$s['created_at']?> · <a href="/seller/order-item/<?=$s['id']?>">View</a></td>
         </tr>
     <?php endforeach;?>
 </table>

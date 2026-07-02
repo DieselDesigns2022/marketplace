@@ -36,6 +36,14 @@
     <div data-preview-alt-fields>
         <p class="muted">Select preview images to add separate alt text for each image.</p>
     </div>
+    <h2>Fulfillment</h2>
+    <label>Fulfillment type<select name="fulfillment_type">
+      <?php $ft=$_POST['fulfillment_type']??$p['fulfillment_type']??'downloadable'; ?>
+      <option value="downloadable" <?=$ft==='downloadable'?'selected':''?>>Downloadable Product</option>
+      <option value="google_drive" <?=$ft==='google_drive'?'selected':''?>>Google Drive / Manual Delivery Product</option>
+    </select></label>
+    <label>Manual delivery instructions<textarea name="manual_delivery_instructions"><?=H::e($_POST['manual_delivery_instructions']??$p['manual_delivery_instructions']??'')?></textarea></label>
+    <p class="help-text">Google Drive/manual delivery products do not require a protected downloadable file. Sellers manually grant access using the buyer email collected during checkout.</p>
     <h2>Product Files</h2>
     <?php foreach($files as $file):?>
         <div class="inline">

@@ -972,3 +972,6 @@ Phase 8.5 does not build real payments, final production checkout processing, fi
 
 ## Phase 8.75 — Marketplace Protection, Sharing & Store Polish
 Implemented public preview watermarking, private preview original retention for regeneration, product page social sharing, structured storefront social links, and documentation for the upload/security behavior. Purchased/downloadable files remain outside the watermark workflow.
+
+## Phase 9 - Cart, Orders, Downloads & Delivery Foundation
+Implemented the Phase 9 foundation for persistent carts, pending-payment order creation, order item snapshots, protected download logging, and Google Drive/manual delivery. This phase intentionally does not implement real Stripe/payment processing or automated Google Drive sharing; those remain future work. Sellers manually grant Google Drive access outside the app and update delivery status, while admins can inspect and override fulfillment status.

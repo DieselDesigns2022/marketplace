@@ -292,7 +292,7 @@ class SellerController
         $price = $_POST['price'] ?? ($existing['price'] ?? '0.00');
         $commercialEnabled = isset($_POST['license_enabled']['commercial']);
         $commercialLicensePrice = $_POST['license_price']['commercial'] ?? ($existing['commercial_license_price'] ?? '0.00');
-        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => H::slug(trim($_POST['slug'] ?? $existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
+        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => H::slug(trim($_POST['slug'] ?? $existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
     }
     private function validateProduct(array $v, ?int $ignoreId = null): array
@@ -339,6 +339,11 @@ class SellerController
         {
             $errors[] = 'Base Price must be a valid amount.';
 
+        }
+        $manualDeliveryInstructions = trim((string)($v['manual_delivery_instructions'] ?? ''));
+        if (($v['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen($manualDeliveryInstructions) < 5)
+        {
+            $errors[] = 'Manual delivery instructions are required for Google Drive delivery products.';
         }
         if (!in_array($v['ai_disclosure'], ['No AI Used', 'AI Assisted', 'AI Generated'], true))
         {
@@ -611,13 +616,13 @@ class SellerController
                 $fileTypes = implode(',', $values['file_types']);
                 if ($p)
                {
-                    DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
+                    DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
                     $productId = (int) $p['id'];
 
                }
                 else
                {
-                    DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, ] );
+                    DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, ] );
                     $productId = DB::id();
 
                }
@@ -646,7 +651,14 @@ class SellerController
     public function submitProduct($id)
     {
         H::requireSeller();
-        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$id, $this->d()['id']] );
+        $d = $this->d();
+        $p = DB::row('select fulfillment_type,manual_delivery_instructions from products where id=? and designer_id=?', [(int)$id, $d['id']]) ?? H::abort(404);
+        if (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen(trim((string)($p['manual_delivery_instructions'] ?? ''))) < 5)
+        {
+            H::flash('error','Manual delivery instructions are required before submitting a Google Drive delivery product.');
+            H::redirect('/seller/product/'.(int)$id);
+        }
+        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$id, $d['id']] );
         H::redirect('/seller/products');
 
     }
@@ -660,8 +672,21 @@ class SellerController
     public function sales()
     {
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select se.*,p.title,u.email from seller_earnings se join products p on p.id=se.product_id join users u on u.id=se.buyer_id where se.designer_id=?', [$this->d()['id']] ), ]);
+        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,u.email from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.designer_id=? order by oi.created_at desc', [$this->d()['id']] ), ]);
 
+    }
+
+    public function saleDetail($id)
+    {
+        H::requireSeller();
+        $d=$this->d();
+        if ($_POST && ($_POST['action'] ?? '') === 'mark_delivered') {
+            DB::exec('update order_items set manual_delivery_status="delivered", delivered_at=now(), delivery_notes=? where id=? and designer_id=? and fulfillment_type="google_drive"', [trim($_POST['delivery_notes'] ?? ''), (int)$id, $d['id']]);
+            H::flash('success','Manual delivery item marked delivered.');
+            H::redirect('/seller/order-item/'.(int)$id);
+        }
+        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=?',[(int)$id,$d['id']]) ?? H::abort(404);
+        H::view('seller/order_item',['item'=>$item]);
     }
     public function referrals()
     {

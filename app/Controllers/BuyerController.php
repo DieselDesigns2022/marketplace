@@ -14,14 +14,14 @@ class BuyerController
     public function purchases()
     {
         H::requireLogin();
-        H::view('buyer/purchases',['orders'=>DB::rows('select o.*, group_concat(concat(p.title," (",oi.license_type,")") separator ", ") product_titles from orders o join order_items oi on oi.order_id=o.id join products p on p.id=oi.product_id where o.user_id=? and o.status in ("paid","completed") group by o.id order by o.created_at desc',[H::user()['id']])]);
+        H::view('buyer/purchases',['orders'=>DB::rows('select o.*, group_concat(concat(coalesce(oi.product_title,p.title)," (",oi.license_name,")") separator ", ") product_titles from orders o join order_items oi on oi.order_id=o.id join products p on p.id=oi.product_id where o.user_id=? group by o.id order by o.created_at desc',[H::user()['id']])]);
 
     }
     public function order($id)
     {
         H::requireLogin();
         $order=DB::row('select * from orders where id=? and user_id=?',[(int)$id,H::user()['id']])??H::abort(404);
-        $items=DB::rows('select oi.*,p.title,p.slug,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id from order_items oi join products p on p.id=oi.product_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id from order_items oi join products p on p.id=oi.product_id where oi.order_id=?',[$order['id']]);
         H::view('buyer/order',['order'=>$order,'items'=>$items]);
 
     }
@@ -33,12 +33,21 @@ class BuyerController
     public function download($file)
     {
         H::requireLogin();
-        $f=DB::row('select pf.* from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=?',[$file,H::user()['id']])??H::abort(403);
-        DB::exec('insert into downloads (user_id,product_id,product_file_id,ip_address,user_agent) values (?,?,?,?,?)',[H::user()['id'],$f['product_id'],$f['id'],$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+        $f=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? order by oi.id desc limit 1',[$file,H::user()['id']]);
+        if(!$f || $f['fulfillment_type'] !== 'downloadable' || !in_array($f['order_status'], ['paid','fulfilled','completed'], true) || (!empty($f['download_expires_at']) && strtotime($f['download_expires_at']) < time())) {
+            if($f) DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$file,'denied','Order is not paid/fulfilled or access expired.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+            H::abort(403);
+        }
         $base=realpath(app_path('storage/protected_uploads/products'));
         $path=app_path('storage/protected_uploads/'.ltrim($f['storage_path'],'/'));
         $real=realpath($path);
-        if(!$base || !$real || !str_starts_with($real,$base) || !is_file($real)) H::abort(404);
+        $insideProtectedProducts = $base && $real && ($real === $base || str_starts_with($real, $base . DIRECTORY_SEPARATOR));
+        if(!$insideProtectedProducts || !is_file($real) || !is_readable($real)) {
+            DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$file,'denied','Protected file is unavailable.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+            H::abort(404);
+        }
+        DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,ip_address,user_agent) values (?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$f['id'],'served',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+        DB::exec('update order_items set download_count=download_count+1 where id=?',[$f['order_item_id']]);
         header('Content-Type: application/octet-stream');
         header('Content-Disposition: attachment; filename="'.basename($f['original_name']).'"');
         readfile($real);
