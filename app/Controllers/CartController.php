@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
+use App\Services\StripeService;
 use Throwable;
 
 class CartController
@@ -223,28 +224,34 @@ class CartController
 
                }
                 $total=array_sum(array_column($valid,'line_total'));
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,subtotal,tax_amount,credits_applied,coupon_discount,total,fulfillment_status,phase9_foundation_order) values (?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','phase9_foundation','pending_payment',$total,0,0,0,$total,'pending',1]);
+                $commissionRate = StripeService::commissionRate();
+                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,credits_applied,coupon_discount,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$total,0,0,0,$total,'pending',1,StripeService::currency(),StripeService::cents($total),round($total * $commissionRate, 2)]);
                 $order=DB::id();
                 foreach($valid as $p)
                {
-                   $comm=round($p['line_total']*.20,2);
+                   $comm=round($p['line_total'] * $commissionRate, 2);
                     $manualEmail = trim($_POST['google_drive_email'] ?? '');
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
-                    $manualStatus = $isManualDelivery ? ($manualEmail === '' ? 'buyer_email_needed' : 'ready_for_seller_delivery') : 'not_applicable';
-                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$p['line_total'],.20,null]);
+                    $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
+                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$p['line_total'],$commissionRate,null]);
                     DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$p['line_total'],$comm,$p['line_total']-$comm,'pending_payment']);
 
                }
+                $createdOrder = DB::row('select * from orders where id=?', [$order]);
+                $createdItems = DB::rows('select * from order_items where order_id=?', [$order]);
+                $session = StripeService::createCheckoutSession($createdOrder, $createdItems);
+                DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?', [$session['id'] ?? null, $order]);
                 DB::exec('delete from cart_items where user_id=?',[H::user()['id']]);
                 DB::commit();
-                H::redirect('/dashboard/order/'.$order);
+                header('Location: ' . $session['url'], true, 303);
+                exit;
 
            }
             catch(Throwable $e)
            {
                DB::rollBack();
-                H::flash('error','Checkout failed. Please try again.');
+                H::flash('error','Checkout failed. Please try again. If this persists, ask an admin to verify Stripe environment configuration.');
                 H::redirect('/cart');
 
            }

@@ -1,8 +1,9 @@
 <h1>Order #<?=$order['id']?>
 </h1>
 <p>Buyer: <?=H::e($order['buyer_name'])?> (<?=H::e($order['buyer_email'])?>)</p>
-<p>Status: <?=H::e($order['status'])?> · Total: <?=H::money($order['total'])?>
+<p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?>
 </p>
+<section class="card"><h2>Stripe payment details</h2><p>Provider: <?=H::e($order['payment_provider'] ?? $order['payment_processor'] ?? "")?> · Session: <?=H::e($order['stripe_checkout_session_id'] ?? "")?> · Intent: <?=H::e($order['stripe_payment_intent_id'] ?? "")?> · Charge: <?=H::e($order['stripe_charge_id'] ?? "")?></p><p>Stripe amount: <?=H::e($order['stripe_amount_total'] ?? "")?> <?=H::e(strtoupper($order['stripe_currency'] ?? ""))?> · Paid: <?=H::e($order['paid_at'] ?? "")?> · Failed: <?=H::e($order['failed_at'] ?? "")?> · Refunded: <?=H::e($order['refunded_at'] ?? "")?></p><p>Manual review: <?=!empty($order['manual_review_required'])?'Required':'No'?> <?=H::e($order['manual_review_reason'] ?? "")?></p><p><a href="/admin/payment-logs">View all payment logs</a></p></section>
 <table>
     <tr>
         <th>Product</th>
@@ -39,3 +40,5 @@
 <p>
 <a href="/admin/orders">Back to orders</a>
 </p>
+
+<h2>Order payment transactions</h2><table><tr><th>Type</th><th>Status</th><th>Amount</th><th>Message</th><th>Date</th></tr><?php foreach(($transactions ?? []) as $t):?><tr><td><?=H::e($t['transaction_type'])?></td><td><?=H::e($t['payment_status'])?></td><td><?=H::money($t['amount'])?> <?=H::e(strtoupper($t['currency']))?></td><td><?=H::e($t['message'] ?? '')?></td><td><?=$t['created_at']?></td></tr><?php endforeach;?></table>

@@ -672,7 +672,7 @@ class SellerController
     public function sales()
     {
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,u.email from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.designer_id=? order by oi.created_at desc', [$this->d()['id']] ), ]);
+        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
 
     }
 
@@ -681,11 +681,11 @@ class SellerController
         H::requireSeller();
         $d=$this->d();
         if ($_POST && ($_POST['action'] ?? '') === 'mark_delivered') {
-            DB::exec('update order_items set manual_delivery_status="delivered", delivered_at=now(), delivery_notes=? where id=? and designer_id=? and fulfillment_type="google_drive"', [trim($_POST['delivery_notes'] ?? ''), (int)$id, $d['id']]);
+            DB::exec('update order_items oi join orders o on o.id=oi.order_id set oi.manual_delivery_status="delivered", oi.delivered_at=now(), oi.delivery_notes=? where oi.id=? and oi.designer_id=? and oi.fulfillment_type="google_drive" and o.payment_status="paid"', [trim($_POST['delivery_notes'] ?? ''), (int)$id, $d['id']]);
             H::flash('success','Manual delivery item marked delivered.');
             H::redirect('/seller/order-item/'.(int)$id);
         }
-        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=?',[(int)$id,$d['id']]) ?? H::abort(404);
+        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
         H::view('seller/order_item',['item'=>$item]);
     }
     public function referrals()

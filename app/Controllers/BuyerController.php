@@ -33,9 +33,10 @@ class BuyerController
     public function download($file)
     {
         H::requireLogin();
-        $f=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? order by oi.id desc limit 1',[$file,H::user()['id']]);
-        if(!$f || $f['fulfillment_type'] !== 'downloadable' || !in_array($f['order_status'], ['paid','fulfilled','completed'], true) || (!empty($f['download_expires_at']) && strtotime($f['download_expires_at']) < time())) {
-            if($f) DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$file,'denied','Order is not paid/fulfilled or access expired.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+        $f=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status,o.payment_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? and oi.fulfillment_type="downloadable" and ((o.payment_status="paid") or (o.status in ("fulfilled","completed") and (o.payment_status is null or o.payment_status not in ("refunded","failed","canceled","expired","manual_review","partially_refunded")))) and (oi.download_expires_at is null or oi.download_expires_at>=now()) order by oi.id desc limit 1',[$file,H::user()['id']]);
+        if(!$f) {
+            $denied=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status,o.payment_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? order by oi.id desc limit 1',[$file,H::user()['id']]);
+            if($denied) DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$denied['order_id'],$denied['order_item_id'],$denied['product_id'],$file,'denied','Order is not paid/fulfilled or access expired.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
             H::abort(403);
         }
         $base=realpath(app_path('storage/protected_uploads/products'));
