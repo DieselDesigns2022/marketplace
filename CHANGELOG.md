@@ -2,7 +2,7 @@
 
 ## Current status
 
-The project currently includes the original MVP plus Phases 1 through 4.5. Phase 5 is documentation only. The marketplace has public browsing, buyer accounts, seller applications, seller storefronts, product management, cart/checkout/order/download workflows, admin moderation, and standardized readable source formatting.
+The project currently includes the original MVP plus implemented phases through Phase 9. Phase 9 provides cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; real Stripe/payment processing remains future Phase 10 work.
 
 ## Original MVP — completed 2026-06-22
 
@@ -180,3 +180,8 @@ Intentionally postponed:
 - Added optional storefront social link fields for Facebook, Instagram, TikTok, Pinterest, Etsy, Shopify, and website with http/https validation and safe public external link attributes.
 
 - Live testing polish: raised seller preview/avatar/banner image upload validation from 2MB to 15MB, added app-specific PHP upload settings through `public/.user.ini`, fixed transparent PNG watermark alpha handling, adjusted preview watermark placement to bottom-left at 50% opacity with a larger size, backfilled existing legacy preview images into watermarked previews with private originals retained, converted share/social links to clickable icon buttons, moved product sharing under the wishlist action, and moved license trust notes below the product description.
+
+## Phase 9 - Cart, Orders, Downloads & Delivery Foundation
+- Added persistent cart price snapshots, product fulfillment types, pending-payment checkout foundation, order item purchase snapshots, secure download logging foundations, and Google Drive/manual delivery statuses.
+- Added seller and admin manual delivery visibility/override workflows.
+- Stripe/payment collection remains Phase 10; Phase 9 orders are clearly marked as pending-payment foundation records.

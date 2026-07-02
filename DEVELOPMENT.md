@@ -76,9 +76,9 @@ All POST requests are checked by the router through `Helpers::verifyCsrf()`. For
 2. Buyer browses products and stores.
 3. Buyer can wishlist products and follow stores.
 4. Buyer adds approved products to cart.
-5. Buyer checks out through the current mock checkout.
-6. Buyer views purchases/order detail.
-7. Buyer downloads purchased files through protected download routes.
+5. Buyer creates a Phase 9 pending-payment foundation order from checkout; no Stripe payment is collected yet.
+6. Buyer views purchases/order detail with license, fulfillment, download, or manual delivery status.
+7. Buyer downloads through protected download routes only after the order is in a paid/fulfilled/completed status.
 
 ## Seller workflow
 
@@ -185,3 +185,6 @@ The public browse UI preserves filters, sort, and pagination parameters. Categor
 
 - Live testing confirmed preview/avatar/banner upload validation is 15MB at the application layer. Production PHP-FPM upload limits are controlled by `public/.user.ini` using `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`.
 - Watermark rendering preserves transparent PNG alpha, applies 50% opacity to the watermark pixels, places the watermark in the bottom-left corner, and uses retained private originals for regeneration/backfill.
+
+## Phase 9 development notes
+Cart totals and license prices are recalculated server-side and snapshotted into cart/order records. Products now support `downloadable` and `google_drive` fulfillment. Google Drive products require seller delivery instructions and collect a buyer Google Drive email during the Phase 9 pending-payment checkout foundation flow. Do not treat these orders as paid Stripe orders until Phase 10 adds payment completion.

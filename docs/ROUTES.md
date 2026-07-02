@@ -134,3 +134,10 @@ Filtered or paginated browse/category URLs remain public but should render `noin
 - Existing admin product detail route now supports a CSRF-protected `regenerate_watermark` action for product preview images with retained private originals.
 - Public product pages include Facebook, X/Twitter, copy-link, and Instagram-friendly share controls without requiring login or adding third-party scripts.
 - Public storefront pages render validated seller social links as safe external links and omit empty/invalid fields.
+
+## Phase 9 route additions and behavior
+- `GET/POST /checkout` creates a Phase 9 pending-payment foundation order only; it does not contact Stripe.
+- `GET/POST /seller/order-item/{id}` lets a seller view only their own order item and mark Google Drive/manual delivery items delivered.
+- `GET/POST /admin/order/{id}` includes manual delivery visibility and admin fulfillment override controls.
+- `GET /admin/downloads` lists download log entries.
+- `GET /download/{file}` validates buyer ownership, downloadable fulfillment, paid/fulfilled legacy status, expiration placeholder, and logs served/denied attempts without exposing protected storage paths.

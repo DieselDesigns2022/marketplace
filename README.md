@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 7 — Marketplace Content & Launch Polish.
+- Current Phase: Phase 9 — Cart, Orders, Downloads & Delivery Foundation.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -29,13 +29,13 @@ These features represent the current implemented and tested functionality in the
 - Buyer registration, login, account management, dashboard, wishlists, follows, purchases, order detail, and downloads.
 - Designer application workflow with admin approval and denial.
 - Approved seller dashboard, storefront settings, product creation/editing, preview images, downloadable files, tags, sales, referrals, and rank pages.
-- Cart, mock checkout, order creation, order items, seller earnings, platform commissions, and protected download access.
+- Cart, Phase 9 pending-payment checkout foundation, order creation, order items, seller earnings placeholders, manual Google Drive delivery status, and protected download access foundations.
 - Admin dashboards for users, applications, designers, products, categories, orders, referrals, homepage features, and ads.
 - Phase 4.5 codebase standardization for readability, plus restoration of public product previews and sell page regressions.
 
 ### Planned / Future Phase
 
-- Real payment processor integration.
+- Real payment processor integration remains planned for Phase 10.
 - Automated payouts and tax/reporting workflows.
 - Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
@@ -187,7 +187,7 @@ public/
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
-## Current phase: Phase 8.75 — Marketplace Protection, Sharing & Store Polish
+## Current phase: Phase 9 — Cart, Orders, Downloads & Delivery Foundation
 
 ### Phase 8.5 licensing capability
 
@@ -197,3 +197,6 @@ Phase 8.5 adds the marketplace licensing foundation with Personal always include
 Asset Moth watermarks seller-uploaded public product preview images server-side. Watermarking is limited to public preview images; purchased/downloadable files are stored separately and are not watermarked or altered. Newly uploaded preview originals are retained privately for regeneration. The default watermark source path is `storage/app/private/branding/watermark.png`, with optional override via `WATERMARK_SOURCE_PATH`.
 
 Product pages include buyer-friendly social sharing controls and Open Graph/Twitter preview metadata. Seller storefronts support optional validated website, Facebook, Instagram, TikTok, Pinterest, Etsy, and Shopify links rendered with safe external-link attributes.
+
+## Phase 9 cart/order/download/manual-delivery foundation
+Phase 9 adds the foundation for carts, order records, downloadable delivery, and Google Drive/manual delivery. Checkout creates a pending-payment foundation order only; real Stripe/payment collection is not live and remains Phase 10. Google Drive delivery is manual: buyers provide a Google Drive email, sellers grant access outside the app, and sellers/admins update delivery status in Asset Moth.
