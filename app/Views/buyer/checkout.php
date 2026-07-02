@@ -1,5 +1,5 @@
-<h1>Phase 9 Checkout Foundation</h1>
-<p class="notice warning">No Stripe or real payment is collected in Phase 9. Submitting creates a pending-payment foundation order for cart/order/download/manual-delivery testing.</p>
+<h1>Secure checkout</h1>
+<p class="notice warning">You will be redirected to Stripe for secure payment. Downloads and Google Drive/manual delivery unlock only after Stripe confirms payment by webhook.</p>
 <?php if(!$items):?>
     <p>Your cart is empty.</p>
 <?php else:?>
@@ -17,9 +17,9 @@
     </table>
     <div class="card">
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
-      <p>Taxes: <span class="muted">$0.00 placeholder for Phase 10+</span></p>
+      <p>Taxes: <span class="muted">$0.00 placeholder / future-ready</span></p>
       <p>Credits: <span class="muted">$0.00 placeholder</span></p>
-      <p>Coupons: <span class="muted">placeholder; no coupon is applied in Phase 9</span></p>
+      <p>Coupons: <span class="muted">placeholder; no coupon is applied</span></p>
       <h2>Total <?=H::money($subtotal)?></h2>
     </div>
     <form method="post" class="form card">
@@ -36,6 +36,6 @@
           <label>Google Drive email required for manual delivery<input type="email" name="google_drive_email" required value="<?=H::e($_POST['google_drive_email'] ?? H::user()['email'] ?? '')?>"></label>
           <p class="help-text">Sellers use this email to manually grant Google Drive access outside Asset Moth.</p>
         <?php endif;?>
-        <button class="btn">Create pending-payment Phase 9 foundation order</button>
+        <button class="btn">Continue to secure Stripe checkout</button>
     </form>
 <?php endif;?>

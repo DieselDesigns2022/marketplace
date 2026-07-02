@@ -7,7 +7,7 @@
            <th>Order</th>
            <th>Date</th>
            <th>Products</th>
-           <th>Total</th>
+           <th>Total</th><th>Payment</th>
            <th>
            </th>
         </tr>
@@ -23,9 +23,9 @@
                </td>
                <td>
                <?=H::money($o['total'])?>
-               </td>
+               </td><td><?=H::e($o['payment_status'] ?? $o['status'])?></td>
                <td>
-               <a class="btn" href="/dashboard/order/<?=$o['id']?>">View downloads</a>
+               <a class="btn" href="/dashboard/order/<?=$o['id']?>">View order</a>
                </td>
            </tr>
         <?php endforeach;?>

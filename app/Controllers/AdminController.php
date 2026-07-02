@@ -253,8 +253,14 @@ class AdminController
         }
         $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404);
         $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,u.email designer_email,se.seller_earning,pc.commission_amount from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id where oi.order_id=?',[$order['id']]);
-        H::view('admin/order_detail',['order'=>$order,'items'=>$items]);
+        H::view('admin/order_detail',['order'=>$order,'items'=>$items,'transactions'=>DB::rows('select * from payment_transactions where order_id=? order by created_at desc',[$order['id']]),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 20')]);
 
+    }
+
+    public function paymentLogs()
+    {
+        $this->gate();
+        H::view('admin/payment_logs',['transactions'=>DB::rows('select pt.*,u.email buyer_email from payment_transactions pt left join orders o on o.id=pt.order_id left join users u on u.id=o.user_id order by pt.created_at desc limit 200'),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 200')]);
     }
 
     public function downloads()

@@ -76,7 +76,7 @@ All POST requests are checked by the router through `Helpers::verifyCsrf()`. For
 2. Buyer browses products and stores.
 3. Buyer can wishlist products and follow stores.
 4. Buyer adds approved products to cart.
-5. Buyer creates a Phase 9 pending-payment foundation order from checkout; no Stripe payment is collected yet.
+5. Buyer checkout creates a Stripe-backed pending order snapshot and redirects to Stripe Checkout; webhooks, not browser redirects, confirm payment.
 6. Buyer views purchases/order detail with license, fulfillment, download, or manual delivery status.
 7. Buyer downloads through protected download routes only after the order is in a paid/fulfilled/completed status.
 
@@ -187,4 +187,28 @@ The public browse UI preserves filters, sort, and pagination parameters. Categor
 - Watermark rendering preserves transparent PNG alpha, applies 50% opacity to the watermark pixels, places the watermark in the bottom-left corner, and uses retained private originals for regeneration/backfill.
 
 ## Phase 9 development notes
-Cart totals and license prices are recalculated server-side and snapshotted into cart/order records. Products now support `downloadable` and `google_drive` fulfillment. Google Drive products require seller delivery instructions and collect a buyer Google Drive email during the Phase 9 pending-payment checkout foundation flow. Do not treat these orders as paid Stripe orders until Phase 10 adds payment completion.
+Cart totals and license prices are recalculated server-side and snapshotted into cart/order records. Products support `downloadable` and `google_drive` fulfillment. Google Drive products require seller delivery instructions and collect a buyer Google Drive email during checkout. Phase 9 created the pending-payment foundation that Phase 10 now connects to Stripe; never treat browser redirects as proof of payment.
+
+## Phase 10 — Stripe Payment Integration
+- Adds Stripe Checkout session creation for buyer checkout using server-side order snapshots and environment-only Stripe configuration.
+- Stores Stripe Checkout Session, Payment Intent, customer/charge references when available, payment status, Stripe amount/currency, paid/failed/refunded timestamps, retry count, and manual review flags.
+- Stripe webhooks are the source of truth for paid, failed, expired/canceled, refunded, and partially refunded status. The browser success redirect only shows a processing page and does not unlock access.
+- Downloads unlock only after webhook-confirmed paid status. Google Drive/manual delivery becomes seller-ready only after payment clears; seller delivery visibility is blocked before payment clears.
+- Failed, canceled, expired, and unpaid orders show retry/return-to-checkout options. `manual_review` is a payment safety lock and blocks buyer retry/unlock until admin review.
+- Buyer order detail acts as the receipt-style payment record until Phase 10.5 email receipts are implemented.
+- Adds duplicate webhook protection via `stripe_events.stripe_event_id`, Stripe signature verification, amount/currency/order metadata mismatch checks, payment transaction logs, and admin payment log visibility.
+- Adds seller payout foundation with Stripe Connect account status fields, seller payout ledger records, and transfer attempts only when connected accounts are enabled. Missing onboarding leaves payouts pending without failing buyer payment.
+- Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
+- Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
+- Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
+- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+
+### Phase 10 development guidance
+- Browser redirects are never trusted as payment proof; only verified Stripe webhooks may mark orders paid or unlock delivery/downloads.
+- Webhooks must verify `Stripe-Signature` using `STRIPE_WEBHOOK_SECRET` and must preserve duplicate-event idempotency.
+- Never commit Stripe secret keys or webhook secrets; use environment variables only.
+- Use server-side order/item/license snapshots and integer cents for all Stripe amounts; never trust client-submitted prices.
+- Do not hardcode commission percent; use `PLATFORM_COMMISSION_PERCENT` through `StripeService::commissionRate()`.
+- `manual_review` is a payment safety lock and should block buyer retry/unlock until admin review.
+- Seller refund/cancellation request flow is future/admin-reviewed only: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe action happens only after approval.
+- Buyers cannot self-cancel completed digital purchases; the Stripe cancel return page only means payment was not completed before access unlocked.
