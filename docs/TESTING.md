@@ -172,3 +172,12 @@ Verify downloadable and Google Drive products can be added to the cart, mixed ca
 - **Future seller refund/cancellation workflow:** seller refund/cancellation requests are future work and must be admin-reviewed before any Stripe refund/cancellation action happens.
 
 Phase 10 does not implement emails/notifications, buyer self-cancellation of completed digital purchases, or seller refund-request approval UI.
+
+### Phase 10 Stripe seller onboarding test coverage
+Check that approved sellers can open `/seller/onboarding`, start `/seller/stripe`, create/continue Stripe Express onboarding with test keys, and return to Asset Moth with status fields synced. Verify buyer Checkout can complete before seller onboarding; seller payout records should remain `pending_stripe_onboarding` until the seller is payout-ready, then become `pending_transfer`/`transferred` or `transfer_failed` without reversing buyer access. Confirm seller-facing pages state no startup fee, no monthly fee, no listing fee, 18% Asset Moth commission, separate Stripe/payment processing fees, Stripe Connect payout requirement, admin-exception refunds, no buyer self-cancellation of completed digital purchases, and no seller instant refunds.
+
+#### Phase 10 correction tests
+After an approved seller completes Stripe onboarding or an `account.updated` webhook marks the seller payout-ready, verify old `pending_stripe_onboarding` paid-order payouts become attempted transfers with idempotency key `asset_moth_payout_order_{orderId}_designer_{designerId}`. Confirm unpaid, manual-review, and refunded orders are skipped; successful transfers become `transferred`, failures become `transfer_failed`, and buyer paid access remains unchanged. Test webhook signatures with `STRIPE_WEBHOOK_SECRET` and, when configured for a separate Connect destination, `STRIPE_CONNECT_WEBHOOK_SECRET`.
+
+#### Source transaction payout retry checks
+Verify transfer requests include `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available. For paid orders with no charge id yet, confirm payouts remain `pending_transfer`; after `payment_intent.succeeded` or `charge.updated` stores the charge id, confirm eligible payout-ready seller transfers are attempted with the same deterministic idempotency key.

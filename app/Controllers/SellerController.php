@@ -5,6 +5,8 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\WatermarkService;
+use App\Services\StripeService;
+use Throwable;
 class SellerController
 {
     private function d()
@@ -169,6 +171,91 @@ class SellerController
         return $errors;
 
     }
+
+    private function approvedDesigner(): array
+    {
+        H::requireSeller();
+        $d = $this->d();
+        if (!$d || $d['status'] !== 'approved') {
+            H::flash('warning', 'You need an approved designer account before accessing seller onboarding.');
+            H::redirect('/apply');
+        }
+        return $d;
+    }
+
+    private function readiness(array $d): array
+    {
+        $products = (int)(DB::row('select count(*) c from products where designer_id=? and status in ("draft","pending_review","approved")', [$d['id']])['c'] ?? 0);
+        return [
+            'profile' => trim((string)($d['display_name'] ?? '')) !== '' && trim((string)($d['bio'] ?? '')) !== '',
+            'stripe' => !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']),
+            'stripe_started' => !empty($d['stripe_connect_account_id']),
+            'store' => trim((string)($d['store_slug'] ?? '')) !== '',
+            'payout' => !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']),
+            'products' => $products > 0,
+            'product_count' => $products,
+        ];
+    }
+
+    public function onboarding(): void
+    {
+        $d = $this->approvedDesigner();
+        H::view('seller/onboarding', ['d' => $d, 'readiness' => $this->readiness($d), 'commissionPercent' => (int)round(StripeService::commissionRate() * 100)]);
+    }
+
+    public function stripe(): void
+    {
+        $d = $this->approvedDesigner();
+        H::view('seller/stripe', ['d' => $d, 'readiness' => $this->readiness($d), 'commissionPercent' => (int)round(StripeService::commissionRate() * 100)]);
+    }
+
+    public function stripeConnect(): void
+    {
+        $d = $this->approvedDesigner();
+        try {
+            $accountId = $d['stripe_connect_account_id'] ?? '';
+            if ($accountId === '') {
+                $account = StripeService::createConnectedAccount($d, H::user());
+                $accountId = (string)($account['id'] ?? '');
+                StripeService::syncConnectedAccountStatus((int)$d['id'], $account);
+                DB::exec('update designers set stripe_onboarding_started_at=coalesce(stripe_onboarding_started_at,now()) where id=?', [$d['id']]);
+            }
+            $base = StripeService::appUrl();
+            $link = StripeService::createAccountLink($accountId, $base . '/seller/stripe/refresh', $base . '/seller/stripe/return');
+            header('Location: ' . $link['url'], true, 303); exit;
+        } catch (Throwable $e) {
+            H::flash('error', 'Stripe setup could not be started: ' . $e->getMessage());
+            H::redirect('/seller/stripe');
+        }
+    }
+
+    public function stripeReturn(): void
+    {
+        $d = $this->approvedDesigner();
+        if (!empty($d['stripe_connect_account_id'])) {
+            try {
+                StripeService::syncConnectedAccountStatus((int)$d['id'], StripeService::retrieveConnectedAccount($d['stripe_connect_account_id']));
+                $this->refreshPendingPayouts((int)$d['id']);
+                H::flash('success', 'Stripe payout setup status was refreshed.');
+            } catch (Throwable $e) { H::flash('warning', 'Stripe returned you to Asset Moth, but status refresh failed: ' . $e->getMessage()); }
+        }
+        H::redirect('/seller/stripe');
+    }
+
+    public function stripeRefresh(): void
+    {
+        $this->stripeConnect();
+    }
+
+    private function refreshPendingPayouts(int $designerId): void
+    {
+        $d = DB::row('select * from designers where id=?', [$designerId]);
+        $ready = $d && !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']);
+        if ($ready) {
+            StripeService::attemptPendingTransfersForDesigner($designerId);
+        }
+    }
+
     public function apply()
     {
         H::requireLogin();

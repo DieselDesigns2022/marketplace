@@ -81,6 +81,23 @@ class StripeController
         elseif ($type === 'payment_intent.payment_failed') $this->markFailedByIntent($object, $eventId, $object['last_payment_error']['message'] ?? 'Payment failed.');
         elseif ($type === 'payment_intent.succeeded') $this->markPaidByIntent($object, $eventId);
         elseif (in_array($type, ['charge.refunded','charge.updated'], true)) $this->processChargeRefund($object, $eventId, $type);
+        elseif ($type === 'account.updated') $this->processAccountUpdated($object);
+    }
+
+
+    private function processAccountUpdated(array $account): void
+    {
+        $designerId = (int)($account['metadata']['designer_id'] ?? 0);
+        if (!$designerId && !empty($account['id'])) {
+            $row = DB::row('select id from designers where stripe_connect_account_id=? limit 1', [$account['id']]);
+            $designerId = (int)($row['id'] ?? 0);
+        }
+        if (!$designerId) return;
+        StripeService::syncConnectedAccountStatus($designerId, $account);
+        $fresh = DB::row('select * from designers where id=?', [$designerId]);
+        if ($fresh && !empty($fresh['stripe_connect_account_id']) && !empty($fresh['stripe_details_submitted']) && !empty($fresh['stripe_payouts_enabled'])) {
+            StripeService::attemptPendingTransfersForDesigner($designerId);
+        }
     }
 
     private function orderFromObject(array $object): ?array
@@ -164,8 +181,13 @@ class StripeController
     private function processChargeRefund(array $charge, string $eventId, string $type): void
     {
         $order = !empty($charge['payment_intent']) ? DB::row('select * from orders where stripe_payment_intent_id=? limit 1', [$charge['payment_intent']]) : null; if (!$order) return;
+        if (!empty($charge['id'])) DB::exec('update orders set stripe_charge_id=coalesce(stripe_charge_id,?) where id=?', [$charge['id'], $order['id']]);
+        $order = DB::row('select * from orders where id=?', [$order['id']]) ?: $order;
         $refunded = (int)($charge['amount_refunded'] ?? 0); $total = (int)($charge['amount'] ?? StripeService::cents($order['total']));
-        if ($refunded <= 0) return;
+        if ($refunded <= 0) {
+            if (($order['payment_status'] ?? '') === 'paid' && !empty($charge['id'])) $this->attemptPendingTransfers((int)$order['id'], strtolower($charge['currency'] ?? $order['stripe_currency'] ?? StripeService::currency()));
+            return;
+        }
         $partial = $refunded < $total;
         DB::exec('update orders set payment_status=?,status=?,stripe_charge_id=coalesce(?,stripe_charge_id),refunded_at=case when ?=0 then coalesce(refunded_at,now()) else refunded_at end,partially_refunded_at=case when ?=1 then coalesce(partially_refunded_at,now()) else partially_refunded_at end where id=?', [$partial?'partially_refunded':'refunded',$partial?'paid':'refunded',$charge['id'] ?? null,$partial?1:0,$partial?1:0,$order['id']]);
         if (!$partial) DB::exec('update order_items set manual_delivery_status=case when fulfillment_type="google_drive" then "cancelled_refunded" else manual_delivery_status end where order_id=?', [$order['id']]);
@@ -174,12 +196,12 @@ class StripeController
 
     private function preparePayoutLedgers(int $orderId, string $currency): void
     {
-        $rows = DB::rows('select oi.designer_id,sum(oi.total_price) gross,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled from order_items oi join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled', [$orderId]);
+        $rows = DB::rows('select oi.designer_id,sum(oi.total_price) gross,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted from order_items oi join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted', [$orderId]);
         foreach ($rows as $row) {
             $gross = (float)$row['gross'];
             $commission = round($gross * StripeService::commissionRate(), 2);
             $payout = max(0, round($gross - $commission, 2));
-            $status = (!empty($row['stripe_connect_account_id']) && (int)$row['stripe_charges_enabled'] === 1 && (int)$row['stripe_payouts_enabled'] === 1 && $payout > 0) ? 'pending_transfer' : 'pending_stripe_onboarding';
+            $status = (!empty($row['stripe_connect_account_id']) && (int)$row['stripe_details_submitted'] === 1 && (int)$row['stripe_payouts_enabled'] === 1 && $payout > 0) ? 'pending_transfer' : 'pending_stripe_onboarding';
             DB::exec('insert into seller_payouts (order_id,designer_id,gross_amount,platform_commission_amount,seller_payout_amount,currency,payout_status) values (?,?,?,?,?,?,?) on duplicate key update gross_amount=values(gross_amount),platform_commission_amount=values(platform_commission_amount),seller_payout_amount=values(seller_payout_amount),currency=values(currency),payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end,updated_at=now()', [$orderId,$row['designer_id'],$gross,$commission,$payout,$currency,$status]);
             foreach (DB::rows('select id,total_price from order_items where order_id=? and designer_id=?', [$orderId, $row['designer_id']]) as $item) {
                 $itemCommission = round(((float)$item['total_price']) * StripeService::commissionRate(), 2);
@@ -191,19 +213,26 @@ class StripeController
 
     private function attemptPendingTransfers(int $orderId, string $currency): void
     {
-        $rows = DB::rows('select sp.*,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled from seller_payouts sp join designers d on d.id=sp.designer_id where sp.order_id=? and sp.payout_status in ("pending_transfer","pending_stripe_onboarding","transfer_failed")', [$orderId]);
+        $rows = DB::rows('select sp.*,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted,o.stripe_charge_id,o.payment_status,o.status order_status,o.manual_review_required from seller_payouts sp join designers d on d.id=sp.designer_id join orders o on o.id=sp.order_id where sp.order_id=? and sp.payout_status in ("pending_transfer","pending_stripe_onboarding","transfer_failed")', [$orderId]);
         foreach ($rows as $row) {
-            $ready = !empty($row['stripe_connect_account_id']) && (int)$row['stripe_charges_enabled'] === 1 && (int)$row['stripe_payouts_enabled'] === 1 && (float)$row['seller_payout_amount'] > 0;
+            $ready = !empty($row['stripe_connect_account_id']) && (int)$row['stripe_details_submitted'] === 1 && (int)$row['stripe_payouts_enabled'] === 1 && (float)$row['seller_payout_amount'] > 0;
             if (!$ready) {
-                $status = !empty($row['stripe_connect_account_id']) ? 'pending_transfer' : 'pending_stripe_onboarding';
+                $status = 'pending_stripe_onboarding';
                 DB::exec('update seller_payouts set payout_status=?,updated_at=now() where id=? and payout_status<>"transferred"', [$status,$row['id']]);
                 DB::exec('update order_items set seller_payout_status=? where order_id=? and designer_id=? and seller_payout_status<>"transferred"', [$status,$orderId,$row['designer_id']]);
+                continue;
+            }
+            if (($row['payment_status'] ?? '') !== 'paid' || in_array(($row['order_status'] ?? ''), ['failed','cancelled','refunded'], true) || !empty($row['manual_review_required'])) continue;
+            $chargeId = trim((string)($row['stripe_charge_id'] ?? ''));
+            if ($chargeId === '') {
+                DB::exec('update seller_payouts set payout_status="pending_transfer",updated_at=now() where id=? and payout_status<>"transferred"', [$row['id']]);
+                DB::exec('update order_items set seller_payout_status="pending_transfer" where order_id=? and designer_id=? and seller_payout_status<>"transferred"', [$orderId,$row['designer_id']]);
                 continue;
             }
 
             $idempotencyKey = 'asset_moth_payout_order_' . (int)$orderId . '_designer_' . (int)$row['designer_id'];
             try {
-                $transfer = StripeService::createTransfer($row['stripe_connect_account_id'], StripeService::cents($row['seller_payout_amount']), $currency, ['order_id'=>(string)$orderId,'designer_id'=>(string)$row['designer_id'],'seller_payout_id'=>(string)$row['id']], $idempotencyKey);
+                $transfer = StripeService::createTransfer($row['stripe_connect_account_id'], StripeService::cents($row['seller_payout_amount']), $currency, ['order_id'=>(string)$orderId,'designer_id'=>(string)$row['designer_id'],'seller_payout_id'=>(string)$row['id']], $idempotencyKey, $chargeId, 'order_' . (int)$orderId);
                 $transferId = $transfer['id'] ?? null;
                 DB::exec('update seller_payouts set payout_status="transferred",stripe_transfer_id=coalesce(?,stripe_transfer_id),stripe_transfer_error=null,updated_at=now() where id=?', [$transferId,$row['id']]);
                 DB::exec('update order_items set seller_payout_status="transferred",stripe_transfer_id=coalesce(?,stripe_transfer_id),stripe_transfer_error=null where order_id=? and designer_id=?', [$transferId,$orderId,$row['designer_id']]);

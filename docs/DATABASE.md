@@ -216,3 +216,12 @@ Migration `2026_07_02_phase_10_stripe_payment_integration.sql` adds Stripe payme
 - `seller_payouts` stores one aggregate payout ledger row per `order_id`/`designer_id`; `order_items` stores item-level commission and seller payout amounts.
 
 `stripe_fee_total` is future/reconciliation-ready and may remain `NULL` until safe Stripe balance transaction fee retrieval is added. Buyer self-cancellation and seller refund/cancellation request approval workflows are not part of Phase 10; Phase 10 only records webhook refund status when Stripe reports it.
+
+### Phase 10 Stripe Connect payout fields
+Designers store Stripe Connect status in `stripe_connect_account_id`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_account_status`, `stripe_onboarding_started_at`, and `stripe_onboarding_completed_at`. Order items and `seller_payouts` snapshot `platform_commission_amount` and `seller_payout_amount` so future commission changes do not alter historical orders. Payout statuses include `pending_stripe_onboarding`, `pending_transfer`, `transferred`, and `transfer_failed`; transfer failures are admin-visible and do not mark buyer orders unpaid.
+
+#### Phase 10 correction: payout retry scope
+Pending seller payout retries are scoped to payout-ready designers and webhook-confirmed paid orders only. `seller_payouts.payout_status` and matching `order_items.seller_payout_status` move from `pending_stripe_onboarding` to `pending_transfer`, `transferred`, or `transfer_failed`; manual-review, unpaid, and refunded orders are not transfer-attempted.
+
+#### Stripe charge id and pending transfers
+`orders.stripe_charge_id` is used as the Stripe transfer `source_transaction` for seller payouts when available. Paid orders missing a charge id keep seller payout rows in `pending_transfer` until a later webhook stores the charge id and retry logic can safely attempt the transfer.
