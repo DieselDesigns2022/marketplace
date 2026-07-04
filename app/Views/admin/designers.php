@@ -7,6 +7,8 @@
         <th>Status</th>
         <th>Followers</th>
         <th>Rank</th>
+        <th>Stripe Connect</th>
+        <th>Payout-ready</th>
         <th>Actions</th>
     </tr>
     <?php foreach($designers as $d):?>
@@ -30,6 +32,8 @@
            <td>
            <?=$d['creator_rank']?>
            </td>
+           <td><?=H::e($d['stripe_account_status'] ?? 'not_connected')?><br><span class="muted"><?=!empty($d['stripe_connect_account_id']) ? H::e($d['stripe_connect_account_id']) : 'Not connected'?></span></td>
+           <td><?=(!empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled'])) ? '<span class="badge ok">payout-ready</span>' : '<span class="badge pending">onboarding incomplete</span>'?></td>
            <td>
            <form method="post">
                <input type="hidden" name="_csrf" value="<?=H::csrf()?>">

@@ -214,3 +214,14 @@ Phase 9 added the foundation for carts, order records, downloadable delivery, an
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
 - Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+
+### Phase 10 Stripe marketplace payments and seller onboarding
+Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Asset Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Asset Moth's 18% commission.
+
+Sellers pay no startup fee, no monthly fee, and no listing fee; Asset Moth only earns when sellers sell. Buyer checkout can work before seller onboarding, but seller payouts remain pending until onboarding is complete. Refunds are Stripe-processed admin exceptions only; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
+
+#### Phase 10 payout math and Connect webhook note
+Phase 10 calculates Asset Moth's commission from the gross sale amount and transfers the seller portion from that gross sale snapshot before separate Stripe fee reconciliation. Stripe/payment processing fees still apply separately; seller-facing copy must not claim sellers receive exactly 82% after all fees. `STRIPE_WEBHOOK_SECRET` is required, and `STRIPE_CONNECT_WEBHOOK_SECRET` is optional for a separate Connect webhook destination that uses a different signing secret.
+
+#### Phase 10 source-transaction transfer reliability
+Seller transfers use the original Stripe charge as `source_transaction` when `stripe_charge_id` is available. If the paid order is waiting for the charge id, payout records stay `pending_transfer` for a later webhook retry instead of being failed solely because Stripe balance timing is not ready.

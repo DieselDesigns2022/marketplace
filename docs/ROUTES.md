@@ -156,3 +156,14 @@ Phase 9 introduced the cart/order/download/manual-delivery route foundation that
 - `GET|POST /seller/order-item/{id}` exposes buyer/manual-delivery details only for paid seller-visible order items; mark-delivered remains paid-only.
 
 Buyer self-cancellation of completed digital purchases is not a route behavior. Future seller refund/cancellation requests must go through admin review and approval before any Stripe refund/cancellation action.
+
+### Phase 10 seller onboarding and Stripe Connect routes
+- `GET /seller/onboarding` — approved seller onboarding checklist, readiness statuses, fee FAQ, refund/cancellation rules.
+- `GET /seller/stripe` — current Stripe Connect status and payout readiness.
+- `POST /seller/stripe/connect` — create/reuse Stripe Express connected account and redirect to Stripe onboarding.
+- `GET /seller/stripe/return` — refresh connected account status after Stripe onboarding.
+- `GET /seller/stripe/refresh` — create a fresh Stripe onboarding account link.
+- `POST /stripe/webhook` — existing Stripe platform webhook; also supports `account.updated` status sync when that event is delivered to this endpoint.
+
+#### Stripe webhook secret behavior
+`POST /stripe/webhook` verifies the required platform `STRIPE_WEBHOOK_SECRET`. If `account.updated` is sent through a separate Stripe Connect webhook destination with a different signing secret, configure optional `STRIPE_CONNECT_WEBHOOK_SECRET`; if Stripe sends connected-account events to the same destination/secret, leave the optional value empty.

@@ -199,3 +199,20 @@ Intentionally postponed:
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
 - Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+
+## Phase 10 refinement - seller onboarding and Stripe Connect payout readiness
+- Added seller onboarding and Stripe payout setup routes/views for approved sellers.
+- Added Stripe Express connected account creation, account links, status sync, and `account.updated` webhook status handling.
+- Defaulted marketplace commission configuration to 18% and documented that Stripe/payment processing fees are separate.
+- Clarified no startup, monthly, or listing fees; Asset Moth only earns when sellers sell.
+- Clarified refunds are Stripe-processed admin exceptions, buyers cannot self-cancel completed digital purchases, and sellers cannot issue instant refunds.
+
+### Phase 10 correction patch
+- Attempts eligible old pending seller payouts after Stripe onboarding return or `account.updated` marks a seller payout-ready.
+- Added optional `STRIPE_CONNECT_WEBHOOK_SECRET` verification support for separate Connect webhook destinations.
+- Corrected seller onboarding and FAQ commission/status wording and clarified gross-sale commission math before separate Stripe fee reconciliation.
+
+### Phase 10 source transaction payout correction
+- Seller transfers now pass `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available.
+- Paid payouts without a charge id remain `pending_transfer` for webhook retry instead of failing solely because the charge id is not available yet.
+- Removed the hardcoded `business_type="individual"` from Express account creation so Stripe onboarding can collect the appropriate seller/business type.

@@ -989,3 +989,12 @@ Implemented the Phase 9 foundation for persistent carts, pending-payment order c
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
 - Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+
+### Phase 10 completion/refinement
+Phase 10 now covers launch-ready buyer Stripe Checkout, webhooks, seller onboarding, seller Stripe Connect onboarding, platform commission, and payout readiness. Asset Moth keeps an 18% marketplace commission by default, Stripe/payment processing fees also apply separately, and sellers have no startup, monthly, or listing fees. Buyer checkout can run before seller onboarding, but automatic seller transfers require Stripe Connect completion. Refunds remain Stripe-processed admin exceptions; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
+
+#### Phase 10 correction patch
+Corrected seller onboarding payout readiness so the Stripe checklist completes only when payout-ready, old paid payouts are attempted when onboarding/account.updated makes a seller payout-ready, optional `STRIPE_CONNECT_WEBHOOK_SECRET` supports separate Connect webhook destinations, and documentation clarifies gross-sale commission math before separate Stripe fee reconciliation.
+
+#### Phase 10 source transaction correction
+Seller transfers now use the original Stripe charge as `source_transaction` when available and keep paid payouts pending when the charge id has not arrived yet, reducing false `transfer_failed` statuses caused by Stripe balance timing.
