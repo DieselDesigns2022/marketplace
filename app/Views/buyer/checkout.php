@@ -17,9 +17,6 @@
     </table>
     <div class="card">
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
-      <p>Taxes: <span class="muted">$0.00 placeholder / future-ready</span></p>
-      <p>Credits: <span class="muted">$0.00 placeholder</span></p>
-      <p>Coupons: <span class="muted">placeholder; no coupon is applied</span></p>
       <h2>Total <?=H::money($subtotal)?></h2>
     </div>
     <form method="post" class="form card">

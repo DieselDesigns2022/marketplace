@@ -2,7 +2,7 @@
 <p class="muted">Connect Stripe so Asset Moth can transfer your seller portion after paid marketplace orders.</p>
 <section class="card page-section">
     <h2>Current Stripe Connect status</h2>
-    <p>Connection: <strong><?=empty($d['stripe_connect_account_id']) ? 'Not connected' : 'Onboarding started'?></strong></p>
+    <p>Connection: <strong><?=$readiness['payout'] ? 'Connected' : (empty($d['stripe_connect_account_id']) ? 'Not connected' : 'Onboarding started')?></strong></p>
     <p>Details submitted: <strong><?=!empty($d['stripe_details_submitted']) ? 'Yes' : 'No'?></strong></p>
     <p>Payouts enabled: <strong><?=!empty($d['stripe_payouts_enabled']) ? 'Yes' : 'No'?></strong></p>
     <p>Payout-ready: <strong><?=$readiness['payout'] ? 'Yes — Stripe connected and payout setup ready.' : 'Not payout-ready yet.'?></strong></p>

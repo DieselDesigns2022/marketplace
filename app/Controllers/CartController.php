@@ -12,7 +12,7 @@ class CartController
     private function owned(int $productId): bool
     {
         if (!H::user()) return false;
-        return (bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where o.user_id=? and oi.product_id=? and o.status in ("paid","completed") limit 1',[H::user()['id'],$productId]);
+        return (bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where o.user_id=? and oi.product_id=? and o.payment_status="paid" limit 1',[H::user()['id'],$productId]);
 
     }
 

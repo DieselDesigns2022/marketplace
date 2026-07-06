@@ -12,6 +12,7 @@
     <?php foreach($items as $i):?>
         <tr>
            <td>
+           <?php if(!empty($i['preview_image'])):?><a href="/product/<?=H::e($i['slug'])?>"><img src="<?=H::assetUrl($i['preview_image'])?>" alt="<?=H::e($i['title'])?>" style="width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin-bottom:8px;"></a><?php endif;?>
            <a href="/product/<?=H::e($i['slug'])?>">
            <?=H::e($i['title'])?>
            </a>
@@ -25,7 +26,7 @@
            <td><?=($i['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></td>
            <td>
            <?php if(($i['fulfillment_type'] ?? 'downloadable')==='downloadable'):?>
-             <?php $blockedStripeStatuses = ['pending','failed','canceled','expired','refunded','partially_refunded','manual_review']; $paymentStatus = $order['payment_status'] ?? ''; $legacyEligible = in_array($order['status'], ['fulfilled','completed'], true) && ($paymentStatus === '' || $paymentStatus === null || !in_array($paymentStatus, $blockedStripeStatuses, true)); $downloadEligible = $i['file_id'] && ($paymentStatus === 'paid' || $legacyEligible); ?>
+             <?php $paymentStatus = $order['payment_status'] ?? ''; $downloadEligible = $i['file_id'] && $paymentStatus === 'paid'; ?>
              <?php if($downloadEligible):?><a class="btn" href="/download/<?=$i['file_id']?>">Download</a><?php else:?><span class="muted">Download access unlocks after Stripe webhook payment confirmation.</span><?php endif;?>
              <br><span class="muted">Downloads: <?=number_format((int)($i['download_count'] ?? 0))?></span>
            <?php else:?>
