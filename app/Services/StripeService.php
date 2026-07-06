@@ -59,7 +59,7 @@ class StripeService
         return self::request('POST', '/v1/accounts', [
             'type' => 'express',
             'email' => $user['email'] ?? null,
-            'capabilities' => ['transfers' => ['requested' => true]],
+            'capabilities' => ['transfers' => ['requested' => 'true']],
             'business_profile' => ['name' => $designer['display_name'] ?? 'Asset Moth seller'],
             'metadata' => ['designer_id' => (string)$designer['id'], 'user_id' => (string)$user['id'], 'platform' => 'asset_moth'],
         ], 'asset_moth_connect_designer_' . (int)$designer['id']);
