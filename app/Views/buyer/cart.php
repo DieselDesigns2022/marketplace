@@ -1,10 +1,24 @@
 <h1>Cart</h1>
+<style>
+.cart-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:1.5rem;align-items:start}
+.cart-items{min-width:0;overflow-x:auto}
+.cart-summary{position:sticky;top:1rem}
+.cart-summary-row{display:flex;justify-content:space-between;gap:1rem}
+.coupon-action{background:none;border:0;color:#6d28d9;padding:0;margin-top:.35rem;font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}
+.coupon-action:hover{text-decoration:none}
+@media (max-width: 950px){
+  .cart-layout{grid-template-columns:1fr}
+  .cart-summary{position:static}
+}
+</style>
 <?php if(!$items):?>
     <p class="muted">Your cart is empty.</p>
     <p>
     <a class="btn" href="/browse">Browse products</a>
     </p>
 <?php else:?>
+    <div class="cart-layout">
+    <div class="cart-items">
     <table>
         <tr>
            <th>Product</th>
@@ -66,19 +80,46 @@
            </tr>
         <?php endforeach;?>
     </table>
-    <div class="card">
-      <h2>Subtotal <?=H::money($subtotal)?></h2>
-      <form method="post" action="/cart/coupon" class="form-inline">
+    </div>
+    <div class="card cart-summary">
+      <?php $discount = (!empty($couponResult) && !empty($couponResult['ok'])) ? (float)$couponResult['discount'] : 0.0; ?>
+      <?php $cartTotal = max(0, round((float)$subtotal - $discount, 2)); ?>
+
+      <h2>Order summary</h2>
+
+      <p class="cart-summary-row">
+        <span>Subtotal</span>
+        <strong><?=H::money($subtotal)?></strong>
+      </p>
+
+      <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?>
+        <p class="cart-summary-row">
+          <span>Coupon <?=H::e($couponResult['coupon']['code'])?></span>
+          <strong>-<?=H::money($discount)?></strong>
+        </p>
+      <?php endif;?>
+
+      <hr>
+
+      <h2 class="cart-summary-row">
+        <span>Total</span>
+        <span><?=H::money($cartTotal)?></span>
+      </h2>
+
+      <form method="post" action="/cart/coupon">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
         <label>Coupon code <input name="coupon_code" value="<?=H::e($_SESSION['coupon_code'] ?? '')?>"></label>
-        <button>Apply coupon</button>
+        <button class="coupon-action">Apply coupon</button>
       </form>
+
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?>
-        <p class="notice success">Coupon <?=H::e($couponResult['coupon']['code'])?> saves <?=H::money($couponResult['discount'])?>.</p>
-        <form method="post" action="/cart/coupon/remove"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Remove coupon</button></form>
+        <p class="notice success">Coupon <?=H::e($couponResult['coupon']['code'])?> saves <?=H::money($discount)?>.</p>
+        <form method="post" action="/cart/coupon/remove"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="coupon-action">Remove coupon</button></form>
       <?php endif;?>
+
+      <p><a class="btn" href="/checkout">Checkout</a></p>
     </div>
-    <a class="btn" href="/checkout">Checkout</a>
+    </div>
 <?php endif;?>
 
 <?php require __DIR__.'/../partials/license_help_modal.php'; ?>

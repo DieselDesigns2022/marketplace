@@ -500,7 +500,8 @@ class AdminController
     public function coupons($id = null)
     {
         $this->gate();
-        if ($id === 'new') $id = null;
+        $creating = ($id === 'new');
+        if ($creating) $id = null;
         if ($_POST) {
             $errors = [];
             [$code,$scope,$sellerId,$type,$value,$starts,$ends,$active,$min,$limit,$userLimit] = $this->couponValues($errors);
@@ -513,7 +514,7 @@ class AdminController
                 } catch (Throwable $e) { DB::rollBack(); H::flash('error','Coupon code already exists or could not be saved.'); }
             }
         }
-        if ($id) H::view('admin/coupon_form',['coupon'=>DB::row('select * from coupons where id=?',[(int)$id]) ?? H::abort(404),'sellers'=>DB::rows('select id,display_name from designers where status="approved" order by display_name'),'restrictions'=>$this->couponRestrictions((int)$id)]);
+        if ($creating || $id) H::view('admin/coupon_form',['coupon'=>$id ? (DB::row('select * from coupons where id=?',[(int)$id]) ?? H::abort(404)) : [],'sellers'=>DB::rows('select id,display_name from designers where status="approved" order by display_name'),'restrictions'=>$id ? $this->couponRestrictions((int)$id) : ['seller'=>'','product'=>'','category'=>'']]);
         else H::view('admin/coupons',['coupons'=>DB::rows('select c.*,d.display_name seller_name,(select group_concat(concat(restrictable_type,":",restrictable_id) separator ", ") from coupon_restrictions cr where cr.coupon_id=c.id) restriction_summary from coupons c left join designers d on d.id=c.seller_id order by c.created_at desc')]);
     }
 

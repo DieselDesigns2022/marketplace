@@ -885,7 +885,8 @@ class SellerController
     public function coupons($id = null)
     {
         $d = $this->approvedDesigner();
-        if ($id === 'new') $id = null;
+        $creating = ($id === 'new');
+        if ($creating) $id = null;
         $ownedCoupon = $id ? DB::row('select * from coupons where id=? and seller_id=? and scope="seller"', [(int)$id,$d['id']]) : null;
         if ($id && !$ownedCoupon) H::abort(404);
         if ($_POST) {
@@ -910,7 +911,7 @@ class SellerController
                 $this->saveSellerRestrictions((int)$id,(int)$d['id']); DB::commit(); H::flash('success','Coupon saved.'); H::redirect('/seller/coupons');
             } catch (Throwable $e) { DB::rollBack(); H::flash('error','Coupon code already exists or could not be saved.'); } }
         }
-        if ($id) H::view('seller/coupon_form',['coupon'=>$ownedCoupon ?: DB::row('select * from coupons where id=? and seller_id=? and scope="seller"',[(int)$id,$d['id']]) ?? H::abort(404),'restrictions'=>$this->sellerCouponRestrictions((int)$id)]);
+        if ($creating || $id) H::view('seller/coupon_form',['coupon'=>$id ? ($ownedCoupon ?: DB::row('select * from coupons where id=? and seller_id=? and scope="seller"',[(int)$id,$d['id']]) ?? H::abort(404)) : [],'restrictions'=>$id ? $this->sellerCouponRestrictions((int)$id) : ['product'=>'','category'=>'']]);
         else H::view('seller/coupons',['coupons'=>DB::rows('select c.*,(select group_concat(concat(restrictable_type,":",restrictable_id) separator ", ") from coupon_restrictions cr where cr.coupon_id=c.id) restriction_summary from coupons c where c.seller_id=? and c.scope="seller" order by c.created_at desc',[$d['id']])]);
     }
 
