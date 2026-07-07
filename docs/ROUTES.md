@@ -182,3 +182,10 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 - `POST /cart/coupon` — applies a normalized coupon code to the buyer cart after server-side validation.
 - `POST /cart/coupon/remove` — removes the currently applied cart coupon.
 - Stripe checkout routes remain unchanged; coupon usage is recorded from the paid webhook path, not at code entry time.
+
+## Phase 10.3 store-level sales tax settings
+- Approved sellers manage store-level tax settings on `/seller/store` in the Store-level sales tax section.
+- Buyer `/checkout` displays seller sales tax only when applicable and posts checkout through server-side tax calculation.
+- Admins review seller tax ON/OFF, state, rate, and update timestamp from `/admin/designers`.
+- Admin order details at `/admin/order/{id}` show collected seller tax and tax snapshots; seller order item detail at `/seller/order-item/{id}` shows seller tax collected and payout basis.
+- No route enables Stripe Tax or marketplace facilitator tax automation in Phase 10.3.

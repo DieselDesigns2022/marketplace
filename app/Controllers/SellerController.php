@@ -6,6 +6,7 @@ use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\WatermarkService;
 use App\Services\StripeService;
+use App\Services\TaxService;
 use Throwable;
 class SellerController
 {
@@ -329,6 +330,17 @@ class SellerController
             $announcement = trim($_POST['announcement'] ?? '');
             $seoTitle = trim($_POST['seo_title'] ?? '');
             $seoDescription = trim($_POST['seo_description'] ?? '');
+            $taxEnabled = isset($_POST['sales_tax_enabled']) ? 1 : 0;
+            $taxState = TaxService::normalizeState($_POST['sales_tax_state'] ?? '');
+            $taxRegistration = trim($_POST['sales_tax_registration_id'] ?? '');
+            $taxRateRaw = trim($_POST['sales_tax_rate'] ?? '');
+            $taxRate = is_numeric($taxRateRaw) ? round((float)$taxRateRaw, 2) : 0.0;
+            $taxConfirmed = isset($_POST['sales_tax_responsibility_confirmed']);
+            $taxChanged = $taxEnabled !== (int)($d['sales_tax_enabled'] ?? 0)
+                || ($taxEnabled ? $taxState : null) !== ($d['sales_tax_state'] ?? null)
+                || $taxRegistration !== (string)($d['sales_tax_registration_id'] ?? '')
+                || round($taxEnabled ? $taxRate : 0.00, 2) !== round((float)($d['sales_tax_rate'] ?? 0), 2)
+                || ($taxEnabled ? 1 : ($taxConfirmed ? 1 : (int)($d['sales_tax_responsibility_confirmed'] ?? 0))) !== (int)($d['sales_tax_responsibility_confirmed'] ?? 0);
             if ($display === '')
            {
                 $errors[] = 'Store display name is required.';
@@ -359,19 +371,40 @@ class SellerController
                 $errors[] = 'SEO description must be 170 characters or fewer.';
 
            }
+            if ($taxEnabled && !$taxConfirmed)
+           {
+                $errors[] = 'You must confirm seller tax responsibility before enabling sales tax collection.';
+
+           }
+            if ($taxEnabled && ($taxRateRaw === '' || !is_numeric($taxRateRaw) || $taxRate <= 0 || $taxRate > 20))
+           {
+                $errors[] = 'Sales tax rate is required when enabled and must be greater than 0% and no more than 20.00%.';
+
+           }
+            if ($taxEnabled && !preg_match('/^[A-Z]{2}$/', $taxState))
+           {
+                $errors[] = 'Tax collection state must be a two-letter US state abbreviation.';
+
+           }
+            if (mb_strlen($taxRegistration) > 120)
+           {
+                $errors[] = 'Tax registration or permit number must be 120 characters or fewer.';
+
+           }
+
 
             $avatar = $this->uploadPublicImage('avatar', 'store_avatars', $errors);
             $banner = $this->uploadPublicImage('banner', 'store_banners', $errors);
             if (!$errors)
            {
-                DB::exec( 'update designers set display_name=?,store_slug=?,bio=?,website_url=?,social_links=?,facebook_url=?,instagram_url=?,tiktok_url=?,pinterest_url=?,etsy_url=?,shopify_url=?,announcement=?,seo_title=?,seo_description=?,avatar_path=coalesce(?,avatar_path),banner_path=coalesce(?,banner_path),updated_at=now() where id=? and user_id=?', [ $display, $slug, $bio, $website, $social, $socialFields['facebook_url'], $socialFields['instagram_url'], $socialFields['tiktok_url'], $socialFields['pinterest_url'], $socialFields['etsy_url'], $socialFields['shopify_url'], $announcement, $seoTitle, $seoDescription, $avatar, $banner, $d['id'], H::user()['id'], ] );
+                DB::exec( 'update designers set display_name=?,store_slug=?,bio=?,website_url=?,social_links=?,facebook_url=?,instagram_url=?,tiktok_url=?,pinterest_url=?,etsy_url=?,shopify_url=?,announcement=?,seo_title=?,seo_description=?,avatar_path=coalesce(?,avatar_path),banner_path=coalesce(?,banner_path),sales_tax_enabled=?,sales_tax_state=?,sales_tax_registration_id=?,sales_tax_rate=?,sales_tax_responsibility_confirmed=?,sales_tax_updated_at=case when ?=1 then now() else sales_tax_updated_at end,updated_at=now() where id=? and user_id=?', [ $display, $slug, $bio, $website, $social, $socialFields['facebook_url'], $socialFields['instagram_url'], $socialFields['tiktok_url'], $socialFields['pinterest_url'], $socialFields['etsy_url'], $socialFields['shopify_url'], $announcement, $seoTitle, $seoDescription, $avatar, $banner, $taxEnabled, $taxEnabled ? $taxState : null, $taxRegistration, $taxEnabled ? $taxRate : 0.00, $taxEnabled ? 1 : ($taxConfirmed ? 1 : (int)($d['sales_tax_responsibility_confirmed'] ?? 0)), $taxChanged ? 1 : 0, $d['id'], H::user()['id'], ] );
                 H::flash('success', 'Store settings updated.');
                 H::redirect('/seller/store');
 
            }
 
         }
-        H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, ]);
+        H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'taxResponsibilityCopy' => TaxService::SELLER_RESPONSIBILITY_COPY, ]);
 
     }
     private function productValues(array $existing = []): array

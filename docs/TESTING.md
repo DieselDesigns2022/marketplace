@@ -226,3 +226,13 @@ Recommended manual checks:
 - A coupon that makes checkout total `$0.00` is rejected because this phase does not implement free-order checkout.
 - Checkout without a coupon still creates a Stripe Checkout session.
 - Stripe paid webhook records coupon usage once and repeated webhook/retry processing does not double-count usage.
+
+## Phase 10.3 store-level sales tax settings
+Checklist:
+- Save `/seller/store` with tax disabled and confirm checkout shows no seller tax.
+- Try enabling tax without responsibility confirmation and confirm the save is rejected.
+- Enable tax with a valid state and seller-entered rate such as `7.25`; confirm checkout tax is calculated after coupon allocation.
+- Try blank/invalid state, nonnumeric rate, zero rate, and rate above `20.00`; confirm server-side validation/service rules prevent tax collection.
+- Complete/retry Stripe checkout and confirm `orders.total`, `stripe_amount_total`, `orders.tax_amount`, and item `tax_snapshot` align.
+- Confirm admin order detail and seller order item detail show discounted item total, seller tax collected, commission basis, and whether seller tax is included in seller payable.
+- Confirm non-tax store profile edits do not change `sales_tax_updated_at`.

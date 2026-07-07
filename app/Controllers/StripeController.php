@@ -198,16 +198,17 @@ class StripeController
 
     private function preparePayoutLedgers(int $orderId, string $currency): void
     {
-        $rows = DB::rows('select oi.designer_id,sum(oi.total_price) gross,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted from order_items oi join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted', [$orderId]);
+        $rows = DB::rows('select oi.designer_id,sum(oi.total_price) gross,sum(coalesce(oi.tax_amount,0)) seller_tax,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted from order_items oi join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted', [$orderId]);
         foreach ($rows as $row) {
             $gross = (float)$row['gross'];
             $commission = round($gross * StripeService::commissionRate(), 2);
-            $payout = max(0, round($gross - $commission, 2));
+            $sellerTax = (float)($row['seller_tax'] ?? 0);
+            $payout = max(0, round($gross - $commission + $sellerTax, 2));
             $status = (!empty($row['stripe_connect_account_id']) && (int)$row['stripe_details_submitted'] === 1 && (int)$row['stripe_payouts_enabled'] === 1 && $payout > 0) ? 'pending_transfer' : 'pending_stripe_onboarding';
-            DB::exec('insert into seller_payouts (order_id,designer_id,gross_amount,platform_commission_amount,seller_payout_amount,currency,payout_status) values (?,?,?,?,?,?,?) on duplicate key update gross_amount=values(gross_amount),platform_commission_amount=values(platform_commission_amount),seller_payout_amount=values(seller_payout_amount),currency=values(currency),payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end,updated_at=now()', [$orderId,$row['designer_id'],$gross,$commission,$payout,$currency,$status]);
-            foreach (DB::rows('select id,total_price from order_items where order_id=? and designer_id=?', [$orderId, $row['designer_id']]) as $item) {
+            DB::exec('insert into seller_payouts (order_id,designer_id,gross_amount,platform_commission_amount,seller_tax_collected,seller_payout_amount,currency,payout_status) values (?,?,?,?,?,?,?,?) on duplicate key update gross_amount=values(gross_amount),platform_commission_amount=values(platform_commission_amount),seller_tax_collected=values(seller_tax_collected),seller_payout_amount=values(seller_payout_amount),currency=values(currency),payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end,updated_at=now()', [$orderId,$row['designer_id'],$gross,$commission,$sellerTax,$payout,$currency,$status]);
+            foreach (DB::rows('select id,total_price,coalesce(tax_amount,0) tax_amount from order_items where order_id=? and designer_id=?', [$orderId, $row['designer_id']]) as $item) {
                 $itemCommission = round(((float)$item['total_price']) * StripeService::commissionRate(), 2);
-                $itemPayout = max(0, round(((float)$item['total_price']) - $itemCommission, 2));
+                $itemPayout = max(0, round(((float)$item['total_price']) - $itemCommission + (float)($item['tax_amount'] ?? 0), 2));
                 DB::exec('update order_items set platform_commission_amount=?,seller_payout_amount=?,seller_payout_status=case when seller_payout_status="transferred" then seller_payout_status else ? end where id=?', [$itemCommission,$itemPayout,$status,$item['id']]);
             }
         }
