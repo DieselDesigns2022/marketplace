@@ -231,7 +231,14 @@ Seller transfers use the original Stripe charge as `source_transaction` when `st
 - Added platform and seller coupon management with normalized unique coupon codes, active status, percent/fixed discounts, start/end dates, minimum eligible cart amount, total and per-user usage limits, and seller/product/category restrictions.
 - Admins manage all coupons at `/admin/coupons`; approved sellers manage only their seller-scoped coupons at `/seller/coupons` and server-side ownership checks prevent cross-seller coupon/product access.
 - Buyers can apply or remove coupon codes in cart/checkout. Invalid, inactive, expired, not-yet-started, over-limit, below-minimum, and non-applicable coupons are rejected server-side.
-- Checkout totals follow: subtotal minus coupon discount plus the existing Phase 10.3 tax placeholder minus the existing Phase 11 credits placeholder equals final total. Taxes remain Phase 10.3; credits/referrals remain Phase 11.
+- Phase 10.2 reserved tax handling in the checkout total order; Phase 10.3 now implements seller opt-in store-level sales tax. Credits/referrals remain Phase 11.
 - Coupon snapshots are stored on orders and order items. Coupon usage is recorded only after Stripe confirms a successful paid order, with an order-level uniqueness guard to avoid webhook/retry double counting.
 - Platform commission, seller earnings, and payout ledger amounts are calculated from discounted order item totals after coupon discounts are allocated across eligible items.
 - Coupons that reduce checkout to `$0.00` are intentionally blocked until a dedicated free-order checkout flow exists.
+
+## Phase 10.3 store-level sales tax settings
+- Phase 10.3 adds seller opt-in store-level sales tax settings for approved sellers. Sellers can enable/disable collection for their whole store, enter a tax collection state, enter a seller-controlled tax rate percentage, optionally store a registration/permit number, and must confirm: "I understand I am responsible for knowing whether I need to collect and remit sales tax for my store, unless Asset Moth is legally required to collect and remit tax as a marketplace facilitator."
+- Checkout calculates seller tax server-side using the seller-entered store-level tax rate only for items from sellers with tax enabled, after coupon discounts are allocated. Totals remain subtotal minus coupon discount plus seller tax, with Phase 11 credits/referrals future-only.
+- Orders and order items store tax amounts and JSON-compatible tax snapshots so historical records remain auditable if seller settings change later; seller tax collected is tracked separately from platform commission and included in seller payable handling for seller remittance.
+- Admin and seller order views show collected tax. Admin copy identifies this as seller-reported/opt-in.
+- Stripe Checkout amounts include the calculated seller-entered-rate tax in the order total. Stripe Tax automation and marketplace facilitator tax automation are not implemented in Phase 10.3; the tax service is intentionally isolated for future replacement.

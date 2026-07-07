@@ -80,3 +80,11 @@ The repository should ignore environment files, public uploads, protected upload
 - Discount amounts are capped to eligible subtotal and final totals are clamped non-negative.
 - `$0.00` Stripe Checkout is blocked until a dedicated free-order flow exists.
 - Usage tracking is written only after successful paid webhook confirmation and uses an order-level uniqueness guard to avoid double-counting.
+
+## Phase 10.3 store-level sales tax settings
+- Only authenticated approved sellers can edit their own store-level tax settings through the seller store settings flow; saves remain CSRF-protected and scoped by the current seller.
+- Seller responsibility confirmation is required before enabling tax collection.
+- Sales tax rate is validated server-side: required when enabled, numeric, greater than `0`, and capped at `20.00%`; state must normalize to a two-letter value.
+- Checkout never trusts client-submitted tax totals. `TaxService` recalculates tax server-side only for enabled, valid seller tax settings and returns `0.00` for disabled or invalid settings.
+- Platform commission is calculated on discounted item subtotal before tax; seller tax collected is tracked separately and included in seller payable handling for seller remittance.
+- Stripe Tax and marketplace facilitator tax automation are not enabled in Phase 10.3.
