@@ -5,6 +5,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\StripeService;
+use App\Services\CouponService;
 use Throwable;
 
 class CartController
@@ -92,7 +93,8 @@ class CartController
     public function show()
     {
         [$items,$subtotal]=$this->totals($this->items());
-        H::view('buyer/cart',['items'=>$items,'subtotal'=>$subtotal]);
+        $couponResult = $this->currentCoupon($items);
+        H::view('buyer/cart',['items'=>$items,'subtotal'=>$subtotal,'couponResult'=>$couponResult]);
 
     }
 
@@ -187,6 +189,31 @@ class CartController
 
     }
 
+    private function currentCoupon(array $items): ?array
+    {
+        if (!H::user() || empty($_SESSION['coupon_code'])) return null;
+        $result = CouponService::validate((string)$_SESSION['coupon_code'], $items, (int)H::user()['id']);
+        if (!$result['ok']) unset($_SESSION['coupon_code']);
+        return $result;
+    }
+
+    public function applyCoupon(): void
+    {
+        H::requireLogin();
+        [$items,] = $this->totals($this->items());
+        $result = CouponService::validate((string)($_POST['coupon_code'] ?? ''), $items, (int)H::user()['id']);
+        if (!$result['ok']) { H::flash('error', $result['error']); unset($_SESSION['coupon_code']); }
+        else { $_SESSION['coupon_code'] = $result['code']; H::flash('success', 'Coupon applied.'); }
+        H::redirect($_SERVER['HTTP_REFERER'] ?? '/cart');
+    }
+
+    public function removeCoupon(): void
+    {
+        unset($_SESSION['coupon_code']);
+        H::flash('success', 'Coupon removed.');
+        H::redirect($_SERVER['HTTP_REFERER'] ?? '/cart');
+    }
+
     public function checkout()
     {
         if (!H::user()) {
@@ -223,26 +250,45 @@ class CartController
                     H::redirect('/cart');
 
                }
-                $total=array_sum(array_column($valid,'line_total'));
+                $subtotal=array_sum(array_column($valid,'line_total'));
+                $couponResult = $this->currentCoupon($valid);
+                $coupon = ($couponResult && $couponResult['ok']) ? $couponResult['coupon'] : null;
+                $couponDiscount = $coupon ? (float)$couponResult['discount'] : 0.0;
+                $allocations = $coupon ? CouponService::allocateDiscount($coupon, $valid, $couponDiscount) : [];
+                $tax = 0.0; // Phase 10.3 placeholder only.
+                $credits = 0.0; // Phase 11 placeholder only.
+                $total=max(0, round($subtotal - $couponDiscount + $tax - $credits, 2));
+                if ($total <= 0) {
+                    DB::rollBack();
+                    H::flash('error','This coupon reduces the order to $0.00. Free coupon checkout is not available yet; please remove the coupon or add another paid item.');
+                    H::redirect('/cart');
+                }
                 $commissionRate = StripeService::commissionRate();
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,credits_applied,coupon_discount,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$total,0,0,0,$total,'pending',1,StripeService::currency(),StripeService::cents($total),round($total * $commissionRate, 2)]);
+                $platformCommissionTotal = 0.0;
+                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),StripeService::cents($total),0]);
                 $order=DB::id();
-                foreach($valid as $p)
+                foreach($valid as $idx=>$p)
                {
-                   $comm=round($p['line_total'] * $commissionRate, 2);
+                   $lineDiscount = (float)($allocations[$idx] ?? 0);
+                   $discountedLine = max(0, round((float)$p['line_total'] - $lineDiscount, 2));
+                   $comm=round($discountedLine * $commissionRate, 2);
+                   $platformCommissionTotal = round($platformCommissionTotal + $comm, 2);
                     $manualEmail = trim($_POST['google_drive_email'] ?? '');
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
                     $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
-                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$p['line_total'],$commissionRate,null]);
-                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$p['line_total'],$comm,$p['line_total']-$comm,'pending_payment']);
+                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null]);
+                    DB::exec('update order_items set coupon_id=?,coupon_code=?,coupon_discount=? where id=?', [$coupon['id'] ?? null,$coupon['code'] ?? null,$lineDiscount,DB::id()]);
+                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$discountedLine,$comm,$discountedLine-$comm,'pending_payment']);
 
                }
+                DB::exec('update orders set platform_commission_total=? where id=?', [$platformCommissionTotal,$order]);
                 $createdOrder = DB::row('select * from orders where id=?', [$order]);
                 $createdItems = DB::rows('select * from order_items where order_id=?', [$order]);
                 $session = StripeService::createCheckoutSession($createdOrder, $createdItems);
                 DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?', [$session['id'] ?? null, $order]);
                 DB::exec('delete from cart_items where user_id=?',[H::user()['id']]);
+                unset($_SESSION['coupon_code']);
                 DB::commit();
                 header('Location: ' . $session['url'], true, 303);
                 exit;
@@ -257,7 +303,9 @@ class CartController
            }
 
         }
-        H::view('buyer/checkout',['items'=>$items,'subtotal'=>$total]);
+        $couponResult = $this->currentCoupon($items);
+        $discount = ($couponResult && $couponResult['ok']) ? (float)$couponResult['discount'] : 0.0;
+        H::view('buyer/checkout',['items'=>$items,'subtotal'=>$total,'couponResult'=>$couponResult,'discount'=>$discount,'finalTotal'=>max(0, round($total - $discount, 2))]);
 
     }
 

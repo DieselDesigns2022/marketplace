@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\StripeService;
+use App\Services\CouponService;
 use Throwable;
 
 class StripeController
@@ -156,6 +157,7 @@ class StripeController
             if (!$review && !$alreadyPaid) {
                 DB::exec('update order_items set paid_at=coalesce(paid_at,now()), payout_ready_at=coalesce(payout_ready_at,now()), manual_delivery_status=case when fulfillment_type="google_drive" and manual_delivery_status in ("pending_delivery","buyer_email_needed","ready_for_seller_delivery") then "ready_for_seller_delivery" else manual_delivery_status end where order_id=?', [$order['id']]);
                 DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$order['id']]);
+                CouponService::recordUsage((int)$order['id']);
                 $this->preparePayoutLedgers((int)$order['id'], $currency);
             }
             StripeService::logTransaction((int)$order['id'], $eventId, $source, $review?'manual_review':'paid', $amount/100, $currency, ['session'=>$sessionId ?? $order['stripe_checkout_session_id'], 'intent'=>$paymentIntentId, 'charge'=>$chargeId], $reason ?? 'Payment confirmed by Stripe webhook.', $review);

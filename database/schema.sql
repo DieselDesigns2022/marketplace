@@ -377,6 +377,55 @@ CREATE TABLE cart_items
     UNIQUE KEY cart_items_user_product_license_unique (user_id,product_id,license_type)
 );
 
+
+-- Phase 10.2 coupon definitions, restrictions, and successful-order usage tracking.
+CREATE TABLE coupons
+(
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(80) NOT NULL,
+    scope ENUM('platform','seller') NOT NULL DEFAULT 'platform',
+    seller_id BIGINT NULL,
+    discount_type ENUM('percent','fixed') NOT NULL,
+    discount_value DECIMAL(10,2) NOT NULL,
+    starts_at DATE NULL,
+    ends_at DATE NULL,
+    is_active BOOLEAN DEFAULT 1,
+    min_cart_amount DECIMAL(10,2) DEFAULT 0.00,
+    usage_limit INT NULL,
+    per_user_limit INT NULL,
+    usage_count INT DEFAULT 0,
+    created_by BIGINT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY coupons_code_unique (code),
+    KEY coupons_scope_seller_idx (scope,seller_id),
+    KEY coupons_active_dates_idx (is_active,starts_at,ends_at)
+);
+
+CREATE TABLE coupon_restrictions
+(
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    coupon_id BIGINT NOT NULL,
+    restrictable_type ENUM('seller','product','category') NOT NULL,
+    restrictable_id BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY coupon_restrictions_unique (coupon_id,restrictable_type,restrictable_id),
+    KEY coupon_restrictions_lookup_idx (restrictable_type,restrictable_id)
+);
+
+CREATE TABLE coupon_usages
+(
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    coupon_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    code_snapshot VARCHAR(80) NOT NULL,
+    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY coupon_usages_order_unique (order_id),
+    KEY coupon_usages_coupon_user_idx (coupon_id,user_id)
+);
+
 CREATE TABLE orders
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -386,6 +435,10 @@ CREATE TABLE orders
     payment_mode VARCHAR(40),
     subtotal DECIMAL(10,2),
     credits_applied DECIMAL(10,2) DEFAULT 0,
+    coupon_discount DECIMAL(10,2) DEFAULT 0.00,
+    coupon_id BIGINT NULL,
+    coupon_code VARCHAR(80) NULL,
+    coupon_snapshot JSON NULL,
     total DECIMAL(10,2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -407,6 +460,9 @@ CREATE TABLE order_items
     commercial_license_price DECIMAL(10,2),
     total_price DECIMAL(10,2),
     commission_rate DECIMAL(5,4) DEFAULT .2000,
+    coupon_id BIGINT NULL,
+    coupon_code VARCHAR(80) NULL,
+    coupon_discount DECIMAL(10,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

@@ -988,7 +988,7 @@ Implemented the Phase 9 foundation for persistent carts, pending-payment order c
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, full tax/VAT logic, and seller refund/cancellation requests remain future work.
 
 ### Phase 10 completion/refinement
 Phase 10 now covers launch-ready buyer Stripe Checkout, webhooks, seller onboarding, seller Stripe Connect onboarding, platform commission, and payout readiness. Asset Moth keeps an 18% marketplace commission by default, Stripe/payment processing fees also apply separately, and sellers have no startup, monthly, or listing fees. Buyer checkout can run before seller onboarding, but automatic seller transfers require Stripe Connect completion. Refunds remain Stripe-processed admin exceptions; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
@@ -1004,3 +1004,11 @@ Seller transfers now use the original Stripe charge as `source_transaction` when
 - Implemented admin pre-live cleanup tools for bulk archive and safe permanent delete of test products.
 - Products referenced by completed paid or partially refunded orders cannot be permanently deleted; cleanup actions archive them to protect historical buyer, seller, and admin records.
 - Public listings and direct public product pages continue to require published/approved products, so archived and deleted products are hidden from active browsing.
+
+## Phase 10.2 Coupons, Discounts & Commission Rules
+- Added platform and seller coupon management with normalized unique coupon codes, active status, percent/fixed discounts, start/end dates, minimum eligible cart amount, total and per-user usage limits, and seller/product/category restrictions.
+- Admins manage all coupons at `/admin/coupons`; approved sellers manage only their seller-scoped coupons at `/seller/coupons` and server-side ownership checks prevent cross-seller coupon/product access.
+- Buyers can apply or remove coupon codes in cart/checkout. Invalid, inactive, expired, not-yet-started, over-limit, below-minimum, and non-applicable coupons are rejected server-side.
+- Checkout totals follow: subtotal minus coupon discount plus the existing Phase 10.3 tax placeholder minus the existing Phase 11 credits placeholder equals final total. Taxes remain Phase 10.3; credits/referrals remain Phase 11.
+- Coupon snapshots are stored on orders and order items. Coupon usage is recorded only after Stripe confirms a successful paid order, with an order-level uniqueness guard to avoid webhook/retry double counting.
+- Platform commission, seller earnings, and payout ledger amounts are calculated from discounted order item totals after coupon discounts are allocated across eligible items.
