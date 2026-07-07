@@ -5,6 +5,8 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\WatermarkService;
+use App\Services\StripeService;
+use Throwable;
 class SellerController
 {
     private function d()
@@ -169,6 +171,91 @@ class SellerController
         return $errors;
 
     }
+
+    private function approvedDesigner(): array
+    {
+        H::requireSeller();
+        $d = $this->d();
+        if (!$d || $d['status'] !== 'approved') {
+            H::flash('warning', 'You need an approved designer account before accessing seller onboarding.');
+            H::redirect('/apply');
+        }
+        return $d;
+    }
+
+    private function readiness(array $d): array
+    {
+        $products = (int)(DB::row('select count(*) c from products where designer_id=? and status in ("draft","pending_review","approved")', [$d['id']])['c'] ?? 0);
+        return [
+            'profile' => trim((string)($d['display_name'] ?? '')) !== '' && trim((string)($d['bio'] ?? '')) !== '',
+            'stripe' => !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']),
+            'stripe_started' => !empty($d['stripe_connect_account_id']),
+            'store' => trim((string)($d['store_slug'] ?? '')) !== '',
+            'payout' => !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']),
+            'products' => $products > 0,
+            'product_count' => $products,
+        ];
+    }
+
+    public function onboarding(): void
+    {
+        $d = $this->approvedDesigner();
+        H::view('seller/onboarding', ['d' => $d, 'readiness' => $this->readiness($d), 'commissionPercent' => (int)round(StripeService::commissionRate() * 100)]);
+    }
+
+    public function stripe(): void
+    {
+        $d = $this->approvedDesigner();
+        H::view('seller/stripe', ['d' => $d, 'readiness' => $this->readiness($d), 'commissionPercent' => (int)round(StripeService::commissionRate() * 100)]);
+    }
+
+    public function stripeConnect(): void
+    {
+        $d = $this->approvedDesigner();
+        try {
+            $accountId = $d['stripe_connect_account_id'] ?? '';
+            if ($accountId === '') {
+                $account = StripeService::createConnectedAccount($d, H::user());
+                $accountId = (string)($account['id'] ?? '');
+                StripeService::syncConnectedAccountStatus((int)$d['id'], $account);
+                DB::exec('update designers set stripe_onboarding_started_at=coalesce(stripe_onboarding_started_at,now()) where id=?', [$d['id']]);
+            }
+            $base = StripeService::appUrl();
+            $link = StripeService::createAccountLink($accountId, $base . '/seller/stripe/refresh', $base . '/seller/stripe/return');
+            header('Location: ' . $link['url'], true, 303); exit;
+        } catch (Throwable $e) {
+            H::flash('error', 'Stripe setup could not be started: ' . $e->getMessage());
+            H::redirect('/seller/stripe');
+        }
+    }
+
+    public function stripeReturn(): void
+    {
+        $d = $this->approvedDesigner();
+        if (!empty($d['stripe_connect_account_id'])) {
+            try {
+                StripeService::syncConnectedAccountStatus((int)$d['id'], StripeService::retrieveConnectedAccount($d['stripe_connect_account_id']));
+                $this->refreshPendingPayouts((int)$d['id']);
+                H::flash('success', 'Stripe payout setup status was refreshed.');
+            } catch (Throwable $e) { H::flash('warning', 'Stripe returned you to Asset Moth, but status refresh failed: ' . $e->getMessage()); }
+        }
+        H::redirect('/seller/stripe');
+    }
+
+    public function stripeRefresh(): void
+    {
+        $this->stripeConnect();
+    }
+
+    private function refreshPendingPayouts(int $designerId): void
+    {
+        $d = DB::row('select * from designers where id=?', [$designerId]);
+        $ready = $d && !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']);
+        if ($ready) {
+            StripeService::attemptPendingTransfersForDesigner($designerId);
+        }
+    }
+
     public function apply()
     {
         H::requireLogin();
@@ -216,7 +303,7 @@ class SellerController
             H::redirect('/apply');
 
         }
-        $stats = DB::row( 'select count(*) product_count, coalesce(sum(sales_count),0) sales_count from products where designer_id=?', [$d['id']] );
+        $stats = DB::row( 'select (select count(*) from products where designer_id=?) product_count, (select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded")) sales_count', [$d['id'], $d['id']] );
         H::view('seller/home', [ 'd' => $d, 'stats' => $stats, ]);
 
     }
@@ -672,7 +759,7 @@ class SellerController
     public function sales()
     {
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,u.email from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.designer_id=? order by oi.created_at desc', [$this->d()['id']] ), ]);
+        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
 
     }
 
@@ -681,11 +768,11 @@ class SellerController
         H::requireSeller();
         $d=$this->d();
         if ($_POST && ($_POST['action'] ?? '') === 'mark_delivered') {
-            DB::exec('update order_items set manual_delivery_status="delivered", delivered_at=now(), delivery_notes=? where id=? and designer_id=? and fulfillment_type="google_drive"', [trim($_POST['delivery_notes'] ?? ''), (int)$id, $d['id']]);
+            DB::exec('update order_items oi join orders o on o.id=oi.order_id set oi.manual_delivery_status="delivered", oi.delivered_at=now(), oi.delivery_notes=? where oi.id=? and oi.designer_id=? and oi.fulfillment_type="google_drive" and o.payment_status="paid"', [trim($_POST['delivery_notes'] ?? ''), (int)$id, $d['id']]);
             H::flash('success','Manual delivery item marked delivered.');
             H::redirect('/seller/order-item/'.(int)$id);
         }
-        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=?',[(int)$id,$d['id']]) ?? H::abort(404);
+        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
         H::view('seller/order_item',['item'=>$item]);
     }
     public function referrals()

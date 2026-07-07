@@ -48,7 +48,7 @@
 - Confirm migrations apply cleanly.
 - Confirm expected tables and columns exist.
 - Confirm status fields contain expected values.
-- Confirm Phase 9 checkout creates pending-payment order and order item records, plus seller earning placeholder rows where applicable; platform commission/payment finalization remains future Phase 10 behavior.
+- Confirm checkout creates Stripe-backed pending order and order item records, plus seller earning/payout placeholder rows where applicable; payment finalization is webhook-driven in Phase 10.
 - Confirm downloads table logs download attempts.
 
 ## Upload testing
@@ -63,7 +63,7 @@
 
 - Add product to cart.
 - Switch license type where commercial license is enabled.
-- Create a Phase 9 pending-payment foundation order from checkout; do not expect Stripe/payment collection.
+- Submit checkout and confirm a Stripe-backed pending order is created, then the buyer is redirected to Stripe Checkout; do not treat the browser success redirect as payment proof.
 - Confirm cart clears after checkout.
 - Confirm order appears in purchases.
 - Confirm authorized download works only for paid/fulfilled/completed orders and denied attempts are logged otherwise.
@@ -154,3 +154,30 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 
 ## Phase 9 manual test scenarios
 Verify downloadable and Google Drive products can be added to the cart, mixed carts show fulfillment type, duplicate product/license entries are prevented, licenses can be changed, removed items disappear, unavailable products/licenses block checkout, Google Drive products require seller delivery instructions before save/submit, public Google Drive product pages show the manual-delivery notice, checkout shows seller delivery instructions beside the Google Drive email field, Google Drive checkout requires a valid email, buyer order detail shows license proof/download or manual delivery status, sellers only see their own order items and can mark manual delivery delivered, delivered manual-delivery items no longer show the mark-delivered button, admins can view orders/download logs/manual delivery details and override fulfillment status, unauthorized buyers/sellers are blocked, and direct unauthorized downloads are denied/logged.
+
+## Phase 10 — Stripe Payment Integration manual test scenarios
+- **Stripe config missing:** with no `STRIPE_SECRET_KEY`, checkout should fail gracefully and must not create paid access.
+- **Checkout success redirect:** complete the browser return to `/checkout/success`; buyer should see processing/status messaging, and no download/manual-delivery access should unlock from the redirect alone.
+- **Webhook success:** send a signed `checkout.session.completed` with `payment_status=paid`; order should become paid, downloadable access should unlock, and Google Drive/manual delivery should become seller-ready.
+- **Checkout completed but unpaid:** send `checkout.session.completed` with `payment_status` not `paid`; order should remain pending and access should stay locked.
+- **Duplicate webhook:** resend the same Stripe event id; processing should be skipped/idempotent through `stripe_events.stripe_event_id`.
+- **Mismatch/manual review:** send amount, currency, or order metadata mismatch; order should become `manual_review`, access should stay locked, and buyer retry should be blocked.
+- **Failed payment:** send failed/async failed/payment_intent failed event; order should become failed and allow retry.
+- **Expired/canceled unpaid session:** send expired/canceled session behavior; order should be not completed/expired/canceled and allow retry when not manual review.
+- **Refund webhooks:** send refunded/partially-refunded charge events; order status should update and download/delivery actions should be blocked according to current rules.
+- **Buyer cancellation rule:** verify buyers cannot self-cancel a completed digital purchase; `/checkout/cancel` only means payment was not completed before access unlocked.
+- **Seller direct URL protection:** direct `/seller/order-item/{id}` for unpaid items must not expose buyer email, Google Drive email, or delivery instructions.
+- **Seller paid-only delivery action:** seller can mark delivered only when `payment_status=paid`; partially-refunded/manual-review/nonpaid items must not show delivery actions.
+- **Admin visibility:** admin can view payment logs, webhook logs, Stripe references, failed/manual-review transactions, and manual review flags.
+- **Future seller refund/cancellation workflow:** seller refund/cancellation requests are future work and must be admin-reviewed before any Stripe refund/cancellation action happens.
+
+Phase 10 does not implement emails/notifications, buyer self-cancellation of completed digital purchases, or seller refund-request approval UI.
+
+### Phase 10 Stripe seller onboarding test coverage
+Check that approved sellers can open `/seller/onboarding`, start `/seller/stripe`, create/continue Stripe Express onboarding with test keys, and return to Asset Moth with status fields synced. Verify buyer Checkout can complete before seller onboarding; seller payout records should remain `pending_stripe_onboarding` until the seller is payout-ready, then become `pending_transfer`/`transferred` or `transfer_failed` without reversing buyer access. Confirm seller-facing pages state no startup fee, no monthly fee, no listing fee, 18% Asset Moth commission, separate Stripe/payment processing fees, Stripe Connect payout requirement, admin-exception refunds, no buyer self-cancellation of completed digital purchases, and no seller instant refunds.
+
+#### Phase 10 correction tests
+After an approved seller completes Stripe onboarding or an `account.updated` webhook marks the seller payout-ready, verify old `pending_stripe_onboarding` paid-order payouts become attempted transfers with idempotency key `asset_moth_payout_order_{orderId}_designer_{designerId}`. Confirm unpaid, manual-review, and refunded orders are skipped; successful transfers become `transferred`, failures become `transfer_failed`, and buyer paid access remains unchanged. Test webhook signatures with `STRIPE_WEBHOOK_SECRET` and, when configured for a separate Connect destination, `STRIPE_CONNECT_WEBHOOK_SECRET`.
+
+#### Source transaction payout retry checks
+Verify transfer requests include `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available. For paid orders with no charge id yet, confirm payouts remain `pending_transfer`; after `payment_intent.succeeded` or `charge.updated` stores the charge id, confirm eligible payout-ready seller transfers are attempted with the same deterministic idempotency key.

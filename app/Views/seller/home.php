@@ -45,7 +45,7 @@
     </div>
     <div class="card">
         <strong>
-        <?=H::e((string)($d['sales_count']??$stats['sales_count']??0))?>
+        <?=H::e((string)($stats['sales_count']??$d['sales_count']??0))?>
         </strong>
         <span>Sales</span>
     </div>
@@ -57,6 +57,8 @@
     </div>
 </section>
 <div class="dash">
+    <a class="card" href="/seller/onboarding">Seller Onboarding</a>
+    <a class="card" href="/seller/stripe">Stripe Payouts</a>
     <a class="card" href="/seller/store">Store Settings</a>
     <a class="card" href="/store/<?=H::e($d['store_slug'])?>">View Public Store</a>
     <a class="card" href="/seller/products">Products</a>

@@ -166,3 +166,62 @@ Indexes added for browsing performance:
 Phase 9 migration `2026_07_01_phase_9_cart_orders_downloads_delivery.sql` adds product `fulfillment_type` and `manual_delivery_instructions`; cart price/license/fulfillment snapshots; future-ready order tax/coupon/fulfillment fields; order item product, seller, license, fulfillment, Google Drive email, manual delivery status, delivery notes/timestamps, purchased file version, download count, and expiration placeholders; and download log order/order-item/status fields.
 
 `not_applicable` is used for downloadable products and other non-manual-delivery order items. Manual Google Drive delivery statuses are `pending_delivery`, `buyer_email_needed`, `ready_for_seller_delivery`, `delivered`, and `cancelled_refunded`. Order statuses include `pending`, future `paid`/`failed`, `cancelled`, `refunded`, `partially_fulfilled`, and `fulfilled`, while legacy `completed` remains accepted for existing data compatibility.
+
+## Phase 10 — Stripe Payment Integration
+Migration `2026_07_02_phase_10_stripe_payment_integration.sql` adds Stripe payment reconciliation, webhook logging, and seller payout foundation fields.
+
+### `orders` payment fields
+- `payment_provider`
+- `payment_status`
+- `stripe_checkout_session_id`
+- `stripe_payment_intent_id`
+- `stripe_customer_id`
+- `stripe_charge_id`
+- `stripe_payment_status`
+- `stripe_amount_total`
+- `stripe_currency`
+- `stripe_fee_total`
+- `platform_commission_total`
+- `paid_at`
+- `failed_at`
+- `refunded_at`
+- `partially_refunded_at`
+- `canceled_at`
+- `payment_error`
+- `payment_retry_count`
+- `manual_review_required`
+- `manual_review_reason`
+
+### `order_items` payout fields
+- `platform_commission_amount`
+- `seller_payout_amount`
+- `seller_payout_status`
+- `stripe_transfer_id`
+- `stripe_transfer_error`
+- `paid_at`
+- `payout_ready_at`
+
+### `designers` Stripe Connect fields
+- `stripe_connect_account_id`
+- `stripe_charges_enabled`
+- `stripe_payouts_enabled`
+- `stripe_details_submitted`
+- `stripe_account_status`
+- `stripe_onboarding_started_at`
+- `stripe_onboarding_completed_at`
+
+### New Phase 10 tables
+- `stripe_events` stores incoming Stripe webhook ids, event types, processing status/errors, payload text, and timestamps. `stripe_events.stripe_event_id` is unique for duplicate webhook protection.
+- `payment_transactions` stores order-linked payment/refund/failure/manual-review transaction records and Stripe references for admin audit visibility.
+- `seller_payouts` stores one aggregate payout ledger row per `order_id`/`designer_id`; `order_items` stores item-level commission and seller payout amounts.
+
+`stripe_fee_total` is future/reconciliation-ready and may remain `NULL` until safe Stripe balance transaction fee retrieval is added. Buyer self-cancellation and seller refund/cancellation request approval workflows are not part of Phase 10; Phase 10 only records webhook refund status when Stripe reports it.
+
+### Phase 10 Stripe Connect payout fields
+Designers store Stripe Connect status in `stripe_connect_account_id`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_account_status`, `stripe_onboarding_started_at`, and `stripe_onboarding_completed_at`. Order items and `seller_payouts` snapshot `platform_commission_amount` and `seller_payout_amount` so future commission changes do not alter historical orders. Payout statuses include `pending_stripe_onboarding`, `pending_transfer`, `transferred`, and `transfer_failed`; transfer failures are admin-visible and do not mark buyer orders unpaid.
+
+#### Phase 10 correction: payout retry scope
+Pending seller payout retries are scoped to payout-ready designers and webhook-confirmed paid orders only. `seller_payouts.payout_status` and matching `order_items.seller_payout_status` move from `pending_stripe_onboarding` to `pending_transfer`, `transferred`, or `transfer_failed`; manual-review, unpaid, and refunded orders are not transfer-attempted.
+
+#### Stripe charge id and pending transfers
+`orders.stripe_charge_id` is used as the Stripe transfer `source_transaction` for seller payouts when available. Paid orders missing a charge id keep seller payout rows in `pending_transfer` until a later webhook stores the charge id and retry logic can safely attempt the transfer.

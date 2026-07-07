@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 9 — Cart, Orders, Downloads & Delivery Foundation.
+- Current Phase: Phase 10 — Stripe Payment Integration.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -29,13 +29,13 @@ These features represent the current implemented and tested functionality in the
 - Buyer registration, login, account management, dashboard, wishlists, follows, purchases, order detail, and downloads.
 - Designer application workflow with admin approval and denial.
 - Approved seller dashboard, storefront settings, product creation/editing, preview images, downloadable files, tags, sales, referrals, and rank pages.
-- Cart, Phase 9 pending-payment checkout foundation, order creation, order items, seller earnings placeholders, manual Google Drive delivery status, and protected download access foundations.
+- Cart/order/download/manual-delivery foundation from Phase 9, now connected to Stripe Checkout and webhook-confirmed payment status in Phase 10.
 - Admin dashboards for users, applications, designers, products, categories, orders, referrals, homepage features, and ads.
 - Phase 4.5 codebase standardization for readability, plus restoration of public product previews and sell page regressions.
 
 ### Planned / Future Phase
 
-- Real payment processor integration remains planned for Phase 10.
+- Stripe Checkout payment creation and webhook-driven payment status are implemented in Phase 10; production keys remain environment-only.
 - Automated payouts and tax/reporting workflows.
 - Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
@@ -187,7 +187,7 @@ public/
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
-## Current phase: Phase 9 — Cart, Orders, Downloads & Delivery Foundation
+## Current phase: Phase 10 — Stripe Payment Integration
 
 ### Phase 8.5 licensing capability
 
@@ -199,4 +199,29 @@ Asset Moth watermarks seller-uploaded public product preview images server-side.
 Product pages include buyer-friendly social sharing controls and Open Graph/Twitter preview metadata. Seller storefronts support optional validated website, Facebook, Instagram, TikTok, Pinterest, Etsy, and Shopify links rendered with safe external-link attributes.
 
 ## Phase 9 cart/order/download/manual-delivery foundation
-Phase 9 adds the foundation for carts, order records, downloadable delivery, and Google Drive/manual delivery. Checkout creates a pending-payment foundation order only; real Stripe/payment collection is not live and remains Phase 10. Google Drive delivery is manual: buyers provide a Google Drive email, sellers grant access outside the app, and sellers/admins update delivery status in Asset Moth.
+Phase 9 added the foundation for carts, order records, downloadable delivery, and Google Drive/manual delivery. Phase 10 now connects that pending-payment foundation to Stripe Checkout and webhook-confirmed payment state. Google Drive delivery remains manual: buyers provide a Google Drive email, sellers grant access outside the app after payment clears, and sellers/admins update delivery status in Asset Moth.
+
+## Phase 10 — Stripe Payment Integration
+- Adds Stripe Checkout session creation for buyer checkout using server-side order snapshots and environment-only Stripe configuration.
+- Stores Stripe Checkout Session, Payment Intent, customer/charge references when available, payment status, Stripe amount/currency, paid/failed/refunded timestamps, retry count, and manual review flags.
+- Stripe webhooks are the source of truth for paid, failed, expired/canceled, refunded, and partially refunded status. The browser success redirect only shows a processing page and does not unlock access.
+- Downloads unlock only after webhook-confirmed paid status. Google Drive/manual delivery becomes seller-ready only after payment clears; seller delivery visibility is blocked before payment clears.
+- Failed, canceled, expired, and unpaid orders show retry/return-to-checkout options. `manual_review` is a payment safety lock and blocks buyer retry/unlock until admin review.
+- Buyer order detail acts as the receipt-style payment record until Phase 10.5 email receipts are implemented.
+- Adds duplicate webhook protection via `stripe_events.stripe_event_id`, Stripe signature verification, amount/currency/order metadata mismatch checks, payment transaction logs, and admin payment log visibility.
+- Adds seller payout foundation with Stripe Connect account status fields, seller payout ledger records, and transfer attempts only when connected accounts are enabled. Missing onboarding leaves payouts pending without failing buyer payment.
+- Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
+- Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
+- Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
+- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+
+### Phase 10 Stripe marketplace payments and seller onboarding
+Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Asset Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Asset Moth's 18% commission.
+
+Sellers pay no startup fee, no monthly fee, and no listing fee; Asset Moth only earns when sellers sell. Buyer checkout can work before seller onboarding, but seller payouts remain pending until onboarding is complete. Refunds are Stripe-processed admin exceptions only; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
+
+#### Phase 10 payout math and Connect webhook note
+Phase 10 calculates Asset Moth's commission from the gross sale amount and transfers the seller portion from that gross sale snapshot before separate Stripe fee reconciliation. Stripe/payment processing fees still apply separately; seller-facing copy must not claim sellers receive exactly 82% after all fees. `STRIPE_WEBHOOK_SECRET` is required, and `STRIPE_CONNECT_WEBHOOK_SECRET` is optional for a separate Connect webhook destination that uses a different signing secret.
+
+#### Phase 10 source-transaction transfer reliability
+Seller transfers use the original Stripe charge as `source_transaction` when `stripe_charge_id` is available. If the paid order is waiting for the charge id, payout records stay `pending_transfer` for a later webhook retry instead of being failed solely because Stripe balance timing is not ready.

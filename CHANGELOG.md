@@ -2,7 +2,7 @@
 
 ## Current status
 
-The project currently includes the original MVP plus implemented phases through Phase 9. Phase 9 provides cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; real Stripe/payment processing remains future Phase 10 work.
+The project currently includes the original MVP plus implemented phases through Phase 10. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
 
 ## Original MVP — completed 2026-06-22
 
@@ -184,4 +184,35 @@ Intentionally postponed:
 ## Phase 9 - Cart, Orders, Downloads & Delivery Foundation
 - Added persistent cart price snapshots, product fulfillment types, pending-payment checkout foundation, order item purchase snapshots, secure download logging foundations, and Google Drive/manual delivery statuses.
 - Added seller and admin manual delivery visibility/override workflows.
-- Stripe/payment collection remains Phase 10; Phase 9 orders are clearly marked as pending-payment foundation records.
+- Stripe/payment collection is implemented in Phase 10; Phase 9 orders established the pending-payment foundation that Phase 10 now reconciles through Stripe webhooks.
+
+## Phase 10 — Stripe Payment Integration
+- Adds Stripe Checkout session creation for buyer checkout using server-side order snapshots and environment-only Stripe configuration.
+- Stores Stripe Checkout Session, Payment Intent, customer/charge references when available, payment status, Stripe amount/currency, paid/failed/refunded timestamps, retry count, and manual review flags.
+- Stripe webhooks are the source of truth for paid, failed, expired/canceled, refunded, and partially refunded status. The browser success redirect only shows a processing page and does not unlock access.
+- Downloads unlock only after webhook-confirmed paid status. Google Drive/manual delivery becomes seller-ready only after payment clears; seller delivery visibility is blocked before payment clears.
+- Failed, canceled, expired, and unpaid orders show retry/return-to-checkout options. `manual_review` is a payment safety lock and blocks buyer retry/unlock until admin review.
+- Buyer order detail acts as the receipt-style payment record until Phase 10.5 email receipts are implemented.
+- Adds duplicate webhook protection via `stripe_events.stripe_event_id`, Stripe signature verification, amount/currency/order metadata mismatch checks, payment transaction logs, and admin payment log visibility.
+- Adds seller payout foundation with Stripe Connect account status fields, seller payout ledger records, and transfer attempts only when connected accounts are enabled. Missing onboarding leaves payouts pending without failing buyer payment.
+- Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
+- Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
+- Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
+- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+
+## Phase 10 refinement - seller onboarding and Stripe Connect payout readiness
+- Added seller onboarding and Stripe payout setup routes/views for approved sellers.
+- Added Stripe Express connected account creation, account links, status sync, and `account.updated` webhook status handling.
+- Defaulted marketplace commission configuration to 18% and documented that Stripe/payment processing fees are separate.
+- Clarified no startup, monthly, or listing fees; Asset Moth only earns when sellers sell.
+- Clarified refunds are Stripe-processed admin exceptions, buyers cannot self-cancel completed digital purchases, and sellers cannot issue instant refunds.
+
+### Phase 10 correction patch
+- Attempts eligible old pending seller payouts after Stripe onboarding return or `account.updated` marks a seller payout-ready.
+- Added optional `STRIPE_CONNECT_WEBHOOK_SECRET` verification support for separate Connect webhook destinations.
+- Corrected seller onboarding and FAQ commission/status wording and clarified gross-sale commission math before separate Stripe fee reconciliation.
+
+### Phase 10 source transaction payout correction
+- Seller transfers now pass `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available.
+- Paid payouts without a charge id remain `pending_transfer` for webhook retry instead of failing solely because the charge id is not available yet.
+- Removed the hardcoded `business_type="individual"` from Express account creation so Stripe onboarding can collect the appropriate seller/business type.

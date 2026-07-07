@@ -21,7 +21,7 @@ class BuyerController
     {
         H::requireLogin();
         $order=DB::row('select * from orders where id=? and user_id=?',[(int)$id,H::user()['id']])??H::abort(404);
-        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id from order_items oi join products p on p.id=oi.product_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id from order_items oi join products p on p.id=oi.product_id where oi.order_id=?',[$order['id']]);
         H::view('buyer/order',['order'=>$order,'items'=>$items]);
 
     }
@@ -33,9 +33,10 @@ class BuyerController
     public function download($file)
     {
         H::requireLogin();
-        $f=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? order by oi.id desc limit 1',[$file,H::user()['id']]);
-        if(!$f || $f['fulfillment_type'] !== 'downloadable' || !in_array($f['order_status'], ['paid','fulfilled','completed'], true) || (!empty($f['download_expires_at']) && strtotime($f['download_expires_at']) < time())) {
-            if($f) DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$file,'denied','Order is not paid/fulfilled or access expired.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+        $f=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status,o.payment_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? and oi.fulfillment_type="downloadable" and o.payment_status="paid" and (oi.download_expires_at is null or oi.download_expires_at>=now()) order by oi.id desc limit 1',[$file,H::user()['id']]);
+        if(!$f) {
+            $denied=DB::row('select pf.*,oi.id order_item_id,oi.order_id,oi.fulfillment_type,oi.download_expires_at,o.status order_status,o.payment_status from product_files pf join order_items oi on oi.product_id=pf.product_id join orders o on o.id=oi.order_id where pf.id=? and o.user_id=? order by oi.id desc limit 1',[$file,H::user()['id']]);
+            if($denied) DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$denied['order_id'],$denied['order_item_id'],$denied['product_id'],$file,'denied','Order is not paid by Stripe webhook confirmation or access expired.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
             H::abort(403);
         }
         $base=realpath(app_path('storage/protected_uploads/products'));
