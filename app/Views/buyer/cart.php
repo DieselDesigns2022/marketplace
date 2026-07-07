@@ -66,8 +66,18 @@
            </tr>
         <?php endforeach;?>
     </table>
-    <h2>Subtotal <?=H::money($subtotal)?>
-    </h2>
+    <div class="card">
+      <h2>Subtotal <?=H::money($subtotal)?></h2>
+      <form method="post" action="/cart/coupon" class="form-inline">
+        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <label>Coupon code <input name="coupon_code" value="<?=H::e($_SESSION['coupon_code'] ?? '')?>"></label>
+        <button>Apply coupon</button>
+      </form>
+      <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?>
+        <p class="notice success">Coupon <?=H::e($couponResult['coupon']['code'])?> saves <?=H::money($couponResult['discount'])?>.</p>
+        <form method="post" action="/cart/coupon/remove"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Remove coupon</button></form>
+      <?php endif;?>
+    </div>
     <a class="btn" href="/checkout">Checkout</a>
 <?php endif;?>
 

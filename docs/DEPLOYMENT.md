@@ -78,3 +78,9 @@ Before requesting indexing, set `APP_URL=https://marketplace.dieseldesigns.co` i
 ## Phase 6 completed deployment state
 
 Phase 6 was validated on the VPS deployment path `/var/www/marketplace.dieseldesigns.co` and pushed to `origin/phase-6-seo-foundation-indexing`. A completed post-Phase-6 project backup was created under `/root/marketplace-phase-backups/` before moving into the next phase workflow. Before starting Phase 7, merge Phase 6 into the main project baseline and create the Phase 7 branch from that updated baseline.
+
+## Phase 10.2 Coupon Deployment Notes
+- Apply `database/migrations/2026_07_07_phase_10_2_coupons_discounts_commission_rules.sql` before enabling coupon UI in a deployed environment.
+- The migration creates coupon definition, restriction, and usage tables and adds order/order item coupon snapshot columns.
+- The migration includes idempotent `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements for existing environments.
+- No Phase 10.3 tax service or Phase 11 credit/referral redemption deployment step is included; those remain placeholders only.

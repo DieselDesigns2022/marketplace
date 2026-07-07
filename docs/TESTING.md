@@ -212,3 +212,17 @@ Recommended manual checks:
 - Admin dashboard live money stats should count live Stripe paid orders only.
 - Test-mode `cs_test_` orders, pending orders, canceled orders, and deleted test-seller cleanup records should not inflate live Gross Sales or Asset Moth Commission dashboard stats.
 - Failed payouts from deleted test sellers can be marked `test_voided` so they do not appear as active seller payout failures.
+
+## Phase 10.2 Coupon Testing Checklist
+- Admin creates a platform coupon, edits its amount/date/limits, and deactivates it from `/admin/coupons`.
+- Admin creates a seller-scoped coupon and verifies the seller must be an approved seller.
+- Seller creates and edits only their own seller coupon from `/seller/coupons`.
+- Seller POST attempts against another seller coupon ID return 404 before any update or restriction rewrite.
+- Buyer applies a valid coupon and sees the discount in cart and checkout totals.
+- Invalid, inactive, expired, not-yet-started, over-limit, per-user-limit, below-minimum, and non-applicable coupons show clear errors.
+- Percentage coupon math discounts only the eligible subtotal.
+- Fixed coupon math is capped to eligible subtotal and never creates a negative total.
+- Seller-scoped coupons in mixed-seller carts discount only eligible items from that seller.
+- A coupon that makes checkout total `$0.00` is rejected because this phase does not implement free-order checkout.
+- Checkout without a coupon still creates a Stripe Checkout session.
+- Stripe paid webhook records coupon usage once and repeated webhook/retry processing does not double-count usage.

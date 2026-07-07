@@ -230,3 +230,11 @@ Pending seller payout retries are scoped to payout-ready designers and webhook-c
 - Migration `2026_07_07_phase_10_1_product_cleanup.sql` expands `products.status` to include `archived` and `deleted` for product cleanup workflows.
 - Existing `approved` products remain the published/public product state. UI labels present `approved` products as Published.
 - Products with completed `paid` or `partially_refunded` orders must remain in `products` so order items, downloads, seller sales, and admin records can continue joining historical product data.
+
+## Phase 10.2 Coupon Database Objects
+- `coupons` stores normalized unique codes, `platform` or `seller` scope, optional `seller_id`, percent/fixed discount value, start/end dates, active flag, minimum eligible cart amount, total usage limit, per-user usage limit, and denormalized usage count.
+- `coupon_restrictions` stores optional seller/product/category restrictions with a unique `(coupon_id, restrictable_type, restrictable_id)` key and lookup index.
+- `coupon_usages` stores paid-order usage rows with `coupon_id`, `user_id`, `order_id`, code snapshot, discount amount, a unique order key, and coupon/user lookup index.
+- `orders.coupon_discount`, `orders.coupon_id`, `orders.coupon_code`, and `orders.coupon_snapshot` snapshot order-level coupon state.
+- `order_items.coupon_id`, `order_items.coupon_code`, and `order_items.coupon_discount` snapshot item-level allocation; `order_items.total_price` stores the discounted item total used for commission and seller payout calculations.
+- Tax fields remain Phase 10.3 placeholders; credit/referral redemption remains Phase 11 placeholder behavior.

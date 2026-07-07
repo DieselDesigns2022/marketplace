@@ -445,4 +445,76 @@ class AdminController
 
     }
 
+    private function couponRestrictions(int $id): array
+    {
+        $out = ['seller'=>'','product'=>'','category'=>''];
+        foreach (DB::rows('select restrictable_type, group_concat(restrictable_id order by restrictable_id) ids from coupon_restrictions where coupon_id=? group by restrictable_type', [$id]) as $r) $out[$r['restrictable_type']] = $r['ids'];
+        return $out;
+    }
+
+    private function saveRestrictions(int $couponId, array $values): void
+    {
+        DB::exec('delete from coupon_restrictions where coupon_id=?', [$couponId]);
+        foreach (['seller'=>'seller_ids','product'=>'product_ids','category'=>'category_ids'] as $type=>$field) {
+            foreach ($this->validRestrictionIds($type, $field) as $rid) {
+                DB::exec('insert ignore into coupon_restrictions (coupon_id,restrictable_type,restrictable_id) values (?,?,?)', [$couponId,$type,$rid]);
+            }
+        }
+    }
+
+    private function nullablePositiveInt(string $field, array &$errors): ?int
+    {
+        $raw = trim((string)($_POST[$field] ?? ''));
+        if ($raw === '') return null;
+        if (!ctype_digit($raw) || (int)$raw < 1) { $errors[] = str_replace('_',' ', $field) . ' must be blank or a positive integer.'; return null; }
+        return (int)$raw;
+    }
+
+    private function validRestrictionIds(string $type, string $field): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($_POST[$field] ?? ''), -1, PREG_SPLIT_NO_EMPTY)))));
+        if (!$ids) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        if ($type === 'seller') $rows = DB::rows('select id from designers where status="approved" and id in (' . $placeholders . ')', $ids);
+        elseif ($type === 'product') $rows = DB::rows('select id from products where id in (' . $placeholders . ')', $ids);
+        else $rows = DB::rows('select id from categories where id in (' . $placeholders . ')', $ids);
+        return array_map('intval', array_column($rows, 'id'));
+    }
+
+    private function couponValues(array &$errors): array
+    {
+        $code = \App\Services\CouponService::normalizeCode($_POST['code'] ?? '');
+        $type = in_array($_POST['discount_type'] ?? '', ['percent','fixed'], true) ? $_POST['discount_type'] : 'percent';
+        $scope = in_array($_POST['scope'] ?? '', ['platform','seller'], true) ? $_POST['scope'] : 'platform';
+        $sellerId = $scope === 'seller' ? (int)($_POST['seller_id'] ?? 0) : null;
+        $value = (float)($_POST['discount_value'] ?? 0);
+        $starts = $_POST['starts_at'] ?: null;
+        $ends = $_POST['ends_at'] ?: null;
+        if ($code === '') $errors[] = 'Coupon code is required.';
+        if ($value <= 0 || ($type === 'percent' && $value > 100)) $errors[] = 'Discount value is invalid.';
+        if ($starts && $ends && $ends < $starts) $errors[] = 'End date cannot be before start date.';
+        if ($scope === 'seller' && (!$sellerId || !DB::row('select id from designers where id=? and status="approved"', [$sellerId]))) $errors[] = 'Seller scope requires an approved seller.';
+        return [$code,$scope,$sellerId,$type,max(0.01,$value),$starts,$ends,isset($_POST['is_active']) ? 1 : 0,max(0,(float)($_POST['min_cart_amount'] ?? 0)),$this->nullablePositiveInt('usage_limit',$errors),$this->nullablePositiveInt('per_user_limit',$errors)];
+    }
+
+    public function coupons($id = null)
+    {
+        $this->gate();
+        if ($id === 'new') $id = null;
+        if ($_POST) {
+            $errors = [];
+            [$code,$scope,$sellerId,$type,$value,$starts,$ends,$active,$min,$limit,$userLimit] = $this->couponValues($errors);
+            if ($errors) H::flash('error', implode(' ', $errors));
+            else {
+                try { DB::begin();
+                    if ($id) DB::exec('update coupons set code=?,scope=?,seller_id=?,discount_type=?,discount_value=?,starts_at=?,ends_at=?,is_active=?,min_cart_amount=?,usage_limit=?,per_user_limit=? where id=?', [$code,$scope,$sellerId,$type,$value,$starts,$ends,$active,$min,$limit,$userLimit,(int)$id]);
+                    else { DB::exec('insert into coupons (code,scope,seller_id,discount_type,discount_value,starts_at,ends_at,is_active,min_cart_amount,usage_limit,per_user_limit,created_by) values (?,?,?,?,?,?,?,?,?,?,?,?)', [$code,$scope,$sellerId,$type,$value,$starts,$ends,$active,$min,$limit,$userLimit,H::user()['id']]); $id = DB::id(); }
+                    $this->saveRestrictions((int)$id, $_POST); DB::commit(); H::flash('success','Coupon saved.'); H::redirect('/admin/coupons');
+                } catch (Throwable $e) { DB::rollBack(); H::flash('error','Coupon code already exists or could not be saved.'); }
+            }
+        }
+        if ($id) H::view('admin/coupon_form',['coupon'=>DB::row('select * from coupons where id=?',[(int)$id]) ?? H::abort(404),'sellers'=>DB::rows('select id,display_name from designers where status="approved" order by display_name'),'restrictions'=>$this->couponRestrictions((int)$id)]);
+        else H::view('admin/coupons',['coupons'=>DB::rows('select c.*,d.display_name seller_name,(select group_concat(concat(restrictable_type,":",restrictable_id) separator ", ") from coupon_restrictions cr where cr.coupon_id=c.id) restriction_summary from coupons c left join designers d on d.id=c.seller_id order by c.created_at desc')]);
+    }
+
 }
