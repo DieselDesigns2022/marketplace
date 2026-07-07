@@ -2,7 +2,7 @@
 </h1>
 <section class="card">
     <p>Status: <span class="badge">
-    <?=H::e(ucwords(str_replace('_',' ',$p['status'])))?>
+    <?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?>
     </span>
     </p>
     <p>Designer: <a href="/store/<?=H::e($p['store_slug'])?>">
@@ -16,6 +16,7 @@
     </p>
     <p>AI Disclosure: <?=H::e($p['ai_disclosure'])?>
     </p>
+    <p>Completed Orders: <?= (int)($p['completed_order_count'] ?? 0) ?> <?php if((int)($p['completed_order_count'] ?? 0)>0):?><span class="muted">Permanent delete is blocked; archive to hide this product while preserving order history.</span><?php endif;?></p>
     <p>SEO Title: <?=H::e($p['seo_title']?:'Fallback to product title')?>
     </p>
     <p>SEO Description: <?=H::e($p['seo_description']?:'Fallback to product description')?>
@@ -62,5 +63,8 @@
         <button class="btn" name="action" value="approve">Approve</button>
         <button name="action" value="reject">Reject</button>
         <button name="action" value="disable">Disable</button>
+        <button name="action" value="archive" onclick="return confirm('Archive this product and hide it from public listings?');">Archive / Hide</button>
+        <?php if(in_array($p['status'], ['archived','deleted'], true)):?><button name="action" value="restore" onclick="return confirm('Restore this product as a draft?');">Restore as Draft</button><?php endif;?>
+        <button name="action" value="mark_deleted" onclick="return confirm('Mark deleted? This hides the product but keeps records. Use bulk delete for safe permanent deletion only.');">Mark Deleted</button>
     </form>
 </section>

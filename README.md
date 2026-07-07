@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 10 — Stripe Payment Integration.
+- Current Phase: Phase 10.1 — Product Cleanup, Delete Options & Pre-Tester Reset.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -30,6 +30,7 @@ These features represent the current implemented and tested functionality in the
 - Designer application workflow with admin approval and denial.
 - Approved seller dashboard, storefront settings, product creation/editing, preview images, downloadable files, tags, sales, referrals, and rank pages.
 - Cart/order/download/manual-delivery foundation from Phase 9, now connected to Stripe Checkout and webhook-confirmed payment status in Phase 10.
+- Phase 10.1 product cleanup tools for seller archive/hide, restore-as-draft, safe permanent delete, admin bulk cleanup, archived/deleted statuses, and completed-order delete protection.
 - Admin dashboards for users, applications, designers, products, categories, orders, referrals, homepage features, and ads.
 - Phase 4.5 codebase standardization for readability, plus restoration of public product previews and sell page regressions.
 

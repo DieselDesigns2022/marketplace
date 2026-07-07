@@ -597,9 +597,9 @@ class SellerController
             return $submittedForReview ? 'pending_review' : 'draft';
 
         }
-        if ($existing['status'] === 'disabled')
+        if (in_array($existing['status'], ['disabled','archived','deleted'], true))
         {
-            return 'disabled';
+            return $existing['status'];
 
         }
         if ($existing['status'] === 'approved')
@@ -645,7 +645,7 @@ class SellerController
         H::requireSeller();
         $d = $this->d();
         $status = $_GET['status'] ?? 'all';
-        $allowed = ['draft', 'pending_review', 'approved', 'rejected', 'disabled'];
+        $allowed = ['draft', 'pending_review', 'approved', 'published', 'rejected', 'disabled', 'archived', 'deleted'];
         $params = [$d['id']];
         $where = 'where p.designer_id=?';
         if (in_array($status, $allowed, true))
@@ -654,7 +654,7 @@ class SellerController
             $params[] = $status;
 
         }
-        H::view('seller/products', [ 'status' => $status, 'products' => DB::rows( 'select p.*,c.name category_name,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
+        H::view('seller/products', [ 'status' => $status, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
 
     }
     public function editProduct($id = null)
@@ -735,17 +735,93 @@ class SellerController
         H::view('seller/edit_product', [ 'p' => $p, 'errors' => $errors, 'cats' => DB::rows('select * from categories where is_active=1'), 'images' => $productId ? DB::rows( 'select * from product_images where product_id=? order by sort_order,id', [$productId] ) : [], 'files' => $productId ? DB::rows( 'select * from product_files where product_id=? order by created_at desc', [$productId] ) : [], 'tagText' => $productId ? $this->tagText((int) $productId) : '', 'licenseTypes' => LicenseService::platformTypes(), 'productLicenses' => $p ? LicenseService::productLicenses($p) : [], ]);
 
     }
+
+    private function productHasCompletedOrders(int $productId): bool
+    {
+        return (bool) DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.product_id=? and o.payment_status in ("paid","partially_refunded") limit 1', [$productId]);
+    }
+
+    private function permanentlyDeleteProduct(int $productId): void
+    {
+        DB::exec('delete from cart_items where product_id=?', [$productId]);
+        DB::exec('delete from wishlists where product_id=?', [$productId]);
+        DB::exec('delete from product_tags where product_id=?', [$productId]);
+        DB::exec('delete from product_license_types where product_id=?', [$productId]);
+        DB::exec('delete from product_images where product_id=?', [$productId]);
+        DB::exec('delete from product_files where product_id=?', [$productId]);
+        DB::exec('delete from products where id=?', [$productId]);
+    }
+
+    public function archiveProduct($id)
+    {
+        H::requireSeller();
+        $d = $this->d();
+        $productId = (int) $id;
+        $p = DB::row('select id,status from products where id=? and designer_id=?', [$productId, $d['id']]) ?? H::abort(404);
+        if (($p['status'] ?? '') === 'deleted') {
+            H::flash('error', 'Deleted products cannot be archived.');
+            H::redirect('/seller/products');
+        }
+        DB::exec('update products set status="archived",updated_at=now() where id=? and designer_id=?', [$productId, $d['id']]);
+        H::flash('success', 'Product archived and hidden from public listings. Historical order records remain available.');
+        H::redirect('/seller/products?status=archived');
+    }
+
+    public function restoreProduct($id)
+    {
+        H::requireSeller();
+        $d = $this->d();
+        $productId = (int) $id;
+        $p = DB::row('select id,status from products where id=? and designer_id=?', [$productId, $d['id']]) ?? H::abort(404);
+        if (!in_array($p['status'], ['archived','deleted'], true)) {
+            H::flash('error', 'Only archived or deleted products can be restored to draft.');
+            H::redirect('/seller/products');
+        }
+        DB::exec('update products set status="draft",updated_at=now() where id=? and designer_id=? and status in ("archived","deleted")', [$productId, $d['id']]);
+        H::flash('success', 'Product restored as a draft. Submit it for review before publishing again.');
+        H::redirect('/seller/products?status=draft');
+    }
+
+    public function deleteProduct($id)
+    {
+        H::requireSeller();
+        $d = $this->d();
+        $productId = (int) $id;
+        $p = DB::row('select id,status from products where id=? and designer_id=?', [$productId, $d['id']]) ?? H::abort(404);
+        if ($this->productHasCompletedOrders($productId)) {
+            DB::exec('update products set status="archived",updated_at=now() where id=? and designer_id=?', [$productId, $d['id']]);
+            H::flash('warning', 'This product has completed orders, so it was archived instead of permanently deleted. Buyer, seller, and admin order history remain intact.');
+            H::redirect('/seller/products?status=archived');
+        }
+        if (!in_array($p['status'], ['draft','rejected','archived','disabled','deleted'], true)) {
+            H::flash('error', 'Only draft, rejected, disabled, or archived products with no completed orders can be permanently deleted. Archive this product instead.');
+            H::redirect('/seller/products');
+        }
+        $this->permanentlyDeleteProduct($productId);
+        H::flash('success', 'Product permanently deleted because it had no completed orders.');
+        H::redirect('/seller/products');
+    }
+
     public function submitProduct($id)
     {
         H::requireSeller();
         $d = $this->d();
-        $p = DB::row('select fulfillment_type,manual_delivery_instructions from products where id=? and designer_id=?', [(int)$id, $d['id']]) ?? H::abort(404);
+        $productId = (int)$id;
+        $p = DB::row('select status,fulfillment_type,manual_delivery_instructions from products where id=? and designer_id=?', [$productId, $d['id']]) ?? H::abort(404);
+        if (in_array($p['status'], ['archived','deleted'], true)) {
+            H::flash('error', 'Archived or deleted products must be restored to draft before they can be submitted for review.');
+            H::redirect('/seller/products?status='.$p['status']);
+        }
+        if (($p['status'] ?? '') === 'disabled') {
+            H::flash('error', 'Disabled products cannot be submitted for review. Contact an admin if this product should be re-enabled.');
+            H::redirect('/seller/products?status=disabled');
+        }
         if (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen(trim((string)($p['manual_delivery_instructions'] ?? ''))) < 5)
         {
             H::flash('error','Manual delivery instructions are required before submitting a Google Drive delivery product.');
-            H::redirect('/seller/product/'.(int)$id);
+            H::redirect('/seller/product/'.$productId);
         }
-        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$id, $d['id']] );
+        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']] );
         H::redirect('/seller/products');
 
     }

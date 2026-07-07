@@ -66,3 +66,8 @@ The repository should ignore environment files, public uploads, protected upload
 
 - Phase 8.75 live testing raised seller preview/avatar/banner image validation to 15MB while keeping extension, MIME, image metadata, and server-generated filename checks. PHP upload handling is capped through `public/.user.ini`; Nginx dotfile protection was verified so `.user.ini` returns 403 publicly.
 - Legacy public preview images were backfilled by copying the existing public preview into private preview storage first, then generating a watermarked public preview from that retained private original.
+
+## Phase 10.1 product cleanup security
+- Seller cleanup actions are POST-only, CSRF-protected, and scoped by `designer_id` so sellers can only archive, restore, or delete their own products.
+- Admin bulk cleanup is POST-only, CSRF-protected, and guarded by admin authentication.
+- Permanent product deletion is blocked when completed paid or partially refunded order items reference the product; the safer archive path is used instead.

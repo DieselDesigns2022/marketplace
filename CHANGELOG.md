@@ -2,7 +2,7 @@
 
 ## Current status
 
-The project currently includes the original MVP plus implemented phases through Phase 10. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
+The project currently includes the original MVP plus implemented phases through Phase 10.1. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
 
 ## Original MVP — completed 2026-06-22
 
@@ -216,3 +216,9 @@ Intentionally postponed:
 - Seller transfers now pass `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available.
 - Paid payouts without a charge id remain `pending_transfer` for webhook retry instead of failing solely because the charge id is not available yet.
 - Removed the hardcoded `business_type="individual"` from Express account creation so Stripe onboarding can collect the appropriate seller/business type.
+
+## Phase 10.1 - Product Cleanup, Delete Options & Pre-Tester Reset
+- Added seller archive/hide, restore-as-draft, and safe permanent delete actions for owned products.
+- Permanent product deletion is blocked for products tied to paid or partially refunded orders; those products are archived instead so buyer history, seller order visibility, downloads, and admin records remain intact.
+- Added admin product cleanup tools with bulk archive and safe bulk permanent delete for draft/test products.
+- Added `archived` and `deleted` product statuses while preserving existing approved/pending/rejected/disabled workflow compatibility.
