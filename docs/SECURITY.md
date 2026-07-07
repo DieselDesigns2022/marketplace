@@ -71,3 +71,12 @@ The repository should ignore environment files, public uploads, protected upload
 - Seller cleanup actions are POST-only, CSRF-protected, and scoped by `designer_id` so sellers can only archive, restore, or delete their own products.
 - Admin bulk cleanup is POST-only, CSRF-protected, and guarded by admin authentication.
 - Permanent product deletion is blocked when completed paid or partially refunded order items reference the product; the safer archive path is used instead.
+
+## Phase 10.2 Coupon Security Notes
+- Seller coupon edit POSTs require the coupon to exist with `scope="seller"` and `seller_id` matching the current approved seller before updates or restriction rewrites occur.
+- Coupon restriction IDs are validated server-side; sellers can only save product/category restrictions tied to their own catalog.
+- Coupon codes are normalized and stored with a unique code key to prevent unsafe collisions.
+- Cart and checkout coupon discounts are recalculated server-side from current cart items; hidden form fields are not trusted for product, seller, or discount ownership.
+- Discount amounts are capped to eligible subtotal and final totals are clamped non-negative.
+- `$0.00` Stripe Checkout is blocked until a dedicated free-order flow exists.
+- Usage tracking is written only after successful paid webhook confirmation and uses an order-level uniqueness guard to avoid double-counting.

@@ -173,3 +173,12 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 - `POST /seller/product/{id}/restore` — seller-only restore of the seller's archived/deleted product to draft.
 - `POST /seller/product/{id}/delete` — seller-only safe permanent delete for owned draft/test products with no completed orders; ordered products are archived instead.
 - `POST /admin/products/bulk-cleanup` — admin-only bulk archive or safe bulk permanent delete for pre-live test product cleanup.
+
+## Phase 10.2 Coupon Routes
+- `GET|POST /admin/coupons` — admin coupon list and create handling for platform-wide and seller-scoped coupons.
+- `GET|POST /admin/coupons/{id}` — admin coupon edit handling, including active status, date windows, limits, and seller/product/category restrictions.
+- `GET|POST /seller/coupons` — approved seller coupon list and create handling for seller-scoped coupons only.
+- `GET|POST /seller/coupons/{id}` — approved seller coupon edit handling; server-side ownership checks require `scope="seller"` and the current seller ID.
+- `POST /cart/coupon` — applies a normalized coupon code to the buyer cart after server-side validation.
+- `POST /cart/coupon/remove` — removes the currently applied cart coupon.
+- Stripe checkout routes remain unchanged; coupon usage is recorded from the paid webhook path, not at code entry time.

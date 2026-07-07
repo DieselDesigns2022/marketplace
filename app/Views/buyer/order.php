@@ -2,6 +2,7 @@
 </h1>
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?> · Date: <?=$order['created_at']?>
 </p>
+<?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>.</p><?php endif;?>
 <table>
     <tr>
         <th>Product</th>

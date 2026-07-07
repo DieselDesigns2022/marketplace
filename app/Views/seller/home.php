@@ -63,6 +63,7 @@
     <a class="card" href="/store/<?=H::e($d['store_slug'])?>">View Public Store</a>
     <a class="card" href="/seller/products">Products</a>
     <a class="card" href="/seller/sales">Sales</a>
+    <a class="card" href="/seller/coupons">Coupons</a>
     <a class="card" href="/seller/referrals">Referrals</a>
     <a class="card" href="/seller/rank">Rank</a>
 </div>
