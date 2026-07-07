@@ -181,3 +181,34 @@ After an approved seller completes Stripe onboarding or an `account.updated` web
 
 #### Source transaction payout retry checks
 Verify transfer requests include `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available. For paid orders with no charge id yet, confirm payouts remain `pending_transfer`; after `payment_intent.succeeded` or `charge.updated` stores the charge id, confirm eligible payout-ready seller transfers are attempted with the same deterministic idempotency key.
+
+## Phase 10.1 product cleanup checks
+Recommended manual checks:
+- Seller archives their own product and confirms it disappears from public browsing.
+- Seller restores an archived product and confirms it returns as a draft.
+- Seller permanently deletes a draft/test product with no completed orders.
+- Seller attempts to delete a product with completed orders and confirms it is archived instead.
+- Admin uses bulk archive/delete cleanup while logged in as admin.
+- Buyer purchase history, downloads, seller sales, and admin order detail still load for completed purchases.
+
+- Direct POST submit attempts against archived or deleted products must be blocked until the product is restored to draft.
+- Restore actions should only succeed for the seller's own archived or deleted products; other statuses should not claim success.
+- Disabled products should not be submitted directly by POST.
+- Seller product lists should hide `deleted` products from the seller-facing dashboard, including the All tab, while admin/payment records remain preserved.
+
+## Admin seller management checks
+- Admin can change seller creator rank from `/admin/designers`.
+- Admin can disable and re-enable sellers from `/admin/designers`.
+- Admin designer management defaults to approved sellers and can filter disabled/all sellers so preserved test sellers do not clutter the live tester view.
+
+## Admin commission report checks
+- Admin can open `/admin/payment-logs` and see gross sales, Asset Moth commission, seller payout totals, transfer status, payment transactions, and webhook logs.
+- A $5.00 paid order at 18% commission should show $0.90 Asset Moth commission and $4.10 seller payout.
+- Failed seller transfers should show the transfer error without changing the commission snapshot.
+- Admin commission report should count live Stripe payments only by default, excluding old `cs_test_` test-mode orders from live money totals.
+- Admin payment log tables should stay inside their content area without causing full-page sideways scrolling.
+
+## Admin dashboard money stat checks
+- Admin dashboard live money stats should count live Stripe paid orders only.
+- Test-mode `cs_test_` orders, pending orders, canceled orders, and deleted test-seller cleanup records should not inflate live Gross Sales or Asset Moth Commission dashboard stats.
+- Failed payouts from deleted test sellers can be marked `test_voided` so they do not appear as active seller payout failures.

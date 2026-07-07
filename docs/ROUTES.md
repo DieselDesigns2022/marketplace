@@ -149,7 +149,7 @@ Phase 9 introduced the cart/order/download/manual-delivery route foundation that
 - `GET /checkout/cancel` means the Stripe payment was not completed before access unlocked. It does not cancel a completed digital order and does not mark anything paid.
 - `POST /checkout/retry/{id}` creates a new Checkout Session for unpaid retryable orders only. Paid, refunded, partially-refunded, and `manual_review` orders are blocked from retry.
 - `POST /stripe/webhook` is public but Stripe-signature verified with `STRIPE_WEBHOOK_SECRET`; it is the source of truth for paid, failed, expired/canceled, refunded, and partially-refunded statuses.
-- `GET /admin/payment-logs` shows payment transactions and Stripe webhook logs.
+- `GET /admin/payment-logs` shows marketplace commission totals, seller payout/transfer status, payment transactions, and Stripe webhook logs.
 - `GET /dashboard/order/{id}` shows receipt-style payment status, paid download/manual-delivery state, retry messaging, and manual-review messaging.
 - `GET /download/{file}` unlocks only for webhook-confirmed paid access or allowed legacy fulfilled/completed access.
 - `GET /seller/sales` exposes seller-visible paid/allowed sales with payout status.
@@ -167,3 +167,9 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 
 #### Stripe webhook secret behavior
 `POST /stripe/webhook` verifies the required platform `STRIPE_WEBHOOK_SECRET`. If `account.updated` is sent through a separate Stripe Connect webhook destination with a different signing secret, configure optional `STRIPE_CONNECT_WEBHOOK_SECRET`; if Stripe sends connected-account events to the same destination/secret, leave the optional value empty.
+
+## Phase 10.1 product cleanup routes
+- `POST /seller/product/{id}/archive` — seller-only archive/hide for the seller's own product.
+- `POST /seller/product/{id}/restore` — seller-only restore of the seller's archived/deleted product to draft.
+- `POST /seller/product/{id}/delete` — seller-only safe permanent delete for owned draft/test products with no completed orders; ordered products are archived instead.
+- `POST /admin/products/bulk-cleanup` — admin-only bulk archive or safe bulk permanent delete for pre-live test product cleanup.
