@@ -24,7 +24,7 @@ Stores product categories with slug, description, image, active flag, and sort o
 
 ### `products`
 
-Stores seller products linked to designers and optionally categories. Important fields include title, slug, descriptions, price, tag text, file types, license flags/prices, POD/resale settings, AI disclosure, SEO fields, status, rejection reason, featured flag, and sales count. Status values are `draft`, `pending_review`, `approved`, `rejected`, and `disabled`.
+Stores seller products linked to designers and optionally categories. Important fields include title, slug, descriptions, price, tag text, file types, license flags/prices, POD/resale settings, AI disclosure, SEO fields, status, rejection reason, featured flag, and sales count. Status values are `draft`, `pending_review`, `approved`, `published`, `rejected`, `disabled`, `archived`, and `deleted`; existing `approved` products are treated as the published/public product state in the current UI.
 
 ### `product_images`
 
@@ -118,7 +118,7 @@ Stores admin actions with entity type/id and JSON metadata.
 - Users: `active`, `disabled`.
 - Applications: `pending`, `approved`, `denied`.
 - Designers: `approved`, `disabled`.
-- Products: `draft`, `pending_review`, `approved`, `rejected`, `disabled`.
+- Products: `draft`, `pending_review`, `approved`, `published`, `rejected`, `disabled`, `archived`, `deleted`.
 - Orders: `pending`, `paid`, `completed`, `failed`, `refunded`.
 - Reviews: `pending`, `approved`, `rejected`.
 - Ads: `draft`, `active`, `paused`, `ended`.
@@ -225,3 +225,8 @@ Pending seller payout retries are scoped to payout-ready designers and webhook-c
 
 #### Stripe charge id and pending transfers
 `orders.stripe_charge_id` is used as the Stripe transfer `source_transaction` for seller payouts when available. Paid orders missing a charge id keep seller payout rows in `pending_transfer` until a later webhook stores the charge id and retry logic can safely attempt the transfer.
+
+## Phase 10.1 product cleanup schema
+- Migration `2026_07_07_phase_10_1_product_cleanup.sql` expands `products.status` to include `archived` and `deleted` for product cleanup workflows.
+- Existing `approved` products remain the published/public product state. UI labels present `approved` products as Published.
+- Products with completed `paid` or `partially_refunded` orders must remain in `products` so order items, downloads, seller sales, and admin records can continue joining historical product data.

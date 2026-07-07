@@ -181,3 +181,16 @@ After an approved seller completes Stripe onboarding or an `account.updated` web
 
 #### Source transaction payout retry checks
 Verify transfer requests include `source_transaction` from `orders.stripe_charge_id` and `transfer_group=order_{orderId}` when available. For paid orders with no charge id yet, confirm payouts remain `pending_transfer`; after `payment_intent.succeeded` or `charge.updated` stores the charge id, confirm eligible payout-ready seller transfers are attempted with the same deterministic idempotency key.
+
+## Phase 10.1 product cleanup checks
+Recommended manual checks:
+- Seller archives their own product and confirms it disappears from public browsing.
+- Seller restores an archived product and confirms it returns as a draft.
+- Seller permanently deletes a draft/test product with no completed orders.
+- Seller attempts to delete a product with completed orders and confirms it is archived instead.
+- Admin uses bulk archive/delete cleanup while logged in as admin.
+- Buyer purchase history, downloads, seller sales, and admin order detail still load for completed purchases.
+
+- Direct POST submit attempts against archived or deleted products must be blocked until the product is restored to draft.
+- Restore actions should only succeed for the seller's own archived or deleted products; other statuses should not claim success.
+- Disabled products should not be submitted directly by POST.

@@ -93,7 +93,7 @@ CREATE TABLE products
     ai_disclosure ENUM('No AI Used','AI Assisted','AI Generated') NOT NULL,
     seo_title VARCHAR(70),
     seo_description VARCHAR(170),
-    status ENUM('draft','pending_review','approved','rejected','disabled') DEFAULT 'draft',
+    status ENUM('draft','pending_review','approved','published','rejected','disabled','archived','deleted') DEFAULT 'draft',
     rejection_reason TEXT,
     is_featured BOOLEAN DEFAULT 0,
     sales_count INT DEFAULT 0,

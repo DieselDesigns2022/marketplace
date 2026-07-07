@@ -50,6 +50,8 @@ Example:
 mysql -u <user> -p <database> < database/migrations/<migration-file>.sql
 ```
 
+Phase 10.1 deployments must apply `database/migrations/2026_07_07_phase_10_1_product_cleanup.sql` before relying on archived/deleted product statuses or admin/seller cleanup tools.
+
 ## Upload folder permissions
 
 Upload folders must be writable by the PHP/Nginx runtime user but must not be committed to Git. Public preview uploads may be web-accessible. Protected product files must not be directly web-accessible.

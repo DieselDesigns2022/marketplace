@@ -167,3 +167,9 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 
 #### Stripe webhook secret behavior
 `POST /stripe/webhook` verifies the required platform `STRIPE_WEBHOOK_SECRET`. If `account.updated` is sent through a separate Stripe Connect webhook destination with a different signing secret, configure optional `STRIPE_CONNECT_WEBHOOK_SECRET`; if Stripe sends connected-account events to the same destination/secret, leave the optional value empty.
+
+## Phase 10.1 product cleanup routes
+- `POST /seller/product/{id}/archive` — seller-only archive/hide for the seller's own product.
+- `POST /seller/product/{id}/restore` — seller-only restore of the seller's archived/deleted product to draft.
+- `POST /seller/product/{id}/delete` — seller-only safe permanent delete for owned draft/test products with no completed orders; ordered products are archived instead.
+- `POST /admin/products/bulk-cleanup` — admin-only bulk archive or safe bulk permanent delete for pre-live test product cleanup.

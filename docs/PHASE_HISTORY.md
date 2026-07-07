@@ -998,3 +998,9 @@ Corrected seller onboarding payout readiness so the Stripe checklist completes o
 
 #### Phase 10 source transaction correction
 Seller transfers now use the original Stripe charge as `source_transaction` when available and keep paid payouts pending when the charge id has not arrived yet, reducing false `transfer_failed` statuses caused by Stripe balance timing.
+
+## Phase 10.1 — Product Cleanup, Delete Options & Pre-Tester Reset
+- Implemented seller-side product archive/hide, restore, and safe permanent delete flows.
+- Implemented admin pre-live cleanup tools for bulk archive and safe permanent delete of test products.
+- Products referenced by completed paid or partially refunded orders cannot be permanently deleted; cleanup actions archive them to protect historical buyer, seller, and admin records.
+- Public listings and direct public product pages continue to require published/approved products, so archived and deleted products are hidden from active browsing.

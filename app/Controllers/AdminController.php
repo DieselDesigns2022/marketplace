@@ -166,21 +166,21 @@ class AdminController
 
         }
         $status=$_GET['status']??'pending_review';
-        $allowed=['pending_review','approved','rejected','disabled'];
+        $allowed=['all','draft','pending_review','approved','published','rejected','disabled','archived','deleted'];
         $where='';
         $params=[];
-        if(in_array($status,$allowed,true))
+        if(in_array($status,$allowed,true) && $status !== 'all')
         {
             $where=' where p.status=?';
             $params[]=$status;
 
         }
-        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);
+        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);
 
     }
     private function moderateProduct(int $id, string $action, string $reason=''): void
     {
-        $status=['approve'=>'approved','reject'=>'rejected','disable'=>'disabled'][$action]??'';
+        $status=['approve'=>'approved','reject'=>'rejected','disable'=>'disabled','archive'=>'archived','restore'=>'draft','mark_deleted'=>'deleted'][$action]??'';
         if(!$status)
         {
            H::flash('error','Invalid product action.');
@@ -198,6 +198,66 @@ class AdminController
         H::flash('success','Product status updated.');
 
     }
+
+    private function productHasCompletedOrders(int $productId): bool
+    {
+        return (bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.product_id=? and o.payment_status in ("paid","partially_refunded") limit 1', [$productId]);
+    }
+
+    private function permanentlyDeleteProduct(int $productId): void
+    {
+        DB::exec('delete from cart_items where product_id=?', [$productId]);
+        DB::exec('delete from wishlists where product_id=?', [$productId]);
+        DB::exec('delete from product_tags where product_id=?', [$productId]);
+        DB::exec('delete from product_license_types where product_id=?', [$productId]);
+        DB::exec('delete from product_images where product_id=?', [$productId]);
+        DB::exec('delete from product_files where product_id=?', [$productId]);
+        DB::exec('delete from products where id=?', [$productId]);
+    }
+
+    public function bulkProductCleanup(): void
+    {
+        $this->gate();
+        $action = $_POST['bulk_action'] ?? '';
+        $ids = array_values(array_filter(array_map('intval', $_POST['product_ids'] ?? [])));
+        if (!$ids || !in_array($action, ['archive','delete'], true)) {
+            H::flash('error', 'Choose products and a cleanup action.');
+            H::redirect('/admin/products');
+        }
+        $archived = 0;
+        $deleted = 0;
+        $skipped = 0;
+        foreach ($ids as $productId) {
+            $p = DB::row('select id,status from products where id=?', [$productId]);
+            if (!$p) { $skipped++; continue; }
+            if ($action === 'archive') {
+                if (($p['status'] ?? '') === 'deleted') {
+                    $skipped++;
+                    continue;
+                }
+                DB::exec('update products set status="archived",updated_at=now() where id=?', [$productId]);
+                $archived++;
+                $this->log('bulk_archived_test_product','product',$productId);
+                continue;
+            }
+            if ($this->productHasCompletedOrders($productId)) {
+                DB::exec('update products set status="archived",updated_at=now() where id=?', [$productId]);
+                $archived++;
+                $this->log('bulk_archived_ordered_product_instead_of_delete','product',$productId);
+                continue;
+            }
+            if (in_array($p['status'], ['draft','rejected','archived','disabled','deleted'], true)) {
+                $this->permanentlyDeleteProduct($productId);
+                $deleted++;
+                $this->log('bulk_permanently_deleted_test_product','product',$productId);
+            } else {
+                $skipped++;
+            }
+        }
+        H::flash('success', 'Cleanup complete: '.$archived.' archived, '.$deleted.' permanently deleted, '.$skipped.' skipped. Products with completed orders are archived, not deleted.');
+        H::redirect('/admin/products?status=all');
+    }
+
     public function productDetail($id)
     {
         $this->gate();
@@ -216,7 +276,7 @@ class AdminController
             H::redirect('/admin/products/'.(int)$id);
 
         }
-        $p=DB::row('select p.*,d.display_name,d.store_slug,d.user_id,u.email designer_email,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id left join categories c on c.id=p.category_id where p.id=?',[$id])??H::abort(404);
+        $p=DB::row('select p.*,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,d.display_name,d.store_slug,d.user_id,u.email designer_email,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id left join categories c on c.id=p.category_id where p.id=?',[$id])??H::abort(404);
         H::view('admin/product_detail',['p'=>$p,'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id]),'licenses'=>LicenseService::productLicenses($p)]);
 
     }
