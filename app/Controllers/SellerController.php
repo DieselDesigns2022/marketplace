@@ -645,9 +645,9 @@ class SellerController
         H::requireSeller();
         $d = $this->d();
         $status = $_GET['status'] ?? 'all';
-        $allowed = ['draft', 'pending_review', 'approved', 'published', 'rejected', 'disabled', 'archived', 'deleted'];
+        $allowed = ['draft', 'pending_review', 'approved', 'published', 'rejected', 'disabled', 'archived'];
         $params = [$d['id']];
-        $where = 'where p.designer_id=?';
+        $where = 'where p.designer_id=? and p.status<>"deleted"';
         if (in_array($status, $allowed, true))
         {
             $where .= ' and p.status=?';

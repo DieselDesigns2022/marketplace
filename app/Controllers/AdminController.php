@@ -110,7 +110,15 @@ class AdminController
     public function home()
     {
         $this->gate();
-        H::view('admin/home',['s'=>DB::row('select (select count(*) from users) users,(select count(*) from designers) designers,(select count(*) from designer_applications where status="pending") apps,(select count(*) from products where status="pending_review") products,(select count(*) from orders) orders,(select coalesce(sum(total),0) from orders) gross,(select coalesce(sum(commission_amount),0) from platform_commissions) commission')]);
+        H::view('admin/home',['s'=>DB::row('select
+            (select count(*) from users where status="active") active_users,
+            (select count(*) from designers where status="approved") approved_designers,
+            (select count(*) from designer_applications where status="pending") pending_apps,
+            (select count(*) from products where status="pending_review") pending_products,
+            (select count(*) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_paid_orders,
+            (select coalesce(round(sum(total),2),0) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_gross_sales,
+            (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") asset_moth_commission
+        ')]);
 
     }
     public function users()
@@ -152,8 +160,43 @@ class AdminController
     public function designers()
     {
         $this->gate();
-        if($_POST) DB::exec('update designers set creator_rank=? where id=?',[$_POST['creator_rank'],$_POST['id']]);
-        H::view('admin/designers',['designers'=>DB::rows('select d.*,u.email from designers d join users u on u.id=d.user_id order by d.updated_at desc')]);
+        if($_POST) {
+            $id = (int)($_POST['id'] ?? 0);
+            $action = $_POST['action'] ?? 'change_rank';
+            if ($action === 'change_rank') {
+                $rank = $_POST['creator_rank'] ?? 'Bronze';
+                if (!in_array($rank, ['Bronze','Silver','Gold','Platinum','Legend'], true)) {
+                    H::flash('error','Invalid creator rank.');
+                } else {
+                    DB::exec('update designers set creator_rank=?, updated_at=now() where id=?',[$rank,$id]);
+                    H::flash('success','Seller rank updated.');
+                }
+            } elseif ($action === 'disable') {
+                DB::exec('update designers set status="disabled", updated_at=now() where id=?',[$id]);
+                H::flash('success','Seller disabled.');
+            } elseif ($action === 'enable') {
+                DB::exec('update designers set status="approved", updated_at=now() where id=?',[$id]);
+                H::flash('success','Seller enabled.');
+            } else {
+                H::flash('error','Invalid seller action.');
+            }
+            H::redirect('/admin/designers');
+        }
+        $status = $_GET['status'] ?? 'approved';
+        $allowed = ['approved','disabled','all'];
+        if (!in_array($status, $allowed, true)) {
+            $status = 'approved';
+        }
+        $where = '';
+        $params = [];
+        if ($status !== 'all') {
+            $where = ' where d.status=?';
+            $params[] = $status;
+        }
+        H::view('admin/designers',[
+            'status'=>$status,
+            'designers'=>DB::rows('select d.*,u.email from designers d join users u on u.id=d.user_id'.$where.' order by d.updated_at desc', $params)
+        ]);
 
     }
     public function products()
@@ -320,7 +363,56 @@ class AdminController
     public function paymentLogs()
     {
         $this->gate();
-        H::view('admin/payment_logs',['transactions'=>DB::rows('select pt.*,u.email buyer_email from payment_transactions pt left join orders o on o.id=pt.order_id left join users u on u.id=o.user_id order by pt.created_at desc limit 200'),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 200')]);
+
+        $summary = DB::row('select
+            (select count(distinct o.id) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") paid_orders,
+            (select coalesce(round(sum(oi.total_price),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") gross_sales,
+            (select coalesce(round(sum(oi.platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") marketplace_commission,
+            (select coalesce(round(sum(oi.seller_payout_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") seller_payouts,
+            (select coalesce(round(sum(coalesce(o.stripe_fee_total,0)),2),0) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") stripe_fees_recorded,
+            (select coalesce(round(sum(sp.seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where sp.payout_status="transferred" and o.stripe_checkout_session_id like "cs_live_%") seller_transfers_sent,
+            (select coalesce(round(sum(sp.seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where sp.payout_status="transfer_failed" and o.stripe_checkout_session_id like "cs_live_%") seller_transfers_failed
+        ');
+
+        $commissionRows = DB::rows('select
+            o.id order_id,
+            o.payment_status,
+            o.total order_total,
+            o.platform_commission_total order_commission_total,
+            o.stripe_fee_total,
+            o.stripe_charge_id,
+            o.paid_at,
+            buyer.email buyer_email,
+            oi.product_title,
+            oi.total_price item_total,
+            oi.commission_rate,
+            oi.platform_commission_amount,
+            oi.seller_payout_amount,
+            oi.seller_payout_status,
+            oi.stripe_transfer_id item_transfer_id,
+            oi.stripe_transfer_error item_transfer_error,
+            d.display_name seller_name,
+            seller.email seller_email,
+            sp.payout_status ledger_payout_status,
+            sp.stripe_transfer_id ledger_transfer_id,
+            sp.stripe_transfer_error ledger_transfer_error
+        from orders o
+        join order_items oi on oi.order_id=o.id
+        join users buyer on buyer.id=o.user_id
+        join designers d on d.id=oi.designer_id
+        join users seller on seller.id=d.user_id
+        left join seller_payouts sp on sp.order_id=o.id and sp.designer_id=oi.designer_id
+        where o.payment_status in ("paid","partially_refunded")
+          and o.stripe_checkout_session_id like "cs_live_%"
+        order by o.id desc, oi.id desc
+        limit 200');
+
+        H::view('admin/payment_logs',[
+            'summary'=>$summary,
+            'commissionRows'=>$commissionRows,
+            'transactions'=>DB::rows('select pt.*,u.email buyer_email from payment_transactions pt left join orders o on o.id=pt.order_id left join users u on u.id=o.user_id order by pt.created_at desc limit 200'),
+            'events'=>DB::rows('select * from stripe_events order by created_at desc limit 200')
+        ]);
     }
 
     public function downloads()

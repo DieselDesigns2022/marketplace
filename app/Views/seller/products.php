@@ -2,7 +2,7 @@
 <p><a class="btn" href="/seller/product/new">Create Product</a></p>
 <p class="muted">Archive hides a product from public browsing while preserving order history. Permanent delete is only available for draft/test products with no completed orders.</p>
 <nav class="tabs">
-    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived','deleted'=>'Deleted'] as $key=>$label): ?>
+    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label): ?>
     <a class="<?=($status??'all')===$key?'active':''?>" href="/seller/products<?=$key==='all'?'':'?status='.$key?>"><?=H::e($label)?></a>
 <?php endforeach; ?>
 </nav>

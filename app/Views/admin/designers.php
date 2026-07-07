@@ -1,4 +1,10 @@
 <h1>Designer Management</h1>
+<nav class="tabs">
+    <?php foreach(['approved'=>'Approved','disabled'=>'Disabled','all'=>'All'] as $key=>$label): ?>
+        <a class="<?=($status??'approved')===$key?'active':''?>" href="/admin/designers?status=<?=$key?>"><?=H::e($label)?></a>
+    <?php endforeach; ?>
+</nav>
+<p class="muted">Approved sellers show by default. Disabled/test sellers stay preserved for payment history but are hidden from the default view.</p>
 <table>
     <tr>
         <th>Designer</th>
@@ -45,8 +51,12 @@
                <option>Platinum</option>
                <option>Legend</option>
                </select>
-               <button>Change rank</button>
-               <button disabled>Disable seller</button>
+               <button name="action" value="change_rank">Change rank</button>
+               <?php if(($d['status'] ?? '') === 'disabled'): ?>
+                   <button name="action" value="enable" onclick="return confirm('Enable this seller?');">Enable seller</button>
+               <?php else: ?>
+                   <button name="action" value="disable" onclick="return confirm('Disable this seller? Their seller account will no longer be approved.');">Disable seller</button>
+               <?php endif; ?>
            </form>
            </td>
         </tr>
