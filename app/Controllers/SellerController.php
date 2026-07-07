@@ -303,7 +303,7 @@ class SellerController
             H::redirect('/apply');
 
         }
-        $stats = DB::row( 'select count(*) product_count, coalesce(sum(sales_count),0) sales_count from products where designer_id=?', [$d['id']] );
+        $stats = DB::row( 'select (select count(*) from products where designer_id=?) product_count, (select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded")) sales_count', [$d['id'], $d['id']] );
         H::view('seller/home', [ 'd' => $d, 'stats' => $stats, ]);
 
     }

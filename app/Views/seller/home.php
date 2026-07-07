@@ -45,7 +45,7 @@
     </div>
     <div class="card">
         <strong>
-        <?=H::e((string)($d['sales_count']??$stats['sales_count']??0))?>
+        <?=H::e((string)($stats['sales_count']??$d['sales_count']??0))?>
         </strong>
         <span>Sales</span>
     </div>
