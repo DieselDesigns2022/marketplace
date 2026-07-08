@@ -6,7 +6,6 @@ use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\StripeService;
 use App\Services\CouponService;
-use App\Services\TaxService;
 use Throwable;
 
 class CartController
@@ -52,12 +51,12 @@ class CartController
     {
         if (H::user()) {
             $this->mergeGuestCart();
-            return DB::rows('select ci.id cart_item_id,ci.license_type,ci.price_snapshot,ci.license_price_snapshot,ci.total_snapshot,p.*,d.display_name,d.store_slug,d.sales_tax_enabled,d.sales_tax_state,d.sales_tax_registration_id,d.sales_tax_rate,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
+            return DB::rows('select ci.id cart_item_id,ci.license_type,ci.price_snapshot,ci.license_price_snapshot,ci.total_snapshot,p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
         }
 
         $items = [];
         foreach ($this->guestCart() as $cartId => $cartItem) {
-            $p = DB::row('select p.*,d.display_name,d.store_slug,d.sales_tax_enabled,d.sales_tax_state,d.sales_tax_registration_id,d.sales_tax_rate,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from products p join designers d on d.id=p.designer_id where p.id=? and p.status="approved"',[(int)($cartItem['product_id'] ?? 0)]);
+            $p = DB::row('select p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from products p join designers d on d.id=p.designer_id where p.id=? and p.status="approved"',[(int)($cartItem['product_id'] ?? 0)]);
             if (!$p) continue;
             $p['cart_item_id'] = (int)$cartId;
             $p['license_type'] = (string)($cartItem['license_type'] ?? 'personal');
@@ -256,8 +255,7 @@ class CartController
                 $coupon = ($couponResult && $couponResult['ok']) ? $couponResult['coupon'] : null;
                 $couponDiscount = $coupon ? (float)$couponResult['discount'] : 0.0;
                 $allocations = $coupon ? CouponService::allocateDiscount($coupon, $valid, $couponDiscount) : [];
-                $taxResult = TaxService::calculate($valid, $allocations);
-                $tax = (float)$taxResult['tax'];
+                $tax = 0.0; // Phase 10.3 placeholder only.
                 $credits = 0.0; // Phase 11 placeholder only.
                 $total=max(0, round($subtotal - $couponDiscount + $tax - $credits, 2));
                 if ($total <= 0) {
@@ -267,22 +265,21 @@ class CartController
                 }
                 $commissionRate = StripeService::commissionRate();
                 $platformCommissionTotal = 0.0;
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,tax_snapshot,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,json_encode($taxResult),$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),StripeService::cents($total),0]);
+                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),StripeService::cents($total),0]);
                 $order=DB::id();
                 foreach($valid as $idx=>$p)
                {
                    $lineDiscount = (float)($allocations[$idx] ?? 0);
                    $discountedLine = max(0, round((float)$p['line_total'] - $lineDiscount, 2));
-                   $itemTax = $taxResult['items'][$idx] ?? ['amount'=>0.0];
                    $comm=round($discountedLine * $commissionRate, 2);
                    $platformCommissionTotal = round($platformCommissionTotal + $comm, 2);
                     $manualEmail = trim($_POST['google_drive_email'] ?? '');
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
                     $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
-                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,tax_amount,tax_snapshot,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,(float)($itemTax['amount'] ?? 0),json_encode($itemTax),$commissionRate,null]);
+                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null]);
                     DB::exec('update order_items set coupon_id=?,coupon_code=?,coupon_discount=? where id=?', [$coupon['id'] ?? null,$coupon['code'] ?? null,$lineDiscount,DB::id()]);
-                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_tax_collected,seller_earning,status) values (?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$discountedLine,$comm,(float)($itemTax['amount'] ?? 0),$discountedLine-$comm+(float)($itemTax['amount'] ?? 0),'pending_payment']);
+                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$discountedLine,$comm,$discountedLine-$comm,'pending_payment']);
 
                }
                 DB::exec('update orders set platform_commission_total=? where id=?', [$platformCommissionTotal,$order]);
@@ -308,11 +305,7 @@ class CartController
         }
         $couponResult = $this->currentCoupon($items);
         $discount = ($couponResult && $couponResult['ok']) ? (float)$couponResult['discount'] : 0.0;
-        $viewAllocations = ($couponResult && $couponResult['ok']) ? CouponService::allocateDiscount($couponResult['coupon'], $items, $discount) : [];
-        $taxResult = TaxService::calculate($items, $viewAllocations);
-        $credits = 0.0; // Phase 11 placeholder only.
-        $finalTotal = max(0, round($total - $discount + (float)$taxResult['tax'] - $credits, 2));
-        H::view('buyer/checkout',['items'=>$items,'subtotal'=>$total,'couponResult'=>$couponResult,'discount'=>$discount,'taxResult'=>$taxResult,'finalTotal'=>$finalTotal]);
+        H::view('buyer/checkout',['items'=>$items,'subtotal'=>$total,'couponResult'=>$couponResult,'discount'=>$discount,'finalTotal'=>max(0, round($total - $discount, 2))]);
 
     }
 

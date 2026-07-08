@@ -10,7 +10,7 @@
         <th>Designer</th>
         <th>Email</th>
         <th>Store</th>
-        <th>Status</th><th>Sales Tax</th>
+        <th>Status</th>
         <th>Followers</th>
         <th>Rank</th>
         <th>Stripe Connect</th>
@@ -20,24 +20,23 @@
     <?php foreach($designers as $d):?>
         <tr>
            <td>
-           <?=H::e($d['display_name'])?>
+           <?=$d['display_name']?>
            </td>
            <td>
-           <?=H::e($d['email'])?>
+           <?=$d['email']?>
            </td>
            <td>
-           <a href="/store/<?=H::e($d['store_slug'])?>">/store/<?=H::e($d['store_slug'])?>
+           <a href="/store/<?=$d['store_slug']?>">/store/<?=$d['store_slug']?>
            </a>
            </td>
            <td>
-           <?=H::e($d['status'])?>
-           </td>
-           <td><?=!empty($d['sales_tax_enabled'])?'On':'Off'?> <?=H::e($d['sales_tax_state'] ?? '')?> · <?=H::e((string)($d['sales_tax_rate'] ?? '0.00'))?>%<br><span class="muted"><?=H::e($d['sales_tax_updated_at'] ?? 'Not updated')?></span></td>
-           <td>
-           <?=H::e((string)($d['follower_count']??0))?>
+           <?=$d['status']?>
            </td>
            <td>
-           <?=H::e($d['creator_rank'])?>
+           <?=$d['follower_count']??0?>
+           </td>
+           <td>
+           <?=$d['creator_rank']?>
            </td>
            <td><?=H::e($d['stripe_account_status'] ?? 'not_connected')?><br><span class="muted"><?=!empty($d['stripe_connect_account_id']) ? H::e($d['stripe_connect_account_id']) : 'Not connected'?></span></td>
            <td><?=(!empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled'])) ? '<span class="badge ok">payout-ready</span>' : '<span class="badge pending">onboarding incomplete</span>'?></td>

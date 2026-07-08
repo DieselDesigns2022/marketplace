@@ -5,9 +5,6 @@
   <?php $paid = (($item['payment_status'] ?? $item['order_status']) === 'paid'); ?><p>Buyer: <?=H::e($paid ? $item['buyer_name'] : 'Hidden until payment clears')?> <?php if($paid):?>(<?=H::e($item['buyer_email'])?>)<?php endif;?></p>
   <p>Product: <?=H::e($item['product_title'] ?: ('Product #'.$item['product_id']))?></p>
   <p>License: <?=H::e($item['license_name'] ?: $item['license_type'])?></p>
-  <p>Discounted item total: <?=H::money($item['total_price'] ?? 0)?> · Seller tax collected: <?=H::money($item['tax_amount'] ?? 0)?></p>
-  <p class="muted">Platform commission is based on the discounted item total before tax. Seller payable includes collected seller tax for seller remittance.</p>
-  <?php if(!empty($item['tax_snapshot'])):?><p class="muted">Tax snapshot: <?=H::e($item['tax_snapshot'])?></p><?php endif;?>
   <?php if(!empty($item['coupon_code'])):?><p>Coupon <?=H::e($item['coupon_code'])?> item discount: <?=H::money($item['coupon_discount'] ?? 0)?>. Earnings use the discounted item total.</p><?php endif;?>
   <p>Fulfillment: <?=($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></p>
   <?php if($item['fulfillment_type']==='google_drive'):?>

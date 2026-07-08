@@ -71,16 +71,5 @@
     <label>Banner image upload <small>JPG, PNG, or WEBP up to 15MB.</small>
     <input type="file" name="banner" accept=".jpg,.jpeg,.png,.webp">
     </label>
-    <section class="card">
-        <h2>Store-level sales tax</h2>
-        <p class="help-text">Phase 10.3 sales tax is seller-reported and opt-in. Asset Moth marketplace facilitator tax automation and Stripe Tax automation are not enabled yet.</p>
-        <label><input type="checkbox" name="sales_tax_enabled" value="1" <?=!empty($d['sales_tax_enabled'])?'checked':''?>> Collect sales tax for my whole store</label>
-        <label>Tax collection state<input name="sales_tax_state" maxlength="2" pattern="[A-Za-z]{2}" value="<?=H::e($d['sales_tax_state']??'')?>" placeholder="CA"></label>
-        <label>Sales tax rate (%)<input name="sales_tax_rate" type="number" min="0" max="20" step="0.01" value="<?=H::e((string)($d['sales_tax_rate']??'0.00'))?>" placeholder="7.25"></label>
-        <p class="help-text">You are responsible for entering the correct sales tax rate for your store and tax obligations. Asset Moth does not calculate marketplace facilitator or Stripe Tax rates in Phase 10.3.</p>
-        <label>Optional tax registration / permit number<input name="sales_tax_registration_id" maxlength="120" value="<?=H::e($d['sales_tax_registration_id']??'')?>"></label>
-        <label><input type="checkbox" name="sales_tax_responsibility_confirmed" value="1" <?=!empty($d['sales_tax_responsibility_confirmed'])?'checked':''?>> <?=H::e($taxResponsibilityCopy ?? '')?></label>
-        <p class="muted">Last updated: <?=H::e($d['sales_tax_updated_at'] ?? 'Never')?></p>
-    </section>
     <button class="btn">Save Store Settings</button>
 </form>

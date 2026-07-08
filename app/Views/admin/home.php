@@ -5,11 +5,6 @@
     <p class="muted">Quick access to marketplace commission, seller payout status, payment transactions, and Stripe webhook logs.</p>
     <p><a class="btn" href="/admin/payment-logs">View Commission & Payment Report</a></p>
 </section>
-<section class="card">
-    <h2>Seller tax settings</h2>
-    <p class="muted">Approved sellers can opt into store-level sales tax. These settings are seller-reported; marketplace facilitator tax automation and Stripe Tax automation are future-only.</p>
-    <p><a class="btn alt" href="/admin/designers">Review seller tax settings on Designers</a></p>
-</section>
 
 <p class="muted">Review marketplace activity, applications, products, and catalog operations from this admin area.</p>
 <?php

@@ -18,8 +18,7 @@
     <div class="card">
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
-      <?php if(!empty($taxResult['tax'])):?><p>Seller sales tax: <strong><?=H::money($taxResult['tax'])?></strong></p><p class="muted">Seller tax is calculated only for items from stores that opted into Phase 10.3 store-level tax collection.</p><?php endif;?>
-      <p class="muted">Credits/referrals are reserved for Phase 11.</p>
+      <p class="muted">Tax is reserved for Phase 10.3; credits/referrals are reserved for Phase 11.</p>
       <h2>Total <?=H::money($finalTotal ?? $subtotal)?></h2>
     </div>
     <form method="post" class="form card">

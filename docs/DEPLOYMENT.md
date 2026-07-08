@@ -83,11 +83,4 @@ Phase 6 was validated on the VPS deployment path `/var/www/marketplace.dieseldes
 - Apply `database/migrations/2026_07_07_phase_10_2_coupons_discounts_commission_rules.sql` before enabling coupon UI in a deployed environment.
 - The migration creates coupon definition, restriction, and usage tables and adds order/order item coupon snapshot columns.
 - The migration includes idempotent `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements for existing environments.
-- Phase 10.2 reserved tax and credit/referral handling in the checkout order. Phase 10.3 now implements seller opt-in store-level sales tax; Phase 11 credit/referral redemption remains future-only.
-
-## Phase 10.3 store-level sales tax settings
-- Apply `database/migrations/2026_07_07_phase_10_3_store_level_sales_tax_settings.sql` before enabling seller tax settings in production.
-- Verify `designers` has the `sales_tax_*` columns, `orders`/`order_items` have `tax_amount` and `tax_snapshot`, and seller payout/earning tables have `seller_tax_collected`.
-- Smoke test checkout with a seller-entered tax rate and confirm `orders.total`, `orders.stripe_amount_total`, and the Stripe Checkout amount include seller tax.
-- Confirm seller tax is visible to admins/sellers and is included in seller payable tracking while platform commission remains based on the discounted item subtotal before tax.
-- Stripe Tax and marketplace facilitator tax automation remain disabled/future-only.
+- No Phase 10.3 tax service or Phase 11 credit/referral redemption deployment step is included; those remain placeholders only.

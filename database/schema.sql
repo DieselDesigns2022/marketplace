@@ -47,12 +47,6 @@ CREATE TABLE designers
     pinterest_url VARCHAR(255),
     etsy_url VARCHAR(255),
     shopify_url VARCHAR(255),
-    sales_tax_enabled TINYINT(1) NOT NULL DEFAULT 0,
-    sales_tax_state CHAR(2),
-    sales_tax_registration_id VARCHAR(120),
-    sales_tax_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-    sales_tax_responsibility_confirmed TINYINT(1) NOT NULL DEFAULT 0,
-    sales_tax_updated_at TIMESTAMP NULL,
     announcement TEXT,
     status ENUM('approved','disabled') DEFAULT 'approved',
     creator_rank ENUM('Bronze','Silver','Gold','Platinum','Legend') DEFAULT 'Bronze',
@@ -440,8 +434,6 @@ CREATE TABLE orders
     payment_processor VARCHAR(40) DEFAULT 'mock',
     payment_mode VARCHAR(40),
     subtotal DECIMAL(10,2),
-    tax_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    tax_snapshot JSON NULL,
     credits_applied DECIMAL(10,2) DEFAULT 0,
     coupon_discount DECIMAL(10,2) DEFAULT 0.00,
     coupon_id BIGINT NULL,
@@ -467,8 +459,6 @@ CREATE TABLE order_items
     unit_price DECIMAL(10,2),
     commercial_license_price DECIMAL(10,2),
     total_price DECIMAL(10,2),
-    tax_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    tax_snapshot JSON NULL,
     commission_rate DECIMAL(5,4) DEFAULT .2000,
     coupon_id BIGINT NULL,
     coupon_code VARCHAR(80) NULL,
@@ -578,32 +568,10 @@ CREATE TABLE seller_earnings
     buyer_id BIGINT,
     gross_sale DECIMAL(10,2),
     marketplace_commission DECIMAL(10,2),
-    seller_tax_collected DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     seller_earning DECIMAL(10,2),
     status VARCHAR(40),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-
-CREATE TABLE seller_payouts
-(
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    order_id BIGINT NOT NULL,
-    designer_id BIGINT NOT NULL,
-    gross_amount DECIMAL(10,2) DEFAULT 0.00,
-    platform_commission_amount DECIMAL(10,2) DEFAULT 0.00,
-    seller_tax_collected DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    seller_payout_amount DECIMAL(10,2) DEFAULT 0.00,
-    currency VARCHAR(10) DEFAULT 'usd',
-    payout_status VARCHAR(60) DEFAULT 'pending_payment',
-    stripe_transfer_id VARCHAR(255),
-    stripe_transfer_error TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY seller_payouts_order_designer_phase10 (order_id, designer_id),
-    KEY seller_payouts_designer_phase10 (designer_id),
-    KEY seller_payouts_status_phase10 (payout_status)
 );
 
 CREATE TABLE platform_commissions

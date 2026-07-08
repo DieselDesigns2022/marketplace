@@ -213,12 +213,12 @@ Migration `2026_07_02_phase_10_stripe_payment_integration.sql` adds Stripe payme
 ### New Phase 10 tables
 - `stripe_events` stores incoming Stripe webhook ids, event types, processing status/errors, payload text, and timestamps. `stripe_events.stripe_event_id` is unique for duplicate webhook protection.
 - `payment_transactions` stores order-linked payment/refund/failure/manual-review transaction records and Stripe references for admin audit visibility.
-- `seller_payouts` stores one aggregate payout ledger row per `order_id`/`designer_id`, including `seller_tax_collected`; `order_items` stores item-level commission and seller payout amounts.
+- `seller_payouts` stores one aggregate payout ledger row per `order_id`/`designer_id`; `order_items` stores item-level commission and seller payout amounts.
 
 `stripe_fee_total` is future/reconciliation-ready and may remain `NULL` until safe Stripe balance transaction fee retrieval is added. Buyer self-cancellation and seller refund/cancellation request approval workflows are not part of Phase 10; Phase 10 only records webhook refund status when Stripe reports it.
 
 ### Phase 10 Stripe Connect payout fields
-Designers store Stripe Connect status in `stripe_connect_account_id`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_account_status`, `stripe_onboarding_started_at`, and `stripe_onboarding_completed_at`. Order items and `seller_payouts` snapshot `platform_commission_amount`, `seller_tax_collected`, and `seller_payout_amount` so future commission or tax setting changes do not alter historical orders. Payout statuses include `pending_stripe_onboarding`, `pending_transfer`, `transferred`, and `transfer_failed`; transfer failures are admin-visible and do not mark buyer orders unpaid.
+Designers store Stripe Connect status in `stripe_connect_account_id`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_account_status`, `stripe_onboarding_started_at`, and `stripe_onboarding_completed_at`. Order items and `seller_payouts` snapshot `platform_commission_amount` and `seller_payout_amount` so future commission changes do not alter historical orders. Payout statuses include `pending_stripe_onboarding`, `pending_transfer`, `transferred`, and `transfer_failed`; transfer failures are admin-visible and do not mark buyer orders unpaid.
 
 #### Phase 10 correction: payout retry scope
 Pending seller payout retries are scoped to payout-ready designers and webhook-confirmed paid orders only. `seller_payouts.payout_status` and matching `order_items.seller_payout_status` move from `pending_stripe_onboarding` to `pending_transfer`, `transferred`, or `transfer_failed`; manual-review, unpaid, and refunded orders are not transfer-attempted.
@@ -237,11 +237,4 @@ Pending seller payout retries are scoped to payout-ready designers and webhook-c
 - `coupon_usages` stores paid-order usage rows with `coupon_id`, `user_id`, `order_id`, code snapshot, discount amount, a unique order key, and coupon/user lookup index.
 - `orders.coupon_discount`, `orders.coupon_id`, `orders.coupon_code`, and `orders.coupon_snapshot` snapshot order-level coupon state.
 - `order_items.coupon_id`, `order_items.coupon_code`, and `order_items.coupon_discount` snapshot item-level allocation; `order_items.total_price` stores the discounted item total used for commission and seller payout calculations.
-- Phase 10.2 reserved tax fields in checkout ordering; Phase 10.3 now implements seller opt-in store-level tax settings plus order/order-item tax amount and snapshot storage. Credit/referral redemption remains Phase 11 placeholder behavior.
-
-## Phase 10.3 store-level sales tax settings
-- `designers` now stores `sales_tax_enabled`, `sales_tax_state`, `sales_tax_registration_id`, `sales_tax_rate`, `sales_tax_responsibility_confirmed`, and `sales_tax_updated_at` for seller-controlled store-level tax settings.
-- `orders.tax_amount` and `orders.tax_snapshot` preserve the order-level seller tax total and JSON-compatible calculation snapshot used at checkout.
-- `order_items.tax_amount` and `order_items.tax_snapshot` preserve per-item seller tax, including enabled state, normalized state, seller-entered rate, validity, taxable amount after coupon allocation, and calculated tax.
-- `seller_earnings.seller_tax_collected` and `seller_payouts.seller_tax_collected` track tax separately from commission basis; seller payable includes collected seller tax while platform commission remains based on discounted item subtotal before tax.
-- Stripe Tax automation and marketplace facilitator tax automation are not implemented in Phase 10.3.
+- Tax fields remain Phase 10.3 placeholders; credit/referral redemption remains Phase 11 placeholder behavior.
