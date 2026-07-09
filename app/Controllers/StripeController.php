@@ -133,8 +133,49 @@ class StripeController
         StripeService::logTransaction((int)$order['id'], $eventId, 'checkout_completed_pending', 'pending', $amount / 100, $currency, ['session' => $session['id'] ?? null, 'intent' => $session['payment_intent'] ?? null], 'Checkout completed, but Stripe payment_status is not paid yet. Delivery remains locked.');
     }
 
-    private function markPaidByIntent(array $intent, string $eventId): void { $order = $this->orderFromObject($intent); if ($order) $this->markPaid($order, $eventId, $intent, 'payment_intent_succeeded'); }
+    private function markPaidByIntent(array $intent, string $eventId): void
+    {
+        $order = $this->orderFromObject($intent);
+        if (!$order) return;
+        $taxEnabled = (($order['tax_provider'] ?? '') === 'stripe_tax');
+        $hasTaxDetails = isset($intent['total_details']['amount_tax']) || isset($intent['automatic_tax']);
+        if ($taxEnabled && !$hasTaxDetails) {
+            $amount = (int)($intent['amount_received'] ?? $intent['amount'] ?? 0);
+            $currency = strtolower((string)($intent['currency'] ?? StripeService::currency()));
+            DB::exec('update orders set stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_payment_status=coalesce(?,stripe_payment_status),stripe_amount_total=coalesce(?,stripe_amount_total),stripe_currency=coalesce(?,stripe_currency) where id=? and payment_status<>"paid"', [$intent['id'] ?? null,$intent['status'] ?? 'succeeded',$amount ?: null,$currency ?: null,$order['id']]);
+            StripeService::logTransaction((int)$order['id'], $eventId, 'payment_intent_succeeded_waiting_for_checkout_session', 'pending', $amount / 100, $currency, ['intent' => $intent['id'] ?? null, 'charge' => $intent['latest_charge'] ?? null], 'PaymentIntent succeeded, waiting for Checkout Session Stripe Tax and customer-location confirmation before unlocking delivery.');
+            return;
+        }
+        $this->markPaid($order, $eventId, $intent, 'payment_intent_succeeded');
+    }
     private function markFailedByIntent(array $intent, string $eventId, string $message): void { $order = $this->orderFromObject($intent); if ($order) $this->markFailed($order, $eventId, $intent, $message); }
+
+    private function stripeTaxData(array $object): array
+    {
+        $taxCents = (int)($object['total_details']['amount_tax'] ?? 0);
+        $automaticTax = is_array($object['automatic_tax'] ?? null) ? $object['automatic_tax'] : [];
+        $status = (string)($automaticTax['status'] ?? ($taxCents > 0 ? 'complete' : 'not_collected'));
+        $liability = $automaticTax['liability'] ?? null;
+        $liabilityOwner = 'platform';
+        if (is_array($liability) && !empty($liability['type'])) {
+            $liabilityOwner = ((string)$liability['type']) === 'account' ? 'connected_account' : 'platform';
+        }
+        return [
+            'amount' => round($taxCents / 100, 2),
+            'cents' => $taxCents,
+            'provider' => 'stripe_tax',
+            'status' => $status,
+            'has_status' => array_key_exists('status', $automaticTax),
+            'liability_owner' => $liabilityOwner,
+            'snapshot' => json_encode([
+                'checkout_session_id' => ($object['object'] ?? '') === 'checkout.session' ? ($object['id'] ?? null) : null,
+                'automatic_tax' => $automaticTax,
+                'total_details' => $object['total_details'] ?? null,
+                'currency' => $object['currency'] ?? null,
+                'customer_details' => $object['customer_details'] ?? null,
+            ]),
+        ];
+    }
 
     private function markPaid(array $order, string $eventId, array $object, string $source): void
     {
@@ -147,13 +188,25 @@ class StripeController
         if (!$chargeId && !empty($object['charges']['data'][0]['id'])) $chargeId = $object['charges']['data'][0]['id'];
 
         $amount = (int)($object['amount_total'] ?? $object['amount_received'] ?? 0); $currency = strtolower((string)($object['currency'] ?? StripeService::currency()));
-        $expected = StripeService::cents($order['total']); $expectedCurrency = strtolower((string)($order['stripe_currency'] ?: StripeService::currency()));
-        $review = $amount !== $expected || $currency !== $expectedCurrency || (int)($object['metadata']['order_id'] ?? $order['id']) !== (int)$order['id'];
+        $taxData = $this->stripeTaxData($object);
+        $base = max(0, round((float)($order['subtotal'] ?? 0) - (float)($order['coupon_discount'] ?? 0) - (float)($order['credits_applied'] ?? 0), 2));
+        $expected = StripeService::cents($base) + $taxData['cents']; $expectedCurrency = strtolower((string)($order['stripe_currency'] ?: StripeService::currency()));
+        $metadataOrderId = (int)($object['metadata']['order_id'] ?? $order['id']);
+        $review = $amount !== $expected || $currency !== $expectedCurrency || $metadataOrderId !== (int)$order['id'];
         $reason = $review ? 'Stripe amount, currency, or metadata did not match the order snapshot.' : null;
+        $country = strtoupper((string)($object['customer_details']['address']['country'] ?? ''));
+        if ($isCheckoutSession && (($order['tax_provider'] ?? '') === 'stripe_tax') && !empty($taxData['has_status']) && $taxData['status'] !== 'complete') {
+            $review = true;
+            $reason = 'Stripe Tax calculation was not completed successfully. Admin review is required before delivery unlock.';
+        }
+        if ($isCheckoutSession && $country !== '' && $country !== 'US') {
+            $review = true;
+            $reason = 'Asset Moth is currently available for US purchases only. International checkout will be added in a future expansion.';
+        }
         $alreadyPaid = (($order['payment_status'] ?? '') === 'paid');
         try {
             DB::begin();
-            DB::exec('update orders set status=?,payment_status=?,payment_provider="stripe",payment_processor="stripe",stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_customer_id=coalesce(?,stripe_customer_id),stripe_charge_id=coalesce(?,stripe_charge_id),stripe_payment_status=?,stripe_amount_total=?,stripe_currency=?,paid_at=case when ?=0 then coalesce(paid_at,now()) else paid_at end,manual_review_required=?,manual_review_reason=? where id=?', [$review?'pending':'paid',$review?'manual_review':'paid',$sessionId,$paymentIntentId,$object['customer'] ?? null,$chargeId,$object['payment_status'] ?? $object['status'] ?? 'paid',$amount,$currency,$review?1:0,$review?1:0,$reason,$order['id']]);
+            DB::exec('update orders set status=?,payment_status=?,payment_provider="stripe",payment_processor="stripe",stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_customer_id=coalesce(?,stripe_customer_id),stripe_charge_id=coalesce(?,stripe_charge_id),stripe_payment_status=?,stripe_amount_total=?,stripe_currency=?,tax_amount=?,tax_provider=?,tax_status=?,tax_liability_owner=?,tax_snapshot=?,tax_collected_at=case when ?>0 and ?=0 then coalesce(tax_collected_at,now()) else tax_collected_at end,total=?,paid_at=case when ?=0 then coalesce(paid_at,now()) else paid_at end,manual_review_required=?,manual_review_reason=? where id=?', [$review?'pending':'paid',$review?'manual_review':'paid',$sessionId,$paymentIntentId,$object['customer'] ?? null,$chargeId,$object['payment_status'] ?? $object['status'] ?? 'paid',$amount,$currency,$taxData['amount'],$taxData['provider'],$taxData['status'],$taxData['liability_owner'],$taxData['snapshot'],$taxData['cents'],$review?1:0,round($amount / 100, 2),$review?1:0,$review?1:0,$reason,$order['id']]);
             if (!$review && !$alreadyPaid) {
                 DB::exec('update order_items set paid_at=coalesce(paid_at,now()), payout_ready_at=coalesce(payout_ready_at,now()), manual_delivery_status=case when fulfillment_type="google_drive" and manual_delivery_status in ("pending_delivery","buyer_email_needed","ready_for_seller_delivery") then "ready_for_seller_delivery" else manual_delivery_status end where order_id=?', [$order['id']]);
                 DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$order['id']]);

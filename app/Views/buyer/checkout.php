@@ -18,8 +18,8 @@
     <div class="card">
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
-      <p class="muted">Tax is reserved for Phase 10.3; credits/referrals are reserved for Phase 11.</p>
-      <h2>Total <?=H::money($finalTotal ?? $subtotal)?></h2>
+      <p class="muted">Sales tax calculated at checkout when required. Asset Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
+      <h2>Subtotal after discounts before tax: <?=H::money($finalTotal ?? $subtotal)?></h2>
     </div>
     <form method="post" class="form card">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">

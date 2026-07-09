@@ -4,6 +4,15 @@
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?>
 </p>
 <?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>. Commission is based on discounted item totals.</p><?php endif;?>
+<section class="card">
+  <h2>Tax details</h2>
+  <p>Tax collected: <strong><?=H::money($order['tax_amount'] ?? 0)?></strong></p>
+  <p>Provider: <?=H::e($order['tax_provider'] ?? 'stripe_tax')?></p>
+  <p>Status: <?=H::e($order['tax_status'] ?? 'pending')?></p>
+  <p>Liability owner: <?=H::e($order['tax_liability_owner'] ?? 'platform')?></p>
+  <?php if(!empty($order['tax_collected_at'])):?><p>Collected at: <?=H::e($order['tax_collected_at'])?></p><?php endif;?>
+  <?php if(!empty($order['tax_snapshot'])):?><details><summary>Stripe tax snapshot/reference</summary><pre style="white-space:pre-wrap; overflow-wrap:anywhere;"><?=H::e($order['tax_snapshot'])?></pre></details><?php endif;?>
+</section>
 <section class="card"><h2>Stripe payment details</h2><p>Provider: <?=H::e($order['payment_provider'] ?? $order['payment_processor'] ?? "")?> · Session: <?=H::e($order['stripe_checkout_session_id'] ?? "")?> · Intent: <?=H::e($order['stripe_payment_intent_id'] ?? "")?> · Charge: <?=H::e($order['stripe_charge_id'] ?? "")?></p><p>Stripe amount: <?=H::e($order['stripe_amount_total'] ?? "")?> <?=H::e(strtoupper($order['stripe_currency'] ?? ""))?> · Paid: <?=H::e($order['paid_at'] ?? "")?> · Failed: <?=H::e($order['failed_at'] ?? "")?> · Refunded: <?=H::e($order['refunded_at'] ?? "")?></p><p>Manual review: <?=!empty($order['manual_review_required'])?'Required':'No'?> <?=H::e($order['manual_review_reason'] ?? "")?></p><p><a href="/admin/payment-logs">View all payment logs</a></p></section>
 <table>
     <tr>

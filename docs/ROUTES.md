@@ -182,3 +182,6 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 - `POST /cart/coupon` — applies a normalized coupon code to the buyer cart after server-side validation.
 - `POST /cart/coupon/remove` — removes the currently applied cart coupon.
 - Stripe checkout routes remain unchanged; coupon usage is recorded from the paid webhook path, not at code entry time.
+
+## Phase 10.3B Stripe Tax compliance
+No new public tax routes are added in Phase 10.3B. Existing checkout and Stripe webhook routes now handle Stripe Tax behavior: checkout creates a tax-enabled Stripe Checkout Session, and webhooks persist Stripe-returned tax details while keeping tax separate from seller payout and commission math.

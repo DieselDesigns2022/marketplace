@@ -26,6 +26,7 @@ class StripeService
     {
         if (!self::configured()) throw new \RuntimeException('Stripe is not configured. Set STRIPE_SECRET_KEY before creating live checkout sessions.');
         $currency = self::currency();
+        if ($currency !== 'usd') throw new \RuntimeException('Asset Moth checkout is US-only at launch and requires USD Stripe Checkout.');
         $lineItems = [];
         foreach ($items as $item) {
             $lineItems[] = [
@@ -48,6 +49,11 @@ class StripeService
             'cancel_url' => $base . '/checkout/cancel?order_id=' . (int)$order['id'],
             'metadata' => ['order_id' => (string)$order['id'], 'buyer_user_id' => (string)$order['user_id']],
             'payment_intent_data' => ['metadata' => ['order_id' => (string)$order['id'], 'buyer_user_id' => (string)$order['user_id']]],
+            'automatic_tax' => [
+                'enabled' => 'true',
+                'liability' => ['type' => 'self'],
+            ],
+            'billing_address_collection' => 'required',
             'line_items' => $lineItems,
         ]);
     }
