@@ -92,7 +92,7 @@ if ($json && json_decode($json) !== null):
         <a href="/dashboard">Dashboard</a>
         <?php if($u['role']==='designer'||$u['role']==='admin'):?><a href="/seller">Seller</a><?php endif; ?>
         <?php if($u['role']==='admin'):?><a href="/admin">Admin</a><?php endif; ?>
-        <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Logout</button></form>
+        <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button type="submit">Logout</button></form>
         <?php else: ?>
         <a href="/login">Login</a>
         <a class="btn" href="/register">Register</a>

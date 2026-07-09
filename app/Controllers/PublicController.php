@@ -178,6 +178,10 @@ class PublicController
 
     public function sell(): void
     {
+        if (!H::user()) {
+            $_SESSION['after_login_redirect'] = '/apply';
+            $_SESSION['seller_intent'] = true;
+        }
         $schema = ['@context'=>'https://schema.org','@type'=>'WebPage','name'=>'Sell on Asset Moth','url'=>H::canonical('/sell')];
         H::view('public/sell', ['meta'=>$this->pageMeta('Sell Digital Designs', 'Apply to sell digital designs through a reviewed storefront on Asset Moth.', '/sell', $schema)]);
     }

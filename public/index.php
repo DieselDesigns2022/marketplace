@@ -21,7 +21,7 @@ use App\Controllers\StripeController;
  $router->match(['GET','POST'], '/register', [AuthController::class, 'register']);
  $router->match(['GET','POST'], '/login', [AuthController::class, 'login']);
  $router->post('/logout', [AuthController::class, 'logout']);
- $router->get('/logout', [AuthController::class, 'logout']);
+ $router->get('/logout', [AuthController::class, 'logoutRedirect']);
  $router->get('/forgot-password', [AuthController::class, 'forgot']);
  $router->match(['GET','POST'], '/account', [AuthController::class, 'account']);
  $router->get('/dashboard', [BuyerController::class, 'home']);

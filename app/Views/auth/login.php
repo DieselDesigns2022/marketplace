@@ -1,4 +1,7 @@
 <h1>Login</h1>
+<?php if (!empty($_SESSION['seller_intent'])): ?>
+<section class="notice warning">Log in to continue applying to sell. Account access is Step 1; the seller application and onboarding still need to be completed before approval.</section>
+<?php endif; ?>
 <?php if(!empty($error)):?>
     <p class="error">
     <?=$error?>
