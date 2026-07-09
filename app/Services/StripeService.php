@@ -54,7 +54,6 @@ class StripeService
                 'liability' => ['type' => 'self'],
             ],
             'billing_address_collection' => 'required',
-            'payment_method_collection' => 'if_required',
             'line_items' => $lineItems,
         ]);
     }
