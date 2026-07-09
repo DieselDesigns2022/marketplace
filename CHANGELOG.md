@@ -198,7 +198,7 @@ Intentionally postponed:
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
 
 ## Phase 10 refinement - seller onboarding and Stripe Connect payout readiness
 - Added seller onboarding and Stripe payout setup routes/views for approved sellers.
@@ -227,7 +227,14 @@ Intentionally postponed:
 - Added platform and seller coupon management with normalized unique coupon codes, active status, percent/fixed discounts, start/end dates, minimum eligible cart amount, total and per-user usage limits, and seller/product/category restrictions.
 - Admins manage all coupons at `/admin/coupons`; approved sellers manage only their seller-scoped coupons at `/seller/coupons` and server-side ownership checks prevent cross-seller coupon/product access.
 - Buyers can apply or remove coupon codes in cart/checkout. Invalid, inactive, expired, not-yet-started, over-limit, below-minimum, and non-applicable coupons are rejected server-side.
-- Checkout totals follow: subtotal minus coupon discount plus the existing Phase 10.3 tax placeholder minus the existing Phase 11 credits placeholder equals final total. Taxes remain Phase 10.3; credits/referrals remain Phase 11.
+- Checkout totals now use Stripe Tax for Phase 10.3B: subtotal minus coupon discount plus Stripe-returned tax minus the existing Phase 11 credits placeholder equals the final captured total. International VAT/GST remains future work; credits/referrals remain Phase 11.
 - Coupon snapshots are stored on orders and order items. Coupon usage is recorded only after Stripe confirms a successful paid order, with an order-level uniqueness guard to avoid webhook/retry double counting.
 - Platform commission, seller earnings, and payout ledger amounts are calculated from discounted order item totals after coupon discounts are allocated across eligible items.
 - Coupons that reduce checkout to `$0.00` are intentionally blocked until a dedicated free-order checkout flow exists.
+
+## Phase 10.3B - Stripe Tax, marketplace tax compliance, and 1099 website integration
+- Added Stripe Tax automatic calculation to Stripe Checkout for US-only, USD digital-file purchases.
+- Seller-entered tax rates/settings are not used; sellers do not enter tax rates, permits, or tax toggles on Asset Moth.
+- Stripe-returned tax is stored separately from gross sales, discounts, marketplace commission, and seller payouts; seller payouts exclude tax.
+- 1099 reporting is handled through Stripe Connect and Stripe tax forms configuration, not homemade IRS form generation.
+- International VAT/GST and non-US checkout remain future work; there is no shipping because Asset Moth sells digital files only.

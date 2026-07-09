@@ -367,6 +367,7 @@ class AdminController
         $summary = DB::row('select
             (select count(distinct o.id) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") paid_orders,
             (select coalesce(round(sum(oi.total_price),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") gross_sales,
+            (select coalesce(round(sum(o.tax_amount),2),0) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") tax_collected,
             (select coalesce(round(sum(oi.platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") marketplace_commission,
             (select coalesce(round(sum(oi.seller_payout_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") seller_payouts,
             (select coalesce(round(sum(coalesce(o.stripe_fee_total,0)),2),0) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") stripe_fees_recorded,
@@ -378,6 +379,7 @@ class AdminController
             o.id order_id,
             o.payment_status,
             o.total order_total,
+            o.tax_amount order_tax_amount,
             o.platform_commission_total order_commission_total,
             o.stripe_fee_total,
             o.stripe_charge_id,

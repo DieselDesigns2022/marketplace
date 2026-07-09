@@ -39,7 +39,8 @@
     <div style="overflow-x:auto; max-width:100%;"><div class="money-scroll"><table>
         <tr>
             <th>Paid Orders</th>
-            <th>Gross Sales</th>
+            <th>Gross Sales<br><span class="muted money-small">excludes tax</span></th>
+            <th>Order Tax Collected</th>
             <th>Asset Moth Commission</th>
             <th>Seller Payouts Owed</th>
             <th>Stripe Fees Recorded</th>
@@ -49,6 +50,7 @@
         <tr>
             <td><?= (int)($summary['paid_orders'] ?? 0) ?></td>
             <td><?= H::money($summary['gross_sales'] ?? 0) ?></td>
+            <td><?= H::money($summary['tax_collected'] ?? 0) ?></td>
             <td><strong><?= H::money($summary['marketplace_commission'] ?? 0) ?></strong></td>
             <td><?= H::money($summary['seller_payouts'] ?? 0) ?></td>
             <td><?= H::money($summary['stripe_fees_recorded'] ?? 0) ?></td>
@@ -60,14 +62,15 @@
 
 <section class="card">
     <h2>Commission detail</h2>
-    <p class="muted">Use this table to verify each paid order's gross sale, Asset Moth commission, seller payout amount, and Stripe transfer status.</p>
+    <p class="muted">Use this table to verify each paid order's gross sale, order-level tax collected, Asset Moth commission, seller payout amount, and Stripe transfer status. Summary Tax Collected is authoritative; order tax is shown once per order below and is excluded from commission and seller payout calculations.</p>
     <table>
         <tr>
             <th>Order</th>
             <th>Buyer</th>
             <th>Seller</th>
             <th>Product</th>
-            <th>Item Total</th>
+            <th>Item Total<br><span class="muted money-small">excludes tax</span></th>
+            <th>Order Tax Collected</th>
             <th>Rate</th>
             <th>Asset Moth Commission</th>
             <th>Seller Payout</th>
@@ -75,13 +78,15 @@
             <th>Stripe Transfer / Error</th>
             <th>Paid</th>
         </tr>
-        <?php foreach($commissionRows as $r): ?>
+        <?php $shownTaxOrders = []; foreach($commissionRows as $r): ?>
+            <?php $taxAlreadyShown = isset($shownTaxOrders[(int)$r['order_id']]); $shownTaxOrders[(int)$r['order_id']] = true; ?>
             <tr>
                 <td><a href="/admin/order/<?=$r['order_id']?>">#<?=H::e($r['order_id'])?></a><br><span class="muted"><?=H::e($r['payment_status'])?></span></td>
                 <td class="money-wrap"><?=H::e($r['buyer_email'])?></td>
                 <td class="money-wrap"><?=H::e($r['seller_name'])?><br><span class="muted money-small"><?=H::e($r['seller_email'])?></span></td>
                 <td class="money-wrap"><?=H::e($r['product_title'])?></td>
                 <td><?=H::money($r['item_total'])?></td>
+                <td><?php if(!$taxAlreadyShown): ?><?=H::money($r['order_tax_amount'] ?? 0)?><?php else: ?><span class="muted money-small">shown above</span><?php endif; ?></td>
                 <td><?=H::e(number_format(((float)$r['commission_rate']) * 100, 2))?>%</td>
                 <td><strong><?=H::money($r['platform_commission_amount'])?></strong></td>
                 <td><?=H::money($r['seller_payout_amount'])?></td>
@@ -96,7 +101,7 @@
             </tr>
         <?php endforeach; ?>
         <?php if(empty($commissionRows)): ?>
-            <tr><td colspan="11" class="muted">No paid commission records found yet.</td></tr>
+            <tr><td colspan="12" class="muted">No paid commission records found yet.</td></tr>
         <?php endif; ?>
     </table></div>
 </section>

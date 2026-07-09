@@ -6,6 +6,7 @@
   <p>Product: <?=H::e($item['product_title'] ?: ('Product #'.$item['product_id']))?></p>
   <p>License: <?=H::e($item['license_name'] ?: $item['license_type'])?></p>
   <?php if(!empty($item['coupon_code'])):?><p>Coupon <?=H::e($item['coupon_code'])?> item discount: <?=H::money($item['coupon_discount'] ?? 0)?>. Earnings use the discounted item total.</p><?php endif;?>
+  <p class="muted">Sales tax, when required, is handled by Asset Moth through Stripe Tax and is excluded from seller payout.</p>
   <p>Fulfillment: <?=($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></p>
   <?php if($item['fulfillment_type']==='google_drive'):?>
     <?php if($paid):?>

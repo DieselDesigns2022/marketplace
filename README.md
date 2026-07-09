@@ -37,7 +37,7 @@ These features represent the current implemented and tested functionality in the
 ### Planned / Future Phase
 
 - Stripe Checkout payment creation and webhook-driven payment status are implemented in Phase 10; production keys remain environment-only.
-- Automated payouts and tax/reporting workflows.
+- Additional payout automation and reporting workflows; Stripe Tax for US checkout is implemented in Phase 10.3B, while international VAT/GST expansion remains future work.
 - Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
 - Advanced SEO iteration after launch data is available.
@@ -214,7 +214,7 @@ Phase 9 added the foundation for carts, order records, downloadable delivery, an
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
 
 ### Phase 10 Stripe marketplace payments and seller onboarding
 Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Asset Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Asset Moth's 18% commission.
@@ -231,7 +231,12 @@ Seller transfers use the original Stripe charge as `source_transaction` when `st
 - Added platform and seller coupon management with normalized unique coupon codes, active status, percent/fixed discounts, start/end dates, minimum eligible cart amount, total and per-user usage limits, and seller/product/category restrictions.
 - Admins manage all coupons at `/admin/coupons`; approved sellers manage only their seller-scoped coupons at `/seller/coupons` and server-side ownership checks prevent cross-seller coupon/product access.
 - Buyers can apply or remove coupon codes in cart/checkout. Invalid, inactive, expired, not-yet-started, over-limit, below-minimum, and non-applicable coupons are rejected server-side.
-- Checkout totals follow: subtotal minus coupon discount plus the existing Phase 10.3 tax placeholder minus the existing Phase 11 credits placeholder equals final total. Taxes remain Phase 10.3; credits/referrals remain Phase 11.
+- Checkout totals sent to Stripe follow: subtotal minus coupon discount plus Stripe Tax returned at Checkout minus the existing Phase 11 credits placeholder equals the final captured total. International VAT/GST remains future work; credits/referrals remain Phase 11.
 - Coupon snapshots are stored on orders and order items. Coupon usage is recorded only after Stripe confirms a successful paid order, with an order-level uniqueness guard to avoid webhook/retry double counting.
 - Platform commission, seller earnings, and payout ledger amounts are calculated from discounted order item totals after coupon discounts are allocated across eligible items.
 - Coupons that reduce checkout to `$0.00` are intentionally blocked until a dedicated free-order checkout flow exists.
+
+### Phase 10.3B Stripe Tax and tax compliance
+Phase 10.3B uses Stripe Tax in Stripe Checkout for automatic sales-tax calculation. Asset Moth is US-only at launch, sellers are US-only at launch, products are digital files only, and there is no shipping. Sellers do not enter tax rates or manual sales-tax settings; tax is returned by Stripe after checkout confirmation and is excluded from seller payouts and marketplace commission math. International VAT/GST is future work. 1099 reporting is handled through Stripe Connect and Stripe tax forms setup rather than homemade IRS form generation.
+
+Delivery unlock requires webhook-confirmed payment and a complete Stripe Tax status for tax-enabled Checkout Sessions.
