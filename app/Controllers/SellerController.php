@@ -135,12 +135,12 @@ class SellerController
         }
         if ($v['desired_slug'] === '')
         {
-            $errors[] = 'Desired store slug is required.';
+            $errors[] = 'Store URL name is required.';
 
         }
         elseif (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $v['desired_slug']))
         {
-            $errors[] = 'Store URL can only contain lowercase letters, numbers, and hyphens.';
+            $errors[] = 'Store URL name can only contain lowercase letters, numbers, and hyphens.';
 
         }
         elseif ($this->slugTaken($v['desired_slug'], $ignoreApplicationId))
@@ -194,7 +194,25 @@ class SellerController
             'payout' => !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']),
             'products' => $products > 0,
             'product_count' => $products,
+            'complete' => trim((string)($d['display_name'] ?? '')) !== ''
+                && trim((string)($d['bio'] ?? '')) !== ''
+                && trim((string)($d['store_slug'] ?? '')) !== ''
+                && !empty($d['stripe_connect_account_id'])
+                && !empty($d['stripe_details_submitted'])
+                && !empty($d['stripe_payouts_enabled']),
         ];
+    }
+
+
+    private function requireOnboardingComplete(?array $d = null): array
+    {
+        $d ??= $this->approvedDesigner();
+        $readiness = $this->readiness($d);
+        if (empty($readiness['complete'])) {
+            H::flash('warning', 'Complete seller onboarding before using seller dashboard tools or adding products.');
+            H::redirect('/seller/onboarding');
+        }
+        return $d;
     }
 
     public function onboarding(): void
@@ -258,11 +276,21 @@ class SellerController
 
     public function apply()
     {
+        if (!H::user()) {
+            $_SESSION['after_login_redirect'] = '/apply';
+            $_SESSION['seller_intent'] = true;
+            H::flash('warning', 'Create or log in to an account first. That is Step 1; you will return here to complete the seller application.');
+            H::redirect('/register');
+        }
         H::requireLogin();
         $designer = $this->d();
         if ($designer && $designer['status'] === 'approved')
         {
-            H::flash('success', 'Your designer application has been approved. You can now access your seller dashboard.');
+            if (empty($this->readiness($designer)['complete'])) {
+                H::flash('success', 'Your seller application is approved. Complete onboarding to unlock seller tools.');
+                H::redirect('/seller/onboarding');
+            }
+            H::flash('success', 'Your seller application is approved. You can now access your seller dashboard.');
             H::redirect('/seller');
 
         }
@@ -302,6 +330,11 @@ class SellerController
             H::flash('warning', 'You need an approved designer account before accessing the seller dashboard.');
             H::redirect('/apply');
 
+        }
+        $readiness = $this->readiness($d);
+        if (empty($readiness['complete'])) {
+            H::view('seller/onboarding', ['d' => $d, 'readiness' => $readiness, 'commissionPercent' => (int)round(StripeService::commissionRate() * 100), 'dashboardGate' => true]);
+            return;
         }
         $stats = DB::row( 'select (select count(*) from products where designer_id=?) product_count, (select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded")) sales_count', [$d['id'], $d['id']] );
         H::view('seller/home', [ 'd' => $d, 'stats' => $stats, ]);
@@ -642,6 +675,7 @@ class SellerController
     }
     public function products()
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d = $this->d();
         $status = $_GET['status'] ?? 'all';
@@ -659,6 +693,7 @@ class SellerController
     }
     public function editProduct($id = null)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d = $this->d();
         $p = $id ? DB::row('select * from products where id=? and designer_id=?', [$id, $d['id']]) : null;
@@ -754,6 +789,7 @@ class SellerController
 
     public function archiveProduct($id)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d = $this->d();
         $productId = (int) $id;
@@ -769,6 +805,7 @@ class SellerController
 
     public function restoreProduct($id)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d = $this->d();
         $productId = (int) $id;
@@ -784,6 +821,7 @@ class SellerController
 
     public function deleteProduct($id)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d = $this->d();
         $productId = (int) $id;
@@ -804,6 +842,7 @@ class SellerController
 
     public function submitProduct($id)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d = $this->d();
         $productId = (int)$id;
@@ -827,6 +866,7 @@ class SellerController
     }
     public function disableProduct($id)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         DB::exec( 'update products set status="disabled",updated_at=now() where id=? and designer_id=?', [$id, $this->d()['id']] );
         H::redirect('/seller/products');
@@ -834,6 +874,7 @@ class SellerController
     }
     public function sales()
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
 
@@ -841,6 +882,7 @@ class SellerController
 
     public function saleDetail($id)
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         $d=$this->d();
         if ($_POST && ($_POST['action'] ?? '') === 'mark_delivered') {
@@ -853,12 +895,14 @@ class SellerController
     }
     public function referrals()
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         H::view('seller/referrals', [ 'refs' => DB::rows('select * from referrals where referrer_user_id=?', [H::user()['id']]), ]);
 
     }
     public function rank()
     {
+        $this->requireOnboardingComplete();
         H::requireSeller();
         H::view('seller/rank', [ 'd' => $this->d(), ]);
 
@@ -884,7 +928,7 @@ class SellerController
 
     public function coupons($id = null)
     {
-        $d = $this->approvedDesigner();
+        $d = $this->requireOnboardingComplete();
         $creating = ($id === 'new');
         if ($creating) $id = null;
         $ownedCoupon = $id ? DB::row('select * from coupons where id=? and seller_id=? and scope="seller"', [(int)$id,$d['id']]) : null;

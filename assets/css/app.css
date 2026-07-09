@@ -44,6 +44,12 @@ nav {
 nav form {
   display: inline;
 }
+.nav-logout {
+  margin: 0;
+}
+.nav-logout button {
+  font: inherit;
+}
 .wrap {
   max-width: 1180px;
   margin: auto;
@@ -106,12 +112,19 @@ button,
   gap: 18px;
 }
 .grid.products {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
-  justify-content: start;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 .product {
   width: 100%;
-  max-width: 280px;
+}
+@media (min-width: 560px) {
+  .grid.products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .grid.products { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1180px) {
+  .grid.products { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .card {
   background: white;

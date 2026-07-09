@@ -204,8 +204,25 @@ class AdminController
         $this->gate();
         if($_POST)
         {
-           $this->moderateProduct((int)$_POST['id'],$_POST['action']??'',trim($_POST['reason']??''));
-            H::redirect('/admin/products');
+            $action = $_POST['action'] ?? '';
+            if ($action === 'bulk_approve') {
+                $ids = array_values(array_filter(array_map('intval', $_POST['product_ids'] ?? [])));
+                $approved = 0;
+                $skipped = 0;
+                foreach ($ids as $productId) {
+                    $p = DB::row('select id,status from products where id=?', [$productId]);
+                    if ($p && ($p['status'] ?? '') === 'pending_review') {
+                        $this->moderateProduct((int)$p['id'], 'approve');
+                        $approved++;
+                    } else {
+                        $skipped++;
+                    }
+                }
+                H::flash('success', 'Bulk approval complete: '.$approved.' approved, '.$skipped.' skipped.');
+            } else {
+                $this->moderateProduct((int)$_POST['id'], $action, trim($_POST['reason']??''));
+            }
+            H::redirect('/admin/products?status='.urlencode($_GET['status'] ?? 'pending_review'));
 
         }
         $status=$_GET['status']??'pending_review';
@@ -218,7 +235,7 @@ class AdminController
             $params[]=$status;
 
         }
-        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);
+        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);
 
     }
     private function moderateProduct(int $id, string $action, string $reason=''): void
@@ -238,7 +255,7 @@ class AdminController
         }
         DB::exec('update products set status=?, rejection_reason=?, updated_at=now() where id=?',[$status,$status==='rejected'?$reason:null,$id]);
         $this->log($status.'_product','product',$id);
-        H::flash('success','Product status updated.');
+        H::flash('success', $status === 'approved' ? 'Product approved and published.' : 'Product status updated.');
 
     }
 

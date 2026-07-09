@@ -1,5 +1,9 @@
-<h1>Seller onboarding</h1>
-<p class="muted">Complete these Phase 10 launch-readiness steps after your seller application is approved.</p>
+<?php $dashboardGate = $dashboardGate ?? false; ?>
+<h1><?= $dashboardGate ? 'Seller onboarding required' : 'Seller onboarding' ?></h1>
+<?php if ($dashboardGate): ?>
+<section class="notice warning">Your seller application is approved, but onboarding is not complete yet. Complete the steps below before accessing products, orders, payouts, coupons, or other seller dashboard tools.</section>
+<?php endif; ?>
+<p class="muted">Complete these Alpha launch-readiness steps after your seller application is approved.</p>
 <?php $ok = fn($v) => $v ? '<span class="badge ok">Complete</span>' : '<span class="badge pending">Needs setup</span>'; ?>
 <section class="card page-section">
     <h2>Your setup checklist</h2>
@@ -7,7 +11,7 @@
         <li><strong>Complete seller profile</strong><br><?=$ok($readiness['profile'])?> <a href="/seller/store">Edit profile</a></li>
         <li><strong>Set up Stripe payouts</strong><br><?=$ok($readiness['stripe'])?> <?php if(!empty($readiness['stripe_started']) && empty($readiness['stripe'])):?><span class="muted">Stripe connection started; onboarding is not payout-ready yet.</span><?php endif;?> <a href="/seller/stripe">Open Stripe setup</a></li>
         <li><strong>Set up store details</strong><br><?=$ok($readiness['store'])?> <a href="/seller/store">Edit store</a></li>
-        <li><strong>Add products/listings</strong><br><?=$ok($readiness['products'])?> <?=H::e((string)$readiness['product_count'])?> product(s) started. <a href="/seller/products">Manage products</a></li>
+        <li><strong>Unlock product tools</strong><br><?=!empty($readiness['complete']) ? '<span class="badge ok">Unlocked</span>' : '<span class="badge pending">Locked until onboarding is complete</span>'?> Product creation opens after profile, store, and Stripe payout setup are complete.</li>
         <li><strong>Review seller FAQ / marketplace rules</strong><br><span class="badge ok">Shown below</span></li>
     </ol>
 </section>

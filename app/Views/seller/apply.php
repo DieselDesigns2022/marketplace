@@ -1,6 +1,7 @@
 <h1>Apply to Sell</h1>
 <section class="card application-intro">
     <h2>Become a designer on Asset Moth</h2>
+    <p><strong>Step 1 is creating an account. Step 2 is completing this seller application.</strong> Your account is not submitted for seller approval until this form is complete and submitted.</p>
     <ul>
         <li>Designers can create a public storefront after approval.</li>
         <li>Approved designers can upload digital products for admin review.</li>
@@ -64,7 +65,7 @@
     <label>Display Name <small>Public designer/store name, e.g. Diesel Designs.</small>
     <input name="display_name" required value="<?=H::e($values['display_name']??'')?>">
     </label>
-    <label>Desired Store Slug <small>Lowercase letters, numbers, and hyphens only. Final URL: /store/diesel-designs.</small>
+    <label>Store URL Name <small>This becomes your store link. Use lowercase letters, numbers, and hyphens only. Example: spooky-designs</small>
     <input name="desired_slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" value="<?=H::e($values['desired_slug']??'')?>">
     </label>
     <label>Bio <small>Minimum 25 characters. This helps us understand your work and seeds your storefront.</small>

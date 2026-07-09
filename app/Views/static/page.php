@@ -469,5 +469,45 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
 <section class="card"><h2>Buyer questions</h2><h3>How do I find products?</h3><p>Use <a href="/browse">Browse</a>, category pages, and product search filters.</p><h3>Do I need an account?</h3><p>An account is used for checkout, purchases, protected downloads, wishlists, and follows.</p><h3>Where are downloads?</h3><p>After checkout, log in and visit dashboard purchases or downloads.</p><h3>Can I use files commercially or for POD?</h3><p>Only when the product page and selected license allow it. Read <a href="/licensing-help">Licensing Help</a>.</p><h3>What if a file is missing or unclear?</h3><p>Use the <a href="/contact">Contact</a> page and include your order details, product name, account email, and a clear description of the missing file, unclear license, or download problem.</p><h3>Are refunds automatic?</h3><p>Refunds are not automatic. Digital product concerns are reviewed based on order details, download/access issues, duplicate purchase concerns, file problems, and the license information shown before purchase.</p></section>
 <?php elseif($page === 'seller-faq'): ?>
 <?php $commissionPercent = (int)round(\App\Services\StripeService::commissionRate() * 100); ?>
-<section class="card"><h2>Seller questions</h2><h3>How do I apply?</h3><p>Create or log in to an account and submit the <a href="/apply">designer application</a>. After approval, use <a href="/seller/onboarding">Seller Onboarding</a> to finish setup.</p><h3>What does it cost to sell on Asset Moth?</h3><p>There are no startup fees, no monthly fees, and no listing fees. Asset Moth only earns when a seller makes a sale.</p><p>Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission only when a sale happens. Stripe/payment processing fees also apply, and Asset Moth's <?=H::e((string)$commissionPercent)?>% commission is separate from Stripe/payment processing fees.</p><h3>How are seller payouts handled?</h3><p>Seller payouts are handled through Stripe Connect. Sellers must complete Stripe onboarding before payouts can be sent; buyer checkout can work before onboarding, but payouts remain pending until the seller is payout-ready.</p><h3>Can buyers or sellers cancel/refund completed orders?</h3><p>Refunds are Stripe-processed and admin-exception only. Digital product purchases cannot be self-canceled by buyers after purchase, and sellers cannot issue instant refunds themselves.</p><h3>Is approval guaranteed?</h3><p>No. Applications are manually reviewed before seller access is granted.</p><h3>What can approved sellers manage?</h3><p>Approved sellers can manage storefront details, upload preview images and protected files, set product title, descriptions, SEO fields, categories, tags, license settings, POD permission, and AI disclosure.</p><h3>Are products reviewed?</h3><p>Yes. Products can be draft, pending review, approved, rejected, or disabled.</p><h3>What content is expected?</h3><p>Only upload original work or files you have the right to sell. Copyright, trademark, misleading, or incomplete listings may be rejected or disabled.</p><h3>Where can I get help?</h3><p>Read <a href="/licensing-help">Licensing Help</a>, <a href="/terms">Terms</a>, or <a href="/contact">Contact</a>.</p></section>
+<section class="page-hero">
+    <p class="eyebrow">Seller FAQ</p>
+    <h1>Seller FAQ</h1>
+    <p>Clear Alpha guidance for applying, onboarding, product uploads, approvals, payouts, taxes, and what to report while Asset Moth is still in private testing.</p>
+</section>
+<section class="card page-section">
+    <h2>Getting approved to sell</h2>
+    <h3>How do I apply to sell?</h3>
+    <p>Start at <a href="/sell">Apply to Sell</a>. If you are logged out, create or log in to an account first. After that, Asset Moth takes you to the seller application so you can submit your store name, store URL name, bio, portfolio, design types, and AI-use disclosure.</p>
+    <h3>Is creating an account the same as completing seller onboarding?</h3>
+    <p>No. Creating an account is only Step 1. You still need to submit the seller application, wait for admin approval, and complete seller onboarding before normal seller tools are available.</p>
+    <h3>What happens after I submit the seller application?</h3>
+    <p>Asset Moth reviews the seller application manually. You may be approved, asked for changes, or denied if the account or work is not a fit for the marketplace. If approved, you will complete onboarding setup steps before normal seller tools unlock.</p>
+    <h3>Why is admin approval required?</h3>
+    <p>Admin approval protects buyers, sellers, and the marketplace by checking marketplace fit, originality, listing quality, policy compliance, and basic readiness before products go live.</p>
+</section>
+<section class="card page-section">
+    <h2>Products during Alpha</h2>
+    <h3>When can sellers add products?</h3>
+    <p>Product tools unlock after seller application approval and onboarding completion, including profile/store setup and Stripe payout readiness. Products still go through admin product review before they are public.</p>
+    <h3>How many products should Alpha sellers add?</h3>
+    <p>For Alpha testing, add a small but useful sample set: about 3 to 5 representative products unless the Asset Moth team asks for more. Include realistic previews, descriptions, categories, prices, files, and license settings.</p>
+    <h3>What should sellers report during Alpha?</h3>
+    <p>Please report confusing steps, upload problems, missing or unclear form fields, product review issues, Stripe onboarding friction, dashboard errors, broken links, unexpected emails, and anything that would block a real seller from listing products confidently.</p>
+</section>
+<section class="card page-section">
+    <h2>Payments, payouts, and taxes</h2>
+    <h3>How do seller payouts work?</h3>
+    <p>Seller payouts are handled through Stripe Connect. Sellers must complete Stripe onboarding before payouts can be sent. Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens; Stripe/payment processing fees also apply.</p>
+    <h3>What should sellers know about taxes?</h3>
+    <p>Asset Moth handles applicable checkout sales tax through Stripe Tax during checkout. Sellers should still track their own income, expenses, tax forms, and business obligations, and should contact a tax professional for advice specific to their situation.</p>
+</section>
+<section class="card page-section">
+    <h2>Alpha notes</h2>
+    <h3>Why does the dashboard look basic?</h3>
+    <p>Dashboards are functional right now so Alpha testers can complete real workflow testing. Visual dashboard upgrades are planned for Phase 10.6.</p>
+    <h3>Is this Alpha private?</h3>
+    <p>Yes. If you are participating in the private Alpha, treat marketplace access, screenshots, workflows, seller feedback, and test details as private unless Asset Moth explicitly says otherwise.</p>
+    <h3>Where can I get help?</h3>
+    <p>Review <a href="/licensing-help">Licensing Help</a>, <a href="/terms">Terms</a>, or <a href="/contact">Contact</a> if you need support.</p>
+</section>
 <?php endif; ?>

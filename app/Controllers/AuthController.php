@@ -7,8 +7,8 @@ class AuthController
 {
     private function afterLoginRedirect(): string
     {
-        $to = $_SESSION['after_login_redirect'] ?? '/dashboard';
-        unset($_SESSION['after_login_redirect']);
+        $to = $_SESSION['after_login_redirect'] ?? (!empty($_SESSION['seller_intent']) ? '/apply' : '/dashboard');
+        unset($_SESSION['after_login_redirect'], $_SESSION['seller_intent']);
         return is_string($to) && str_starts_with($to, '/') && !str_starts_with($to, '//') ? $to : '/dashboard';
 
     }
@@ -46,7 +46,12 @@ class AuthController
     public function logout()
     {
         session_destroy();
-        H::redirect('/');
+        H::redirect('/login');
+
+    }
+    public function logoutRedirect()
+    {
+        H::redirect('/login');
 
     }
     public function forgot()
