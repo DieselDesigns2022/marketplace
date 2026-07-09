@@ -17,4 +17,5 @@
     <h2>Fees and payout notes</h2>
     <p>Sellers must complete Stripe onboarding before payouts/transfers can be sent. Stripe/payment processing fees apply.</p>
     <p>Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission on each sale. Asset Moth has no startup fee, no monthly fee, and no listing fee.</p>
+    <p>Sales tax, when required, is handled by Asset Moth through Stripe Tax and is excluded from seller payouts.</p>
 </section>

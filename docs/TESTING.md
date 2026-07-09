@@ -226,3 +226,19 @@ Recommended manual checks:
 - A coupon that makes checkout total `$0.00` is rejected because this phase does not implement free-order checkout.
 - Checkout without a coupon still creates a Stripe Checkout session.
 - Stripe paid webhook records coupon usage once and repeated webhook/retry processing does not double-count usage.
+
+## Phase 10.3B Stripe Tax compliance
+Use this checklist for Phase 10.3B validation:
+- Stripe Checkout Session has `automatic_tax` enabled.
+- Billing address collection is required.
+- No shipping address or shipping rates are collected.
+- US checkout works.
+- Non-US billing country gets manual review and no delivery/download unlock if detected on the Checkout Session.
+- Checkout Session `automatic_tax.status` must be `complete`; `failed` or `requires_location_inputs` gets manual review and no delivery/download unlock.
+- Stripe webhook stores `total_details.amount_tax` into `orders.tax_amount`.
+- Tax is excluded from seller earnings, seller payouts, and platform commission.
+- Coupons still reduce item totals before commission.
+- `$0.00` coupon checkout remains blocked.
+- Admin order detail and payment logs show tax separately; payment-log detail shows order-level tax once per order while the summary remains authoritative.
+- Seller pages state tax is handled by Asset Moth/Stripe Tax and excluded from payout.
+- Downloads/manual delivery unlock only after a valid webhook-confirmed paid order.

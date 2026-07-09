@@ -237,4 +237,7 @@ Pending seller payout retries are scoped to payout-ready designers and webhook-c
 - `coupon_usages` stores paid-order usage rows with `coupon_id`, `user_id`, `order_id`, code snapshot, discount amount, a unique order key, and coupon/user lookup index.
 - `orders.coupon_discount`, `orders.coupon_id`, `orders.coupon_code`, and `orders.coupon_snapshot` snapshot order-level coupon state.
 - `order_items.coupon_id`, `order_items.coupon_code`, and `order_items.coupon_discount` snapshot item-level allocation; `order_items.total_price` stores the discounted item total used for commission and seller payout calculations.
-- Tax fields remain Phase 10.3 placeholders; credit/referral redemption remains Phase 11 placeholder behavior.
+- Phase 10.3B stores Stripe Tax results on orders; credit/referral redemption remains Phase 11 placeholder behavior.
+
+## Phase 10.3B Stripe Tax compliance
+Phase 10.3B uses Stripe Tax through Stripe Checkout. `orders.tax_amount` stores Stripe-returned tax, `orders.tax_provider` identifies `stripe_tax`, `orders.tax_status` stores the Stripe automatic-tax status, `orders.tax_liability_owner` stores the normalized marketplace owner such as `platform`, `orders.tax_snapshot` stores escaped admin-review context from Stripe Checkout, and `orders.tax_collected_at` records when tax was confirmed. Asset Moth is US-only at launch, sells digital files only, has no shipping, and excludes tax from seller earnings, seller payouts, gross-sales commission calculations, and platform commission. International VAT/GST remains future work; 1099 reporting is handled through Stripe Connect and Stripe tax forms setup, not homemade IRS form generation.

@@ -270,7 +270,7 @@
     <p>If a buyer receives a refund, dispute, chargeback, payment reversal, or order adjustment, seller earnings may be reduced, reversed, held, or deducted.</p>
 
     <h3>28. Taxes</h3>
-    <p>Sellers are responsible for understanding and handling their own income taxes, business taxes, sales tax responsibilities, reporting obligations, and financial records. Asset Moth does not provide tax advice.</p>
+    <p>Sellers are responsible for understanding and handling their own income taxes, business taxes, records, and tax obligations outside Asset Moth checkout. For Asset Moth marketplace checkout at US launch, applicable sales tax is handled through Asset Moth’s Stripe Tax configuration. Asset Moth does not provide tax advice.</p>
 
     <h3>29. Seller referrals</h3>
     <p>Asset Moth may offer designer referral rewards. Asset Moth may deny, pause, revoke, or adjust referral rewards if there is fraud, self-referral, duplicate accounts, abuse, fake sales, chargebacks, refunds, policy violations, or technical errors.</p>

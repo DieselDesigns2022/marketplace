@@ -80,3 +80,6 @@ The repository should ignore environment files, public uploads, protected upload
 - Discount amounts are capped to eligible subtotal and final totals are clamped non-negative.
 - `$0.00` Stripe Checkout is blocked until a dedicated free-order flow exists.
 - Usage tracking is written only after successful paid webhook confirmation and uses an order-level uniqueness guard to avoid double-counting.
+
+## Phase 10.3B Stripe Tax compliance
+Tax is trusted only from Stripe webhook data, not buyer input, seller input, or client-provided totals. Seller/manual tax fields and manual seller tax settings are intentionally absent. If a Checkout Session provides a non-US billing country, or Stripe returns a non-complete `automatic_tax.status`, the order goes to manual review and delivery/download unlock remains blocked. Existing Stripe webhook signature verification, duplicate-event protection, amount/currency checks, and metadata checks remain required.

@@ -83,4 +83,7 @@ Phase 6 was validated on the VPS deployment path `/var/www/marketplace.dieseldes
 - Apply `database/migrations/2026_07_07_phase_10_2_coupons_discounts_commission_rules.sql` before enabling coupon UI in a deployed environment.
 - The migration creates coupon definition, restriction, and usage tables and adds order/order item coupon snapshot columns.
 - The migration includes idempotent `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements for existing environments.
-- No Phase 10.3 tax service or Phase 11 credit/referral redemption deployment step is included; those remain placeholders only.
+- Phase 10.2 did not include Stripe Tax or Phase 11 credit/referral redemption; Stripe Tax deployment is documented below in Phase 10.3B, while credits/referrals remain Phase 11.
+
+## Phase 10.3B Stripe Tax compliance
+Apply `database/migrations/2026_07_08_phase_10_3b_stripe_tax_compliance.sql` before deploying the Phase 10.3B code so `orders.tax_amount` and the Stripe Tax metadata columns exist. In Stripe Dashboard, confirm Stripe Tax is enabled/configured, the digital artwork tax category is set, prices/shipping behavior match launch policy, USD-only checkout is expected, no shipping address or shipping rates are configured by the app, and the Stripe webhook endpoint is active. After deploy, test a Stripe Checkout Session and webhook confirmation to verify `automatic_tax` is enabled, billing address collection is required, Stripe-returned tax is stored, and delivery unlocks only after a valid webhook-confirmed paid order. Include a negative webhook/test case for non-complete `automatic_tax.status` to confirm the order remains in manual review and delivery/download unlock stays blocked.

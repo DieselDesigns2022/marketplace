@@ -255,7 +255,7 @@ class CartController
                 $coupon = ($couponResult && $couponResult['ok']) ? $couponResult['coupon'] : null;
                 $couponDiscount = $coupon ? (float)$couponResult['discount'] : 0.0;
                 $allocations = $coupon ? CouponService::allocateDiscount($coupon, $valid, $couponDiscount) : [];
-                $tax = 0.0; // Phase 10.3 placeholder only.
+                $tax = 0.0; // Stripe Tax calculates and returns the final tax amount by webhook.
                 $credits = 0.0; // Phase 11 placeholder only.
                 $total=max(0, round($subtotal - $couponDiscount + $tax - $credits, 2));
                 if ($total <= 0) {
@@ -265,7 +265,7 @@ class CartController
                 }
                 $commissionRate = StripeService::commissionRate();
                 $platformCommissionTotal = 0.0;
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),StripeService::cents($total),0]);
+                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,tax_provider,tax_status,tax_liability_owner,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,'stripe_tax','pending','platform',$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),StripeService::cents($total),0]);
                 $order=DB::id();
                 foreach($valid as $idx=>$p)
                {
