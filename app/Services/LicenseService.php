@@ -184,6 +184,63 @@ class LicenseService
         return $snapshot === false ? '[]' : $snapshot;
     }
 
+    public static function sellerPresets(int $designerId): array
+    {
+        try {
+            return DB::rows('select slp.*,lt.license_key,lt.name,lt.description platform_description,lt.sort_order platform_sort_order from seller_license_presets slp join license_types lt on lt.id=slp.license_type_id where slp.designer_id=? and lt.is_active=1 order by slp.sort_order,lt.sort_order,lt.name', [$designerId]);
+        } catch (Throwable $e) {
+            if (!self::missingTable($e)) throw $e;
+            return [];
+        }
+    }
+
+    public static function presetLicensesForProductForm(int $designerId): array
+    {
+        $presets = [];
+        foreach (self::sellerPresets($designerId) as $preset) {
+            if (!empty($preset['is_enabled'])) {
+                $presets[] = [
+                    'license_type_id' => (int)$preset['license_type_id'],
+                    'license_key' => $preset['license_key'],
+                    'price' => (float)($preset['price'] ?? 0),
+                    'description' => $preset['description'] ?: ($preset['platform_description'] ?? ''),
+                    'sort_order' => (int)($preset['sort_order'] ?? $preset['platform_sort_order'] ?? 0),
+                ];
+            }
+        }
+        return $presets;
+    }
+
+    public static function syncSellerPresets(int $designerId, array $post): array
+    {
+        $types = self::platformTypes();
+        $enabled = $post['preset_enabled'] ?? [];
+        $prices = $post['preset_price'] ?? [];
+        $descriptions = $post['preset_description'] ?? [];
+        $errors = [];
+        $rows = [];
+        foreach ($types as $type) {
+            $key = $type['license_key'];
+            $price = '0.00';
+            if ($key !== self::PERSONAL_KEY) {
+                $raw = trim((string)($prices[$key] ?? '0.00'));
+                if ($raw === '') $raw = '0.00';
+                if (!is_numeric($raw) || (float)$raw < 0) { $errors[] = ($type['name'] ?? $key) . ' preset price must be a valid non-negative amount.'; $raw = '0.00'; }
+                $price = number_format((float)$raw, 2, '.', '');
+            }
+            $rows[] = [$designerId, (int)$type['id'], ($key === self::PERSONAL_KEY || isset($enabled[$key])) ? 1 : 0, $price, trim((string)($descriptions[$key] ?? '')), (int)($type['sort_order'] ?? 0)];
+        }
+        if ($errors) return $errors;
+        DB::begin();
+        try {
+            foreach ($rows as $row) {
+                DB::exec('insert into seller_license_presets (designer_id,license_type_id,is_enabled,price,description,sort_order) values (?,?,?,?,?,?) on duplicate key update is_enabled=values(is_enabled),price=values(price),description=values(description),sort_order=values(sort_order),updated_at=now()', $row);
+            }
+            DB::commit();
+        } catch (Throwable $e) { DB::rollBack(); if (!self::missingTable($e)) throw $e; return ['License preset database table is unavailable. Run the latest migration.']; }
+        return [];
+    }
+
     public static function normalizePosted(array $product, array $post): array
     {
         $types = self::platformTypes();

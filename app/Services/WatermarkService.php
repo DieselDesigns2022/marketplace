@@ -23,8 +23,8 @@ class WatermarkService
             $errors[] = 'Preview image upload failed.';
             return null;
         }
-        if (($file['size'] ?? 0) > 15 * 1024 * 1024) {
-            $errors[] = 'Preview images must be 15MB or smaller.';
+        if (($file['size'] ?? 0) > 25 * 1024 * 1024) {
+            $errors[] = 'Preview images must be 25MB or smaller.';
             return null;
         }
         $tmp = $file['tmp_name'] ?? '';

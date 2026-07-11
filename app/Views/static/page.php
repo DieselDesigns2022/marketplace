@@ -32,7 +32,7 @@
 
 <section class="page-section card">
     <h2>What you can shop on Asset Moth</h2>
-    <p>Asset Moth is focused on digital files only. Buyers can browse and purchase SVG files, PNG files, sublimation designs, seamless patterns, Canva templates, Procreate brushes and stamps, fonts, clipart, alphas, mockups, DTF-ready files, digital papers, business templates, stickers, printables, laser files, embroidery files, tumbler wraps, social media templates, website graphics, and other digital design resources.</p>
+    <p>Asset Moth is focused on digital files only. Buyers can browse and purchase SVG files, print-ready PNG files, seamless patterns, Canva templates, Procreate brushes and stamps, fonts, clipart, alphas, mockups, DTF-ready files, digital papers, business templates, stickers, printables, laser files, embroidery files, tumbler wraps, social media templates, website graphics, and other digital design resources.</p>
 </section>
 
 <section class="page-section card">
@@ -163,7 +163,7 @@
     <p>By using Asset Moth, creating an account, purchasing a product, applying to sell, uploading products, downloading files, or using any marketplace feature, you agree to these Terms &amp; Conditions.</p>
 
     <h2>1. About Asset Moth</h2>
-    <p>Asset Moth is a marketplace for digital design files. Products sold on Asset Moth may include SVG files, PNG files, sublimation designs, seamless patterns, Canva templates, Procreate brushes and stamps, fonts, clipart, alphas, mockups, DTF-ready files, digital papers, business templates, stickers, printables, laser files, embroidery files, tumbler wraps, social media templates, website graphics, and other digital products.</p>
+    <p>Asset Moth is a marketplace for digital design files. Products sold on Asset Moth may include SVG files, print-ready PNG files, seamless patterns, Canva templates, Procreate brushes and stamps, fonts, clipart, alphas, mockups, DTF-ready files, digital papers, business templates, stickers, printables, laser files, embroidery files, tumbler wraps, social media templates, website graphics, and other digital products.</p>
     <p>Asset Moth does not sell physical products. Unless clearly stated otherwise, products sold through Asset Moth are digital downloads only.</p>
 
     <h2>2. Important definitions</h2>
@@ -230,7 +230,7 @@
     <p>Users may apply to become approved designers on Asset Moth. Asset Moth may review applications based on marketplace fit, product quality, originality, portfolio, design type, seller information, AI usage, and other business needs. Approval to sell is not guaranteed.</p>
 
     <h3>16. Seller storefronts</h3>
-    <p>Approved designers may create a public storefront inside Asset Moth. Sellers may be able to manage their display name, store slug, logo or avatar, banner image, bio, store announcement, social links, website link, featured products, product categories, and store SEO fields.</p>
+    <p>Approved designers may create a public storefront inside Asset Moth. Sellers may be able to manage their display name, store URL name, logo or avatar, banner image, bio, store announcement, social links, website link, featured products, product categories, and store SEO fields.</p>
     <p>Seller storefront content must be accurate, lawful, respectful, and not misleading.</p>
 
     <h3>17. Seller product listings</h3>
@@ -345,7 +345,7 @@
     <p>If you use Asset Moth as a buyer, we may collect marketplace activity such as products viewed, products wishlisted, designers followed, cart activity, purchase history, download history, selected license details, marketplace credit activity, and support requests.</p>
 
     <h2>3. Designer and seller information</h2>
-    <p>If you apply to become a designer or sell products on Asset Moth, we may collect application details, display name, desired store name or store slug, bio, portfolio links, social links, website link, product types, AI usage details, storefront images, store announcements, product listings, preview images, protected digital product files, pricing, license settings, POD permission settings, AI disclosure labels, sales records, referral activity, and future creator rank progress.</p>
+    <p>If you apply to become a designer or sell products on Asset Moth, we may collect application details, display name, desired store name or store URL name, bio, portfolio links, social links, website link, product types, AI usage details, storefront images, store announcements, product listings, preview images, protected digital product files, pricing, license settings, POD permission settings, AI disclosure labels, sales records, referral activity, and future creator rank progress.</p>
     <p>Some designer information may be shown publicly on storefronts, product pages, search results, category pages, and other public marketplace pages.</p>
 
     <h2>4. Product and upload information</h2>
@@ -472,42 +472,52 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
 <section class="page-hero">
     <p class="eyebrow">Seller FAQ</p>
     <h1>Seller FAQ</h1>
-    <p>Clear Alpha guidance for applying, onboarding, product uploads, approvals, payouts, taxes, and what to report while Asset Moth is still in private testing.</p>
+    <p>Helpful answers for applying to sell, setting up your storefront, adding products, choosing licenses, understanding payouts, and keeping listings clear for buyers.</p>
 </section>
 <section class="card page-section">
-    <h2>Getting approved to sell</h2>
+    <h2>Applying and onboarding</h2>
     <h3>How do I apply to sell?</h3>
-    <p>Start at <a href="/sell">Apply to Sell</a>. If you are logged out, create or log in to an account first. After that, Asset Moth takes you to the seller application so you can submit your store name, store URL name, bio, portfolio, design types, and AI-use disclosure.</p>
-    <h3>Is creating an account the same as completing seller onboarding?</h3>
-    <p>No. Creating an account is only Step 1. You still need to submit the seller application, wait for admin approval, and complete seller onboarding before normal seller tools are available.</p>
-    <h3>What happens after I submit the seller application?</h3>
-    <p>Asset Moth reviews the seller application manually. You may be approved, asked for changes, or denied if the account or work is not a fit for the marketplace. If approved, you will complete onboarding setup steps before normal seller tools unlock.</p>
-    <h3>Why is admin approval required?</h3>
-    <p>Admin approval protects buyers, sellers, and the marketplace by checking marketplace fit, originality, listing quality, policy compliance, and basic readiness before products go live.</p>
+    <p>Start at <a href="/sell">Apply to Sell</a>. Create or log in to an Asset Moth account, then submit the seller application with your store name, preferred store URL name, bio, portfolio or website, design types, and AI-use disclosure.</p>
+    <h3>Is an account the same as being a seller?</h3>
+    <p>No. An account lets you log in and use buyer features. Applying to sell submits your information for review. Approval means Asset Moth has accepted your seller account. Onboarding is the final setup step where you complete storefront and Stripe payout requirements before regular seller tools unlock.</p>
+    <h3>Why is seller approval manual?</h3>
+    <p>Asset Moth reviews sellers manually to protect buyers, reduce infringement risk, and keep marketplace listings high quality. Approval is based on marketplace fit, originality, portfolio or product examples, policy compliance, and readiness to sell digital products.</p>
 </section>
 <section class="card page-section">
-    <h2>Products during Alpha</h2>
-    <h3>When can sellers add products?</h3>
-    <p>Product tools unlock after seller application approval and onboarding completion, including profile/store setup and Stripe payout readiness. Products still go through admin product review before they are public.</p>
-    <h3>How many products should Alpha sellers add?</h3>
-    <p>For Alpha testing, add a small but useful sample set: about 3 to 5 representative products unless the Asset Moth team asks for more. Include realistic previews, descriptions, categories, prices, files, and license settings.</p>
-    <h3>What should sellers report during Alpha?</h3>
-    <p>Please report confusing steps, upload problems, missing or unclear form fields, product review issues, Stripe onboarding friction, dashboard errors, broken links, unexpected emails, and anything that would block a real seller from listing products confidently.</p>
+    <h2>Store setup and payouts</h2>
+    <h3>What should I set up in my store?</h3>
+    <p>Your store should include a clear display name, store URL name, bio, avatar or logo, banner image, optional social links, and any announcement buyers should see. Keep store information accurate and professional.</p>
+    <h3>How do Stripe payouts work?</h3>
+    <p>Seller payouts are handled through Stripe Connect. Approved sellers must complete Stripe onboarding before payouts can be sent. Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens, and Stripe/payment processing fees also apply.</p>
+    <h3>What about sales tax?</h3>
+    <p>Asset Moth handles applicable checkout sales tax through Stripe Tax at checkout. Sellers should still track their own income, expenses, records, business registrations, and tax obligations. Asset Moth does not provide tax advice.</p>
 </section>
 <section class="card page-section">
-    <h2>Payments, payouts, and taxes</h2>
-    <h3>How do seller payouts work?</h3>
-    <p>Seller payouts are handled through Stripe Connect. Sellers must complete Stripe onboarding before payouts can be sent. Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens; Stripe/payment processing fees also apply.</p>
-    <h3>What should sellers know about taxes?</h3>
-    <p>Asset Moth handles applicable checkout sales tax through Stripe Tax during checkout. Sellers should still track their own income, expenses, tax forms, and business obligations, and should contact a tax professional for advice specific to their situation.</p>
+    <h2>Products and review</h2>
+    <h3>When can I add products?</h3>
+    <p>Product tools unlock after your seller application is approved and onboarding is complete, including storefront setup and Stripe payout readiness.</p>
+    <h3>How does product review work?</h3>
+    <p>Products can be saved as drafts or submitted for review. Submitted products are reviewed before becoming public. Asset Moth may approve, reject, disable, or request changes for listings that are incomplete, unclear, miscategorized, infringing, misleading, low quality, or not aligned with marketplace policies.</p>
+    <h3>What happens if a product is rejected?</h3>
+    <p>A rejected product is not public. Review any reason provided, update the listing, files, previews, category, AI disclosure, or license details as needed, then submit it again when ready.</p>
+    <h3>What should preview images and product files include?</h3>
+    <p>Preview images should accurately show what buyers receive and may be watermarked automatically. Product files should match the listing, be organized, and include the file types, instructions, or usage notes buyers need.</p>
 </section>
 <section class="card page-section">
-    <h2>Alpha notes</h2>
-    <h3>Why does the dashboard look basic?</h3>
-    <p>Dashboards are functional right now so Alpha testers can complete real workflow testing. Visual dashboard upgrades are planned for Phase 10.6.</p>
-    <h3>Is this Alpha private?</h3>
-    <p>Yes. If you are participating in the private Alpha, treat marketplace access, screenshots, workflows, seller feedback, and test details as private unless Asset Moth explicitly says otherwise.</p>
-    <h3>Where can I get help?</h3>
-    <p>Review <a href="/licensing-help">Licensing Help</a>, <a href="/terms">Terms</a>, or <a href="/contact">Contact</a> if you need support.</p>
+    <h2>Licenses and presets</h2>
+    <h3>How do license options work?</h3>
+    <p>Every product includes personal use with the base price. Depending on the product, sellers may enable additional license permissions such as commercial, POD, wholesale, fabric, VA, reseller, or extended commercial use. Product-level license settings are what buyers see and what checkout records for the order.</p>
+    <h3>Can I save default license settings?</h3>
+    <p>Yes. Store-level license presets let you save default enabled license options, prices, and descriptions for new products. Presets are optional, only prefill new product forms, and do not change existing products. You can still edit licenses per product before saving.</p>
+    <p>For details on license language, review <a href="/licensing-help">Licensing Help</a>.</p>
+</section>
+<section class="card page-section">
+    <h2>Refunds, responsibilities, and support</h2>
+    <h3>How are refunds and cancellations handled?</h3>
+    <p>Digital purchases are generally final once files are accessed or made available, but Asset Moth may review issues such as duplicate purchases, missing files, inaccessible downloads, incorrect uploads, or listings that materially differ from what was promised. Refunds, disputes, chargebacks, or adjustments may affect seller earnings.</p>
+    <h3>What are seller responsibilities?</h3>
+    <p>Sellers are responsible for original work or properly licensed content, legal rights to sell every file, accurate listings, clear license settings, correct AI disclosure, safe files, responsive communication, and compliance with marketplace policies.</p>
+    <h3>Where can sellers get help?</h3>
+    <p>Review <a href="/licensing-help">Licensing Help</a>, <a href="/terms">Terms</a>, and the <a href="/contact">Contact page</a>. When contacting support, include your account email, store name, product title if relevant, page URL, and a clear description of the issue.</p>
 </section>
 <?php endif; ?>

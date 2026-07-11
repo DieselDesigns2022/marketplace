@@ -323,6 +323,23 @@ CREATE TABLE product_license_types
     INDEX idx_product_license_type (license_type_id)
 );
 
+
+CREATE TABLE seller_license_presets
+(
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    designer_id BIGINT NOT NULL,
+    license_type_id BIGINT NOT NULL,
+    is_enabled BOOLEAN DEFAULT 0,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    description TEXT,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE(designer_id, license_type_id),
+    INDEX idx_seller_license_presets_designer (designer_id,is_enabled,sort_order),
+    INDEX idx_seller_license_presets_type (license_type_id)
+);
+
 CREATE TABLE product_images
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -631,4 +648,4 @@ CREATE TABLE admin_logs
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-INSERT INTO categories (name,slug,description) VALUES ('SVG Cut Files','svg-cut-files','Layered files for cutting machines'),('Fonts','fonts','Display and script fonts'),('Canva Templates','canva-templates','Editable templates for creators');
+INSERT INTO categories (name,slug,description) VALUES ('SVG Cut Files','svg-cut-files','Layered files for cutting machines'),('PNG Files','png-files','Transparent and print-ready PNG design files'),('Fonts','fonts','Display and script fonts'),('Canva Templates','canva-templates','Editable templates for creators');

@@ -81,7 +81,7 @@
     <?=H::e($values['social_links']??'')?>
     </textarea>
     </label>
-    <label>What type of designs do you sell? <small>Examples: SVG files, PNG designs, sublimation, seamless patterns, Canva templates, fonts, Procreate brushes/stamps, clipart, mockups, digital papers, other.</small>
+    <label>What type of designs do you sell? <small>Examples: SVG files, print-ready PNG designs, seamless patterns, Canva templates, fonts, Procreate brushes/stamps, clipart, mockups, digital papers, other.</small>
     <textarea name="design_types" required>
     <?=H::e($values['design_types']??'')?>
     </textarea>

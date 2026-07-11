@@ -32,13 +32,13 @@ foreach (['q'=>'Search','category'=>'Category','ai'=>'AI','pod'=>'POD','creator'
 ?>
 <nav class="breadcrumbs"><a href="/">Home</a> / <a href="/browse">Browse</a><?php if($isCategory): ?> / <?=H::e($category['name'])?><?php endif; ?></nav>
 <section class="page-hero"><p class="eyebrow"><?= $isCategory ? 'Category' : 'Marketplace browse' ?></p><h1><?= $isCategory ? H::e($category['name']) : 'Browse digital designs' ?></h1>
-<p><?= $isCategory ? H::e($category['description'] ?: 'Browse approved downloadable products in this category on Asset Moth.') : 'Discover SVGs, PNGs, sublimation designs, seamless patterns, templates, fonts, brushes, mockups, printables, and other creative files from independent designers.' ?></p></section>
+<p><?= $isCategory ? H::e($category['description'] ?: 'Browse approved downloadable products in this category on Asset Moth.') : 'Discover SVGs, print-ready PNG files, seamless patterns, templates, fonts, brushes, mockups, printables, and other creative files from independent designers.' ?></p></section>
 <section class="card">
     <h2>Categories</h2>
     <div class="grid"><?php foreach($cats as $c):?><a href="/category/<?=H::e($c['slug'])?>"><?=H::e($c['name'])?></a><?php endforeach;?></div>
 </section>
 <form class="filters browse-filters" action="<?=H::e($basePath)?>" method="get">
-    <label class="wide">Search keywords<input name="q" value="<?=H::e($filters['q']??'')?>" placeholder="Try sublimation mockup, font, POD..."></label>
+    <label class="wide">Search keywords<input name="q" value="<?=H::e($filters['q']??'')?>" placeholder="Try PNG mockup, font, POD..."></label>
     <?php if(!$isCategory): ?><label>Category<select name="category"><option value="">All categories</option><?php foreach($cats as $c):?><option value="<?=H::e($c['slug'])?>" <?=$selectedCategory===$c['slug']?'selected':''?>><?=H::e($c['name'])?></option><?php endforeach;?></select></label><?php endif; ?>
     <label>Creator<select name="creator"><option value="">All creators</option><?php foreach(($creators??[]) as $d):?><option value="<?=H::e($d['store_slug'])?>" <?=($filters['creator']??'')===$d['store_slug']?'selected':''?>><?=H::e($d['display_name'])?></option><?php endforeach;?></select></label>
     <label>Min price<input name="min_price" inputmode="decimal" value="<?=H::e($filters['min_price']??'')?>" placeholder="0"></label>
