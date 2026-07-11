@@ -36,9 +36,26 @@ class PublicController
 
     private const BROWSE_PAGE_SIZE = 12;
 
+    private function visibleCategories(?int $limit = null): array
+    {
+        $sql = 'select * from categories where is_active=1 and slug not in (?, ?) and not (lower(name) in (?, ?) and slug<>?) order by sort_order,name';
+        if ($limit !== null) $sql .= ' limit ' . max(1, $limit);
+        return DB::rows($sql, ['sublimation','png','png','png files','png-files']);
+    }
+
+    private function redirectLegacyBrowseCategory(): void
+    {
+        $category = trim((string)($_GET['category'] ?? ''));
+        if (!in_array($category, ['sublimation','png'], true)) return;
+        $query = $_GET;
+        $query['category'] = 'png-files';
+        $qs = http_build_query($query);
+        H::redirect('/browse' . ($qs !== '' ? '?' . $qs : ''));
+    }
+
     public function home(): void
     {
-        $cats = DB::rows('select * from categories where is_active=1 order by sort_order,name limit 8');
+        $cats = $this->visibleCategories(8);
         $products = DB::rows("select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status='approved' and d.status='approved' and p.is_featured=1 order by p.updated_at desc,p.id desc limit 8");
         $recentProducts = DB::rows("select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status='approved' and d.status='approved' order by p.created_at desc,p.id desc limit 8");
         $designers = DB::rows('select * from designers where status="approved" and is_featured=1 order by updated_at desc,id desc limit 6');
@@ -152,9 +169,10 @@ class PublicController
 
     public function browse(): void
     {
+        $this->redirectLegacyBrowseCategory();
         $state = $this->browseState();
         $result = $this->browseQuery($state['filters'], $state['terms'], $state['sort'], $state['page']);
-        $cats = DB::rows('select * from categories where is_active=1 order by sort_order,name');
+        $cats = $this->visibleCategories();
         $creators = DB::rows('select id,display_name,store_slug from designers where status="approved" order by display_name limit 100');
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
         $filtered = array_filter($state['filters'], fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
@@ -164,10 +182,11 @@ class PublicController
 
     public function category($slug): void
     {
+        if (in_array($slug, ['sublimation','png'], true)) { H::redirect('/category/png-files'); }
         $cat = DB::row('select * from categories where slug=? and is_active=1', [$slug]) ?? H::abort(404);
         $state = $this->browseState($slug);
         $result = $this->browseQuery($state['filters'], $state['terms'], $state['sort'], $state['page']);
-        $cats = DB::rows('select * from categories where is_active=1 order by sort_order,name');
+        $cats = $this->visibleCategories();
         $creators = DB::rows('select id,display_name,store_slug from designers where status="approved" order by display_name limit 100');
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
         $description = $cat['description'] ?: 'Shop approved digital design products in the '.$cat['name'].' category on Asset Moth.';
@@ -192,7 +211,8 @@ class PublicController
         $images = DB::rows('select * from product_images where product_id=? order by sort_order,id', [$p['id']]);
         $preview = $images[0]['image_path'] ?? '';
         $title = $p['seo_title'] ?: $p['title'];
-        $description = $p['seo_description'] ?: ($p['short_description'] ?: mb_substr(strip_tags($p['description']), 0, 160));
+        $description = trim((string)($p['seo_description'] ?: ($p['short_description'] ?: preg_replace('/\s+/', ' ', strip_tags((string)$p['description'])))));
+        $description = mb_substr($description, 0, 160);
         $licenses = LicenseService::productLicenses($p);
         $defaultLicense = $licenses[0] ?? ['price' => (float)($p['price'] ?? 0), 'license_key' => 'personal'];
         foreach ($licenses as $license) if (!empty($license['is_default'])) $defaultLicense = $license;
@@ -246,7 +266,7 @@ class PublicController
     {
         header('Content-Type: application/xml; charset=utf-8');
         $urls = ['/', '/browse', '/sell', '/about', '/contact', '/terms', '/privacy', '/licensing-help', '/buyer-faq', '/seller-faq'];
-        foreach (DB::rows('select slug from categories where is_active=1 order by sort_order,name') as $c) $urls[] = '/category/'.$c['slug'];
+        foreach ($this->visibleCategories() as $c) $urls[] = '/category/'.$c['slug'];
         foreach (DB::rows('select slug from products where status="approved" order by updated_at desc') as $p) $urls[] = '/product/'.$p['slug'];
         foreach (DB::rows('select store_slug from designers where status="approved" order by updated_at desc') as $d) $urls[] = '/store/'.$d['store_slug'];
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";

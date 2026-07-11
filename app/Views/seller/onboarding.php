@@ -3,7 +3,7 @@
 <?php if ($dashboardGate): ?>
 <section class="notice warning">Your seller application is approved, but onboarding is not complete yet. Complete the steps below before accessing products, orders, payouts, coupons, or other seller dashboard tools.</section>
 <?php endif; ?>
-<p class="muted">Complete these Alpha launch-readiness steps after your seller application is approved.</p>
+<p class="muted">Complete these seller onboarding steps after your application is approved.</p>
 <?php $ok = fn($v) => $v ? '<span class="badge ok">Complete</span>' : '<span class="badge pending">Needs setup</span>'; ?>
 <section class="card page-section">
     <h2>Your setup checklist</h2>

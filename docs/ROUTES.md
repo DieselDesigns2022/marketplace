@@ -121,6 +121,13 @@ No new routes were added for Phase 7. Header and footer polish use existing rout
 
 Filtered or paginated browse/category URLs remain public but should render `noindex,follow` with canonical URLs to the base browse/category route.
 
+Legacy PNG/Sublimation category normalization is implemented for the consolidated PNG category. The canonical category slug is `png-files`, and the canonical visible category label is `PNG Files`.
+
+- `GET /category/sublimation` redirects to `/category/png-files`.
+- `GET /category/png` redirects to `/category/png-files`.
+- `GET /browse?category=sublimation` redirects/normalizes to `/browse?category=png-files` while preserving any other browse query parameters.
+- `GET /browse?category=png` redirects/normalizes to `/browse?category=png-files` while preserving any other browse query parameters.
+
 ## Phase 8.5 licensing behavior
 - `GET|POST /seller/product/new` and `GET|POST /seller/product/{id}` include seller license configuration fields for enabled licenses and add-on prices. Personal is always included/free; sellers enable or disable Basic, Commercial, POD, Wholesale, Fabric, VA, Reseller, and Extended Commercial add-on permissions and may price any add-on at `$0.00` or higher.
 - `GET /product/{slug}` displays enabled license options, including selected add-on prices where applicable, and posts one or more selected license keys to `POST /cart/add/{id}`.

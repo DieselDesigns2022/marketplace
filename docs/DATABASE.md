@@ -241,3 +241,9 @@ Pending seller payout retries are scoped to payout-ready designers and webhook-c
 
 ## Phase 10.3B Stripe Tax compliance
 Phase 10.3B uses Stripe Tax through Stripe Checkout. `orders.tax_amount` stores Stripe-returned tax, `orders.tax_provider` identifies `stripe_tax`, `orders.tax_status` stores the Stripe automatic-tax status, `orders.tax_liability_owner` stores the normalized marketplace owner such as `platform`, `orders.tax_snapshot` stores escaped admin-review context from Stripe Checkout, and `orders.tax_collected_at` records when tax was confirmed. Asset Moth is US-only at launch, sells digital files only, has no shipping, and excludes tax from seller earnings, seller payouts, gross-sales commission calculations, and platform commission. International VAT/GST remains future work; 1099 reporting is handled through Stripe Connect and Stripe tax forms setup, not homemade IRS form generation.
+
+## Seller license presets
+
+`seller_license_presets` stores optional store-level default license settings for approved designers. Rows are scoped by `designer_id` and `license_type_id`, with enabled state, default add-on price, optional default description, and sort order. These presets only prefill new product forms; saved product license rows in `product_license_types` remain the checkout and order-snapshot source of truth.
+
+The migration `database/migrations/2026_07_11_seller_product_cleanup_launch_faq.sql` creates `seller_license_presets` if it is missing. It also consolidates legacy PNG/Sublimation categories into the canonical `PNG Files` category with slug `png-files`. Products assigned to old Sublimation categories or duplicate PNG categories are moved to the canonical `png-files` category. Old Sublimation rows and duplicate PNG rows by slug/name are disabled, not deleted, for safety.

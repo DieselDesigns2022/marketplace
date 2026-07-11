@@ -85,9 +85,9 @@ class SellerController
             return null;
 
         }
-        if (($_FILES[$field]['size'] ?? 0) > 15 * 1024 * 1024)
+        if (($_FILES[$field]['size'] ?? 0) > 25 * 1024 * 1024)
         {
-            $errors[] = ucfirst($field) . ' must be 15MB or smaller.';
+            $errors[] = ucfirst($field) . ' must be 25MB or smaller.';
             return null;
 
         }
@@ -213,6 +213,27 @@ class SellerController
             H::redirect('/seller/onboarding');
         }
         return $d;
+    }
+
+
+    private function productCategoryRows(): array
+    {
+        return DB::rows('select * from categories where is_active=1 and slug not in (?, ?) and not (lower(name) in (?, ?) and slug<>?) order by sort_order,name', ['sublimation','png','png','png files','png-files']);
+    }
+
+    private function renderProductForm(?array $p, array $errors, array $d): void
+    {
+        $productId = $p['id'] ?? 0;
+        H::view('seller/edit_product', [
+            'p' => $p,
+            'errors' => $errors,
+            'cats' => $this->productCategoryRows(),
+            'images' => $productId ? DB::rows('select * from product_images where product_id=? order by sort_order,id', [$productId]) : [],
+            'files' => $productId ? DB::rows('select * from product_files where product_id=? order by created_at desc', [$productId]) : [],
+            'tagText' => $productId ? $this->tagText((int)$productId) : '',
+            'licenseTypes' => LicenseService::platformTypes(),
+            'productLicenses' => $p ? LicenseService::productLicenses($p) : LicenseService::presetLicensesForProductForm((int)$d['id']),
+        ]);
     }
 
     public function onboarding(): void
@@ -353,6 +374,12 @@ class SellerController
         $errors = [];
         if ($_POST)
         {
+            if (($_POST['settings_section'] ?? 'store') === 'licenses') {
+                $errors = LicenseService::syncSellerPresets((int)$d['id'], $_POST);
+                if (!$errors) { H::flash('success', 'License presets updated.'); H::redirect('/seller/store'); }
+                H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'licenseTypes' => LicenseService::platformTypes(), 'licensePresets' => LicenseService::sellerPresets((int)$d['id']), ]);
+                return;
+            }
             $display = trim($_POST['display_name'] ?? '');
             $slug = trim($_POST['store_slug'] ?? '');
             $bio = trim($_POST['bio'] ?? '');
@@ -369,7 +396,7 @@ class SellerController
            }
             if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug))
            {
-                $errors[] = 'Store slug must use lowercase letters, numbers, and hyphens only.';
+                $errors[] = 'Store URL name must use lowercase letters, numbers, and hyphens only.';
 
            }
             elseif ($this->storeSlugTaken($slug, (int) $d['id']))
@@ -404,7 +431,7 @@ class SellerController
            }
 
         }
-        H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, ]);
+        H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'licenseTypes' => LicenseService::platformTypes(), 'licensePresets' => LicenseService::sellerPresets((int)$d['id']), ]);
 
     }
     private function productValues(array $existing = []): array
@@ -412,42 +439,46 @@ class SellerController
         $price = $_POST['price'] ?? ($existing['price'] ?? '0.00');
         $commercialEnabled = isset($_POST['license_enabled']['commercial']);
         $commercialLicensePrice = $_POST['license_price']['commercial'] ?? ($existing['commercial_license_price'] ?? '0.00');
-        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => H::slug(trim($_POST['slug'] ?? $existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
+        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
+    }
+
+    private function uniqueProductSlug(string $title, ?int $ignoreId = null): string
+    {
+        $base = H::slug($title) ?: 'product';
+        $slug = mb_substr($base, 0, 190);
+        $i = 2;
+        while (true) {
+            $params = [$slug];
+            $sql = 'select id from products where slug=?';
+            if ($ignoreId) { $sql .= ' and id<>?'; $params[] = $ignoreId; }
+            if (!DB::row($sql . ' limit 1', $params)) return $slug;
+            $suffix = '-' . $i++;
+            $slug = mb_substr($base, 0, 190 - mb_strlen($suffix)) . $suffix;
+        }
+    }
+
+    private function uploadedPreviewFilesValid(array &$errors): bool
+    {
+        if (empty($_FILES['preview_images']['name'][0])) return true;
+        $before = count($errors);
+        foreach ($_FILES['preview_images']['name'] as $idx => $original) {
+            $err = $_FILES['preview_images']['error'][$idx] ?? UPLOAD_ERR_NO_FILE;
+            if ($err === UPLOAD_ERR_NO_FILE) continue;
+            if ($err !== UPLOAD_ERR_OK) { $errors[] = 'Preview image upload failed.'; continue; }
+            if (($_FILES['preview_images']['size'][$idx] ?? 0) > 25 * 1024 * 1024) { $errors[] = 'Preview images must be 25MB or smaller.'; continue; }
+            $tmp = $_FILES['preview_images']['tmp_name'][$idx] ?? '';
+            $ext = strtolower(pathinfo((string)$original, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg','jpeg','png','webp'], true) || !@getimagesize($tmp)) $errors[] = 'Preview images must be valid JPG, PNG, or WEBP files.';
+        }
+        return count($errors) === $before;
     }
     private function validateProduct(array $v, ?int $ignoreId = null): array
     {
         $errors = [];
         if ($v['title'] === '')
         {
-            $errors[] = 'Product Name is required.';
-
-        }
-        if ($v['slug'] === '')
-        {
-            $errors[] = 'Product Slug is required.';
-
-        }
-        elseif (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $v['slug']))
-        {
-            $errors[] = 'Product Slug can only contain lowercase letters, numbers, and hyphens.';
-
-        }
-        else
-        {
-            $params = [$v['slug']];
-            $sql = 'select id from products where slug=?';
-            if ($ignoreId)
-           {
-                $sql .= ' and id<>?';
-                $params[] = $ignoreId;
-
-           }
-            if (DB::row($sql . ' limit 1', $params))
-           {
-                $errors[] = 'Product Slug must be unique.';
-
-           }
+            $errors[] = 'Product Title is required.';
 
         }
         if ($v['description'] === '')
@@ -470,12 +501,12 @@ class SellerController
             $errors[] = 'AI Disclosure is required.';
 
         }
-        if (mb_strlen($v['seo_title']) > 70)
+        if ($v['seo_title'] !== '' && mb_strlen($v['seo_title']) > 70)
         {
             $errors[] = 'SEO title must be 70 characters or fewer.';
 
         }
-        if (mb_strlen($v['seo_description']) > 170)
+        if ($v['seo_description'] !== '' && mb_strlen($v['seo_description']) > 170)
         {
             $errors[] = 'SEO description must be 170 characters or fewer.';
 
@@ -483,9 +514,26 @@ class SellerController
         return $errors;
 
     }
-    private function savePreviewImages(int $productId, array &$errors): void
+    private function deletePreviewPaths(?string $imagePath, ?string $originalImagePath): void
     {
-        if (empty($_FILES['preview_images']['name'][0])) return;
+        if ($imagePath) {
+            $path = public_path(ltrim($imagePath, '/'));
+            $base = realpath(public_path('uploads/product_previews'));
+            $real = realpath($path);
+            if ($base && $real && is_file($real) && str_starts_with($real, $base)) @unlink($real);
+        }
+        if ($originalImagePath) {
+            $originalPath = app_path('storage/app/private/' . ltrim($originalImagePath, '/'));
+            $originalBase = realpath(app_path('storage/app/private/product_previews'));
+            $originalReal = realpath($originalPath);
+            if ($originalBase && $originalReal && is_file($originalReal) && str_starts_with($originalReal, $originalBase)) @unlink($originalReal);
+        }
+    }
+
+    private function savePreviewImages(int $productId, array &$errors): array
+    {
+        $createdImageIds = [];
+        if (empty($_FILES['preview_images']['name'][0])) return $createdImageIds;
         foreach ($_FILES['preview_images']['name'] as $idx => $original) {
             if (($_FILES['preview_images']['error'][$idx] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
             $file = [
@@ -499,10 +547,23 @@ class SellerController
             if ($saved) {
                 $alt = trim($_POST['preview_alt'][$idx] ?? pathinfo((string)$original, PATHINFO_FILENAME));
                 $sort = (int) ($_POST['preview_sort'][$idx] ?? $idx);
-                DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)', [$productId, $saved['image_path'], $saved['original_image_path'], $saved['watermark_status'], $saved['watermark_error'], $alt, $sort]);
+                try {
+                    DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)', [$productId, $saved['image_path'], $saved['original_image_path'], $saved['watermark_status'], $saved['watermark_error'], $alt, $sort]);
+                    $createdImageIds[] = (int)DB::id();
+                } catch (Throwable $e) {
+                    $this->deletePreviewPaths($saved['image_path'] ?? null, $saved['original_image_path'] ?? null);
+                    $errors[] = 'Preview image could not be attached to the product.';
+                }
             }
         }
+        return $createdImageIds;
     }
+
+    private function cleanupCreatedPreviewImages(int $productId, array $imageIds): void
+    {
+        foreach ($imageIds as $imageId) $this->deletePreviewImage((int)$imageId, $productId);
+    }
+
     private function syncTags(int $productId, string $tagsText): void
     {
         DB::exec('delete from product_tags where product_id=?', [$productId]);
@@ -536,20 +597,7 @@ class SellerController
         $img = DB::row('select image_path,original_image_path from product_images where id=? and product_id=?', [$imageId, $productId]);
         if ($img)
         {
-            $path = public_path(ltrim($img['image_path'], '/'));
-            $base = realpath(public_path('uploads/product_previews'));
-            $real = realpath($path);
-            if ($base && $real && is_file($real) && str_starts_with($real, $base))
-           {
-                @unlink($real);
-
-           }
-            if (!empty($img['original_image_path'])) {
-                $originalPath = app_path('storage/app/private/' . ltrim($img['original_image_path'], '/'));
-                $originalBase = realpath(app_path('storage/app/private/product_previews'));
-                $originalReal = realpath($originalPath);
-                if ($originalBase && $originalReal && is_file($originalReal) && str_starts_with($originalReal, $originalBase)) @unlink($originalReal);
-            }
+            $this->deletePreviewPaths($img['image_path'] ?? null, $img['original_image_path'] ?? null);
             DB::exec('delete from product_images where id=? and product_id=?', [$imageId, $productId]);
 
         }
@@ -584,14 +632,20 @@ class SellerController
         return true;
 
     }
-    private function saveProductFiles(int $productId): bool
+
+    private function cleanupProductUploadRowsAndFiles(int $productId): void
     {
+        foreach (DB::rows('select id from product_images where product_id=?', [$productId]) as $img) $this->deletePreviewImage((int)$img['id'], $productId);
+        foreach (DB::rows('select id from product_files where product_id=?', [$productId]) as $file) $this->deleteProductFile((int)$file['id'], $productId);
+    }
+    private function saveProductFiles(int $productId, array &$errors): array
+    {
+        $createdFileIds = [];
         if (empty($_FILES['product_files']['name'][0]))
         {
-            return false;
+            return $createdFileIds;
 
         }
-        $saved = false;
         $dir = app_path('storage/protected_uploads/products');
         if (!is_dir($dir))
         {
@@ -600,23 +654,40 @@ class SellerController
         }
         foreach ($_FILES['product_files']['name'] as $idx => $original)
         {
-            if (($_FILES['product_files']['error'][$idx] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK)
+            $error = $_FILES['product_files']['error'][$idx] ?? UPLOAD_ERR_NO_FILE;
+            if ($error === UPLOAD_ERR_NO_FILE) continue;
+            if ($error !== UPLOAD_ERR_OK)
            {
+                $errors[] = 'Product file upload failed for ' . basename((string)$original) . '.';
                 continue;
 
            }
             $name = bin2hex(random_bytes(12)) . '-' . basename($original);
-            if (move_uploaded_file($_FILES['product_files']['tmp_name'][$idx], $dir . '/' . $name))
+            $absolutePath = $dir . '/' . $name;
+            if (!move_uploaded_file($_FILES['product_files']['tmp_name'][$idx], $absolutePath))
            {
-                DB::exec( 'insert into product_files (product_id,storage_path,original_name,file_size,mime_type) values (?,?,?,?,?)', [ $productId, 'products/' . $name, $original, $_FILES['product_files']['size'][$idx], $_FILES['product_files']['type'][$idx] ?? 'application/octet-stream', ] );
-                $saved = true;
+                $errors[] = 'Product file could not be saved: ' . basename((string)$original) . '.';
+                continue;
 
            }
+            try {
+                DB::exec( 'insert into product_files (product_id,storage_path,original_name,file_size,mime_type) values (?,?,?,?,?)', [ $productId, 'products/' . $name, $original, $_FILES['product_files']['size'][$idx], $_FILES['product_files']['type'][$idx] ?? 'application/octet-stream', ] );
+                $createdFileIds[] = (int)DB::id();
+            } catch (Throwable $e) {
+                @unlink($absolutePath);
+                $errors[] = 'Product file could not be attached to the product: ' . basename((string)$original) . '.';
+            }
 
         }
-        return $saved;
+        return $createdFileIds;
 
     }
+
+    private function cleanupCreatedProductFiles(int $productId, array $fileIds): void
+    {
+        foreach ($fileIds as $fileId) $this->deleteProductFile((int)$fileId, $productId);
+    }
+
     private function productReviewContentChanged(array $existing, array $values): bool
     {
         return (string) ($existing['title'] ?? '') !== (string) $values['title'] || (string) ($existing['short_description'] ?? '') !== (string) $values['short_description'] || (string) ($existing['description'] ?? '') !== (string) $values['description'];
@@ -727,14 +798,33 @@ class SellerController
             $errors = $this->validateProduct($values, $p ? (int) $p['id'] : null);
             [$postedLicenses, $licenseErrors] = LicenseService::normalizePosted($values, $_POST);
             $errors = array_merge($errors, $licenseErrors);
+            $this->uploadedPreviewFilesValid($errors);
             if (!$errors)
            {
+                $createdPreviewIds = [];
+                $createdFileIds = [];
+
                 if ($p)
                {
-                    $this->saveProductFiles((int) $p['id']);
+                    $productId = (int)$p['id'];
+                    $createdPreviewIds = $this->savePreviewImages($productId, $errors);
+                    if ($errors) {
+                        $this->cleanupCreatedPreviewImages($productId, $createdPreviewIds);
+                        $this->renderProductForm($p, $errors, $d);
+                        return;
+                    }
 
-               }
+                    $createdFileIds = $this->saveProductFiles($productId, $errors);
+                    if ($errors) {
+                        $this->cleanupCreatedPreviewImages($productId, $createdPreviewIds);
+                        $this->cleanupCreatedProductFiles($productId, $createdFileIds);
+                        $this->renderProductForm($p, $errors, $d);
+                        return;
+                    }
+                }
+
                 $status = $this->productStatusForSave($p, $values);
+                $values['slug'] = $p ? (string)$p['slug'] : $this->uniqueProductSlug($values['title']);
                 $fileTypes = implode(',', $values['file_types']);
                 if ($p)
                {
@@ -745,29 +835,41 @@ class SellerController
                 else
                {
                     DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, ] );
-                    $productId = DB::id();
+                    $productId = (int)DB::id();
 
                }
                 $this->syncTags($productId, $values['tags']);
                 LicenseService::syncProductLicenses($productId, $postedLicenses);
-                $this->savePreviewImages($productId, $errors);
-                if (!$p)
-               {
-                    $this->saveProductFiles($productId);
 
-               }
-                if (!$errors)
-               {
-                    H::flash('success', $this->flashMessageForProductStatus($status));
-                    H::redirect('/seller/products');
+                if (!$p) {
+                    $createdPreviewIds = $this->savePreviewImages($productId, $errors);
+                    if ($errors) {
+                        $this->cleanupProductUploadRowsAndFiles($productId);
+                        DB::exec('delete from product_tags where product_id=?', [$productId]);
+                        DB::exec('delete from product_license_types where product_id=?', [$productId]);
+                        DB::exec('delete from products where id=? and designer_id=?', [$productId, $d['id']]);
+                        $this->renderProductForm(null, $errors, $d);
+                        return;
+                    }
 
-               }
+                    $createdFileIds = $this->saveProductFiles($productId, $errors);
+                    if ($errors) {
+                        $this->cleanupProductUploadRowsAndFiles($productId);
+                        DB::exec('delete from product_tags where product_id=?', [$productId]);
+                        DB::exec('delete from product_license_types where product_id=?', [$productId]);
+                        DB::exec('delete from products where id=? and designer_id=?', [$productId, $d['id']]);
+                        $this->renderProductForm(null, $errors, $d);
+                        return;
+                    }
+                }
+
+                H::flash('success', $this->flashMessageForProductStatus($status));
+                H::redirect('/seller/products');
 
            }
 
         }
-        $productId = $p['id'] ?? 0;
-        H::view('seller/edit_product', [ 'p' => $p, 'errors' => $errors, 'cats' => DB::rows('select * from categories where is_active=1'), 'images' => $productId ? DB::rows( 'select * from product_images where product_id=? order by sort_order,id', [$productId] ) : [], 'files' => $productId ? DB::rows( 'select * from product_files where product_id=? order by created_at desc', [$productId] ) : [], 'tagText' => $productId ? $this->tagText((int) $productId) : '', 'licenseTypes' => LicenseService::platformTypes(), 'productLicenses' => $p ? LicenseService::productLicenses($p) : [], ]);
+        $this->renderProductForm($p, $errors, $d);
 
     }
 

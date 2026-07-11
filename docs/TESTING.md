@@ -242,3 +242,8 @@ Use this checklist for Phase 10.3B validation:
 - Admin order detail and payment logs show tax separately; payment-log detail shows order-level tax once per order while the summary remains authoritative.
 - Seller pages state tax is handled by Asset Moth/Stripe Tax and excluded from payout.
 - Downloads/manual delivery unlock only after a valid webhook-confirmed paid order.
+
+
+## Current seller upload limit check
+
+- Current seller preview, avatar, and banner image validation allows JPG, PNG, and WEBP uploads up to 25MB. Verify app validation messages, seller form help text, and deployment limits (`upload_max_filesize`, `post_max_size`, and reverse proxy body size) before launch.

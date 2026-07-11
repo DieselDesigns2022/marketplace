@@ -8,10 +8,9 @@
 <form method="post" enctype="multipart/form-data" class="form card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <h2>Basic Information</h2>
-    <label>Product Name<input name="title" required value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source>
+    <label>Product Title<input name="title" required value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source>
     </label>
-    <label>Product Slug<input name="slug" required value="<?=H::e($_POST['slug']??$p['slug']??'') ?>" data-slug-target>
-    </label>
+    <p class="help-text">The public product URL is generated automatically from the product title.</p>
     <label>Short Description<textarea name="short_description">
     <?=H::e($_POST['short_description']??$p['short_description']??'')?>
     </textarea>
@@ -30,7 +29,7 @@
            <?php if(!empty($img['watermark_error'])):?><small class="help-text">Watermark note: <?=H::e($img['watermark_error'])?></small><?php endif;?>
         </div>
     <?php endforeach;?>
-    <p class="help-text">Public preview images are watermarked automatically. Purchased/downloadable files below are never watermarked or altered.</p>
+    <p class="help-text">Public preview images are watermarked automatically. JPG, PNG, or WEBP up to 25MB each. Purchased/downloadable files below are never watermarked or altered.</p>
     <label>Upload preview images<input type="file" name="preview_images[]" multiple accept=".jpg,.jpeg,.png,.webp" data-preview-images>
     </label>
     <div data-preview-alt-fields>
@@ -107,13 +106,9 @@
 <?php endforeach;?>
 </select>
 </label>
-<h2>SEO Section</h2>
-<label>SEO Title<input name="seo_title" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>">
-</label>
-<label>SEO Description<textarea name="seo_description">
-<?=H::e($_POST['seo_description']??$p['seo_description']??'')?>
-</textarea>
-</label>
+<details class="advanced-panel"><summary>Advanced SEO (optional)</summary><p class="help-text">Leave these blank to use the product title and short description automatically.</p>
+<label>SEO Title<input name="seo_title" maxlength="70" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>"></label>
+<label>SEO Description<textarea name="seo_description" maxlength="170"><?=H::e($_POST['seo_description']??$p['seo_description']??'')?></textarea></label></details>
 <button name="action" value="draft">Save Draft</button>
 <button class="btn" name="action" value="review">Submit For Review</button>
 </form>

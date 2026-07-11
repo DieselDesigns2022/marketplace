@@ -87,3 +87,13 @@ Phase 6 was validated on the VPS deployment path `/var/www/marketplace.dieseldes
 
 ## Phase 10.3B Stripe Tax compliance
 Apply `database/migrations/2026_07_08_phase_10_3b_stripe_tax_compliance.sql` before deploying the Phase 10.3B code so `orders.tax_amount` and the Stripe Tax metadata columns exist. In Stripe Dashboard, confirm Stripe Tax is enabled/configured, the digital artwork tax category is set, prices/shipping behavior match launch policy, USD-only checkout is expected, no shipping address or shipping rates are configured by the app, and the Stripe webhook endpoint is active. After deploy, test a Stripe Checkout Session and webhook confirmation to verify `automatic_tax` is enabled, billing address collection is required, Stripe-returned tax is stored, and delivery unlocks only after a valid webhook-confirmed paid order. Include a negative webhook/test case for non-complete `automatic_tax.status` to confirm the order remains in manual review and delivery/download unlock stays blocked.
+
+## Upload size requirements
+
+Seller product preview images support JPG, PNG, and WEBP uploads up to 25MB each. Production PHP and web server limits must allow that size plus normal multipart overhead. Recommended minimums:
+
+- `upload_max_filesize = 25M`
+- `post_max_size = 30M` or higher
+- Nginx `client_max_body_size 30M` or an equivalent reverse proxy limit
+
+If these server limits are lower than the application limit, sellers may see a server-level upload failure before Asset Moth can show the normal validation message.
