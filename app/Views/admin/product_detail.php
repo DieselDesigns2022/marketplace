@@ -63,7 +63,7 @@
     </ul>
     <form method="post">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-        <label>Rejection Reason<input name="reason">
+        <label>Rejection Reason <span class="muted">(required only when rejecting)</span><input name="reason" placeholder="Example: TM, copyright issue, wrong file, needs clearer preview">
         </label>
         <button class="btn" name="action" value="approve">Approve</button>
         <button name="action" value="reject">Reject</button>

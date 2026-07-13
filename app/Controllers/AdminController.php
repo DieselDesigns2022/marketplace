@@ -247,7 +247,7 @@ class AdminController
             return;
 
         }
-        if($status==='rejected' && mb_strlen($reason)<5)
+        if($status==='rejected' && trim($reason)==='')
         {
            H::flash('error','Rejection Reason is required.');
             return;
