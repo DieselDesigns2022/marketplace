@@ -989,3 +989,23 @@ aside .share-card {
   color: #b91c1c;
   font-weight: 700;
 }
+
+/* Live fix: show full uncropped product previews on admin review pages */
+.admin-review-preview-item {
+  margin: 12px 0 24px;
+}
+
+.admin-review-preview-link {
+  display: block;
+}
+
+.admin-review-preview {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: none;
+  object-fit: contain;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffd1e2, #c7fff1);
+}
