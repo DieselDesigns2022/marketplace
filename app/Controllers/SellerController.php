@@ -894,6 +894,14 @@ class SellerController
         DB::exec('delete from products where id=?', [$productId]);
     }
 
+    private function duplicateProductTitle(string $title): string
+    {
+        $suffix = ' Copy';
+        $base = trim($title) !== '' ? trim($title) : 'Product';
+        $maxBaseLength = 190 - mb_strlen($suffix);
+        return rtrim(mb_substr($base, 0, $maxBaseLength)) . $suffix;
+    }
+
 
     public function duplicateProduct($id)
     {
@@ -901,8 +909,7 @@ class SellerController
         H::requireSeller();
         $d = $this->d();
         $source = DB::row('select * from products where id=? and designer_id=? and status<>"deleted"', [(int)$id, $d['id']]) ?? H::abort(404);
-        $copyTitleBase = trim((string)$source['title']) !== '' ? (string)$source['title'] . ' Copy' : 'Product Copy';
-        $copyTitle = mb_substr($copyTitleBase, 0, 190);
+        $copyTitle = $this->duplicateProductTitle((string)$source['title']);
         $slug = $this->uniqueProductSlug($copyTitle);
         try {
             DB::begin();
