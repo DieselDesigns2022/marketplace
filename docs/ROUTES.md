@@ -55,6 +55,7 @@ Routes are registered in `public/index.php`.
 | GET/POST | `/seller/product/new` | `SellerController::editProduct` | Seller/admin protected |
 | GET/POST | `/seller/product/{id}` | `SellerController::editProduct` | Seller/admin protected |
 | POST | `/seller/product/{id}/submit` | `SellerController::submitProduct` | Seller/admin protected |
+| POST | `/seller/product/{id}/duplicate` | `SellerController::duplicateProduct` | Seller/admin protected |
 | POST | `/seller/product/{id}/disable` | `SellerController::disableProduct` | Seller/admin protected |
 | GET | `/seller/sales` | `SellerController::sales` | Seller/admin protected |
 | GET | `/seller/referrals` | `SellerController::referrals` | Seller/admin protected |

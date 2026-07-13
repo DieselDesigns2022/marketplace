@@ -41,7 +41,7 @@
     </label>
     <label>Store URL Name<input name="store_slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" value="<?=H::e($d['store_slug'])?>">
     </label>
-    <label>Bio/about section<textarea name="bio" maxlength="1200">
+    <label>Bio/about section<textarea name="bio" maxlength="1200" data-character-counter>
     <?=H::e($d['bio'])?>
     </textarea>
     </label>
@@ -59,9 +59,9 @@
     <?=H::e($d['announcement'])?>
     </textarea>
     </label>
-    <label>SEO title<input name="seo_title" maxlength="70" value="<?=H::e($d['seo_title']??'')?>">
+    <label>SEO title<input name="seo_title" maxlength="70" value="<?=H::e($d['seo_title']??'')?>" data-character-counter>
     </label>
-    <label>SEO description<textarea name="seo_description" maxlength="170">
+    <label>SEO description<textarea name="seo_description" maxlength="170" data-character-counter>
     <?=H::e($d['seo_description']??'')?>
     </textarea>
     </label>

@@ -247,3 +247,10 @@ Use this checklist for Phase 10.3B validation:
 ## Current seller upload limit check
 
 - Current seller preview, avatar, and banner image validation allows JPG, PNG, and WEBP uploads up to 25MB. Verify app validation messages, seller form help text, and deployment limits (`upload_max_filesize`, `post_max_size`, and reverse proxy body size) before launch.
+
+## Seller tester feedback polish checklist
+
+- Seller FAQ Stripe/CSRF clarity: open `/seller-faq` and confirm Stripe Connect onboarding, buyer checkout through Stripe, payout timing caveats, accurate Stripe account information, and plain-language CSRF/session recovery wording are visible. Confirm the old Product Status Guide help section is not shown.
+- Character counters: on `/seller/product/new`, `/seller/product/{id}`, and `/seller/store`, type into seller-facing limited fields such as product title, SEO title, SEO description, store bio, store SEO title, and store SEO description. Confirm counters update live and clearly indicate over-limit text if the browser allows it.
+- Wishlist card images/seller links: open `/dashboard/wishlist` with saved products that have preview images and approved seller records. Confirm cards show preview images, real seller display names, valid `/store/{slug}` links when a store slug exists, and no broken seller link when seller/store data is missing.
+- Duplicate listing behavior: from `/seller/products`, duplicate one of the signed-in seller's own products. Confirm the new listing is a draft named like `Original Title Copy`, has a unique auto-generated slug, copies editable listing details/tags/license settings/SEO fields, does not copy order/download/sales/history data, and does not copy preview images or downloadable files.

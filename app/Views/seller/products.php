@@ -22,6 +22,7 @@
                <td><?=H::e($p['updated_at'])?></td>
                <td>
                    <a href="/seller/product/<?=$p['id']?>">Edit</a>
+                   <form method="post" action="/seller/product/<?=$p['id']?>/duplicate" onsubmit="return confirm('Create a draft copy of this product? Product files and preview images will not be copied.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Duplicate</button></form>
                    <?php if(in_array($p['status'], ['approved','published'], true)):?><a href="/product/<?=H::e($p['slug'])?>">View Public Page</a><?php endif;?>
                    <?php if(!in_array($p['status'], ['archived','deleted'], true)):?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/archive" onsubmit="return confirm('Archive this product and hide it from public listings? Order history will remain available.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Archive / Hide</button></form>

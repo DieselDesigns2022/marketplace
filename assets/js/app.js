@@ -1,4 +1,24 @@
+
+function updateCharacterCounter(field) {
+  const max = Number(field.getAttribute("maxlength"));
+  if (!max) return;
+  let counter = field.parentElement?.querySelector(`[data-character-counter-for="${field.name}"]`);
+  if (!counter) {
+    counter = document.createElement("small");
+    counter.className = "character-counter";
+    counter.setAttribute("data-character-counter-for", field.name);
+    field.insertAdjacentElement("afterend", counter);
+  }
+  const current = Array.from(field.value || "").length;
+  const over = current > max;
+  counter.textContent = `${current}/${max} characters${over ? ` (${current - max} over)` : ` (${max - current} left)`}`;
+  counter.classList.toggle("over-limit", over);
+  counter.setAttribute("aria-live", "polite");
+}
+
+document.querySelectorAll("[data-character-counter][maxlength]").forEach(updateCharacterCounter);
 document.addEventListener("input", (e) => {
+  if (e.target.matches("[data-character-counter][maxlength]")) updateCharacterCounter(e.target);
   if (e.target.matches("[data-slug-source]")) {
     const target = document.querySelector("[data-slug-target]");
     if (target && !target.dataset.touched)
