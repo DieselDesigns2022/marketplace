@@ -481,6 +481,11 @@ class SellerController
             $errors[] = 'Product Title is required.';
 
         }
+        if (mb_strlen($v['title']) > 190)
+        {
+            $errors[] = 'Product Title must be 190 characters or fewer.';
+
+        }
         if ($v['description'] === '')
         {
             $errors[] = 'Full Description is required.';
@@ -887,6 +892,38 @@ class SellerController
         DB::exec('delete from product_images where product_id=?', [$productId]);
         DB::exec('delete from product_files where product_id=?', [$productId]);
         DB::exec('delete from products where id=?', [$productId]);
+    }
+
+
+    public function duplicateProduct($id)
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+        $d = $this->d();
+        $source = DB::row('select * from products where id=? and designer_id=? and status<>"deleted"', [(int)$id, $d['id']]) ?? H::abort(404);
+        $copyTitleBase = trim((string)$source['title']) !== '' ? (string)$source['title'] . ' Copy' : 'Product Copy';
+        $copyTitle = mb_substr($copyTitleBase, 0, 190);
+        $slug = $this->uniqueProductSlug($copyTitle);
+        try {
+            DB::begin();
+            DB::exec('insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,"draft")', [
+                $d['id'], $source['category_id'], $copyTitle, $slug, $source['short_description'], $source['description'], $source['price'], $source['fulfillment_type'], $source['manual_delivery_instructions'], null, $source['file_types'], $source['commercial_license_enabled'], $source['commercial_license_price'], $source['pod_allowed'], $source['digital_resale_prohibited'], $source['ai_disclosure'], $source['seo_title'], $source['seo_description'],
+            ]);
+            $newId = (int)DB::id();
+            foreach (DB::rows('select tag_id from product_tags where product_id=?', [(int)$source['id']]) as $tag) {
+                DB::exec('insert ignore into product_tags (product_id,tag_id) values (?,?)', [$newId, $tag['tag_id']]);
+            }
+            foreach (DB::rows('select license_type_id,is_enabled,is_default,price,custom_name,description,sort_order from product_license_types where product_id=?', [(int)$source['id']]) as $license) {
+                DB::exec('insert into product_license_types (product_id,license_type_id,is_enabled,is_default,price,custom_name,description,sort_order) values (?,?,?,?,?,?,?,?)', [$newId, $license['license_type_id'], $license['is_enabled'], $license['is_default'], $license['price'], $license['custom_name'], $license['description'], $license['sort_order']]);
+            }
+            DB::commit();
+            H::flash('success', 'Product duplicated as a draft. Preview images and downloadable files were not copied; add or upload files before submitting the copy for review.');
+            H::redirect('/seller/product/' . $newId);
+        } catch (Throwable $e) {
+            DB::rollBack();
+            H::flash('error', 'Product could not be duplicated. Please try again.');
+            H::redirect('/seller/products');
+        }
     }
 
     public function archiveProduct($id)

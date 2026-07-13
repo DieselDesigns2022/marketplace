@@ -58,7 +58,7 @@ class BuyerController
     public function wishlist()
     {
         H::requireLogin();
-        H::view('buyer/wishlist',['products'=>DB::rows('select p.* from wishlists w join products p on p.id=w.product_id where w.user_id=?',[H::user()['id']])]);
+        H::view('buyer/wishlist',['products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from wishlists w join products p on p.id=w.product_id left join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where w.user_id=? order by w.created_at desc',[H::user()['id']])]);
 
     }
     public function following()

@@ -3,7 +3,8 @@
 <article class="card product">
     <a href="/product/<?=H::e($p['slug'])?>"><?php if (!empty($p['preview_image'])): ?><img class="thumb" src="<?=H::e($p['preview_image'])?>" alt="<?=H::e($p['title'])?> preview image"><?php else: ?><div class="thumb">Digital design preview unavailable</div><?php endif; ?></a>
     <h3><a href="/product/<?=H::e($p['slug'])?>"><?=H::e($p['title'])?></a></h3>
-    <p>by <a href="/store/<?=H::e($p['store_slug'] ?? '')?>"><?=H::e($p['display_name'] ?? 'Independent designer')?></a></p>
+    <?php $sellerName = trim((string)($p['display_name'] ?? '')); $sellerSlug = trim((string)($p['store_slug'] ?? '')); ?>
+    <p>by <?php if($sellerName !== '' && $sellerSlug !== ''):?><a href="/store/<?=H::e($sellerSlug)?>"><?=H::e($sellerName)?></a><?php else:?><?=H::e($sellerName !== '' ? $sellerName : 'Independent designer')?><?php endif;?></p>
     <?php if(!empty($p['category_slug'])):?><p><a href="/category/<?=H::e($p['category_slug'])?>"><?=H::e($p['category_name'])?></a></p><?php endif;?>
     <div class="product-card-badges">
         <?php if(!empty($p['is_featured'])):?><span class="badge rank">Featured</span><?php endif;?>
