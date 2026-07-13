@@ -44,6 +44,7 @@ use App\Controllers\StripeController;
  $router->match(['GET','POST'], '/seller/product/new', [SellerController::class, 'editProduct']);
  $router->match(['GET','POST'], '/seller/product/{id}', [SellerController::class, 'editProduct']);
  $router->post('/seller/product/{id}/submit', [SellerController::class, 'submitProduct']);
+ $router->post('/seller/product/{id}/duplicate', [SellerController::class, 'duplicateProduct']);
  $router->post('/seller/product/{id}/disable', [SellerController::class, 'disableProduct']);
  $router->post('/seller/product/{id}/archive', [SellerController::class, 'archiveProduct']);
  $router->post('/seller/product/{id}/restore', [SellerController::class, 'restoreProduct']);

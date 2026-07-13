@@ -978,3 +978,14 @@ body.license-modal-open {
 aside .share-card {
   margin-top: 1rem;
 }
+
+.character-counter {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.character-counter.over-limit {
+  color: #b91c1c;
+  font-weight: 700;
+}

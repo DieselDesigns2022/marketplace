@@ -8,7 +8,7 @@
 <form method="post" enctype="multipart/form-data" class="form card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <h2>Basic Information</h2>
-    <label>Product Title<input name="title" required value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source>
+    <label>Product Title<input name="title" required maxlength="190" value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source data-character-counter>
     </label>
     <p class="help-text">The public product URL is generated automatically from the product title.</p>
     <label>Short Description<textarea name="short_description">
@@ -107,8 +107,8 @@
 </select>
 </label>
 <details class="advanced-panel"><summary>Advanced SEO (optional)</summary><p class="help-text">Leave these blank to use the product title and short description automatically.</p>
-<label>SEO Title<input name="seo_title" maxlength="70" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>"></label>
-<label>SEO Description<textarea name="seo_description" maxlength="170"><?=H::e($_POST['seo_description']??$p['seo_description']??'')?></textarea></label></details>
+<label>SEO Title<input name="seo_title" maxlength="70" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>" data-character-counter></label>
+<label>SEO Description<textarea name="seo_description" maxlength="170" data-character-counter><?=H::e($_POST['seo_description']??$p['seo_description']??'')?></textarea></label></details>
 <button name="action" value="draft">Save Draft</button>
 <button class="btn" name="action" value="review">Submit For Review</button>
 </form>

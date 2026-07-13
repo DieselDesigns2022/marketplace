@@ -488,7 +488,8 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
     <h3>What should I set up in my store?</h3>
     <p>Your store should include a clear display name, store URL name, bio, avatar or logo, banner image, optional social links, and any announcement buyers should see. Keep store information accurate and professional.</p>
     <h3>How do Stripe payouts work?</h3>
-    <p>Seller payouts are handled through Stripe Connect. Approved sellers must complete Stripe onboarding before payouts can be sent. Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens, and Stripe/payment processing fees also apply.</p>
+    <p>Asset Moth processes buyer checkout through Stripe, and seller payouts are handled through Stripe Connect. Approved sellers must complete Stripe onboarding before they can receive payouts. Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens, and Stripe/payment processing fees also apply.</p>
+    <p>When earnings are paid out can depend on Stripe processing, your Stripe account status, refunds, disputes, and any platform payout rules. Keep your Stripe account information accurate so Stripe can review and send payouts without avoidable delays.</p>
     <h3>What about sales tax?</h3>
     <p>Asset Moth handles applicable checkout sales tax through Stripe Tax at checkout. Sellers should still track their own income, expenses, records, business registrations, and tax obligations. Asset Moth does not provide tax advice.</p>
 </section>
@@ -498,6 +499,8 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
     <p>Product tools unlock after your seller application is approved and onboarding is complete, including storefront setup and Stripe payout readiness.</p>
     <h3>How does product review work?</h3>
     <p>Products can be saved as drafts or submitted for review. Submitted products are reviewed before becoming public. Asset Moth may approve, reject, disable, or request changes for listings that are incomplete, unclear, miscategorized, infringing, misleading, low quality, or not aligned with marketplace policies.</p>
+    <h3>What does a CSRF or session form error mean?</h3>
+    <p>CSRF means Cross-Site Request Forgery. It is a security protection used on forms to help make sure a form submission came from the real Asset Moth page and your current session. If you see a CSRF or session error, refresh the page, log back in if needed, and submit the form again.</p>
     <h3>What happens if a product is rejected?</h3>
     <p>A rejected product is not public. Review any reason provided, update the listing, files, previews, category, AI disclosure, or license details as needed, then submit it again when ready.</p>
     <h3>What should preview images and product files include?</h3>
