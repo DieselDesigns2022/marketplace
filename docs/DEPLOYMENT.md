@@ -97,3 +97,9 @@ Seller product preview images support JPG, PNG, and WEBP uploads up to 25MB each
 - Nginx `client_max_body_size 30M` or an equivalent reverse proxy limit
 
 If these server limits are lower than the application limit, sellers may see a server-level upload failure before Asset Moth can show the normal validation message.
+
+### Phase 10.4 deployment notes
+
+Run `database/migrations/2026_07_13_phase_10_4_ip_risk_compliance.sql` before using the Phase 10.4 code. Back up the database first. This migration is not documented as idempotent; do not run it twice without checking table existence. Verify fresh schema parity against `database/schema.sql`, then check that the seven IP risk tables exist, starter terms are present, and FK constraints were created.
+
+Rollback order is: `product_ip_risk_review_history`, `product_ip_rights_confirmations`, `product_ip_risk_states`, `product_ip_risk_detections`, `product_ip_risk_scans`, `ip_risk_term_aliases`, `ip_risk_terms`. Do not run production migrations from an agent session.

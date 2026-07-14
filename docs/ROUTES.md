@@ -193,3 +193,16 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 
 ## Phase 10.3B Stripe Tax compliance
 No new public tax routes are added in Phase 10.3B. Existing checkout and Stripe webhook routes now handle Stripe Tax behavior: checkout creates a tax-enabled Stripe Checkout Session, and webhooks persist Stripe-returned tax details while keeping tax separate from seller payout and commission math.
+
+### Phase 10.4 routes
+
+- `GET /admin/ip-risk-terms` — admin only — list configured advisory terms; read-only.
+- `GET /admin/ip-risk-terms/create` — admin only — render create form; read-only.
+- `POST /admin/ip-risk-terms` — admin only + CSRF — create a term and aliases; changes state.
+- `GET /admin/ip-risk-terms/{id}/edit` — admin only — render edit form; read-only.
+- `POST /admin/ip-risk-terms/{id}` — admin only + CSRF — update term, aliases, note, category, enabled state; changes state.
+- `POST /admin/ip-risk-terms/{id}/enable` — admin only + CSRF — enable an existing term; changes state.
+- `POST /admin/ip-risk-terms/{id}/disable` — admin only + CSRF — disable an existing term without deleting history; changes state.
+- `POST /admin/products/{id}/ip-risk-review` — admin only + CSRF — keep pending, approve, publish/keep published while flagged, reject, or archive through validated transitions; changes state.
+
+There are no public term-list endpoints and no state-changing GET routes.

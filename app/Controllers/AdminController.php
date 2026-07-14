@@ -5,6 +5,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\WatermarkService;
+use App\Repositories\IpRiskRepository;
 use Throwable;
 class AdminController
 {
@@ -208,17 +209,26 @@ class AdminController
             if ($action === 'bulk_approve') {
                 $ids = array_values(array_filter(array_map('intval', $_POST['product_ids'] ?? [])));
                 $approved = 0;
-                $skipped = 0;
+                $skippedNotPending = 0;
+                $skippedIpReview = 0;
+                $repo = new IpRiskRepository();
                 foreach ($ids as $productId) {
                     $p = DB::row('select id,status from products where id=?', [$productId]);
-                    if ($p && ($p['status'] ?? '') === 'pending_review') {
-                        $this->moderateProduct((int)$p['id'], 'approve');
+                    if (!$p || ($p['status'] ?? '') !== 'pending_review') {
+                        $skippedNotPending++;
+                        continue;
+                    }
+                    if ($repo->productRequiresIpRiskReview((int)$productId)) {
+                        $skippedIpReview++;
+                        continue;
+                    }
+                    if ($this->moderateProduct((int)$p['id'], 'approve', '', false)) {
                         $approved++;
                     } else {
-                        $skipped++;
+                        $skippedNotPending++;
                     }
                 }
-                H::flash('success', 'Bulk approval complete: '.$approved.' approved, '.$skipped.' skipped.');
+                H::flash('success', 'Bulk approval complete: '.$approved.' approved, '.$skippedNotPending.' skipped because no longer pending, '.$skippedIpReview.' skipped because IP review is required.');
             } else {
                 $this->moderateProduct((int)$_POST['id'], $action, trim($_POST['reason']??''));
             }
@@ -235,27 +245,36 @@ class AdminController
             $params[]=$status;
 
         }
-        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id'.$where.' order by p.updated_at desc',$params)]);
+        H::view('admin/products',['status'=>$status,'products'=>DB::rows('select p.*,coalesce(irs.review_status,"clear") ip_review_status,(select count(*) from product_ip_risk_detections ipd where ipd.product_id=p.id and ipd.scan_id=irs.latest_scan_id and ipd.is_active=1) ip_active_match_count,d.display_name,d.store_slug,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id left join product_ip_risk_states irs on irs.product_id=p.id left join product_ip_risk_scans s on s.id=irs.latest_scan_id'.$where.' order by p.updated_at desc',$params)]);
 
     }
-    private function moderateProduct(int $id, string $action, string $reason=''): void
+    private function moderateProduct(int $id, string $action, string $reason='', bool $flashSuccess = true): bool
     {
         $status=['approve'=>'approved','reject'=>'rejected','disable'=>'disabled','archive'=>'archived','restore'=>'draft','mark_deleted'=>'deleted'][$action]??'';
         if(!$status)
         {
            H::flash('error','Invalid product action.');
-            return;
+            return false;
+
+        }
+        if($status === 'approved' && (new IpRiskRepository())->productRequiresIpRiskReview($id))
+        {
+           H::flash('error','IP Review Required: review the product’s IP / Protected Content Risk section before approving this flagged product.');
+            return false;
 
         }
         if($status==='rejected' && trim($reason)==='')
         {
            H::flash('error','Rejection Reason is required.');
-            return;
+            return false;
 
         }
         DB::exec('update products set status=?, rejection_reason=?, updated_at=now() where id=?',[$status,$status==='rejected'?$reason:null,$id]);
         $this->log($status.'_product','product',$id);
-        H::flash('success', $status === 'approved' ? 'Product approved and published.' : 'Product status updated.');
+        if ($flashSuccess) {
+            H::flash('success', $status === 'approved' ? 'Product approved and published.' : 'Product status updated.');
+        }
+        return true;
 
     }
 
@@ -266,13 +285,61 @@ class AdminController
 
     private function permanentlyDeleteProduct(int $productId): void
     {
+        (new IpRiskRepository())->cleanupProductRecords($productId);
         DB::exec('delete from cart_items where product_id=?', [$productId]);
         DB::exec('delete from wishlists where product_id=?', [$productId]);
         DB::exec('delete from product_tags where product_id=?', [$productId]);
         DB::exec('delete from product_license_types where product_id=?', [$productId]);
-        DB::exec('delete from product_images where product_id=?', [$productId]);
-        DB::exec('delete from product_files where product_id=?', [$productId]);
+        $this->cleanupProductUploadRowsAndFiles($productId);
         DB::exec('delete from products where id=?', [$productId]);
+    }
+
+    private function deleteProductPreviewImage(int $imageId, int $productId): void
+    {
+        $img = DB::row('select image_path,original_image_path from product_images where id=? and product_id=?', [$imageId, $productId]);
+        if ($img) {
+            if (!empty($img['image_path'])) {
+                $path = public_path(ltrim((string)$img['image_path'], '/'));
+                $base = realpath(public_path('uploads/product_previews'));
+                $real = realpath($path);
+                if ($base && $real && is_file($real) && ($real === $base || str_starts_with($real, $base . DIRECTORY_SEPARATOR))) {
+                    @unlink($real);
+                }
+            }
+            if (!empty($img['original_image_path'])) {
+                $originalPath = app_path('storage/app/private/' . ltrim((string)$img['original_image_path'], '/'));
+                $originalBase = realpath(app_path('storage/app/private/product_previews'));
+                $originalReal = realpath($originalPath);
+                if ($originalBase && $originalReal && is_file($originalReal) && ($originalReal === $originalBase || str_starts_with($originalReal, $originalBase . DIRECTORY_SEPARATOR))) {
+                    @unlink($originalReal);
+                }
+            }
+            DB::exec('delete from product_images where id=? and product_id=?', [$imageId, $productId]);
+        }
+    }
+
+    private function deleteProductDownloadFile(int $fileId, int $productId): void
+    {
+        $file = DB::row('select storage_path from product_files where id=? and product_id=?', [$fileId, $productId]);
+        if ($file) {
+            $path = app_path('storage/protected_uploads/' . ltrim((string)$file['storage_path'], '/'));
+            $base = realpath(app_path('storage/protected_uploads/products'));
+            $real = realpath($path);
+            if ($base && $real && is_file($real) && ($real === $base || str_starts_with($real, $base . DIRECTORY_SEPARATOR))) {
+                @unlink($real);
+            }
+            DB::exec('delete from product_files where id=? and product_id=?', [$fileId, $productId]);
+        }
+    }
+
+    private function cleanupProductUploadRowsAndFiles(int $productId): void
+    {
+        foreach (DB::rows('select id from product_images where product_id=?', [$productId]) as $img) {
+            $this->deleteProductPreviewImage((int)$img['id'], $productId);
+        }
+        foreach (DB::rows('select id from product_files where product_id=?', [$productId]) as $file) {
+            $this->deleteProductDownloadFile((int)$file['id'], $productId);
+        }
     }
 
     public function bulkProductCleanup(): void
@@ -337,9 +404,25 @@ class AdminController
 
         }
         $p=DB::row('select p.*,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,d.display_name,d.store_slug,d.user_id,u.email designer_email,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id left join categories c on c.id=p.category_id where p.id=?',[$id])??H::abort(404);
-        H::view('admin/product_detail',['p'=>$p,'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id]),'licenses'=>LicenseService::productLicenses($p)]);
+        $repo = new IpRiskRepository();
+        H::view('admin/product_detail',['p'=>$p,'ipState'=>$repo->state((int)$id),'ipDetections'=>$repo->detections((int)$id),'ipConfirmations'=>$repo->confirmations((int)$id),'ipHistory'=>$repo->reviewHistory((int)$id),'images'=>DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]),'files'=>DB::rows('select * from product_files where product_id=? order by created_at desc',[$id]),'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$id]),'licenses'=>LicenseService::productLicenses($p)]);
 
     }
+    public function productIpRiskReview($id): void
+    {
+        $this->gate();
+        $productId = (int)$id;
+        $action = $_POST['ip_action'] ?? '';
+        $note = trim($_POST['admin_note'] ?? '');
+        try {
+            $result = (new IpRiskRepository())->applyAdminReviewTransition($productId, $action, $note, (int)H::user()['id']);
+            H::flash('success', $result['message'] ?? 'IP risk review updated.');
+        } catch (\InvalidArgumentException $e) {
+            H::flash('error', $e->getMessage());
+        }
+        H::redirect('/admin/products/'.$productId);
+    }
+
     public function categories()
     {
         $this->gate();
