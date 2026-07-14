@@ -247,3 +247,13 @@ Phase 10.3B uses Stripe Tax through Stripe Checkout. `orders.tax_amount` stores 
 `seller_license_presets` stores optional store-level default license settings for approved designers. Rows are scoped by `designer_id` and `license_type_id`, with enabled state, default add-on price, optional default description, and sort order. These presets only prefill new product forms; saved product license rows in `product_license_types` remain the checkout and order-snapshot source of truth.
 
 The migration `database/migrations/2026_07_11_seller_product_cleanup_launch_faq.sql` creates `seller_license_presets` if it is missing. It also consolidates legacy PNG/Sublimation categories into the canonical `PNG Files` category with slug `png-files`. Products assigned to old Sublimation categories or duplicate PNG categories are moved to the canonical `png-files` category. Old Sublimation rows and duplicate PNG rows by slug/name are disabled, not deleted, for safety.
+
+### Phase 10.4 IP risk database tables
+
+`ip_risk_terms` stores canonical advisory terms with normalized unique text, category, enabled state, admin audit columns, and `users.id` foreign keys using `ON DELETE SET NULL` for admin references. `ip_risk_term_aliases` stores globally unique normalized aliases and references canonical terms with `ON DELETE RESTRICT`; terms are disabled rather than deleted to preserve history.
+
+`product_ip_risk_scans` stores product/user scan records, content fingerprints, match fingerprints, active counts, and scan timestamps. `product_ip_risk_detections` stores historical detections with active/inactive state, `matched_value_key` for MariaDB-safe canonical/alias duplicate protection, source field enum values (`title`, `description`, `tags`, `seo_title`, `seo_description`, `file_name`), carried-forward `first_detected_at`, and latest `last_detected_at`.
+
+`product_ip_risk_states` stores one current IP review state per product, separate from `products.status`. `product_ip_rights_confirmations` binds the exact seller checkbox text to product, scan, and seller user. `product_ip_risk_review_history` preserves every admin IP review transition with previous/new IP state and previous/new product status. Product-related FKs are restrictive; safe permanent deletion explicitly removes Phase 10.4 child rows before deleting a product.
+
+The Phase 10.4 migration and fresh schema seed 12 starter canonical terms and one Coke alias. These records are advisory/testing-oriented starter data only; they are incomplete and are not comprehensive legal, trademark, copyright, celebrity, franchise, sports, music, or protected-content coverage.

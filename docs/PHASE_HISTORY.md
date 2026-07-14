@@ -1015,3 +1015,14 @@ Seller transfers now use the original Stripe charge as `source_transaction` when
 
 ## Phase 10.3B Stripe Tax compliance
 Phase 10.3B uses Stripe Tax through Stripe Checkout. Asset Moth is US-only at launch, sellers are US-only at launch, products are digital files only, and there is no shipping. Sellers do not enter sales-tax rates or manual tax settings. Stripe-returned tax is stored separately and excluded from seller payouts, seller earnings, gross-sales commission calculations, and platform commission. International VAT/GST is future work. 1099 reporting is handled through Stripe Connect and Stripe tax forms setup, not homemade IRS form generation.
+
+### Phase 10.4 — Pre-launch compliance, trademark/copyright warning, and content safety
+
+Implemented an advisory metadata scanner and admin review layer separate from normal product moderation. Sellers see neutral warnings for active matches and must confirm rights before submitting flagged products for review. Admins can manage canonical terms and aliases, review flagged products, approve the IP risk, reject/archive through the normal product workflow, or publish/keep published while flagged when transition rules allow it.
+
+Future work remains outside this phase: no OCR/image/audio/video scanning, no external trademark database, no legal determinations, no automatic takedown solely because of a match, and no permanent deletion of configured terms.
+
+Automated matching can produce false positives and false negatives. Starter seed terms are intentionally limited, incomplete, and do not represent comprehensive legal, trademark, copyright, celebrity, franchise, sports, music, or protected-content coverage.
+
+
+Phase 10.4 review-before-approval rule: normal admin approval remains available for unflagged pending products, but active matches with pending IP review require an explicit IP review decision before ordinary approval can publish the product. Bulk approval reports and skips those products instead of silently approving them.
