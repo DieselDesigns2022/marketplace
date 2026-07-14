@@ -38,6 +38,7 @@ $moneyStats = ['live_gross_sales', 'asset_moth_commission'];
     <a href="/admin/applications">Applications</a>
     <a href="/admin/designers">Designers</a>
     <a href="/admin/products">Products</a>
+    <a href="/admin/ip-risk-terms">IP Risk Terms</a>
     <a href="/admin/categories">Categories</a>
     <a href="/admin/coupons">Coupons</a>
     <a href="/admin/orders">Orders</a>

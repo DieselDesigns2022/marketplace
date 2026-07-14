@@ -35,6 +35,21 @@
         <?php endforeach;?>
         </ul>
     <?php endif;?>
+
+    <h2 id="ip-risk-review">IP / Protected Content Risk</h2>
+    <?php $ipStatus=$ipState['review_status']??'clear'; $ipLabels=['clear'=>'Clear','pending_review'=>'Pending Review','approved'=>'Approved','rejected'=>'Rejected','archived'=>'Archived','published_flagged'=>'Published — Flagged']; ?>
+    <section class="card">
+        <p>Normal product status: <strong><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></strong></p>
+        <p>Current IP-risk review status: <span class="badge"><?=H::e($ipLabels[$ipStatus]??$ipStatus)?></span></p>
+        <p>Active match count: <?=(int)count(array_filter($ipDetections, fn($d)=>!empty($d['is_active'])))?></p>
+        <p>Current admin note: <?=H::e($ipState['admin_note']??'None')?></p>
+        <table><tr><th>Term</th><th>Alias</th><th>Category</th><th>Source</th><th>Status</th><th>Scan date</th></tr>
+        <?php foreach($ipDetections as $d): ?><tr><td><?=H::e($d['matched_term'])?></td><td><?=H::e($d['matched_alias']??'')?></td><td><?=H::e($d['category'])?></td><td><?=H::e((['seo_title'=>'SEO title','seo_description'=>'SEO description','file_name'=>'File name','tags'=>'Tags','title'=>'Title','description'=>'Description'][$d['source_field']] ?? str_replace('_',' ',$d['source_field'])))?></td><td><?=!empty($d['is_active'])?'Active':'Inactive'?></td><td><?=H::e($d['scanned_at'])?></td></tr><?php endforeach; ?>
+        <?php if(!$ipDetections): ?><tr><td colspan="6" class="muted">No IP risk detections recorded.</td></tr><?php endif; ?></table>
+        <h3>Seller confirmations</h3><ul><?php foreach($ipConfirmations as $c): ?><li><?=H::e($c['confirmed_at'])?> — <?=H::e($c['seller_email'])?> — <?=H::e($c['confirmation_text'])?></li><?php endforeach; ?><?php if(!$ipConfirmations): ?><li class="muted">No confirmations recorded.</li><?php endif; ?></ul>
+        <h3>Admin review history</h3><ul><?php foreach($ipHistory as $h): ?><li><?=H::e($h['created_at'])?> — <?=H::e($h['admin_email'])?>: <?=H::e($h['previous_review_status']??'none')?> → <?=H::e($h['new_review_status'])?>; product <?=H::e($h['previous_product_status']??'none')?> → <?=H::e($h['new_product_status']??'none')?><?php if($h['admin_note']): ?> — <?=H::e($h['admin_note'])?><?php endif; ?></li><?php endforeach; ?><?php if(!$ipHistory): ?><li class="muted">No admin IP review history recorded.</li><?php endif; ?></ul>
+        <form method="post" action="/admin/products/<?=$p['id']?>/ip-risk-review"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><p class="help-text">Ordinary approval is blocked while active matches are pending IP review. Use Approve IP Review first if this should follow the separate normal approval flow, or use Leave Published While Flagged to explicitly approve/preserve publication while flagged. Reject and Archive change the normal product status.</p><label>Admin note / rejection reason<input name="admin_note" value="<?=H::e($ipState['admin_note']??'')?>"></label><button name="ip_action" value="pending">Keep Pending</button><button class="btn" name="ip_action" value="approve">Approve IP Review</button><button class="btn" name="ip_action" value="published_flagged" onclick="return confirm('Publish or keep this product published while visibly flagged for IP risk review?');">Leave Published While Flagged</button><button name="ip_action" value="reject" onclick="if(!this.form.admin_note.value.trim()){alert('Rejection Reason is required.');return false;} return confirm('Reject this product and change its normal product status?');">Reject</button><button name="ip_action" value="archive" onclick="return confirm('Archive this product and change its normal product status?');">Archive</button></form>
+    </section>
     <h2>Product information</h2>
     <p>
     <?=nl2br(H::e($p['description']))?>

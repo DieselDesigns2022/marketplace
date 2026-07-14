@@ -238,3 +238,10 @@ Intentionally postponed:
 - Stripe-returned tax is stored separately from gross sales, discounts, marketplace commission, and seller payouts; seller payouts exclude tax.
 - 1099 reporting is handled through Stripe Connect and Stripe tax forms configuration, not homemade IRS form generation.
 - International VAT/GST and non-US checkout remain future work; there is no shipping because Asset Moth sells digital files only.
+
+### Phase 10.4 — IP risk workflow integrity
+
+- Added readable scanner, workflow, repository, admin term-management, seller warning, and admin review code for advisory protected-term matching.
+- Added separate IP review state/history, seller confirmations tied to latest server-side scans, active/inactive detections, and term/alias management without deletion.
+- Corrected permanent product deletion cleanup, database foreign keys, duplicate detection keys, array-value scanning, admin transition validation, and documentation for deployment/testing/security.
+- Matching is advisory and may produce false positives or false negatives; the starter term set is limited testing/initial-review data, not complete protected-content coverage.

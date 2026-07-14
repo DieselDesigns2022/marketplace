@@ -9,7 +9,7 @@
 <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
 <p><button class="btn" name="action" value="bulk_approve">Approve selected pending products</button> <select name="bulk_action"><option value="archive">Bulk archive / hide selected</option><option value="delete">Bulk permanent delete safe selected products</option></select> <button class="btn alt" formaction="/admin/products/bulk-cleanup" onclick="return confirm('Run the selected cleanup action? Products with completed orders will be archived instead of permanently deleted.');">Run Cleanup</button></p>
 <table>
-    <tr><th>Select</th><th>Preview</th><th>Product</th><th>Designer</th><th>Category</th><th>Status</th><th>Completed Orders</th><th>Actions</th></tr>
+    <tr><th>Select</th><th>Preview</th><th>Product</th><th>Designer</th><th>Category</th><th>Status</th><th>IP Risk Review</th><th>Completed Orders</th><th>Actions</th></tr>
     <?php foreach($products as $p):?>
         <tr>
            <td><input type="checkbox" name="product_ids[]" value="<?=$p['id']?>"></td>
@@ -17,12 +17,12 @@
            <td><a href="/admin/products/<?=$p['id']?>"><?=H::e($p['title'])?></a><?php if((int)($p['completed_order_count'] ?? 0)>0):?><br><small class="muted">Order history protected; permanent delete blocked.</small><?php endif;?></td>
            <td><?=H::e($p['display_name'])?></td>
            <td><?=H::e($p['category_name']??'Uncategorized')?></td>
-           <td><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></td>
+           <td><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></td><td><?php if(($p['ip_review_status']??'clear')!=='clear'): ?><span class="badge warning">IP Risk Review</span><br><?=H::e(['pending_review'=>'Pending Review','approved'=>'Approved','rejected'=>'Rejected','archived'=>'Archived','published_flagged'=>'Published — Flagged'][$p['ip_review_status']] ?? $p['ip_review_status'])?> · <?=(int)($p['ip_active_match_count']??0)?> active<?php else: ?><span class="muted">Clear</span><?php endif; ?></td>
            <td><?=(int)($p['completed_order_count'] ?? 0)?></td>
-           <td><a href="/admin/products/<?=$p['id']?>">Review</a><?php if($p['status']==='pending_review'):?><br><button class="btn" name="action" value="approve" onclick="this.form.elements['id'].value='<?=$p['id']?>'">Approve</button><?php endif;?></td>
+           <td><a href="/admin/products/<?=$p['id']?>">Review</a><?php if($p['status']==='pending_review'):?><?php if(($p['ip_review_status']??'clear')==='pending_review' && (int)($p['ip_active_match_count']??0)>0): ?><br><a class="badge warning" href="/admin/products/<?=$p['id']?>#ip-risk-review">IP Review Required</a><?php else: ?><br><button class="btn" name="action" value="approve" onclick="this.form.elements['id'].value='<?=$p['id']?>'">Approve</button><?php endif; ?><?php endif;?></td>
         </tr>
     <?php endforeach;?>
-    <?php if(!$products):?><tr><td colspan="8" class="muted">No products found for this status filter.</td></tr><?php endif;?>
+    <?php if(!$products):?><tr><td colspan="9" class="muted">No products found for this status filter.</td></tr><?php endif;?>
 </table>
 <input type="hidden" name="id" value="">
 </form>

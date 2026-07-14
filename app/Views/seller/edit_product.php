@@ -109,6 +109,24 @@
 <details class="advanced-panel"><summary>Advanced SEO (optional)</summary><p class="help-text">Leave these blank to use the product title and short description automatically.</p>
 <label>SEO Title<input name="seo_title" maxlength="70" value="<?=H::e($_POST['seo_title']??$p['seo_title']??'')?>" data-character-counter></label>
 <label>SEO Description<textarea name="seo_description" maxlength="170" data-character-counter><?=H::e($_POST['seo_description']??$p['seo_description']??'')?></textarea></label></details>
+
+<?php if(!empty($ipRisk['matches'])): ?>
+<section class="notice warning">
+    <p><strong>This product may contain trademarked, copyrighted, or protected terms. Please confirm you own the rights, have permission, or that your use is legally allowed before publishing.</strong></p>
+    <ul>
+    <?php $labels=['title'=>'Title','description'=>'Description','tags'=>'Tags','seo_title'=>'SEO title','seo_description'=>'SEO description','file_name'=>'File name']; foreach($ipRisk['matches'] as $match): ?>
+        <li><?=H::e($match['matched_term'])?><?php if(!empty($match['matched_alias'])): ?> (matched alias: <?=H::e($match['matched_alias'])?>)<?php endif; ?> — <?=H::e($labels[$match['source_field']] ?? $match['source_field'])?></li>
+    <?php endforeach; ?>
+    </ul>
+    <p>Automated matching may be incorrect and cannot identify every legal issue. Asset Moth does not provide legal advice. You are responsible for confirming that you have the right to sell your product.</p>
+    <?php if(!empty($ipRisk['requires_confirmation'])): ?>
+        <p class="help-text">Confirmation is required before publishing or submitting this flagged product for review. Draft saves are allowed without confirmation.</p>
+        <label><input type="checkbox" name="ip_rights_confirmation" value="1"> I confirm I have the legal right to sell this design and any included wording, artwork, or references.</label>
+    <?php else: ?>
+        <p class="help-text">The latest scan already has a seller confirmation or does not currently require another confirmation.</p>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
 <button name="action" value="draft">Save Draft</button>
 <button class="btn" name="action" value="review">Submit For Review</button>
 </form>

@@ -6,6 +6,9 @@ use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\WatermarkService;
 use App\Services\StripeService;
+use App\Services\ProductIpRiskWorkflow;
+use App\Services\IpRiskScanner;
+use App\Repositories\IpRiskRepository;
 use Throwable;
 class SellerController
 {
@@ -221,7 +224,7 @@ class SellerController
         return DB::rows('select * from categories where is_active=1 and slug not in (?, ?) and not (lower(name) in (?, ?) and slug<>?) order by sort_order,name', ['sublimation','png','png','png files','png-files']);
     }
 
-    private function renderProductForm(?array $p, array $errors, array $d): void
+    private function renderProductForm(?array $p, array $errors, array $d, ?array $ipRiskOverride = null): void
     {
         $productId = $p['id'] ?? 0;
         H::view('seller/edit_product', [
@@ -233,6 +236,7 @@ class SellerController
             'tagText' => $productId ? $this->tagText((int)$productId) : '',
             'licenseTypes' => LicenseService::platformTypes(),
             'productLicenses' => $p ? LicenseService::productLicenses($p) : LicenseService::presetLicensesForProductForm((int)$d['id']),
+            'ipRisk' => $ipRiskOverride ?: ($productId ? (new ProductIpRiskWorkflow())->currentReview((int)$productId, (int)H::user()['id']) : ['matches'=>[], 'requires_confirmation'=>false, 'state'=>null]),
         ]);
     }
 
@@ -525,13 +529,13 @@ class SellerController
             $path = public_path(ltrim($imagePath, '/'));
             $base = realpath(public_path('uploads/product_previews'));
             $real = realpath($path);
-            if ($base && $real && is_file($real) && str_starts_with($real, $base)) @unlink($real);
+            if ($base && $real && is_file($real) && ($real === $base || str_starts_with($real, $base . DIRECTORY_SEPARATOR))) @unlink($real);
         }
         if ($originalImagePath) {
             $originalPath = app_path('storage/app/private/' . ltrim($originalImagePath, '/'));
             $originalBase = realpath(app_path('storage/app/private/product_previews'));
             $originalReal = realpath($originalPath);
-            if ($originalBase && $originalReal && is_file($originalReal) && str_starts_with($originalReal, $originalBase)) @unlink($originalReal);
+            if ($originalBase && $originalReal && is_file($originalReal) && ($originalReal === $originalBase || str_starts_with($originalReal, $originalBase . DIRECTORY_SEPARATOR))) @unlink($originalReal);
         }
     }
 
@@ -628,7 +632,7 @@ class SellerController
         $path = app_path('storage/protected_uploads/' . ltrim($file['storage_path'], '/'));
         $base = realpath(app_path('storage/protected_uploads/products'));
         $real = realpath($path);
-        if ($base && $real && is_file($real) && str_starts_with($real, $base))
+        if ($base && $real && is_file($real) && ($real === $base || str_starts_with($real, $base . DIRECTORY_SEPARATOR)))
         {
             @unlink($real);
 
@@ -642,6 +646,15 @@ class SellerController
     {
         foreach (DB::rows('select id from product_images where product_id=?', [$productId]) as $img) $this->deletePreviewImage((int)$img['id'], $productId);
         foreach (DB::rows('select id from product_files where product_id=?', [$productId]) as $file) $this->deleteProductFile((int)$file['id'], $productId);
+    }
+
+    private function cleanupNewProductAfterFailedSave(int $productId, int $designerId): void
+    {
+        (new IpRiskRepository())->cleanupProductRecords($productId);
+        $this->cleanupProductUploadRowsAndFiles($productId);
+        DB::exec('delete from product_tags where product_id=?', [$productId]);
+        DB::exec('delete from product_license_types where product_id=?', [$productId]);
+        DB::exec('delete from products where id=? and designer_id=?', [$productId, $designerId]);
     }
     private function saveProductFiles(int $productId, array &$errors): array
     {
@@ -804,6 +817,16 @@ class SellerController
             [$postedLicenses, $licenseErrors] = LicenseService::normalizePosted($values, $_POST);
             $errors = array_merge($errors, $licenseErrors);
             $this->uploadedPreviewFilesValid($errors);
+            if (!$errors && $p && in_array($p['status'], ['pending_review','approved','published'], true)) {
+                $preRisk = $this->submittedIpRiskPreview((int)$p['id'], $values);
+                $wantsReview = ($_POST['action'] ?? 'draft') === 'review';
+                $publicationSensitive = $wantsReview || in_array($p['status'], ['approved','published'], true);
+                if ($publicationSensitive && $preRisk['requires_confirmation'] && empty($_POST['ip_rights_confirmation'])) {
+                    $errors[] = 'Please confirm your legal right to sell this design before submitting or saving risk-bearing changes.';
+                    $this->renderProductForm($p, $errors, $d, $preRisk);
+                    return;
+                }
+            }
             if (!$errors)
            {
                 $createdPreviewIds = [];
@@ -831,38 +854,77 @@ class SellerController
                 $status = $this->productStatusForSave($p, $values);
                 $values['slug'] = $p ? (string)$p['slug'] : $this->uniqueProductSlug($values['title']);
                 $fileTypes = implode(',', $values['file_types']);
-                if ($p)
-               {
-                    DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
-                    $productId = (int) $p['id'];
+                $ipWorkflow = new ProductIpRiskWorkflow();
+                $publicationSensitive = $status === 'pending_review' || ($p && in_array($p['status'], ['approved','published'], true));
 
-               }
-                else
-               {
-                    DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, ] );
-                    $productId = (int)DB::id();
-
-               }
-                $this->syncTags($productId, $values['tags']);
-                LicenseService::syncProductLicenses($productId, $postedLicenses);
-
-                if (!$p) {
-                    $createdPreviewIds = $this->savePreviewImages($productId, $errors);
-                    if ($errors) {
-                        $this->cleanupProductUploadRowsAndFiles($productId);
-                        DB::exec('delete from product_tags where product_id=?', [$productId]);
-                        DB::exec('delete from product_license_types where product_id=?', [$productId]);
-                        DB::exec('delete from products where id=? and designer_id=?', [$productId, $d['id']]);
-                        $this->renderProductForm(null, $errors, $d);
+                if ($p) {
+                    $productId = (int)$p['id'];
+                    try {
+                        DB::begin();
+                        DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
+                        $this->syncTags($productId, $values['tags']);
+                        LicenseService::syncProductLicenses($productId, $postedLicenses);
+                        $ipRiskResult = $ipWorkflow->scanProduct($productId, (int)H::user()['id']);
+                        if ($ipRiskResult['matches'] && ($publicationSensitive || !empty($_POST['ip_rights_confirmation']))) {
+                            if (empty($_POST['ip_rights_confirmation'])) {
+                                DB::rollBack();
+                                $this->cleanupCreatedPreviewImages($productId, $createdPreviewIds);
+                                $this->cleanupCreatedProductFiles($productId, $createdFileIds);
+                                $errors[] = 'Please confirm your legal right to sell this design before saving or submitting a flagged product.';
+                                $this->renderProductForm($p, $errors, $d, $ipRiskResult);
+                                return;
+                            }
+                            $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
+                        }
+                        DB::commit();
+                    } catch (Throwable $e) {
+                        if (DB::pdo()->inTransaction()) {
+                            DB::rollBack();
+                        }
+                        $this->cleanupCreatedPreviewImages($productId, $createdPreviewIds);
+                        $this->cleanupCreatedProductFiles($productId, $createdFileIds);
+                        $errors[] = 'Product could not be saved safely. Please try again.';
+                        $this->renderProductForm($p, $errors, $d);
                         return;
                     }
+                } else {
+                    $productId = 0;
+                    try {
+                        DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, ] );
+                        $productId = (int)DB::id();
+                        $this->syncTags($productId, $values['tags']);
+                        LicenseService::syncProductLicenses($productId, $postedLicenses);
+                        $createdPreviewIds = $this->savePreviewImages($productId, $errors);
+                        if ($errors) {
+                            $this->cleanupNewProductAfterFailedSave($productId, (int)$d['id']);
+                            $this->renderProductForm(null, $errors, $d);
+                            return;
+                        }
 
-                    $createdFileIds = $this->saveProductFiles($productId, $errors);
-                    if ($errors) {
-                        $this->cleanupProductUploadRowsAndFiles($productId);
-                        DB::exec('delete from product_tags where product_id=?', [$productId]);
-                        DB::exec('delete from product_license_types where product_id=?', [$productId]);
-                        DB::exec('delete from products where id=? and designer_id=?', [$productId, $d['id']]);
+                        $createdFileIds = $this->saveProductFiles($productId, $errors);
+                        if ($errors) {
+                            $this->cleanupNewProductAfterFailedSave($productId, (int)$d['id']);
+                            $this->renderProductForm(null, $errors, $d);
+                            return;
+                        }
+
+                        $ipRiskResult = $ipWorkflow->scanProduct($productId, (int)H::user()['id']);
+                        if ($ipRiskResult['matches'] && ($publicationSensitive || !empty($_POST['ip_rights_confirmation']))) {
+                            if (empty($_POST['ip_rights_confirmation'])) {
+                                $safeStatus = $status === 'pending_review' ? 'draft' : $status;
+                                DB::exec('update products set status=?,updated_at=now() where id=? and designer_id=?', [$safeStatus, $productId, $d['id']]);
+                                $errors[] = 'Please confirm your legal right to sell this design before submitting a flagged product for review.';
+                                $fresh = DB::row('select * from products where id=? and designer_id=?', [$productId, $d['id']]);
+                                $this->renderProductForm($fresh, $errors, $d, $ipRiskResult);
+                                return;
+                            }
+                            $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
+                        }
+                    } catch (Throwable $e) {
+                        if ($productId > 0) {
+                            $this->cleanupNewProductAfterFailedSave($productId, (int)$d['id']);
+                        }
+                        $errors[] = 'Product could not be saved safely. Please try again.';
                         $this->renderProductForm(null, $errors, $d);
                         return;
                     }
@@ -878,6 +940,33 @@ class SellerController
 
     }
 
+    private function submittedIpRiskPreview(int $productId, array $values): array
+    {
+        $repo = new IpRiskRepository();
+        $scanner = new IpRiskScanner();
+        $tags = array_values(array_filter(array_map('trim', preg_split('/[,\n]+/', (string)$values['tags']))));
+        $fileNames = array_column(DB::rows('select original_name from product_files where product_id=? order by original_name', [$productId]), 'original_name');
+        foreach (($_FILES['product_files']['name'] ?? []) as $name) {
+            if (trim((string)$name) !== '') {
+                $fileNames[] = (string)$name;
+            }
+        }
+        $matches = $scanner->scan([
+            'title' => $values['title'] ?? '',
+            'description' => trim(($values['short_description'] ?? '') . ' ' . ($values['description'] ?? '')),
+            'tags' => $tags,
+            'seo_title' => $values['seo_title'] ?? '',
+            'seo_description' => $values['seo_description'] ?? '',
+            'file_names' => $fileNames,
+        ], $repo->enabledTermsWithAliases());
+
+        return [
+            'state' => null,
+            'matches' => $matches,
+            'requires_confirmation' => count($matches) > 0,
+        ];
+    }
+
     private function productHasCompletedOrders(int $productId): bool
     {
         return (bool) DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.product_id=? and o.payment_status in ("paid","partially_refunded") limit 1', [$productId]);
@@ -885,12 +974,12 @@ class SellerController
 
     private function permanentlyDeleteProduct(int $productId): void
     {
+        (new IpRiskRepository())->cleanupProductRecords($productId);
         DB::exec('delete from cart_items where product_id=?', [$productId]);
         DB::exec('delete from wishlists where product_id=?', [$productId]);
         DB::exec('delete from product_tags where product_id=?', [$productId]);
         DB::exec('delete from product_license_types where product_id=?', [$productId]);
-        DB::exec('delete from product_images where product_id=?', [$productId]);
-        DB::exec('delete from product_files where product_id=?', [$productId]);
+        $this->cleanupProductUploadRowsAndFiles($productId);
         DB::exec('delete from products where id=?', [$productId]);
     }
 
@@ -1006,7 +1095,27 @@ class SellerController
             H::flash('error','Manual delivery instructions are required before submitting a Google Drive delivery product.');
             H::redirect('/seller/product/'.$productId);
         }
-        DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']] );
+        $ipWorkflow = new ProductIpRiskWorkflow();
+        try {
+            DB::begin();
+            $ipRiskResult = $ipWorkflow->scanProduct($productId, (int)H::user()['id']);
+            if ($ipRiskResult['requires_confirmation']) {
+                if (empty($_POST['ip_rights_confirmation'])) {
+                    DB::rollBack();
+                    H::flash('error','Please confirm your legal right to sell this design before submitting a flagged product for review.');
+                    H::redirect('/seller/product/'.$productId);
+                }
+                $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
+            }
+            DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']] );
+            DB::commit();
+        } catch (Throwable $e) {
+            if (DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+            H::flash('error','Product could not be submitted safely. Please try again.');
+            H::redirect('/seller/product/'.$productId);
+        }
         H::redirect('/seller/products');
 
     }

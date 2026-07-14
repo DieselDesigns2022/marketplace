@@ -83,3 +83,23 @@ The repository should ignore environment files, public uploads, protected upload
 
 ## Phase 10.3B Stripe Tax compliance
 Tax is trusted only from Stripe webhook data, not buyer input, seller input, or client-provided totals. Seller/manual tax fields and manual seller tax settings are intentionally absent. If a Checkout Session provides a non-US billing country, or Stripe returns a non-complete `automatic_tax.status`, the order goes to manual review and delivery/download unlock remains blocked. Existing Stripe webhook signature verification, duplicate-event protection, amount/currency checks, and metadata checks remain required.
+
+### Phase 10.4 security controls
+
+Seller scanning and confirmation verify ownership inside `ProductIpRiskWorkflow` by joining products to designers and comparing the authoritative designer user ID. Confirmations bind the authenticated seller to the latest server-side scan; submitted scan IDs, seller IDs, term IDs, detection lists, match counts, and review states are ignored.
+
+Admin writes require admin authorization, CSRF, POST routes, allowlisted categories/actions/statuses, transition validation, prepared statements, and escaped output. Term aliases and canonical terms are collision-checked across both tables. Only stored downloadable product-file original filename metadata is scanned; no preview-image names, file binary, private path, image, OCR, audio, video, or external database content is transmitted or inspected. Safe permanent product deletion removes Phase 10.4 product child rows before deleting products while preserving configured terms and aliases.
+
+
+Phase 10.4 approval-bypass hardening: ordinary admin approval checks authoritative latest IP state and active detections before approving. Products with active matches and `pending_review` IP status are blocked from single approval and skipped during bulk approval until an explicit IP review action is taken. Combined IP review decisions that also change product status are committed in one database transaction with the product status update, IP state/history, and admin log together.
+
+
+Explicit IP review transitions re-read and lock the current product row and current IP state inside the transaction. Controllers do not supply or trust previous product status, new product status, latest scan ID, target IP status, active counts, product update status, or log action for those transitions.
+
+
+Final Phase 10.4 hardening: failed confirmation attempts for existing published products do not replace live content or unpublish the listing. Admin IP transitions validate a complete product-status/action matrix and cannot revive terminal product statuses. Ordinary admin approval fails closed when latest-scan active detections exist with contradictory or incomplete IP state.
+
+Phase 10.4 seller confirmation hardening: the pre-scan is an advisory UI check only. Seller confirmations are bound to the final authoritative saved scan, not to browser-submitted scan data or a pre-save preview. Publication-sensitive product edits, tag/license changes, scan persistence, detection/state updates, and seller confirmation are coordinated to fail closed; if the coordinated save fails, newly created uploads are cleaned up while existing uploads remain untouched. Authoritative filename matching covers stored downloadable product-file original names, not preview-image upload names that are not retained for every future scan.
+Phase 10.4 new-product save hardening: a missing confirmation during a flagged new review submission is a validation outcome, not a system failure; the valid product remains a draft with its authoritative scan, uploads, tags, and licenses. A system/database exception after new-product creation uses compensating cleanup scoped only to the new product. Cleanup removes Phase 10.4 child records, newly created upload rows and physical files, product tags, product license rows, and then the product row. Existing products and their uploads are not affected, and this compensating cleanup is not described as a database rollback.
+
+Phase 10.4 permanent-delete cleanup uses file-aware seller/admin upload cleanup. Seller and admin permanent deletion remove upload metadata plus safely contained public preview files, private retained preview originals, and protected downloadable files; path containment checks prevent unlinking files outside the expected upload directories, and completed-order protection still archives instead of permanently deleting ordered products.
