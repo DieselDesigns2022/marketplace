@@ -288,15 +288,38 @@ class LicenseService
             }
         }
 
-        DB::begin();
+        $ownsTransaction = !DB::pdo()->inTransaction();
+
         try {
-            DB::exec('delete from product_license_types where product_id=?', [$productId]);
-            foreach ($licenses as $license) {
-                DB::exec('insert into product_license_types (product_id,license_type_id,is_enabled,is_default,price,description,sort_order) values (?,?,?,?,?,?,?)', [$productId,$license['license_type_id'],1,$license['is_default'] ? 1 : 0,$license['price'],$license['description'],$license['sort_order']]);
+            if ($ownsTransaction) {
+                DB::begin();
             }
-            DB::commit();
+
+            DB::exec('delete from product_license_types where product_id=?', [$productId]);
+
+            foreach ($licenses as $license) {
+                DB::exec(
+                    'insert into product_license_types (product_id,license_type_id,is_enabled,is_default,price,description,sort_order) values (?,?,?,?,?,?,?)',
+                    [
+                        $productId,
+                        $license['license_type_id'],
+                        1,
+                        $license['is_default'] ? 1 : 0,
+                        $license['price'],
+                        $license['description'],
+                        $license['sort_order'],
+                    ]
+                );
+            }
+
+            if ($ownsTransaction) {
+                DB::commit();
+            }
         } catch (Throwable $e) {
-            DB::rollBack();
+            if ($ownsTransaction && DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
             throw $e;
         }
     }

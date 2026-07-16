@@ -1009,3 +1009,42 @@ aside .share-card {
   border-radius: 18px;
   background: linear-gradient(135deg, #ffd1e2, #c7fff1);
 }
+
+.ip-rights-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.ip-rights-confirmation input[type="checkbox"] {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  margin: 2px 0 0;
+  cursor: pointer;
+  accent-color: currentColor;
+}
+
+.ip-rights-confirmation span {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .ip-rights-confirmation {
+    gap: 16px;
+    padding: 16px 12px;
+    font-size: 1rem;
+  }
+
+  .ip-rights-confirmation input[type="checkbox"] {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+}

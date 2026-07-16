@@ -881,6 +881,13 @@ class SellerController
                         if (DB::pdo()->inTransaction()) {
                             DB::rollBack();
                         }
+                        error_log(
+                            'Seller product save failed for product ' . $productId .
+                            ': ' . get_class($e) .
+                            ': ' . $e->getMessage() .
+                            ' in ' . $e->getFile() .
+                            ':' . $e->getLine()
+                        );
                         $this->cleanupCreatedPreviewImages($productId, $createdPreviewIds);
                         $this->cleanupCreatedProductFiles($productId, $createdFileIds);
                         $errors[] = 'Product could not be saved safely. Please try again.';
@@ -914,13 +921,19 @@ class SellerController
                                 $safeStatus = $status === 'pending_review' ? 'draft' : $status;
                                 DB::exec('update products set status=?,updated_at=now() where id=? and designer_id=?', [$safeStatus, $productId, $d['id']]);
                                 $errors[] = 'Please confirm your legal right to sell this design before submitting a flagged product for review.';
-                                $fresh = DB::row('select * from products where id=? and designer_id=?', [$productId, $d['id']]);
-                                $this->renderProductForm($fresh, $errors, $d, $ipRiskResult);
-                                return;
+                                H::flash('error', 'Please confirm your legal right to sell this design before submitting a flagged product for review.');
+                                H::redirect('/seller/product/' . $productId);
                             }
                             $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
                         }
                     } catch (Throwable $e) {
+                        error_log(
+                            'New seller product save failed for product ' . $productId .
+                            ': ' . get_class($e) .
+                            ': ' . $e->getMessage() .
+                            ' in ' . $e->getFile() .
+                            ':' . $e->getLine()
+                        );
                         if ($productId > 0) {
                             $this->cleanupNewProductAfterFailedSave($productId, (int)$d['id']);
                         }

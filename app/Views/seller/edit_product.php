@@ -121,7 +121,7 @@
     <p>Automated matching may be incorrect and cannot identify every legal issue. Asset Moth does not provide legal advice. You are responsible for confirming that you have the right to sell your product.</p>
     <?php if(!empty($ipRisk['requires_confirmation'])): ?>
         <p class="help-text">Confirmation is required before publishing or submitting this flagged product for review. Draft saves are allowed without confirmation.</p>
-        <label><input type="checkbox" name="ip_rights_confirmation" value="1"> I confirm I have the legal right to sell this design and any included wording, artwork, or references.</label>
+        <label class="ip-rights-confirmation"><input type="checkbox" name="ip_rights_confirmation" value="1"> <span>I confirm I have the legal right to sell this design and any included wording, artwork, or references.</span></label>
     <?php else: ?>
         <p class="help-text">The latest scan already has a seller confirmation or does not currently require another confirmation.</p>
     <?php endif; ?>

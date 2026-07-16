@@ -330,3 +330,11 @@ Admin checks: verify list badge/count/status, detail active/inactive detections,
 - Seller permanent delete: create a product with no completed orders, preview images, retained private preview originals, protected downloadable files, tags, licenses, and Phase 10.4 scan records. Permanently delete it and verify public preview files, private retained originals, protected downloadable files, upload database rows, Phase 10.4 rows, tags, licenses, and the product row are removed without touching any unrelated product files.
 - Admin permanent delete: repeat the same physical/database cleanup checks through admin bulk delete and verify bulk delete uses the same safe cleanup path. Products with completed paid or partially refunded orders must remain protected and be archived instead of permanently deleted.
 - Missing-file behavior: remove one physical preview/download file before deletion and verify the matching database row and product still delete safely. Insert or simulate a path outside the approved preview/download directories and verify it is never unlinked.
+
+#### Phase 10.4 live admin moderation separation
+- The IP-risk review form contains only IP-specific actions: keep IP review pending, approve IP review, and leave published while flagged.
+- Normal admin moderation remains separate and available regardless of IP-risk state or whether a current scan has active matches.
+- Verify an unflagged product can be rejected, disabled, archived, restored where eligible, or marked deleted through normal moderation.
+- Verify a flagged product can still be rejected or archived through normal moderation without using an IP-risk transition.
+- Verify ordinary approval remains blocked when a pending product has active matches requiring IP review.
+- Verify IP-specific actions still reject products that do not have a current scan with active matches.
