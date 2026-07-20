@@ -1,0 +1,1 @@
+<?php use App\Core\Helpers as H;?><h2>You are on the waitlist</h2><p>Hello <?=H::e($data['name']??'')?>. You asked for Asset Moth waitlist and launch communication as a <?=H::e($data['interest_type']??'community member')?>.</p><p><a href="<?=H::e($data['unsubscribe_url']??'#')?>">Unsubscribe from optional launch email</a></p>

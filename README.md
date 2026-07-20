@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 10.1 — Product Cleanup, Delete Options & Pre-Tester Reset.
+- Current Phase: Phase 10.5 — Emails, Notifications & Waitlist.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -41,7 +41,7 @@ These features represent the current implemented and tested functionality in the
 - Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
 - Advanced SEO iteration after launch data is available.
-- Production-grade notification and email flows.
+- Phase 10.5 implements the durable email queue, log transport, escaped templates, consent controls, promotional campaign foundation, waitlist workflows, and in-app notification center. Production-provider delivery, provider authentication, sender verification, bounce handling, and advanced production operations remain future work.
 - More complete ad campaign management and analytics.
 
 
@@ -188,7 +188,7 @@ public/
 The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
-## Current phase: Phase 10 — Stripe Payment Integration
+## Historical feature section: Phase 10 — Stripe Payment Integration
 
 ### Phase 8.5 licensing capability
 
@@ -208,13 +208,13 @@ Phase 9 added the foundation for carts, order records, downloadable delivery, an
 - Stripe webhooks are the source of truth for paid, failed, expired/canceled, refunded, and partially refunded status. The browser success redirect only shows a processing page and does not unlock access.
 - Downloads unlock only after webhook-confirmed paid status. Google Drive/manual delivery becomes seller-ready only after payment clears; seller delivery visibility is blocked before payment clears.
 - Failed, canceled, expired, and unpaid orders show retry/return-to-checkout options. `manual_review` is a payment safety lock and blocks buyer retry/unlock until admin review.
-- Buyer order detail acts as the receipt-style payment record until Phase 10.5 email receipts are implemented.
+- Buyer order detail remains the persistent web receipt and payment record; Phase 10.5 additionally queues the purchase-receipt email only after webhook-confirmed payment.
 - Adds duplicate webhook protection via `stripe_events.stripe_event_id`, Stripe signature verification, amount/currency/order metadata mismatch checks, payment transaction logs, and admin payment log visibility.
 - Adds seller payout foundation with Stripe Connect account status fields, seller payout ledger records, and transfer attempts only when connected accounts are enabled. Missing onboarding leaves payouts pending without failing buyer payment.
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
+- Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
 
 ### Phase 10 Stripe marketplace payments and seller onboarding
 Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Asset Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Asset Moth's 18% commission.
@@ -244,3 +244,6 @@ Delivery unlock requires webhook-confirmed payment and a complete Stripe Tax sta
 ### Phase 10.4 — Advisory IP Risk Warning
 
 Asset Moth includes an advisory IP-risk warning workflow for seller product metadata. It scans saved product title, short/full description, tags, SEO title, SEO description, and stored original downloadable product-file names; preview-image filenames are not scanned. There is no separate seller product keyword field in the current schema, so Phase 10.4 does not invent one against admin-managed terms and aliases. Matches warn sellers and require the exact rights-confirmation checkbox before submitting flagged products for review. The scanner is not legal advice, does not determine infringement, and does not scan file contents, images, OCR, audio, video, private paths, or external trademark databases. Automated matching can produce false positives and false negatives. Starter advisory terms are incomplete and are not comprehensive trademark, copyright, celebrity, franchise, or protected-content coverage.
+
+## Phase 10.5 — emails, notifications, and launch waitlist
+Phase 10.5 provides authenticated notifications, a consent-aware public waitlist, admin waitlist/campaign tools, and a durable email queue. Development uses `MAIL_TRANSPORT=log`; run `php scripts/process_email_queue.php 50`. See [the operational guide](docs/EMAILS_NOTIFICATIONS_WAITLIST.md).

@@ -1,0 +1,5 @@
+<?php use App\Core\Helpers as H; use App\Services\NotificationService; ?>
+<section class="panel"><div class="section-head"><h1>Notifications</h1><form method="post" action="/notifications/read-all"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Mark all read</button></form></div>
+<?php if(!$notifications):?><p class="muted">You have no notifications yet.</p><?php endif;?>
+<div class="notification-list"><?php foreach($notifications as $n):$url=NotificationService::safeActionUrl($n['action_url']);?><article class="notification <?=$n['read_at']?'':'unread'?>"><h2><?=H::e($n['title'])?></h2><p><?=H::e($n['message'])?></p><small><?=H::e($n['created_at'])?></small><?php if($url):?> <a href="<?=H::e($url)?>">View</a><?php endif;?><?php if(!$n['read_at']):?><form method="post" action="/notifications/<?=(int)$n['id']?>/read"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Mark read</button></form><?php endif;?></article><?php endforeach;?></div>
+<nav><?php if($page>1):?><a href="?page=<?=$page-1?>">Previous</a><?php endif;?> <?php if($page<$pages):?><a href="?page=<?=$page+1?>">Next</a><?php endif;?></nav></section>

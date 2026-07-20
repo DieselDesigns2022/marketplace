@@ -1,0 +1,2 @@
+<?php use App\Core\Helpers as H;?><h2>Asset Moth news</h2><p>Hello <?=H::e($data['name']??'')?>,</p><p><?=nl2br(H::e($data['body']??''))?></p><?php if(!empty($data['cta_url'])):?><p><a href="<?=H::e($data['cta_url'])?>"><?=H::e($data['cta_label']??'Learn more')?></a></p><?php endif;?>
+<?php if(!empty($data['unsubscribe_url'])):?><p><small><a href="<?=H::e($data['unsubscribe_url'])?>">Unsubscribe from optional email</a></small></p><?php endif;?>
