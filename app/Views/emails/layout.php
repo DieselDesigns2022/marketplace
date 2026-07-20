@@ -1,0 +1,1 @@
+<?php use App\Core\Helpers as H;?><!doctype html><html><body style="font-family:Arial,sans-serif;color:#24222b"><div style="max-width:640px;margin:auto"><h1>Asset Moth</h1><?=$content?><hr><p style="font-size:12px;color:#666">Asset Moth · <a href="<?=H::e(H::baseUrl())?>"><?=H::e(H::baseUrl())?></a></p></div></body></html>

@@ -1,7 +1,9 @@
 <?php
 use App\Core\Helpers as H;
+use App\Core\Database as DB;
 
 $u = H::user();
+$unreadNotifications = $u ? (int)(DB::row('select count(*) c from notifications where user_id=? and read_at is null', [(int)$u['id']])['c'] ?? 0) : 0;
 $meta = $meta ?? [];
 $defaultDescription = H::DEFAULT_DESCRIPTION;
 $pageTitle = trim($meta['title'] ?? H::SITE_NAME);
@@ -90,6 +92,7 @@ if ($json && json_decode($json) !== null):
         <a href="/cart">Cart</a>
         <?php if($u): ?>
         <a href="/dashboard">Dashboard</a>
+        <a href="/notifications">Notifications<?php if($unreadNotifications):?> <span class="badge" aria-label="<?=$unreadNotifications?> unread"><?=$unreadNotifications>99?'99+':$unreadNotifications?></span><?php endif;?></a>
         <?php if($u['role']==='designer'||$u['role']==='admin'):?><a href="/seller">Seller</a><?php endif; ?>
         <?php if($u['role']==='admin'):?><a href="/admin">Admin</a><?php endif; ?>
         <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button type="submit">Logout</button></form>
@@ -112,6 +115,7 @@ if ($json && json_decode($json) !== null):
         <a href="/browse">Browse</a>
         <a href="/sell">Sell</a>
         <a href="/about">About</a>
+        <a href="/waitlist">Waitlist</a>
         <a href="/contact">Contact</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>

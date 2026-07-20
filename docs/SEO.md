@@ -104,3 +104,12 @@ Phase 7 kept the Phase 6 indexing, canonical, robots, sitemap, and structured-da
 ## Phase 8 browse/search SEO behavior
 
 Phase 8 preserves Phase 6 SEO rules. Unfiltered `/browse` and clean `/category/{slug}` pages use canonical base URLs and remain public indexable collection pages. Search, filtered, sorted, or paginated browse/category URLs render `noindex,follow` and canonicalize to the base browse/category route to avoid indexing duplicate or thin result combinations. The sitemap continues to include only base public routes, active categories, approved products, approved stores, and selected static pages; it does not include filtered search URLs.
+
+## Phase 10.5 route behavior
+
+- `/waitlist` is a public footer-linked route using the shared default metadata and canonical behavior. It is not currently included in `/sitemap.xml`.
+- `/email/unsubscribe` is a public utility route and does not currently receive an explicit `noindex` prefix from the shared layout.
+- `/notifications` requires authentication and does not currently receive an explicit `noindex` prefix from the shared layout.
+- `/admin/waitlist` and `/admin/email-campaigns` inherit the existing `/admin` `noindex` behavior.
+
+Whether `/email/unsubscribe` and `/notifications` should receive explicit `noindex` behavior remains an unresolved implementation-policy decision. This documentation records current behavior; it does not claim those routes are already noindexed.

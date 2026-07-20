@@ -9,6 +9,7 @@ use App\Services\StripeService;
 use App\Services\ProductIpRiskWorkflow;
 use App\Services\IpRiskScanner;
 use App\Repositories\IpRiskRepository;
+use App\Services\NotificationService;
 use Throwable;
 class SellerController
 {
@@ -337,6 +338,7 @@ class SellerController
                 DB::exec( 'insert into designer_applications (user_id,display_name,desired_slug,bio,portfolio_url,social_links,design_types,uses_ai,agreement,status) values (?,?,?,?,?,?,?,?,?,"pending")', [ H::user()['id'], $values['display_name'], $values['desired_slug'], $values['bio'], $values['portfolio_url'], $values['social_links'], $values['design_types'], $values['uses_ai'], 1, ] );
                 $applicationId = DB::id();
                 DB::exec( 'insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)', [ null, 'submitted_designer_application', 'designer_application', $applicationId, json_encode(['user_id' => H::user()['id']]), ] );
+                try { NotificationService::admins('seller_application','New seller application','A new seller application is ready for review.',"seller-application:$applicationId",'/admin/applications/'.$applicationId); } catch(Throwable $e) { NotificationService::reportFailure('seller_application',$e); }
                 H::flash('success', 'Your designer application has been submitted and is waiting for review.');
                 H::redirect('/apply');
 

@@ -206,3 +206,23 @@ No new public tax routes are added in Phase 10.3B. Existing checkout and Stripe 
 - `POST /admin/products/{id}/ip-risk-review` — admin only + CSRF — keep pending, approve, publish/keep published while flagged, reject, or archive through validated transitions; changes state.
 
 There are no public term-list endpoints and no state-changing GET routes.
+
+## Phase 10.5 routes
+| Method | Route | Access |
+|---|---|---|
+| GET, POST | `/waitlist` | Public, CSRF on POST |
+| GET, POST | `/email/unsubscribe` | Public token, CSRF on POST |
+| GET | `/notifications` | Authenticated |
+| POST | `/notifications/read-all` | Authenticated owner, CSRF |
+| POST | `/notifications/{id}/read` | Authenticated owner, CSRF |
+| GET | `/admin/waitlist` | Admin read access |
+| POST | `/admin/waitlist` | Admin, CSRF-protected status mutation |
+| GET | `/admin/waitlist/export` | Admin |
+| POST | `/admin/waitlist/launch-invite` | Admin, CSRF |
+| GET | `/admin/email-campaigns` | Admin |
+| GET | `/admin/email-campaigns/new` | Admin form/read access |
+| POST | `/admin/email-campaigns/new` | Admin, CSRF-protected preview/save/queue |
+| GET | `/admin/email-campaigns/{id}` | Admin detail/read access |
+| POST | `/admin/email-campaigns/{id}` | Admin, CSRF-protected queue/cancel/test |
+
+`/notifications/read-all` and `/admin/email-campaigns/new` are registered before their dynamic sibling routes.

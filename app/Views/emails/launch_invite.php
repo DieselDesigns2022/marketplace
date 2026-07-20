@@ -1,0 +1,2 @@
+<?php use App\Core\Helpers as H;?><h2>Asset Moth is ready for you</h2><p>Hello <?=H::e($data['name']??'')?>. Your Asset Moth launch invitation has arrived.</p><p><a href="<?=H::e($data['cta_url']??H::baseUrl())?>">Visit Asset Moth</a></p>
+<?php if(!empty($data['unsubscribe_url'])):?><p><small><a href="<?=H::e($data['unsubscribe_url'])?>">Unsubscribe from optional email</a></small></p><?php endif;?>
