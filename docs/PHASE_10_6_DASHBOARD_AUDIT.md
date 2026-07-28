@@ -20,3 +20,6 @@
 | Account navigation and operational warnings | Partially complete | Complete but cleaned up — buyer, seller, and admin navigation includes Account; seller payout issues and failed/manual-review admin payments remain actionable until resolved. |
 | Deterministic category consolidation | Partially complete | Complete but cleaned up — normalized canonical-slug matches take priority over normalized names, and each duplicate receives exactly one different canonical target before products and coupon restrictions move. |
 | Free checkout, new fulfillment, messaging, refund controls, seller tax | Intentionally outside Phase 10.6 | Intentionally outside Phase 10.6. |
+
+## Live-testing corrections (2026-07-28)
+Metric cards now stack their value and label consistently. The admin overview uses a cohesive accessible pastel operations surface without changing its data or destinations. The waitlist has a dedicated form-only shell. Eligible pre-launch users can be permanently deleted by an admin only after exact-email confirmation and retention checks. New store banners are safely normalized to 2400 × 800 (3:1). Google Drives and Bundles & Collaborations are active canonical seller categories.

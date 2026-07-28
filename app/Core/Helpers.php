@@ -129,4 +129,11 @@ class Helpers
 
     }
 
+     public static function minimalView(string $view, array $data=[]): void
+    {
+        extract($data);
+        require app_path('app/Views/layouts/minimal.php');
+
+    }
+
 }

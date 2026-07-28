@@ -142,8 +142,93 @@ class AdminController
     {
         $this->gate();
         if($_POST) DB::exec('update users set status=? where id=?',[$_POST['status'],$_POST['id']]);
-        H::view('admin/table',['title'=>'Users','rows'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
+        H::view('admin/users',['users'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
 
+    }
+    private function userDeletionBlockReason(array $user): ?string
+    {
+        $id=(int)$user['id'];
+        if ($id===(int)H::user()['id']) return 'You cannot permanently delete your own account.';
+        if (($user['role']??'')==='admin') return 'Admin accounts cannot be permanently deleted.';
+        if (DB::row('select id from orders where user_id=? limit 1',[$id])) return 'This account has an order that must be retained.';
+        if (DB::row('select id from coupon_usages where user_id=? limit 1',[$id])) return 'This account has coupon usage history that must be retained.';
+        if (DB::row('select id from seller_earnings where buyer_id=? limit 1',[$id])) return 'This account has buyer earnings history that must be retained.';
+        if (DB::row('select id from referrals where (referrer_user_id=? or referred_user_id=?) and estimated_earnings<>0 limit 1',[$id,$id])) return 'This account has referral earnings history that must be retained.';
+        if (DB::row('select id from email_campaign_recipients where user_id=? or lower(email)=lower(?) limit 1',[$id,$user['email']])) return 'This account has email campaign recipient history that must be retained.';
+        if (DB::row('select id from email_messages where lower(recipient_email)=lower(?) limit 1',[$user['email']])) return 'This account has email delivery history that must be retained.';
+        if (DB::row('select id from email_campaigns where created_by=? limit 1',[$id])) return 'This account has email campaign author history that must be retained.';
+        if (DB::row('select id from coupons where created_by=? limit 1',[$id])) return 'This account has coupon author history that must be retained.';
+        if (DB::row('select id from designer_applications where user_id=? and status="approved" limit 1',[$id])) return 'This account has approved seller application history that must be retained.';
+        $designer=DB::row('select id,status from designers where user_id=? limit 1',[$id]);
+        if ($designer) {
+            if ($designer['status']==='approved') return 'This account has an approved seller store that must be retained.';
+            if (DB::row('select id from products where designer_id=? limit 1',[$designer['id']])) return 'This seller account has products that must be retained.';
+            if (DB::row('select id from seller_payouts where designer_id=? limit 1',[$designer['id']])) return 'This seller account has payout or transfer history that must be retained.';
+            if (DB::row('select id from seller_earnings where designer_id=? limit 1',[$designer['id']])) return 'This seller account has financial earnings history that must be retained.';
+            if (DB::row('select id from platform_commissions where designer_id=? limit 1',[$designer['id']])) return 'This seller account has commission history that must be retained.';
+            if (DB::row('select id from ads where designer_id=? limit 1',[$designer['id']])) return 'This seller account has advertising history that must be retained.';
+            if (DB::row('select id from creator_rank_history where designer_id=? limit 1',[$designer['id']])) return 'This seller account has creator rank history that must be retained.';
+            if (DB::row('select c.id from coupons c left join coupon_usages cu on cu.coupon_id=c.id where c.seller_id=? and (c.usage_count>0 or cu.id is not null) limit 1',[$designer['id']])) return 'This seller account has coupon redemption history that must be retained.';
+            if (DB::row('select id from order_items where designer_id=? limit 1',[$designer['id']])) return 'This seller account has order-item history that must be retained.';
+            if (DB::row('select id from reviews where designer_id=? limit 1',[$designer['id']])) return 'This seller account has store review history that must be retained.';
+        }
+        if (DB::row('select id from product_ip_risk_scans where seller_id=? limit 1',[$id])||DB::row('select id from product_ip_rights_confirmations where seller_id=? limit 1',[$id])) return 'This seller account has IP compliance history that must be retained.';
+        if (DB::row('select id from ip_risk_terms where created_by_admin_id=? or updated_by_admin_id=? limit 1',[$id,$id])||DB::row('select product_id from product_ip_risk_states where reviewed_by_admin_id=? limit 1',[$id])||DB::row('select id from product_ip_risk_review_history where admin_id=? limit 1',[$id])||DB::row('select id from admin_logs where admin_user_id=? limit 1',[$id])) return 'This account has administration or review history that must be retained.';
+        if (DB::row('select id from payment_transactions pt join orders o on o.id=pt.order_id where o.user_id=? limit 1',[$id])) return 'This account has payment transaction history that must be retained.';
+        if (DB::row('select id from downloads where user_id=? limit 1',[$id])||DB::row('select id from reviews where user_id=? limit 1',[$id])) return 'This account has marketplace history that must be retained.';
+        return null;
+    }
+    private function removeDeletedStoreFile(?string $path, string $folder): void
+    {
+        if (!in_array($folder,['store_avatars','store_banners'],true)||!$path||!preg_match('#^/uploads/'.preg_quote($folder,'#').'/[a-f0-9]{24,64}\.(?:jpe?g|png|webp)$#',$path)) return;
+        $base=realpath(public_path('uploads/'.$folder));
+        $file=realpath(public_path(ltrim($path,'/')));
+        if ($base&&$file&&str_starts_with($file,$base.DIRECTORY_SEPARATOR)&&is_file($file)) @unlink($file);
+    }
+    public function deleteUser($id): void
+    {
+        $this->gate(); $id=(int)$id;
+        $user=DB::row('select id,name,email,role,status from users where id=?',[$id]);
+        if (!$user) { H::flash('error','User not found.'); H::redirect('/admin/users'); }
+        $reason=$this->userDeletionBlockReason($user);
+        if ($reason) { H::flash('error',$reason); H::redirect('/admin/users'); }
+        if (!hash_equals((string)$user['email'],trim((string)($_POST['confirm_email']??'')))) { H::flash('error','Type the target user’s exact email address to confirm permanent deletion.'); H::redirect('/admin/users'); }
+        $storeFiles=[];
+        try {
+            DB::begin();
+            $designer=DB::row('select id,avatar_path,banner_path from designers where user_id=?',[$id]); $designerId=(int)($designer['id']??0);
+            if ($designer) $storeFiles=['avatar'=>$designer['avatar_path']??null,'banner'=>$designer['banner_path']??null];
+            DB::exec('delete from notifications where user_id=?',[$id]);
+            DB::exec('delete from email_preferences where user_id=?',[$id]);
+            DB::exec('delete from cart_items where user_id=?',[$id]);
+            DB::exec('delete from wishlists where user_id=?',[$id]);
+            DB::exec('delete from follows where user_id=?',[$id]);
+            DB::exec('delete from marketplace_credits where user_id=?',[$id]);
+            DB::exec('delete from credit_transactions where user_id=?',[$id]);
+            DB::exec('delete from referrals where referrer_user_id=? or referred_user_id=?',[$id,$id]);
+            if ($designerId) DB::exec('delete from referrals where referred_designer_id=?',[$designerId]);
+            DB::exec('delete from designer_applications where user_id=? and status in ("pending","denied")',[$id]);
+            if ($designerId) {
+                DB::exec('delete from follows where designer_id=?',[$designerId]);
+                DB::exec('delete from homepage_features where feature_type="designer" and feature_id=?',[$designerId]);
+                DB::exec('delete from coupon_restrictions where restrictable_type="seller" and restrictable_id=?',[$designerId]);
+                DB::exec('delete from seller_license_presets where designer_id=?',[$designerId]);
+                DB::exec('delete cr from coupon_restrictions cr join coupons c on c.id=cr.coupon_id where c.seller_id=? and c.usage_count=0',[$designerId]);
+                DB::exec('delete from coupons where seller_id=? and usage_count=0',[$designerId]);
+                DB::exec('delete from designers where id=? and status<>"approved"',[$designerId]);
+            }
+            DB::exec('delete from waitlist_entries where lower(email)=lower(?)',[$user['email']]);
+            DB::exec('delete from users where id=?',[$id]);
+            $this->log('permanently_deleted_user','user',$id,['personal_data_retained'=>false]);
+            DB::commit();
+            $this->removeDeletedStoreFile($storeFiles['avatar']??null,'store_avatars');
+            $this->removeDeletedStoreFile($storeFiles['banner']??null,'store_banners');
+            H::flash('success','User permanently deleted. The email address can register again.');
+        } catch (Throwable $e) {
+            if (DB::pdo()->inTransaction()) DB::rollBack();
+            H::flash('error','Permanent deletion failed. No account records were changed.');
+        }
+        H::redirect('/admin/users');
     }
     public function applications($id=null)
     {

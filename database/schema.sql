@@ -660,7 +660,9 @@ INSERT INTO categories (name,slug,description,sort_order) VALUES
 ('Digital Papers','digital-papers','Digital paper designs and patterns',103),
 ('Freebies','freebies','Freebie-category digital products; zero-total checkout is not enabled',104),
 ('Digital Services','digital-services','Digital services delivered using existing fulfillment choices',105),
-('Customs / Personalized','customs-personalized','Custom and personalized products using existing fulfillment choices',106)
+('Customs / Personalized','customs-personalized','Custom and personalized products using existing fulfillment choices',106),
+('Google Drives','google-drives','Google Drive products using existing fulfillment choices',107),
+('Bundles & Collaborations','bundles-collaborations','Bundled and collaborative digital products',108)
 ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),is_active=1;
 CREATE TABLE ip_risk_terms
 (
