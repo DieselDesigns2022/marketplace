@@ -1072,3 +1072,32 @@ html,body{max-width:100%;overflow-x:hidden}.dashboard-nav{display:flex;flex-wrap
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #8b3fd1; outline-offset: 3px; }
 .dashboard-grid > .card { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 700px) { .responsive-table table { min-width: 640px; } .dashboard-heading > * { min-width: 0; } }
+
+/* Phase 10.6 live dashboard, waitlist, and storefront refinements. */
+.dashboard-grid > .card { display:flex; flex-direction:column; align-items:flex-start; gap:.45rem; }
+.dashboard-grid > .card > strong { display:block; font-size:clamp(1.35rem,3vw,2rem); line-height:1.05; }
+.dashboard-grid > .card > span { display:block; line-height:1.35; }
+.dashboard-grid > a.card:focus-visible,.admin-dashboard a:focus-visible,.danger-button:focus-visible { outline:3px solid #8b3fd1; outline-offset:3px; }
+.minimal-page { min-height:100%; background:linear-gradient(145deg,#fff7fb 0%,#f3fff9 52%,#f6f0ff 100%); }
+.minimal-shell { min-height:100vh; width:min(100% - 2rem,560px); margin:auto; display:grid; place-content:center; padding:2rem 0; }
+.waitlist-form-panel { width:100%; margin:0; box-shadow:0 18px 55px #6f46701a; }
+.waitlist-form-panel fieldset { border:0; padding:0; margin:0; min-width:0; }
+.waitlist-form-panel legend { font-size:1.55rem; font-weight:800; margin-bottom:1rem; color:#372b46; }
+.admin-dashboard { position:relative; isolation:isolate; display:grid; gap:1.35rem; padding-bottom:1rem; }
+.admin-dashboard::before,.admin-dashboard::after { content:"✦"; position:absolute; z-index:-1; color:#d89be9; opacity:.45; font-size:2rem; }
+.admin-dashboard::before { top:1rem; right:4%; transform:rotate(12deg); }
+.admin-dashboard::after { top:12rem; left:-.5rem; color:#6bcdb0; font-size:1.3rem; }
+.admin-dashboard-hero { position:relative; overflow:hidden; padding:clamp(1.35rem,4vw,2.4rem); border:1px solid #eadcf2; border-radius:26px; background:linear-gradient(120deg,#fff 0%,#fff1f7 48%,#ecfff8 100%); box-shadow:0 14px 40px #6f467012; }
+.admin-dashboard-hero::after { content:""; position:absolute; width:130px; height:130px; right:-45px; bottom:-70px; border-radius:50%; background:#d9c5ff66; }
+.admin-dashboard-section { margin:0; padding:clamp(1rem,3vw,1.55rem); border:1px solid #ede2f0; border-radius:22px; background:#ffffffde; box-shadow:0 8px 28px #6f46700d; }
+.admin-dashboard-section > h2 { margin-top:0; color:#493652; }
+.admin-dashboard .attention-panel { border-left:5px solid #d989af; background:linear-gradient(120deg,#fff,#fff4f8); }
+.admin-dashboard .dashboard-grid > .card { border-color:#eadff0; background:linear-gradient(150deg,#fff,#fbf8ff); }
+.admin-dashboard .dashboard-grid > a.card:hover { border-color:#bf8ddd; box-shadow:0 9px 24px #8b3fd116; text-decoration:none; transform:translateY(-2px); }
+.admin-waitlist-section { background:linear-gradient(135deg,#fff,#effff8); }
+.admin-quick-section { background:linear-gradient(135deg,#fff9fc,#f4f0ff); }
+.permanent-delete-form { display:grid; gap:.45rem; margin-top:.75rem; padding:.75rem; border:1px solid #e8a7ad; border-radius:12px; background:#fff5f5; min-width:260px; }
+.danger-button { background:#9b2632; color:#fff; border-color:#9b2632; }
+.storefront-banner { width:100%; min-height:0; aspect-ratio:3 / 1; background-size:cover; background-position:center; }
+.storefront-banner.small { min-height:0; aspect-ratio:3 / 1; }
+@media(max-width:600px){.admin-dashboard-section{padding:.9rem}.admin-dashboard-hero{align-items:stretch}.admin-dashboard-hero .btn{width:100%}.permanent-delete-form{min-width:220px}.minimal-shell{width:min(100% - 1.25rem,560px)}}

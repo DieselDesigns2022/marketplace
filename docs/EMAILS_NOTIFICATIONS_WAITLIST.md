@@ -9,6 +9,8 @@ Phase 10.5 adds durable in-app notifications, the public launch waitlist, consen
 ## Routes
 Public: `GET|POST /waitlist`, `GET|POST /email/unsubscribe`. Authenticated: `GET /notifications`, `POST /notifications/read-all`, and `POST /notifications/{id}/read` (the static route is registered first). Admin: `GET|POST /admin/waitlist`, `GET /admin/waitlist/export`, `POST /admin/waitlist/launch-invite`, `GET /admin/email-campaigns`, `GET|POST /admin/email-campaigns/new`, and `GET|POST /admin/email-campaigns/{id}`.
 
+Public `/waitlist` uses a form-only minimal shell while preserving its existing signup, consent, confirmation, unsubscribe, and administrator-notification behavior.
+
 ## Worker and transport
 Development defaults to `MAIL_TRANSPORT=log`. Run `php scripts/process_email_queue.php 50` from cron (normally every minute). It claims with a row lock and `SKIP LOCKED`, recovers claims older than 15 minutes, processes at most 100 per invocation, retries after roughly 5 and 30 minutes and permanently fails on attempt three. Log delivery writes structured JSON lines to `storage/logs/mail.log`, containing a recipient hash rather than an address or unsubscribe token. The current repository implements the safe log transport; production provider integration must be implemented and tested before selecting a different transport.
 

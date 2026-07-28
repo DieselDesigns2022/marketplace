@@ -107,7 +107,7 @@ Phase 8 preserves Phase 6 SEO rules. Unfiltered `/browse` and clean `/category/{
 
 ## Phase 10.5 route behavior
 
-- `/waitlist` is a public footer-linked route using the shared default metadata and canonical behavior. It is not currently included in `/sitemap.xml`.
+- `/waitlist` remains `noindex,follow` and excluded from `/sitemap.xml`. It intentionally uses a form-only minimal shell with no global header, footer, logo, or navigation links.
 - `/email/unsubscribe` is a public utility route and does not currently receive an explicit `noindex` prefix from the shared layout.
 - `/notifications` requires authentication and does not currently receive an explicit `noindex` prefix from the shared layout.
 - `/admin/waitlist` and `/admin/email-campaigns` inherit the existing `/admin` `noindex` behavior.
@@ -118,4 +118,4 @@ Whether `/email/unsubscribe` and `/notifications` should receive explicit `noind
 
 ## Phase 10.6 SEO behavior
 
-The seven Phase 10.6 categories use the existing active category data flow, so their category pages and sitemap entries appear automatically when active. No special sitemap entries or seller receipt content were added. Dashboard, account, notification, checkout, seller, and admin routes retain private `noindex,follow` handling.
+The nine Phase 10.6 canonical categories—Engagement Graphics, Social Media Graphics, Libby Wraps, Digital Papers, Freebies, Digital Services, Customs / Personalized, Google Drives, and Bundles & Collaborations—use the existing active category data flow, so their category pages and sitemap entries appear automatically when active. No special sitemap entries or seller receipt content were added. Dashboard, account, notification, checkout, seller, and admin routes retain private `noindex,follow` handling.

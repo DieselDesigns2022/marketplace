@@ -125,6 +125,49 @@ class SellerController
         return '/uploads/' . $folder . '/' . $name;
 
     }
+
+    private function uploadStoreBanner(array &$errors): ?string
+    {
+        if (empty($_FILES['banner']['tmp_name'])) return null;
+        $file=$_FILES['banner'];
+        if (($file['error']??UPLOAD_ERR_OK)!==UPLOAD_ERR_OK) { $errors[]='Banner upload failed.'; return null; }
+        if (($file['size']??0)>25*1024*1024) { $errors[]='Banner must be 25MB or smaller.'; return null; }
+        if (!is_uploaded_file($file['tmp_name'])) { $errors[]='Banner must be a genuine uploaded file.'; return null; }
+        if (!extension_loaded('gd')||!function_exists('imagecreatefromstring')) { $errors[]='Banner processing is unavailable because GD is not installed.'; return null; }
+        $mime=(new \finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+        $encoders=['image/jpeg'=>['jpg','imagejpeg'],'image/png'=>['png','imagepng'],'image/webp'=>['webp','imagewebp']];
+        if (!isset($encoders[$mime])||!function_exists($encoders[$mime][1])) { $errors[]='Banner must be a valid JPG, PNG, or WEBP image.'; return null; }
+        $info=@getimagesize($file['tmp_name']);
+        if (!$info||($info['mime']??'')!==$mime||$info[0]<1||$info[1]<1||$info[0]*$info[1]>40000000) { $errors[]='Banner must be a valid image file.'; return null; }
+        $bytes=@file_get_contents($file['tmp_name']); $source=$bytes===false?false:@imagecreatefromstring($bytes);
+        if (!$source) { $errors[]='Banner could not be decoded.'; return null; }
+        $canvas=imagecreatetruecolor(2400,800);
+        if (!$canvas) { imagedestroy($source); $errors[]='Banner could not be processed.'; return null; }
+        if (in_array($mime,['image/png','image/webp'],true)) { imagealphablending($canvas,false); imagesavealpha($canvas,true); $transparent=imagecolorallocatealpha($canvas,0,0,0,127); imagefilledrectangle($canvas,0,0,2399,799,$transparent); }
+        $scale=max(2400/$info[0],800/$info[1]);
+        $srcW=2400/$scale; $srcH=800/$scale; $srcX=($info[0]-$srcW)/2; $srcY=($info[1]-$srcH)/2;
+        $ok=imagecopyresampled($canvas,$source,0,0,(int)floor($srcX),(int)floor($srcY),2400,800,(int)ceil($srcW),(int)ceil($srcH));
+        imagedestroy($source);
+        $dir=public_path('uploads/store_banners');
+        if (!$ok||(!is_dir($dir)&&!mkdir($dir,0755,true))) { imagedestroy($canvas); $errors[]='Banner could not be processed.'; return null; }
+        [$ext,$encoder]=$encoders[$mime]; $name=bin2hex(random_bytes(16)).'.'.$ext; $absolute=$dir.'/'.$name;
+        $saved=$mime==='image/jpeg'?$encoder($canvas,$absolute,90):$encoder($canvas,$absolute);
+        imagedestroy($canvas);
+        if (!$saved) { @unlink($absolute); $errors[]='Banner could not be saved.'; return null; }
+        return '/uploads/store_banners/'.$name;
+    }
+
+    public static function isSafeStoreBannerPath(string $path): bool
+    {
+        return (bool)preg_match('#^/uploads/store_banners/[a-f0-9]{24,64}\.(?:jpe?g|png|webp)$#',$path);
+    }
+
+    private function removeStoreBanner(?string $path): void
+    {
+        if (!$path||!self::isSafeStoreBannerPath($path)) return;
+        $base=realpath(public_path('uploads/store_banners')); $file=realpath(public_path(ltrim($path,'/')));
+        if ($base&&$file&&str_starts_with($file,$base.DIRECTORY_SEPARATOR)&&is_file($file)) @unlink($file);
+    }
     private function applicationValues(): array
     {
         return [ 'display_name' => trim($_POST['display_name'] ?? ''), 'desired_slug' => trim($_POST['desired_slug'] ?? ''), 'bio' => trim($_POST['bio'] ?? ''), 'portfolio_url' => trim($_POST['portfolio_url'] ?? ''), 'social_links' => trim($_POST['social_links'] ?? ''), 'design_types' => trim($_POST['design_types'] ?? ''), 'uses_ai' => trim($_POST['uses_ai'] ?? ''), 'agreement' => isset($_POST['agreement']), ];
@@ -471,10 +514,17 @@ class SellerController
            }
 
             $avatar = $this->uploadPublicImage('avatar', 'store_avatars', $errors);
-            $banner = $this->uploadPublicImage('banner', 'store_banners', $errors);
+            $banner = $this->uploadStoreBanner($errors);
             if (!$errors)
            {
-                DB::exec( 'update designers set display_name=?,store_slug=?,bio=?,website_url=?,social_links=?,facebook_url=?,instagram_url=?,tiktok_url=?,pinterest_url=?,etsy_url=?,shopify_url=?,announcement=?,seo_title=?,seo_description=?,avatar_path=coalesce(?,avatar_path),banner_path=coalesce(?,banner_path),updated_at=now() where id=? and user_id=?', [ $display, $slug, $bio, $website, $social, $socialFields['facebook_url'], $socialFields['instagram_url'], $socialFields['tiktok_url'], $socialFields['pinterest_url'], $socialFields['etsy_url'], $socialFields['shopify_url'], $announcement, $seoTitle, $seoDescription, $avatar, $banner, $d['id'], H::user()['id'], ] );
+                try {
+                    if (!DB::exec( 'update designers set display_name=?,store_slug=?,bio=?,website_url=?,social_links=?,facebook_url=?,instagram_url=?,tiktok_url=?,pinterest_url=?,etsy_url=?,shopify_url=?,announcement=?,seo_title=?,seo_description=?,avatar_path=coalesce(?,avatar_path),banner_path=coalesce(?,banner_path),updated_at=now() where id=? and user_id=?', [ $display, $slug, $bio, $website, $social, $socialFields['facebook_url'], $socialFields['instagram_url'], $socialFields['tiktok_url'], $socialFields['pinterest_url'], $socialFields['etsy_url'], $socialFields['shopify_url'], $announcement, $seoTitle, $seoDescription, $avatar, $banner, $d['id'], H::user()['id'], ] )) throw new \RuntimeException('Store update failed.');
+                } catch (Throwable $e) {
+                    $this->removeStoreBanner($banner);
+                    $errors[]='Store settings could not be saved.';
+                }
+                if ($errors) { H::view('seller/store', [ 'd'=>$this->d(), 'errors'=>$errors, 'licenseTypes'=>LicenseService::platformTypes(), 'licensePresets'=>LicenseService::sellerPresets((int)$d['id']) ]); return; }
+                if ($banner) $this->removeStoreBanner($d['banner_path']??null);
                 H::flash('success', 'Store settings updated.');
                 H::redirect('/seller/store');
 

@@ -85,6 +85,7 @@ use App\Controllers\AdminEmailCampaignController;
  $router->match(['GET','POST'], '/admin/email-campaigns/new', [AdminEmailCampaignController::class, 'create']);
  $router->match(['GET','POST'], '/admin/email-campaigns/{id}', [AdminEmailCampaignController::class, 'show']);
  $router->match(['GET','POST'], '/admin/users', [AdminController::class, 'users']);
+ $router->post('/admin/users/{id}/delete', [AdminController::class, 'deleteUser']);
  $router->match(['GET','POST'], '/admin/applications', [AdminController::class, 'applications']);
  $router->match(['GET','POST'], '/admin/applications/{id}', [AdminController::class, 'applications']);
  $router->match(['GET','POST'], '/admin/designers', [AdminController::class, 'designers']);

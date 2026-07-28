@@ -10,4 +10,3 @@
     <li>Platinum: 500 sales</li>
     <li>Legend: 1500 sales</li>
 </ul>
-<p class="muted">Progress and perks placeholder.</p>
