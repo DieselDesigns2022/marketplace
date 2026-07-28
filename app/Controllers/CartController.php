@@ -6,6 +6,7 @@ use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\StripeService;
 use App\Services\CouponService;
+use App\Services\SellerReceiptService;
 use Throwable;
 
 class CartController
@@ -51,12 +52,12 @@ class CartController
     {
         if (H::user()) {
             $this->mergeGuestCart();
-            return DB::rows('select ci.id cart_item_id,ci.license_type,ci.price_snapshot,ci.license_price_snapshot,ci.total_snapshot,p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
+            return DB::rows('select ci.id cart_item_id,ci.license_type,ci.price_snapshot,ci.license_price_snapshot,ci.total_snapshot,p.*,d.display_name,d.store_slug,d.receipt_note,d.receipt_image_path,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
         }
 
         $items = [];
         foreach ($this->guestCart() as $cartId => $cartItem) {
-            $p = DB::row('select p.*,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from products p join designers d on d.id=p.designer_id where p.id=? and p.status="approved"',[(int)($cartItem['product_id'] ?? 0)]);
+            $p = DB::row('select p.*,d.display_name,d.store_slug,d.receipt_note,d.receipt_image_path,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from products p join designers d on d.id=p.designer_id where p.id=? and p.status="approved"',[(int)($cartItem['product_id'] ?? 0)]);
             if (!$p) continue;
             $p['cart_item_id'] = (int)$cartId;
             $p['license_type'] = (string)($cartItem['license_type'] ?? 'personal');
@@ -269,6 +270,9 @@ class CartController
                 $order=DB::id();
                 foreach($valid as $idx=>$p)
                {
+                   // Read receipt settings authoritatively inside this transaction; cart/request values are never trusted.
+                   $receipt=DB::row('select receipt_note,receipt_image_path from designers where id=?',[(int)$p['designer_id']])??[];
+                   $receiptSnapshot=SellerReceiptService::snapshotFromSeller($receipt);
                    $lineDiscount = (float)($allocations[$idx] ?? 0);
                    $discountedLine = max(0, round((float)$p['line_total'] - $lineDiscount, 2));
                    $comm=round($discountedLine * $commissionRate, 2);
@@ -277,7 +281,7 @@ class CartController
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
                     $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
-                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null]);
+                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version,seller_receipt_note_snapshot,seller_receipt_image_path_snapshot) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null,$receiptSnapshot['note'],$receiptSnapshot['image_path']]);
                     DB::exec('update order_items set coupon_id=?,coupon_code=?,coupon_discount=? where id=?', [$coupon['id'] ?? null,$coupon['code'] ?? null,$lineDiscount,DB::id()]);
                     DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$discountedLine,$comm,$discountedLine-$comm,'pending_payment']);
 

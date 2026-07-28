@@ -50,6 +50,7 @@ use App\Controllers\AdminEmailCampaignController;
  $router->get('/seller/stripe/return', [SellerController::class, 'stripeReturn']);
  $router->get('/seller/stripe/refresh', [SellerController::class, 'stripeRefresh']);
  $router->match(['GET','POST'], '/seller/store', [SellerController::class, 'storeSettings']);
+ $router->match(['GET','POST'], '/seller/receipt-settings', [SellerController::class, 'receiptSettings']);
  $router->get('/seller/products', [SellerController::class, 'products']);
  $router->match(['GET','POST'], '/seller/product/new', [SellerController::class, 'editProduct']);
  $router->match(['GET','POST'], '/seller/product/{id}', [SellerController::class, 'editProduct']);

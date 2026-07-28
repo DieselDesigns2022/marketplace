@@ -87,15 +87,18 @@
     </table>
     <p>Digital Resale: always prohibited.</p>
     <h2>Product Details</h2>
-    <label>Category<select name="category_id">
+    <label>Category<select name="category_id" data-category-guidance-source>
     <option value="">None</option>
     <?php foreach($cats as $c):?>
-        <option value="<?=$c['id']?>" <?=(string)($p['category_id']??'')===(string)$c['id']?'selected':''?>>
+        <option value="<?=$c['id']?>" data-slug="<?=H::e($c['slug'])?>" <?=(string)($p['category_id']??'')===(string)$c['id']?'selected':''?>>
         <?=H::e($c['name'])?>
         </option>
     <?php endforeach;?>
     </select>
     </label>
+    <p class="notice warning" data-category-guidance="freebies" hidden>Freebies is an active category, but $0.00 checkout is not supported yet. Existing paid checkout rules still apply.</p>
+    <p class="notice warning" data-category-guidance="digital-services" hidden>Digital Services must use the existing downloadable or Google Drive / manual-delivery choice.</p>
+    <p class="notice warning" data-category-guidance="customs-personalized" hidden>Customs / Personalized products must use the existing downloadable or Google Drive / manual-delivery choice.</p>
     <label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>">
     </label>
 <label>AI Disclosure<select name="ai_disclosure" required>

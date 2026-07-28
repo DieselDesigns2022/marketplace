@@ -1,5 +1,5 @@
-<h1>Sales</h1>
-<table>
+<header class="dashboard-heading"><div><h1>Sales</h1><p class="muted">Seller-owned orders, gross sales, earnings, and payout status are shown separately.</p></div></header>
+<?php if(!$sales):?><section class="card empty-state"><h2>No paid sales yet</h2><p>Paid and partially refunded seller-owned order items will appear here.</p><a class="btn" href="/seller/products">Review products</a></section><?php else:?><div class="responsive-table"><table>
     <tr>
         <th>Product</th>
         <th>Buyer</th>
@@ -24,4 +24,4 @@
            <td><?=$s['created_at']?> · <a href="/seller/order-item/<?=$s['id']?>">View</a></td>
         </tr>
     <?php endforeach;?>
-</table>
+</table></div><?php endif;?>

@@ -226,3 +226,9 @@ There are no public term-list endpoints and no state-changing GET routes.
 | POST | `/admin/email-campaigns/{id}` | Admin, CSRF-protected queue/cancel/test |
 
 `/notifications/read-all` and `/admin/email-campaigns/new` are registered before their dynamic sibling routes.
+
+
+
+## Phase 10.6 seller receipt route
+
+`GET|POST /seller/receipt-settings` maps to `SellerController::receiptSettings`. Access requires the authenticated seller's approved designer record and completed onboarding. GET displays current future-order settings; POST requires CSRF and accepts the explicit `save`, `remove_note`, `remove_image`, or `restore` action for that seller only. Successful changes affect snapshots created for later order items and never mutate existing snapshots. Seller and admin secondary navigation now includes the existing `/account` shortcut. Buyer download links are displayed only after the corresponding protected file passes containment, regular-file, and readability checks.

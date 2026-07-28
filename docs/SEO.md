@@ -113,3 +113,9 @@ Phase 8 preserves Phase 6 SEO rules. Unfiltered `/browse` and clean `/category/{
 - `/admin/waitlist` and `/admin/email-campaigns` inherit the existing `/admin` `noindex` behavior.
 
 Whether `/email/unsubscribe` and `/notifications` should receive explicit `noindex` behavior remains an unresolved implementation-policy decision. This documentation records current behavior; it does not claim those routes are already noindexed.
+
+
+
+## Phase 10.6 SEO behavior
+
+The seven Phase 10.6 categories use the existing active category data flow, so their category pages and sitemap entries appear automatically when active. No special sitemap entries or seller receipt content were added. Dashboard, account, notification, checkout, seller, and admin routes retain private `noindex,follow` handling.

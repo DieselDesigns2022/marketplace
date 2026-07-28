@@ -358,3 +358,19 @@ Production-provider authentication, sender verification, bounce handling, and li
 The database-independent suite also covers backslash/browser-normalization URL attacks, same-host unapproved ports, URL userinfo, deterministic verified-payload fingerprints, normalized event types, allowlisted failure categories, controlled non-sensitive webhook-alert copy, and idempotent structured log append by message ID. Database persistence after physical delivery and verified webhook notification insertion remain part of the unexecuted staging matrix when no disposable MariaDB environment is configured.
 
 Log recovery tests execute duplicate-ID suppression, distinct valid records, incomplete-tail truncation, malformed-complete-record failure, invalid-ID rejection, JSON validity, and sensitive-field absence. Webhook helper tests execute stable and distinct verified-payload fingerprints, event-type normalization, category allowlisting, and proof that supplied sensitive text is excluded from alert copy. Actual database notification insertion for verified webhook failures remains an unexecuted staging scenario without a disposable migrated MariaDB environment.
+
+
+
+## Phase 10.6 test matrix
+
+| Area | Automated | Disposable database / browser verification |
+|---|---|---|
+| PHP and regressions | PHP lint; Phase 10.6 suite; Phase 10.5 suite | Run relevant database integration suites |
+| Buyer downloads | Query/static behavior checks for per-file rows, refund precedence, expiry, and protected links | Purchase a multi-file product; verify paid, unpaid, refunded, expired, manual, and missing-file states |
+| Roles/navigation | Dynamic-route and role-aware navigation checks | Exercise buyer, incomplete/approved seller, and admin sessions, including 403/redirect boundaries |
+| Receipt notes/images | Normalization, path, action, encoder/transparency, grouping, escaping, and retention checks | Upload valid/invalid/oversized/polyglot formats; replace/remove/restore; verify future snapshots and historical retention |
+| Categories | Canonical list and punctuation normalization checks | Run migration twice; verify assignments, coupon restrictions, duplicates, filters, pages, and sitemap |
+| Responsive/accessibility | Markup and JS state checks | Test keyboard controls, screen-reader names, responsive tables, and layouts at 320px and desktop widths |
+| Payments/security | Phase 10.5 regression, cumulative partial/full refund allocation, tax exclusion, replay determinism, Stripe account-state mapping, and trailing-payload image checks | Verify Stripe Checkout/Tax/webhook/payout/coupon/IP-risk behavior in a test Stripe environment |
+
+Commands: `find app public tests -name '*.php' -print0 | xargs -0 -n1 php -l`, `php tests/Phase106DashboardUsabilityTest.php`, `php tests/Phase105EmailsNotificationsWaitlistTest.php`, and `git diff --check`. Never run the migration first against production. The automated suite also asserts protected-file availability gating, the pre-decode source-pixel ceiling, non-blocking invalid receipt snapshot fallback, seller/admin Account links, manual-review payment warnings, payout actions, and validated `assetUrl` receipt rendering. Migration checks assert a single deterministic target per duplicate, canonical-slug priority over legacy name conflicts, and exclusion of self-maps. Buyer-order checks assert that `file_available` is supplied by the controller and required by the Download button. Phase 10.6 checks also execute partial/full cumulative refund allocation, repeated-input determinism, tax exclusion, exact PNG/WEBP/JPEG boundaries before GD decode, and Stripe information-required/payout-ready/payout-issue mapping. Database staging must still verify absolute pending-ledger reconciliation against real `payment_transactions`.

@@ -1038,3 +1038,9 @@ Verified Stripe events now receive failure coverage immediately after signature 
 
 ### Phase 10.5 Step 8 completion
 Receipts now preserve stored order-item product-title snapshots, with live titles used only for legacy blank snapshots. Refund communication follows monotonic cumulative amounts already recorded in `payment_transactions`; stable order/status/amount keys let verified replays heal missing communication without repeating financial mutations. Communication, queue, and Stripe diagnostics use one bounded sensitive-value sanitizer before protected logging or database storage.
+
+
+
+## Phase 10.6 — Dashboard cleanup and usability
+
+Completed role-aware dashboard navigation and responsive buyer, seller, and admin operational summaries. Added per-file buyer download history, secure future-order seller receipt customization and snapshots, accessible password controls, and canonical category consolidation that preserves product and coupon history. Existing payment, Stripe Tax, fulfillment, authorization, and zero-total restrictions remain unchanged. Follow-up hardening aligned availability with readable protected storage, added a 25-megapixel source-image ceiling, made invalid optional receipt snapshots non-blocking, and corrected payout/manual-review warnings and Account navigation. Seller refund figures now use the maximum cumulative refund transaction, allocate tax-exclusive merchandise refunds in cents, and reconcile non-transferred payout ledgers without replay drift. Receipt images reject trailing payloads before GD decode, and Stripe requirement payloads now produce reachable information-required and payout-issue states.
