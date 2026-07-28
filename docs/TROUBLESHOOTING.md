@@ -107,3 +107,37 @@ Phase 10.4 scans stored downloadable product-file original names. Preview-image 
 
 #### Phase 10.4 new-product cleanup after failed save
 If a system/database failure occurs after a new product row is created, inspect the failed new product ID and verify compensating cleanup removed `product_ip_risk_review_history`, `product_ip_rights_confirmations`, `product_ip_risk_detections`, `product_ip_risk_states`, `product_ip_risk_scans`, preview and downloadable upload rows/files, product tags, product license rows, and the new product row. Missing confirmation is different: the product should remain as a draft with its valid scan/uploads/tags/licenses and should not be deleted.
+
+## Phase 10.5 emails, notifications, and waitlist
+
+### Waitlist signup reports a temporary failure
+
+- Confirm `database/migrations/2026_07_20_phase_10_5_emails_notifications_waitlist.sql` was applied once and the six Phase 10.5 tables exist.
+- Confirm `EMAIL_UNSUBSCRIBE_SECRET` is configured with a valid environment-only value of at least 32 bytes.
+- Inspect protected database and queue-insertion error logs. The public response intentionally does not reveal whether an address already exists.
+
+### Email queue worker exits nonzero
+
+- Confirm database connectivity and availability.
+- Confirm the PHP/cron user can write to the protected, non-public `storage/logs` directory.
+- Inspect the protected mail log for a malformed complete JSON record.
+
+### Mail-log recovery
+
+Incomplete trailing fragments are repaired automatically while the worker holds the exclusive log lock. A complete malformed record fails closed and requires operator inspection or controlled log rotation while the worker is stopped; do not blindly delete or overwrite the log.
+
+### Messages remain in `processing`
+
+Claims older than 15 minutes are recovered on a later worker run. Repeated reappearance can indicate database failure or worker interruption and should be investigated in protected operational logs.
+
+### Campaign recipients are suppressed
+
+Confirm the current waitlist `status` and `unsubscribed_at`, or the registered user's current marketing preference and opt-out timestamp. Consent is rechecked immediately before delivery, so withdrawal after campaign snapshotting suppresses the queued message.
+
+### Verified webhook issue notification
+
+Inspect the protected administrator payment logs and server logs. The in-app notification intentionally excludes exception text and sensitive Stripe event data.
+
+### Paid or refund communication is missing after a webhook
+
+Safely replay the same verified Stripe event after correcting the database/queue fault. For a processed paid event, replay only re-attempts stable deduplicated communications for a paid, non-manual-review order; it does not repeat financial mutations. Refund replay only recovers the current authoritative cumulative transition. Operational diagnostics are deliberately redacted, so correlate the normalized context with protected payment/server logs rather than expecting credentials, tokens, Stripe identifiers, or stack traces in the stored message.

@@ -338,3 +338,23 @@ Admin checks: verify list badge/count/status, detail active/inactive detections,
 - Verify a flagged product can still be rejected or archived through normal moderation without using an IP-risk transition.
 - Verify ordinary approval remains blocked when a pending product has active matches requiring IP review.
 - Verify IP-specific actions still reject products that do not have a current scan with active matches.
+
+
+## Phase 10.5 testing
+
+### Executed database-independent suite
+Run `php tests/Phase105EmailsNotificationsWaitlistTest.php`. Its 22 executed database-independent behavior groups directly exercise original-input URL/CTA control validation, header-injection rejection, signed-token verification and tamper failure, waitlist normalization, administrator status/invitation decisions, active-admin test authorization decisions, seller subject/action safety, retry/status calculations, escaped campaign rendering, neutral launch copy, visible marketing unsubscribe links, stored receipt-title precedence/escaping, monotonic refund decisions and keys, paid-communication eligibility, shared diagnostic redaction (including API-key variants, Stripe signatures, and URL userinfo), and log/webhook helper behavior.
+
+### Database connectivity gate
+On a disposable MariaDB database with the corrected migration applied, set the normal `DB_*` environment values and run `PHASE105_RUN_DATABASE_TESTS=1 php tests/Phase105DatabaseIntegrationTest.php`. This gate confirms connectivity and table availability only; it is not proof that stateful scenarios passed.
+
+### Manual/staging scenarios not run by the lightweight suite
+Verify active repeat signup, transactional signup/confirmation rollback, intentional resubscription, suppressed protection, notification ownership, queue/event deduplication, paid webhook replay with separate receipt/download notifications, seller alert deduplication, two concurrent workers, consent withdrawal after snapshot, explicit individual/filtered invitation modes, invalid status transitions, confirmation/invitation timestamps, campaign `completed`/sent/failure states, and recipient synchronization/recalculation failures after message state is safely stored. Confirm such reconciliation failures do not stop independent queue work.
+
+Step 8 staging must also verify: a receipt insert followed by a failed download insert is healed on replay; an existing buyer notification with a missing seller notification is healed without duplicates; replay does not repeat coupon usage, earnings, payout ledgers, transfers, unlock, or transaction logging; manual-review orders receive no paid communication; complete communication sets remain unchanged; and identical/smaller/out-of-order refunds do not communicate while increased partial and partial-to-full transitions do. These database-backed cases are not passed by the lightweight suite or connectivity gate.
+
+Production-provider authentication, sender verification, bounce handling, and live delivery remain future work because only `MAIL_TRANSPORT=log` is implemented.
+
+The database-independent suite also covers backslash/browser-normalization URL attacks, same-host unapproved ports, URL userinfo, deterministic verified-payload fingerprints, normalized event types, allowlisted failure categories, controlled non-sensitive webhook-alert copy, and idempotent structured log append by message ID. Database persistence after physical delivery and verified webhook notification insertion remain part of the unexecuted staging matrix when no disposable MariaDB environment is configured.
+
+Log recovery tests execute duplicate-ID suppression, distinct valid records, incomplete-tail truncation, malformed-complete-record failure, invalid-ID rejection, JSON validity, and sensitive-field absence. Webhook helper tests execute stable and distinct verified-payload fingerprints, event-type normalization, category allowlisting, and proof that supplied sensitive text is excluded from alert copy. Actual database notification insertion for verified webhook failures remains an unexecuted staging scenario without a disposable migrated MariaDB environment.

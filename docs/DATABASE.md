@@ -257,3 +257,31 @@ The migration `database/migrations/2026_07_11_seller_product_cleanup_launch_faq.
 `product_ip_risk_states` stores one current IP review state per product, separate from `products.status`. `product_ip_rights_confirmations` binds the exact seller checkbox text to product, scan, and seller user. `product_ip_risk_review_history` preserves every admin IP review transition with previous/new IP state and previous/new product status. Product-related FKs are restrictive; safe permanent deletion explicitly removes Phase 10.4 child rows before deleting a product.
 
 The Phase 10.4 migration and fresh schema seed 12 starter canonical terms and one Coke alias. These records are advisory/testing-oriented starter data only; they are incomplete and are not comprehensive legal, trademark, copyright, celebrity, franchise, sports, music, or protected-content coverage.
+
+## Phase 10.5 tables
+
+### `notifications`
+Each row belongs to `user_id` and stores `notification_type`, an `audience` of `buyer`, `designer`, `admin`, or `system`, escaped display `title` and `message`, an optional validated local `action_url`, stable `event_key`, `read_at`, and `created_at`. Unique `(user_id, event_key)` enforces event deduplication. `(user_id, created_at)` supports newest-first display and `(user_id, read_at, created_at)` supports unread queries. Deleting the owning user cascades to notifications.
+
+### `email_preferences`
+There is zero or one row per user, keyed by `user_id`, with `marketing_opt_in`, `marketing_opted_in_at`, `marketing_opted_out_at`, a unique non-secret `unsubscribe_nonce`, and `created_at`/`updated_at`. The nonce participates in HMAC-signed unsubscribe authorization; it is not the complete token. User deletion cascades to the preference row.
+
+### `waitlist_entries`
+Rows contain `name`, normalized unique `email`, optional `business_name`, `interest_type` (`seller`, `buyer`, `both`, or `tester`), controlled `source` (`direct`, `homepage`, `seller`, `social`, `referral`, or `campaign`), and `status` (`subscribed`, `invited`, `unsubscribed`, or `suppressed`). Consent and delivery history use `consent_at`, `unsubscribed_at`, `confirmation_sent_at`, `invited_at`, `created_at`, and `updated_at`; confirmation/invitation timestamps mean successful transport delivery, not queueing. Email and `unsubscribe_nonce` are independently unique. The `(status, interest_type, source, created_at)` index supports filtering and pagination.
+
+### `email_campaigns`
+Campaigns store `campaign_type` (`promotional` or `launch_invite`), a service-controlled `audience`, escaped `subject` and plain-text `body`, optional validated CTA label/URL, and creator attribution. Status is `draft`, `queued`, `sending`, `sent`, `completed`, `partially_failed`, `failed`, or `cancelled`; the status/creation index supports administration and processing. `created_by` references an administrator user with deletion restricted. Lifecycle timestamps are `queued_at`, `sent_at`, `completed_at`, `cancelled_at`, `created_at`, and `updated_at`. `sent_at` records that at least one delivery succeeded; `completed_at` records terminal recipient processing, including a truthful zero-delivery `completed` result.
+
+### `email_campaign_recipients`
+The campaign, nullable registered-user/waitlist references, and selected email/name fields preserve the intended recipient identity and audience snapshot. Operational `status`, `last_error`, and `updated_at` remain mutable. Status is `pending`, `queued`, `sent`, `failed`, `cancelled`, or `suppressed`; `(campaign_id, email)` is unique and `(campaign_id, status)` supports aggregate calculations. Campaign deletion cascades, while deleted users or waitlist entries set their nullable references to `NULL`.
+
+### `email_messages`
+Durable work records include `classification` (`transactional` or `marketing`), recipient envelope fields, subject, controlled template name, JSON `template_data`, optional campaign/recipient/waitlist relationships, and a unique `deduplication_key`. Status is `pending`, `processing`, `sent`, `failed`, or `cancelled`. Delivery state uses `attempt_count`, `next_attempt_at`, `claimed_at`, `sent_at`, `last_error`, `created_at`, and `updated_at`. `(status, next_attempt_at, created_at)` supports due-work claiming and `(status, claimed_at)` supports stale-claim recovery. Related campaign, recipient, and waitlist foreign keys are nullable and use `ON DELETE SET NULL`. Once safely recorded, `sent` and `sent_at` never return to a resendable state, although `last_error` may later receive a sanitized reconciliation diagnostic.
+
+The baseline schema repeats the additive Phase 10.5 migration definitions. The unreleased migration is non-idempotent: back up first, inspect migration state, apply it once, and activate schema-dependent code only afterward.
+
+### Phase 10.5 campaign completion semantics
+`sent_at` is set only when at least one recipient was successfully delivered (including partially failed campaigns). `completed_at` records terminal recipient processing for `sent`, `completed`, `partially_failed`, or `failed`. `completed` means processing ended without delivery failures but zero messages were delivered because no recipient was eligible or all snapshotted recipients were suppressed/excluded.
+
+### Phase 10.5 refund communication state
+No duplicate refund-total column is added. Existing `payment_transactions` rows with `transaction_type` `partial_refund` or `refund` store Stripe's cumulative refunded amount in `amount`; their maximum amount is the authoritative prior cumulative value for monotonic communication decisions. Stable refund communication keys include order, resulting partial/full state, and cumulative refunded cents. Older, equal, or smaller observations may remain in protected transaction history but cannot regress the order or create another buyer message.

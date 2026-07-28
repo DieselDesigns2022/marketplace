@@ -195,13 +195,13 @@ Cart totals and license prices are recalculated server-side and snapshotted into
 - Stripe webhooks are the source of truth for paid, failed, expired/canceled, refunded, and partially refunded status. The browser success redirect only shows a processing page and does not unlock access.
 - Downloads unlock only after webhook-confirmed paid status. Google Drive/manual delivery becomes seller-ready only after payment clears; seller delivery visibility is blocked before payment clears.
 - Failed, canceled, expired, and unpaid orders show retry/return-to-checkout options. `manual_review` is a payment safety lock and blocks buyer retry/unlock until admin review.
-- Buyer order detail acts as the receipt-style payment record until Phase 10.5 email receipts are implemented.
+- Buyer order detail remains the persistent web receipt and payment record; Phase 10.5 additionally queues the purchase-receipt email only after webhook-confirmed payment.
 - Adds duplicate webhook protection via `stripe_events.stripe_event_id`, Stripe signature verification, amount/currency/order metadata mismatch checks, payment transaction logs, and admin payment log visibility.
 - Adds seller payout foundation with Stripe Connect account status fields, seller payout ledger records, and transfer attempts only when connected accounts are enabled. Missing onboarding leaves payouts pending without failing buyer payment.
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals/coupons, full tax/VAT logic, and seller refund/cancellation requests remain future work.
+- Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
 
 ### Phase 10 development guidance
 - Browser redirects are never trusted as payment proof; only verified Stripe webhooks may mark orders paid or unlock delivery/downloads.
@@ -225,3 +225,8 @@ When Stripe onboarding return or `account.updated` makes a seller payout-ready, 
 
 #### Phase 10 correction: transfer source transactions
 Seller Stripe transfers now include `source_transaction` when Asset Moth has the original `orders.stripe_charge_id`, plus `transfer_group=order_{orderId}` for order-level traceability. If a webhook-confirmed paid order does not have `stripe_charge_id` yet, the payout remains `pending_transfer` instead of being marked `transfer_failed` for charge/balance timing. Later `payment_intent.succeeded` or `charge.updated` webhook data can record the charge id and safely retry eligible pending transfers. This does not change Phase 10 math: the seller portion is still calculated from gross sale amount after Asset Moth's marketplace commission, before separate Stripe/payment processing fee reconciliation.
+
+## Phase 10.5 local mail
+Keep `MAIL_TRANSPORT=log` locally. Apply `database/migrations/2026_07_20_phase_10_5_emails_notifications_waitlist.sql`, ensure `storage/logs` is writable, then run `php scripts/process_email_queue.php 50`. The JSON-lines mail log intentionally records recipient hashes, not addresses or unsubscribe tokens.
+
+Generate `EMAIL_UNSUBSCRIBE_SECRET` as an environment-only random value of at least 32 bytes before queueing waitlist or marketing mail. Do not rotate it without an unsubscribe-link migration plan. Campaign and launch-invite messages include HMAC-signed unsubscribe URLs. Complete unsubscribe tokens, recipient addresses, and signing secrets are not written to delivery logs.

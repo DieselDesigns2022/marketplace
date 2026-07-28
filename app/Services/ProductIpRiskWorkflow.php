@@ -21,11 +21,22 @@ class ProductIpRiskWorkflow
     public function scanProduct(int $productId, int $sellerUserId): array
     {
         $owner = $this->ownedProduct($productId, $sellerUserId);
+        $previous = $this->repo->state($productId);
         $input = $this->input($productId, $owner);
         $matches = $this->scanner->scan($input, $this->repo->enabledTermsWithAliases());
         $contentFingerprint = $this->contentFingerprint($input);
         $matchFingerprint = $this->matchFingerprint($matches);
         $scanId = $this->repo->saveScan($productId, (int)$owner['seller_user_id'], $contentFingerprint, $matchFingerprint, $matches);
+        $meaningfulFlag = $matches && (empty($previous['latest_match_fingerprint']) || !hash_equals((string)$previous['latest_match_fingerprint'],$matchFingerprint));
+        if ($meaningfulFlag) {
+            try {
+                $event="product:$productId:flag-transition:$scanId";
+                NotificationService::create((int)$owner['seller_user_id'],'product_flagged','designer','Product flagged for review','Your product “'.($owner['title']??'Untitled').'” requires an IP risk review.',$event,'/seller/product/'.$productId);
+                NotificationService::admins('product_flagged','Product flagged for review','A product requires IP risk review.',$event.':admin','/admin/products/'.$productId);
+                $seller=DB::row('select email,name from users where id=?',[$owner['seller_user_id']]);
+                if($seller)EmailQueueService::foundationSellerEmail($seller['email'],'product_flagged',['name'=>$seller['name'],'title'=>'Product flagged for review','message'=>'Your product “'.($owner['title']??'Untitled').'” requires review.','action_url'=>'/seller/product/'.$productId],$event.':email');
+            } catch(\Throwable $e) { NotificationService::reportFailure('product_ip_flag',$e); }
+        }
 
         return [
             'scan_id' => $scanId,

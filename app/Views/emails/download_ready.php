@@ -1,0 +1,1 @@
+<?php use App\Core\Helpers as H;?><h2>Your files are ready</h2><p>Hello <?=H::e($data['name']??'')?>. Your webhook-confirmed purchase is ready.</p><p><a href="<?=H::e(H::baseUrl().'/dashboard/order/'.(int)$data['order_id'])?>">Open your order and downloads</a></p>

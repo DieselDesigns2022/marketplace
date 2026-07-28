@@ -6,6 +6,8 @@ use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\WatermarkService;
 use App\Repositories\IpRiskRepository;
+use App\Services\NotificationService;
+use App\Services\EmailQueueService;
 use Throwable;
 class AdminController
 {
@@ -25,9 +27,10 @@ class AdminController
         return (bool)$d;
 
     }
-    private function log(string $action, string $entityType, int $entityId, array $metadata=[]): void
+    private function log(string $action, string $entityType, int $entityId, array $metadata=[]): int
     {
         DB::exec('insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)',[H::user()['id'],$action,$entityType,$entityId,json_encode($metadata)]);
+        return (int)DB::id();
 
     }
     private function approveApplication(int $id): void
@@ -269,8 +272,14 @@ class AdminController
             return false;
 
         }
+        $before=DB::row('select status,rejection_reason from products where id=?',[$id]);
         DB::exec('update products set status=?, rejection_reason=?, updated_at=now() where id=?',[$status,$status==='rejected'?$reason:null,$id]);
-        $this->log($status.'_product','product',$id);
+        $transitionId=$this->log($status.'_product','product',$id,['status'=>$status]);
+        $meaningfulTransition=($before['status']??null)!==$status||($status==='rejected'&&($before['rejection_reason']??'')!==$reason);
+        try { if($meaningfulTransition){
+            $owner=DB::row('select d.user_id,u.email,u.name,p.title,p.rejection_reason from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id where p.id=?',[$id]);
+            if($owner){$event="product:$id:moderation:$transitionId";$message='Your product “'.$owner['title'].'” is now '.$status.'.';if($status==='rejected'&&!empty($owner['rejection_reason']))$message.=' Reason: '.mb_substr(strip_tags($owner['rejection_reason']),0,500);NotificationService::create((int)$owner['user_id'],'product_'.$status,'designer','Product status updated',$message,$event,'/seller/product/'.$id);if(in_array($status,['approved','rejected'],true))EmailQueueService::foundationSellerEmail($owner['email'],'product_'.$status,['name'=>$owner['name'],'title'=>'Product '.ucfirst($status),'message'=>$message,'action_url'=>'/seller/product/'.$id],$event.':email');}}
+        } catch(Throwable $e) { NotificationService::reportFailure('product_moderation',$e); }
         if ($flashSuccess) {
             H::flash('success', $status === 'approved' ? 'Product approved and published.' : 'Product status updated.');
         }

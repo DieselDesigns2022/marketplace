@@ -982,13 +982,13 @@ Implemented the Phase 9 foundation for persistent carts, pending-payment order c
 - Stripe webhooks are the source of truth for paid, failed, expired/canceled, refunded, and partially refunded status. The browser success redirect only shows a processing page and does not unlock access.
 - Downloads unlock only after webhook-confirmed paid status. Google Drive/manual delivery becomes seller-ready only after payment clears; seller delivery visibility is blocked before payment clears.
 - Failed, canceled, expired, and unpaid orders show retry/return-to-checkout options. `manual_review` is a payment safety lock and blocks buyer retry/unlock until admin review.
-- Buyer order detail acts as the receipt-style payment record until Phase 10.5 email receipts are implemented.
+- Buyer order detail remains the persistent web receipt and payment record; Phase 10.5 additionally queues the purchase-receipt email only after webhook-confirmed payment.
 - Adds duplicate webhook protection via `stripe_events.stripe_event_id`, Stripe signature verification, amount/currency/order metadata mismatch checks, payment transaction logs, and admin payment log visibility.
 - Adds seller payout foundation with Stripe Connect account status fields, seller payout ledger records, and transfer attempts only when connected accounts are enabled. Missing onboarding leaves payouts pending without failing buyer payment.
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 10.5 emails/notifications, receipt emails, Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
+- Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
 
 ### Phase 10 completion/refinement
 Phase 10 now covers launch-ready buyer Stripe Checkout, webhooks, seller onboarding, seller Stripe Connect onboarding, platform commission, and payout readiness. Asset Moth keeps an 18% marketplace commission by default, Stripe/payment processing fees also apply separately, and sellers have no startup, monthly, or listing fees. Buyer checkout can run before seller onboarding, but automatic seller transfers require Stripe Connect completion. Refunds remain Stripe-processed admin exceptions; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
@@ -1026,3 +1026,15 @@ Automated matching can produce false positives and false negatives. Starter seed
 
 
 Phase 10.4 review-before-approval rule: normal admin approval remains available for unflagged pending products, but active matches with pending IP review require an explicit IP review decision before ordinary approval can publish the product. Bulk approval reports and skips those products instead of silently approving them.
+
+## Phase 10.5 — Emails, Notifications & Waitlist (complete)
+Implemented durable transactional/marketing queueing, authenticated notification ownership/read state, consent and tokenized unsubscribe, public/admin waitlist workflows, controlled campaigns, and live hooks for established paid/refund/application/moderation/Stripe events. Future credit, referral, promotion, bundle, and rank events remain callable foundations only.
+
+### Phase 10.5 consolidated correction
+Final review added transactional waitlist confirmation consistency, explicit invitation/status policies, active-admin test-send checks, truthful `completed` campaigns with separate completion/delivery timestamps, separate buyer receipt/download notifications, controlled seller subjects/action URLs, foundation-only admin event methods, and nonblocking queue reconciliation.
+
+### Phase 10.5 final hardening
+Verified Stripe events now receive failure coverage immediately after signature verification, administrator webhook alerts use controlled non-sensitive copy, and missing event IDs use a verified-payload fingerprint. The locked log transport repairs partial trailing records, fails on malformed complete records, and uses a full-write append loop.
+
+### Phase 10.5 Step 8 completion
+Receipts now preserve stored order-item product-title snapshots, with live titles used only for legacy blank snapshots. Refund communication follows monotonic cumulative amounts already recorded in `payment_transactions`; stable order/status/amount keys let verified replays heal missing communication without repeating financial mutations. Communication, queue, and Stripe diagnostics use one bounded sensitive-value sanitizer before protected logging or database storage.
