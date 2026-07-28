@@ -119,3 +119,11 @@ The protected log transport repairs an incomplete trailing fragment automaticall
 The Phase 10.5 migration is **not idempotent**. Back up the database and inspect migration state before applying it; never run it twice blindly. Apply the migration before activating application code that queries the new tables. In particular, the shared authenticated layout queries `notifications`, so code-first deployment can break authenticated page rendering. Use maintenance mode or the project’s schema-first safe deployment order when an atomic release is unavailable.
 
 Configure `EMAIL_UNSUBSCRIBE_SECRET` before accepting waitlist signups, administrator test sends, or marketing queue work. Rotating this secret invalidates outstanding unsubscribe links unless a planned dual-key/migration strategy is used. `MAIL_TRANSPORT=log` is the only implemented transport; no production provider is included.
+
+
+
+## Phase 10.6 deployment
+
+Run `database/migrations/2026_07_28_phase_10_6_dashboard_cleanup_usability.sql` in each non-production validation environment before production deployment. PHP must provide Fileinfo, GD decoding, and JPEG/PNG/WEBP encoders. Create `public/uploads/receipt_images/` as a web-readable, application-writable image directory and configure the web server to prohibit script execution there. Uploads are decoded/re-encoded and receive random names; do not restore submitted names.
+
+After deployment, run PHP lint and both Phase 10.6 and Phase 10.5 behavioral suites, verify migration idempotency in disposable MariaDB, exercise note/image replace/remove/restore flows, confirm historical images remain, and check buyer/seller/admin layouts at 320px and desktop widths. The receipt processor rejects source images over 25,000,000 pixels before GD decode. Deployment verification must also confirm buyer availability ignores missing, unreadable, and out-of-directory protected-file records.

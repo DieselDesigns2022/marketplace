@@ -3,14 +3,14 @@
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?> · Date: <?=$order['created_at']?>
 </p>
 <?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>.</p><?php endif;?>
-<table>
+<?php foreach($sellerGroups as $group): $receiptImage=\App\Services\SellerReceiptService::safePublicPath($group['receipt_image_path']??null);?><section class="card seller-receipt-group"><h2>Items from <?=H::e($group['seller_name'])?></h2><?php if($receiptImage):?><img class="receipt-image" src="<?=H::e(H::assetUrl($receiptImage))?>" alt="Receipt image from <?=H::e($group['seller_name'])?>"><?php endif;?><?php if($group['receipt_note']):?><p><strong>Message from the seller (not Asset Moth)</strong><br><?=nl2br(H::e($group['receipt_note']))?></p><?php endif;?><div class="responsive-table"><table>
     <tr>
         <th>Product</th>
         <th>Purchased permissions</th>
         <th>Price</th>
         <th>Fulfillment</th><th>Download / Delivery</th>
     </tr>
-    <?php foreach($items as $i):?>
+    <?php foreach($group['items'] as $i):?>
         <tr>
            <td>
            <?php if(!empty($i['preview_image'])):?><a href="/product/<?=H::e($i['slug'])?>"><img src="<?=H::assetUrl($i['preview_image'])?>" alt="<?=H::e($i['title'])?>" style="width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin-bottom:8px;"></a><?php endif;?>
@@ -27,8 +27,8 @@
            <td><?=($i['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></td>
            <td>
            <?php if(($i['fulfillment_type'] ?? 'downloadable')==='downloadable'):?>
-             <?php $paymentStatus = $order['payment_status'] ?? ''; $downloadEligible = $i['file_id'] && $paymentStatus === 'paid'; ?>
-             <?php if($downloadEligible):?><a class="btn" href="/download/<?=$i['file_id']?>">Download</a><?php else:?><span class="muted">Download access unlocks after Stripe webhook payment confirmation.</span><?php endif;?>
+             <?php $paymentStatus = $order['payment_status'] ?? ''; $downloadExpired = !empty($i['download_expires_at']) && strtotime($i['download_expires_at']) < time(); $downloadEligible = $i['file_id'] && !empty($i['file_available']) && $paymentStatus === 'paid' && !$downloadExpired; ?>
+             <?php if($paymentStatus==='refunded'):?><span class="muted">Refunded — download unavailable.</span><?php elseif($downloadEligible):?><a class="btn" href="/download/<?=$i['file_id']?>">Download</a><?php elseif($downloadExpired):?><span class="muted">Download access has expired.</span><?php elseif($paymentStatus==='paid'):?><span class="muted">File unavailable.</span><?php else:?><span class="muted">Download access unlocks after Stripe webhook payment confirmation.</span><?php endif;?>
              <br><span class="muted">Downloads: <?=number_format((int)($i['download_count'] ?? 0))?></span>
            <?php else:?>
              <span>Status: <?=H::e(str_replace('_',' ', $i['manual_delivery_status']))?></span><br>
@@ -37,7 +37,7 @@
            </td>
         </tr>
     <?php endforeach;?>
-</table>
+</table></div></section><?php endforeach;?>
 <?php $orderPaymentStatus = $order['payment_status'] ?? $order['status']; ?>
 <?php if($orderPaymentStatus === 'manual_review'):?>
   <p class="notice warning">This payment needs admin review before another payment attempt can be made.</p>

@@ -69,3 +69,24 @@ document.addEventListener('click', async (event) => {
     window.prompt('Copy this link:', text);
   }
 });
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-password-toggle]");
+  if (!button) return;
+  const input = document.getElementById(button.dataset.passwordTarget || "");
+  if (!input || !["password", "text"].includes(input.type)) return;
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  button.textContent = showing ? "Show" : "Hide";
+  button.setAttribute("aria-pressed", showing ? "false" : "true");
+  button.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+});
+
+function updateCategoryGuidance() {
+  const category = document.querySelector("[data-category-guidance-source]");
+  document.querySelectorAll("[data-category-guidance]").forEach((message) => {
+    message.hidden = message.dataset.categoryGuidance !== category?.selectedOptions?.[0]?.dataset?.slug;
+  });
+}
+document.addEventListener("change", (event) => { if (event.target.matches("[data-category-guidance-source]")) updateCategoryGuidance(); });
+updateCategoryGuidance();

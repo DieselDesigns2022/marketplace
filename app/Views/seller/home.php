@@ -1,69 +1,10 @@
-<h1>Seller dashboard</h1>
-<p class="muted">Manage your reviewed storefront, product drafts, submitted listings, and public catalog from one place.</p>
-<section class="card seller-summary">
-    <div class="storefront-banner small" <?php if(!empty($d['banner_path'])):?>style="background-image:url('<?=H::e($d['banner_path'])?>')"<?php endif; ?>>
-    </div>
-    <div class="store-preview-row">
-        <div class="avatar">
-           <?php if(!empty($d['avatar_path'])):?>
-               <img src="<?=H::e($d['avatar_path'])?>" alt="<?=H::e($d['display_name'])?> avatar">
-           <?php else:?>
-               <span>
-               <?=H::e(substr($d['display_name']??'S',0,1))?>
-               </span>
-           <?php endif;?>
-        </div>
-        <div>
-           <h2>
-           <?=H::e($d['display_name'])?>
-           </h2>
-           <p>Store status: <span class="badge ok">
-           <?=H::e($d['status']??'not approved')?>
-           </span>
-           <span class="badge rank">
-           <?=H::e($d['creator_rank']??'Bronze')?>
-           </span>
-           </p>
-           <p>Public store: <a href="/store/<?=H::e($d['store_slug'])?>">/store/<?=H::e($d['store_slug'])?>
-           </a>
-           </p>
-        </div>
-    </div>
-</section>
-<section class="stats-row">
-    <div class="card">
-        <strong>
-        <?=H::e((string)($d['follower_count']??0))?>
-        </strong>
-        <span>Followers</span>
-    </div>
-    <div class="card">
-        <strong>
-        <?=H::e((string)($stats['product_count']??0))?>
-        </strong>
-        <span>Products</span>
-    </div>
-    <div class="card">
-        <strong>
-        <?=H::e((string)($stats['sales_count']??$d['sales_count']??0))?>
-        </strong>
-        <span>Sales</span>
-    </div>
-    <div class="card">
-        <strong>
-        <?=H::e((string)($d['average_rating']??'0.00'))?>
-        </strong>
-        <span>Average rating</span>
-    </div>
-</section>
-<div class="dash">
-    <a class="card" href="/seller/onboarding">Seller Onboarding</a>
-    <a class="card" href="/seller/stripe">Stripe Payouts</a>
-    <a class="card" href="/seller/store">Store Settings</a>
-    <a class="card" href="/store/<?=H::e($d['store_slug'])?>">View Public Store</a>
-    <a class="card" href="/seller/products">Products</a>
-    <a class="card" href="/seller/sales">Sales</a>
-    <a class="card" href="/seller/coupons">Coupons</a>
-    <a class="card" href="/seller/referrals">Referrals</a>
-    <a class="card" href="/seller/rank">Rank</a>
-</div>
+<?php use App\Core\Helpers as H; $stripeLabels=['not_connected'=>'Not connected','onboarding_started'=>'Onboarding started','information_required'=>'Information required','connected'=>'Connected','payout_ready'=>'Payout-ready','payout_issue'=>'Payout issue']; ?>
+<header class="dashboard-heading"><div><h1>Seller dashboard</h1><p class="muted">Welcome, <?=H::e($d['display_name'])?>. All figures below are restricted to your store.</p></div><a class="btn" href="/seller/product/new">New product</a></header>
+<?php if($stripeState!=='payout_ready'):?><section class="card attention-panel"><h2>Required action</h2><p>Your Stripe status is <strong><?=H::e($stripeLabels[$stripeState])?></strong>. Complete the outstanding payout step.</p><a class="btn" href="/seller/stripe">Review Stripe status</a></section><?php endif;?>
+<?php if((int)($stats['payout_issues']??0)>0):?><section class="card attention-panel"><h2>Payout issue</h2><p><?=number_format((int)$stats['payout_issues'])?> seller payout<?=((int)$stats['payout_issues']===1?'':'s')?> require attention.</p><a class="btn" href="/seller/stripe">Resolve payout issues</a></section><?php endif;?>
+<section><h2>Setup Checklist &amp; Readiness</h2><div class="dashboard-grid"><?php foreach([['Store profile',$readiness['profile'],'/seller/store'],['Store URL',$readiness['store'],'/seller/store'],['Stripe and payouts',$readiness['stripe'],'/seller/stripe'],['First product',$readiness['products'],'/seller/product/new']] as [$label,$done,$url]):?><a class="card" href="<?=$url?>"><span class="status-badge <?=$done?'ok':'warning'?>"><?=$done?'Complete':'Action needed'?></span><strong><?=H::e($label)?></strong></a><?php endforeach;?></div></section>
+<div class="dashboard-columns"><section class="card"><h2>Stripe &amp; Payout Status</h2><p><span class="status-badge <?=$stripeState==='payout_ready'?'ok':'warning'?>"><?=H::e($stripeLabels[$stripeState])?></span></p><a href="/seller/stripe">View payout setup</a></section><section class="card"><h2>Tax Status</h2><p><span class="status-badge ok">No seller action required</span></p><p>Asset Moth handles marketplace tax through Stripe Tax.</p></section></div>
+<section><h2>Products</h2><div class="dashboard-grid"><?php foreach([['Total',$stats['total_products']??0,''],['Draft',$stats['draft_products']??0,'draft'],['Pending review',$stats['pending_products']??0,'pending_review'],['Approved / published',$stats['published_products']??0,'approved'],['Rejected',$stats['rejected_products']??0,'rejected'],['Archived',$stats['archived_products']??0,'archived'],['Flagged / IP-risk',$stats['flagged_products']??0,'']] as [$label,$value,$filter]):?><a class="card" href="/seller/products<?=$filter?'?status='.$filter:''?>"><strong><?=number_format((int)$value)?></strong><span><?=H::e($label)?></span></a><?php endforeach;?></div></section>
+<section><h2>Sales, Earnings &amp; Payouts</h2><div class="dashboard-grid"><?php foreach([['Completed sales',$stats['sales_count']??0,'count'],['Gross sales',$stats['gross_sales']??0,'money'],['Seller earnings',$stats['seller_earnings']??0,'money'],['Pending payouts',$stats['pending_payouts']??0,'money'],['Transferred payouts',$stats['transferred_payouts']??0,'money'],['Payout issues',$stats['payout_issues']??0,'count'],['Refund adjustments',$stats['refund_adjustments']??0,'money']] as [$label,$value,$format]):?><div class="card"><strong><?=$format==='count'?number_format((int)$value):H::money($value)?></strong><span><?=H::e($label)?></span></div><?php endforeach;?></div></section>
+<div class="dashboard-columns"><section><div class="dashboard-heading"><h2>Recent Orders</h2><a href="/seller/sales">All sales</a></div><?php if(!$recentOrders):?><div class="card empty-state">No paid seller orders yet.</div><?php else:?><div class="responsive-table"><table><thead><tr><th>Order</th><th>Product</th><th>Gross</th><th>Seller payout</th><th>Status</th></tr></thead><tbody><?php foreach($recentOrders as $order):?><tr><td><a href="/seller/order-item/<?=(int)$order['id']?>">#<?=(int)$order['order_id']?></a></td><td><?=H::e($order['product_title']??'Purchased product')?></td><td><?=H::money($order['total_price'])?></td><td><?=H::money($order['seller_payout_amount'])?></td><td><?=H::e(str_replace('_',' ',$order['seller_payout_status']))?></td></tr><?php endforeach;?></tbody></table></div><?php endif;?></section><section><div class="dashboard-heading"><h2>Notifications <span class="badge"><?=$unreadCount?></span></h2><a href="/notifications">All notifications</a></div><?php if(!$notifications):?><div class="card empty-state">You're all caught up.</div><?php else:?><?php foreach($notifications as $notification):?><article class="card notification <?=empty($notification['read_at'])?'unread':''?>"><strong><?=H::e($notification['title'])?></strong><p><?=H::e($notification['message'])?></p></article><?php endforeach;?><?php endif;?></section></div>
+<section><h2>Quick Actions</h2><div class="quick-actions"><a class="btn" href="/seller/product/new">New product</a><a href="/seller/products">Products</a><a href="/seller/sales">Sales / orders</a><a href="/seller/stripe">Payouts &amp; Stripe status</a><a href="/seller/coupons">Coupons</a><a href="/seller/store">Store &amp; license presets</a><a href="/store/<?=H::e($d['store_slug'])?>">Public store</a><a href="/notifications">Notifications</a><a href="/seller/receipt-settings">Receipt settings</a></div></section>

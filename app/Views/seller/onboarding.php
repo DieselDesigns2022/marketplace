@@ -1,5 +1,5 @@
 <?php $dashboardGate = $dashboardGate ?? false; ?>
-<h1><?= $dashboardGate ? 'Seller onboarding required' : 'Seller onboarding' ?></h1>
+<h1><?= $dashboardGate ? 'Seller readiness and onboarding required' : 'Seller onboarding' ?></h1>
 <?php if ($dashboardGate): ?>
 <section class="notice warning">Your seller application is approved, but onboarding is not complete yet. Complete the steps below before accessing products, orders, payouts, coupons, or other seller dashboard tools.</section>
 <?php endif; ?>

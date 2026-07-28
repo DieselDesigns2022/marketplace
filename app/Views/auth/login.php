@@ -11,7 +11,7 @@
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <label>Email<input type="email" name="email">
     </label>
-    <label>Password<input type="password" name="password">
+    <label>Password<span class="password-field"><input id="login-password" type="password" name="password"><button type="button" class="password-toggle" data-password-toggle data-password-target="login-password" aria-controls="login-password" aria-label="Show password" aria-pressed="false">Show</button></span>
     </label>
     <button class="btn">Login</button>
     <div style="border-top:1px solid var(--line); padding-top:14px; text-align:center;">

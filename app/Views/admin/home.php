@@ -1,48 +1,9 @@
-<h1>Admin Dashboard</h1>
-
-<section class="card">
-    <h2>Money & Payments</h2>
-    <p class="muted">Quick access to marketplace commission, seller payout status, payment transactions, and Stripe webhook logs.</p>
-    <p><a class="btn" href="/admin/payment-logs">View Commission & Payment Report</a></p>
-</section>
-
-<p class="muted">Review marketplace activity, applications, products, and catalog operations from this admin area.</p>
-<?php
-$statLabels = [
-    'active_users' => 'Active Users',
-    'approved_designers' => 'Approved Designers',
-    'pending_apps' => 'Pending Applications',
-    'pending_products' => 'Pending Products',
-    'live_paid_orders' => 'Live Paid Orders',
-    'live_gross_sales' => 'Live Gross Sales',
-    'asset_moth_commission' => 'Asset Moth Commission',
-];
-$moneyStats = ['live_gross_sales', 'asset_moth_commission'];
-?>
-<div class="dash">
-    <?php foreach($s as $k=>$v):?>
-        <div class="card">
-           <b><?=H::e($statLabels[$k] ?? ucwords(str_replace('_',' ',$k)))?></b>
-           <p>
-           <?php if(in_array($k, $moneyStats, true)): ?>
-               <?=H::money($v)?>
-           <?php else: ?>
-               <?=H::e($v)?>
-           <?php endif; ?>
-           </p>
-        </div>
-    <?php endforeach;?>
-</div>
-<nav class="adminnav">
-    <a href="/admin/users">Users</a>
-    <a href="/admin/applications">Applications</a>
-    <a href="/admin/designers">Designers</a>
-    <a href="/admin/products">Products</a>
-    <a href="/admin/ip-risk-terms">IP Risk Terms</a>
-    <a href="/admin/categories">Categories</a>
-    <a href="/admin/coupons">Coupons</a>
-    <a href="/admin/orders">Orders</a>
-    <a href="/admin/referrals">Referrals</a>
-    <a href="/admin/homepage">Homepage</a>
-    <a href="/admin/ads">Ads</a>
-</nav>
+<?php use App\Core\Helpers as H; ?>
+<header class="dashboard-heading"><div><h1>Admin dashboard</h1><p class="muted">Live marketplace operations and review queues.</p></div><a class="btn" href="/admin/payment-logs">Payment, Stripe &amp; webhook report</a></header>
+<section class="card attention-panel"><h2>Attention Required</h2><div class="dashboard-grid"><?php foreach([
+['Pending seller applications',$s['pending_apps'],'/admin/applications?status=pending'],['Pending products',$s['pending_products'],'/admin/products?status=pending_review'],['Active IP-risk reviews',$s['ip_risk_products'],'/admin/products'],['Failed / manual-review payments',$s['payment_warnings'],'/admin/payment-logs'],['Failed seller transfers',$s['failed_transfers'],'/admin/payment-logs'],['Sellers missing Stripe setup',$s['stripe_missing'],'/admin/designers'],['Incomplete payout setup',$s['payout_incomplete'],'/admin/designers'],['Webhook / Stripe issues',$s['webhook_issues'],'/admin/payment-logs']] as [$label,$count,$url]):?><a class="card" href="<?=$url?>"><strong><?=number_format((int)$count)?></strong><span><?=H::e($label)?></span></a><?php endforeach;?></div></section>
+<section><h2>Marketplace Statistics</h2><div class="dashboard-grid"><?php foreach([
+['Total users',$s['total_users']],['Buyers',$s['total_buyers']],['Approved sellers',$s['approved_designers']],['Active products',$s['active_products']],['Draft products',$s['draft_products']],['Pending products',$s['pending_products']],['Live completed orders',$s['live_paid_orders']],['Live gross sales',H::money($s['live_gross_sales'])],['Marketplace commission',H::money($s['asset_moth_commission'])],['Seller earnings / payouts',H::money($s['seller_payouts'])],['Total waitlist entries',$s['waitlist_total']]] as [$label,$value]):?><div class="card"><strong><?=H::e((string)$value)?></strong><span><?=H::e($label)?></span></div><?php endforeach;?></div><p class="muted">Financial totals include existing live Stripe Checkout records (`cs_live_%`) only.</p></section>
+<section><h2>Waitlist</h2><div class="dashboard-grid"><?php foreach([['Total',$waitlist['total']],['Recent / new (7 days)',$waitlist['recent']],['Buyer interest',$waitlist['buyer_interest']],['Seller interest',$waitlist['seller_interest']],['Confirmed',$waitlist['confirmed']],['Invited',$waitlist['invited']],['Awaiting invitation',$waitlist['awaiting_invitation']]] as [$label,$value]):?><div class="card"><strong><?=number_format((int)$value)?></strong><span><?=H::e($label)?></span></div><?php endforeach;?></div><p><a href="/admin/waitlist">Manage waitlist</a></p></section>
+<div class="dashboard-columns"><section class="card"><h2>Recent Activity</h2><?php if(!$recentActivity):?><p class="muted">No admin activity recorded.</p><?php else:?><ul><?php foreach($recentActivity as $activity):?><li><strong><?=H::e(ucwords(str_replace('_',' ',$activity['action'])))?></strong> · <?=H::e($activity['entity_type'])?> #<?=(int)$activity['entity_id']?> <small><?=H::e($activity['created_at'])?></small></li><?php endforeach;?></ul><?php endif;?></section><section class="card"><h2>Recent Admin Notifications <span class="badge"><?=$unreadCount?></span></h2><?php if(!$notifications):?><p class="muted">No recent admin notifications.</p><?php else:?><ul><?php foreach($notifications as $notification):?><li><strong><?=H::e($notification['title'])?></strong><br><?=H::e($notification['message'])?></li><?php endforeach;?></ul><?php endif;?><a href="/notifications">All notifications</a></section></div>
+<section><h2>Quick Actions</h2><div class="quick-actions"><a class="btn" href="/admin">Admin overview</a><a class="btn" href="/admin/users">Users</a><a class="btn" href="/admin/applications">Applications</a><a class="btn" href="/admin/designers">Sellers</a><a class="btn" href="/admin/products">Products</a><a class="btn" href="/admin/ip-risk-terms">IP Risk Terms</a><a class="btn" href="/admin/categories">Categories</a><a class="btn" href="/admin/coupons">Coupons</a><a class="btn" href="/admin/orders">Orders</a><a class="btn" href="/admin/referrals">Referrals</a><a class="btn" href="/admin/homepage">Homepage</a><a class="btn" href="/admin/ads">Ads</a><a class="btn alt" href="/admin/payment-logs">Payments / Stripe</a><a class="btn alt" href="/admin/waitlist">Waitlist</a><a class="btn alt" href="/admin/email-campaigns">Email campaigns</a><a class="btn alt" href="/account">Account</a><a class="btn alt" href="/notifications">Notifications</a></div></section>

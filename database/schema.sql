@@ -48,6 +48,8 @@ CREATE TABLE designers
     etsy_url VARCHAR(255),
     shopify_url VARCHAR(255),
     announcement TEXT,
+    receipt_note VARCHAR(500) NULL,
+    receipt_image_path VARCHAR(255) NULL,
     status ENUM('approved','disabled') DEFAULT 'approved',
     creator_rank ENUM('Bronze','Silver','Gold','Platinum','Legend') DEFAULT 'Bronze',
     rank_override BOOLEAN DEFAULT 0,
@@ -486,6 +488,8 @@ CREATE TABLE order_items
     coupon_id BIGINT NULL,
     coupon_code VARCHAR(80) NULL,
     coupon_discount DECIMAL(10,2) DEFAULT 0.00,
+    seller_receipt_note_snapshot VARCHAR(500) NULL,
+    seller_receipt_image_path_snapshot VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -649,6 +653,15 @@ CREATE TABLE admin_logs
 );
 
 INSERT INTO categories (name,slug,description) VALUES ('SVG Cut Files','svg-cut-files','Layered files for cutting machines'),('PNG Files','png-files','Transparent and print-ready PNG design files'),('Fonts','fonts','Display and script fonts'),('Canva Templates','canva-templates','Editable templates for creators');
+INSERT INTO categories (name,slug,description,sort_order) VALUES
+('Engagement Graphics','engagement-graphics','Graphics designed to encourage audience engagement',100),
+('Social Media Graphics','social-media-graphics','Graphics for social media publishing',101),
+('Libby Wraps','libby-wraps','Digital wraps for Libby-style products',102),
+('Digital Papers','digital-papers','Digital paper designs and patterns',103),
+('Freebies','freebies','Freebie-category digital products; zero-total checkout is not enabled',104),
+('Digital Services','digital-services','Digital services delivered using existing fulfillment choices',105),
+('Customs / Personalized','customs-personalized','Custom and personalized products using existing fulfillment choices',106)
+ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),is_active=1;
 CREATE TABLE ip_risk_terms
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
