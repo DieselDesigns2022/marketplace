@@ -88,15 +88,24 @@ class StripeService
         return self::request('GET', '/v1/accounts/' . rawurlencode($accountId));
     }
 
+    public static function connectedAccountStatus(array $account): string
+    {
+        if(empty($account['id']))return 'not_connected';
+        $requirements=$account['requirements']??[];$disabled=trim((string)($requirements['disabled_reason']??''));
+        if($disabled!=='')return str_contains($disabled,'rejected')?'disabled':'restricted';
+        if(!empty($requirements['past_due'])||!empty($requirements['currently_due'])||!empty($requirements['errors']))return 'information_required';
+        $details=!empty($account['details_submitted']);$payouts=!empty($account['payouts_enabled']);
+        if($details&&$payouts)return 'payout_ready';
+        if($details)return 'details_submitted';
+        return 'onboarding_incomplete';
+    }
+
     public static function syncConnectedAccountStatus(int $designerId, array $account): void
     {
         $charges = !empty($account['charges_enabled']) ? 1 : 0;
         $payouts = !empty($account['payouts_enabled']) ? 1 : 0;
         $details = !empty($account['details_submitted']) ? 1 : 0;
-        $status = 'onboarding_incomplete';
-        if (empty($account['id'])) $status = 'not_connected';
-        elseif ($details && $payouts) $status = 'payout_ready';
-        elseif ($details) $status = 'details_submitted';
+        $status = self::connectedAccountStatus($account);
         DB::exec('update designers set stripe_connect_account_id=coalesce(?,stripe_connect_account_id),stripe_charges_enabled=?,stripe_payouts_enabled=?,stripe_details_submitted=?,stripe_account_status=?,stripe_onboarding_completed_at=case when ?=1 then coalesce(stripe_onboarding_completed_at,now()) else stripe_onboarding_completed_at end,updated_at=now() where id=?', [$account['id'] ?? null,$charges,$payouts,$details,$status,($details && $payouts)?1:0,$designerId]);
     }
 

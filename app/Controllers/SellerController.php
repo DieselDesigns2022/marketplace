@@ -10,6 +10,7 @@ use App\Services\ProductIpRiskWorkflow;
 use App\Services\IpRiskScanner;
 use App\Repositories\IpRiskRepository;
 use App\Services\NotificationService;
+use App\Services\SellerReceiptService;
 use Throwable;
 class SellerController
 {
@@ -262,7 +263,6 @@ class SellerController
                 $account = StripeService::createConnectedAccount($d, H::user());
                 $accountId = (string)($account['id'] ?? '');
                 StripeService::syncConnectedAccountStatus((int)$d['id'], $account);
-                DB::exec('update designers set stripe_onboarding_started_at=coalesce(stripe_onboarding_started_at,now()) where id=?', [$d['id']]);
             }
             $base = StripeService::appUrl();
             $link = StripeService::createAccountLink($accountId, $base . '/seller/stripe/refresh', $base . '/seller/stripe/return');
@@ -348,6 +348,15 @@ class SellerController
         H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, 'meta' => ['title' => 'Apply to Sell | Asset Moth', 'description' => 'Apply for a reviewed designer storefront on Asset Moth.', 'canonical' => H::canonical('/apply'), 'robots' => 'noindex,follow'] ]);
 
     }
+    private function refundSummary(int $designerId): array
+    {
+        $rows=DB::rows('select oi.id,oi.order_id,oi.designer_id,oi.total_price,oi.commission_rate,o.tax_amount,r.cumulative_refund from order_items oi join orders o on o.id=oi.order_id join (select order_id,max(amount) cumulative_refund from payment_transactions where transaction_type in ("partial_refund","refund") group by order_id) r on r.order_id=oi.order_id order by oi.order_id,oi.id');
+        $orders=[];foreach($rows as $row){$orderId=(int)$row['order_id'];$orders[$orderId]['tax_cents']=StripeService::cents($row['tax_amount']??0);$orders[$orderId]['refund_cents']=StripeService::cents($row['cumulative_refund']??0);$orders[$orderId]['items'][]=$row;}
+        $summary=['gross_refund_cents'=>0,'seller_refund_cents'=>0,'by_order'=>[],'original_by_order'=>[]];
+        foreach($orders as $orderId=>$order){$allocation=StripeController::allocateSellerRefund($order['items'],$order['refund_cents'],$order['tax_cents']);foreach($order['items'] as $item){if((int)$item['designer_id']!==$designerId)continue;$share=$allocation[(int)$item['id']]??['gross_refund_cents'=>0,'seller_refund_cents'=>0];$gross=StripeService::cents($item['total_price']);$originalSeller=$gross-(int)round($gross*(float)$item['commission_rate']);$summary['gross_refund_cents']+=$share['gross_refund_cents'];$summary['seller_refund_cents']+=$share['seller_refund_cents'];$summary['by_order'][$orderId]=($summary['by_order'][$orderId]??0)+$share['seller_refund_cents'];$summary['original_by_order'][$orderId]=($summary['original_by_order'][$orderId]??0)+$originalSeller;}}
+        return $summary;
+    }
+
     public function home()
     {
         H::requireSeller();
@@ -363,10 +372,45 @@ class SellerController
             H::view('seller/onboarding', ['d' => $d, 'readiness' => $readiness, 'commissionPercent' => (int)round(StripeService::commissionRate() * 100), 'dashboardGate' => true]);
             return;
         }
-        $stats = DB::row( 'select (select count(*) from products where designer_id=?) product_count, (select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded")) sales_count', [$d['id'], $d['id']] );
-        H::view('seller/home', [ 'd' => $d, 'stats' => $stats, ]);
+        $id=(int)$d['id']; $userId=(int)H::user()['id'];
+        $stats=DB::row('select count(*) total_products,sum(status="draft") draft_products,sum(status="pending_review") pending_products,sum(status in ("approved","published")) published_products,sum(status="rejected") rejected_products,sum(status="archived") archived_products from products where designer_id=? and status<>"deleted"',[$id]);
+        $stats=array_merge($stats??[],DB::row('select count(*) sales_count,coalesce(sum(gross_sale),0) gross_sales,coalesce(sum(seller_earning),0) seller_earnings from seller_earnings where designer_id=?',[$id])??[],DB::row('select sum(review_status in ("pending_review","published_flagged")) flagged_products from product_ip_risk_states s join products p on p.id=s.product_id where p.designer_id=?',[$id])??[]);
+        $refunds=$this->refundSummary($id);$stats['gross_sales']=max(0,(float)$stats['gross_sales']-$refunds['gross_refund_cents']/100);$stats['seller_earnings']=max(0,(float)$stats['seller_earnings']-$refunds['seller_refund_cents']/100);$stats['refund_adjustments']=$refunds['seller_refund_cents']/100;
+        $stats['pending_payouts']=0.0;$stats['transferred_payouts']=0.0;$stats['payout_issues']=0;
+        foreach(DB::rows('select order_id,seller_payout_amount,payout_status,stripe_transfer_error from seller_payouts where designer_id=?',[$id]) as $payout){$orderId=(int)$payout['order_id'];$amount=(float)$payout['seller_payout_amount'];if(in_array($payout['payout_status'],['pending_payment','pending_transfer','pending_stripe_onboarding'],true))$stats['pending_payouts']+=isset($refunds['original_by_order'][$orderId])?max(0,($refunds['original_by_order'][$orderId]-($refunds['by_order'][$orderId]??0))/100):$amount;if($payout['payout_status']==='transferred')$stats['transferred_payouts']+=$amount;if($payout['payout_status']==='transfer_failed'||!empty($payout['stripe_transfer_error']))$stats['payout_issues']++;}
+        $accountStatus=(string)($d['stripe_account_status']??'');
+        if (empty($d['stripe_connect_account_id'])) $stripeState='not_connected';
+        elseif (in_array($accountStatus,['restricted','disabled','error'],true)) $stripeState='payout_issue';
+        elseif ($accountStatus==='information_required') $stripeState='information_required';
+        elseif (!empty($d['stripe_payouts_enabled']) && !empty($readiness['payout'])) $stripeState='payout_ready';
+        elseif ($accountStatus==='details_submitted'||!empty($d['stripe_details_submitted'])) $stripeState='connected';
+        else $stripeState='onboarding_started';
+        H::view('seller/home',['d'=>$d,'stats'=>$stats,'readiness'=>$readiness,'stripeState'=>$stripeState,'recentOrders'=>DB::rows('select oi.id,oi.order_id,oi.product_title,oi.total_price,oi.seller_payout_amount,oi.seller_payout_status,o.payment_status,o.created_at from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by o.created_at desc,oi.id desc limit 5',[$id]),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc limit 5',[$userId]),'unreadCount'=>(int)(DB::row('select count(*) c from notifications where user_id=? and read_at is null',[$userId])['c']??0)]);
 
     }
+    public function receiptSettings(): void
+    {
+        $d=$this->requireOnboardingComplete();
+        $errors=[]; $note=$d['receipt_note'] ?? '';
+        if ($_SERVER['REQUEST_METHOD']==='POST') {
+            H::verifyCsrf(); $service=new SellerReceiptService(); $action=$_POST['action'] ?? 'save';
+            $newImage=null;
+            try {
+                if (!in_array($action,['save','remove_image','remove_note','restore'],true)) throw new \RuntimeException('Unknown receipt settings action.');
+                $note=in_array($action,['remove_note','restore'],true) ? null : SellerReceiptService::normalizeNote($_POST['receipt_note'] ?? '');
+                $image=$d['receipt_image_path'] ?? null;
+                if (in_array($action,['remove_image','restore'],true)) $image=null;
+                if ($action==='save' && !empty($_FILES['receipt_image']['tmp_name'])) $image=$newImage=$service->storeUpload($_FILES['receipt_image']);
+                if (!DB::exec('update designers set receipt_note=?,receipt_image_path=? where id=? and user_id=?',[$note,$image,$d['id'],H::user()['id']])) throw new \RuntimeException('Receipt settings could not be saved.');
+                if (($d['receipt_image_path'] ?? null)!==$image) $service->removeIfUnreferenced($d['receipt_image_path'] ?? null);
+                H::flash('success',$action==='restore'?'Standard receipt restored.':'Receipt customization saved for future purchases.');
+                H::redirect('/seller/receipt-settings');
+            } catch (Throwable $e) { if ($newImage) $service->removeStoredFile($newImage); $errors[]=$e instanceof \RuntimeException?$e->getMessage():'Receipt settings could not be saved. Please try again.'; }
+        }
+        $preview=$d; $preview['receipt_note']=$note;
+        H::view('seller/receipt_settings',['d'=>$preview,'errors'=>$errors]);
+    }
+
     public function storeSettings()
     {
         H::requireSeller();

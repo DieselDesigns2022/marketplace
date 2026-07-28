@@ -254,3 +254,16 @@ Intentionally postponed:
 - Phase 10.5 consolidated review: hardened invitation modes and consent transitions; made signup/confirmation atomic; added active-admin test authorization, truthful `completed` campaign state, separate buyer download notifications, controlled seller subjects/links, foundation-only admin notification methods, responsive admin tables, and nonblocking queue reconciliation.
 - Phase 10.5 final hardening covers every failure after successful Stripe signature verification, uses controlled webhook-issue notification copy and verified-payload fingerprints for missing IDs, and makes locked mail-log recovery truncate incomplete tails, reject malformed complete records, and append complete records with full-write loops.
 - Phase 10.5 Step 8 completion fixes make receipts prefer stored order-item title snapshots, enforce monotonic cumulative-refund communications from the existing payment transaction ledger, let verified paid/refund webhook replay heal only missing deduplicated communications, and centralize secret-safe operational diagnostic redaction.
+
+
+
+## Phase 10.6 dashboard usability (2026-07-28)
+
+- Completed buyer, seller, and admin dashboard summaries, warnings, navigation, recent activity, responsive tables, and empty states.
+- Added protected per-file buyer download history and expiry/refund status clarity.
+- Added seller receipt settings with secure GD image processing and immutable order-item snapshots grouped by seller on web and email receipts.
+- Added accessible password visibility controls and seven canonical marketplace categories with duplicate and coupon-restriction consolidation.
+- Preserved Stripe Checkout/Tax, live financial reporting, payout, protected download, coupon, fulfillment, and authorization rules.
+- Required readable, contained protected files for buyer availability counts and buttons; added a 25-megapixel pre-decode receipt-image limit and non-blocking invalid snapshot fallback.
+- Corrected seller payout warnings, admin manual-review payment warnings, Account shortcuts, and receipt image URL generation.
+- Final Phase 10.6 hardening derives seller refund adjustments from maximum cumulative refund transactions, reconciles non-transferred payout ledgers without replay drift, rejects image trailing payloads, and maps Stripe requirements to actionable account states.

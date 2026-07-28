@@ -1,15 +1,5 @@
-<h1>Buyer dashboard</h1>
-<p>Welcome, <?=H::e(H::user()['name'])?>. Use your dashboard to revisit purchases, wishlist products, and followed designers as marketplace features continue to grow.</p>
-<div class="dash">
-    <a class="card" href="/dashboard/purchases"><strong>Purchases</strong><p class="muted">Purchases and downloads will appear here as marketplace checkout and order features are completed.</p></a>
-    <a class="card" href="/dashboard/wishlist"><strong>Wishlist</strong><p class="muted">Save products to compare or revisit later.</p></a>
-    <a class="card" href="/dashboard/following"><strong>Followed designers</strong><p class="muted">Find storefronts you follow.</p></a>
-    <a class="card" href="/dashboard/referrals"><strong>Credits / referrals</strong><p class="muted">Referral and credit polish is planned for a later phase.</p></a>
-</div>
-<h2>Recent purchases</h2>
-<?php if(!$orders):?>
-    <div class="card empty-state"><p>No purchases are shown yet. Future completed orders and available downloads will appear here.</p><a class="btn" href="/browse">Browse Digital Designs</a></div>
-<?php endif;?>
-<?php foreach($orders as $o):?>
-    <p>Order #<?=$o['id']?> — <?=H::money($o['total'])?></p>
-<?php endforeach;?>
+<?php use App\Core\Helpers as H; ?>
+<header class="dashboard-heading"><div><h1>Welcome back, <?=H::e(H::user()['name'])?></h1><p class="muted">Your purchases, saved designs, and marketplace updates at a glance.</p></div><a class="btn" href="/browse">Browse designs</a></header>
+<div class="dashboard-grid"><?php foreach([['Purchases',$summary['purchase_count']??0,'/dashboard/purchases'],['Available downloads',$summary['available_downloads']??0,'/dashboard/downloads'],['Wishlist',$summary['wishlist_count']??0,'/dashboard/wishlist'],['Unread notifications',$summary['unread_count']??0,'/notifications']] as [$label,$count,$url]):?><a class="card" href="<?=$url?>"><strong><?=number_format((int)$count)?></strong><span><?=$label?></span></a><?php endforeach;?></div>
+<section><div class="dashboard-heading"><h2>Recent orders</h2><a href="/dashboard/purchases">View all</a></div><?php if(!$orders):?><div class="card empty-state"><p>No purchases yet. Find a design you love to get started.</p><a class="btn" href="/browse">Browse marketplace</a></div><?php else:?><div class="responsive-table"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th></tr></thead><tbody><?php foreach($orders as $o):?><tr><td><a href="/dashboard/order/<?=(int)$o['id']?>">#<?=(int)$o['id']?></a></td><td><?=H::e($o['created_at'])?></td><td><span class="status-badge <?=($o['payment_status']??'')==='paid'?'ok':'neutral'?>"><?=H::e(str_replace('_',' ',$o['payment_status']??$o['status']))?></span></td><td><?=H::money($o['total'])?></td></tr><?php endforeach;?></tbody></table></div><?php endif;?></section>
+<div class="dashboard-columns"><section><div class="dashboard-heading"><h2>Recently wished</h2><a href="/dashboard/wishlist">Wishlist</a></div><?php if(!$wishlist):?><div class="card empty-state">Use the heart on products to save them here.</div><?php else:?><?php foreach($wishlist as $p):?><p class="card"><a href="/product/<?=H::e($p['slug'])?>"><?=H::e($p['title'])?></a></p><?php endforeach;?><?php endif;?></section><section><div class="dashboard-heading"><h2>Recent notifications</h2><a href="/notifications">View all</a></div><?php if(!$notifications):?><div class="card empty-state">You're all caught up.</div><?php else:?><?php foreach($notifications as $n):?><p class="card notification <?=empty($n['read_at'])?'unread':''?>"><strong><?=H::e($n['title'])?></strong><br><span class="muted"><?=H::e($n['message']??'')?></span></p><?php endforeach;?><?php endif;?></section></div>

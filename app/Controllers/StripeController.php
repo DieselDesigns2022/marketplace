@@ -13,6 +13,29 @@ use Throwable;
 
 class StripeController
 {
+    /** Allocate the cumulative Stripe refund across merchandise only, never tax. */
+    public static function allocateSellerRefund(array $items,int $cumulativeRefundCents,int $taxCents): array
+    {
+        $normalized=[];$merchandise=0;
+        foreach($items as $item){$cents=max(0,StripeService::cents($item['total_price']??0));$merchandise+=$cents;$normalized[]=['id'=>(int)($item['id']??0),'cents'=>$cents,'commission_rate'=>max(0.0,min(1.0,(float)($item['commission_rate']??0)))];}
+        $total=$merchandise+max(0,$taxCents);$cumulative=max(0,min($cumulativeRefundCents,$total));
+        $merchandiseRefund=$total>0?intdiv($cumulative*$merchandise+intdiv($total,2),$total):0;
+        $allocated=0;$rows=[];
+        foreach($normalized as $item){$numerator=$merchandiseRefund*$item['cents'];$gross=$merchandise>0?intdiv($numerator,$merchandise):0;$allocated+=$gross;$rows[]=['id'=>$item['id'],'gross_refund_cents'=>$gross,'remainder'=>$merchandise>0?$numerator%$merchandise:0,'commission_rate'=>$item['commission_rate']];}
+        usort($rows,static fn($a,$b)=>$b['remainder']<=>$a['remainder']?:$a['id']<=>$b['id']);
+        for($i=0,$left=$merchandiseRefund-$allocated;$i<$left&&$rows;$i++)$rows[$i%count($rows)]['gross_refund_cents']++;
+        $result=[];foreach($rows as $row){$gross=$row['gross_refund_cents'];$result[$row['id']]=['gross_refund_cents'=>$gross,'seller_refund_cents'=>$gross-(int)round($gross*$row['commission_rate'])];}
+        ksort($result);return $result;
+    }
+
+    private function reconcileRefundPayouts(int $orderId): void
+    {
+        $refund=DB::row('select max(amount) amount from payment_transactions where order_id=? and transaction_type in ("partial_refund","refund")',[$orderId]);$cumulative=StripeService::cents($refund['amount']??0);if($cumulative<=0)return;
+        $order=DB::row('select tax_amount from orders where id=?',[$orderId]);$items=DB::rows('select id,designer_id,total_price,commission_rate,seller_payout_status from order_items where order_id=? order by id',[$orderId]);$allocation=self::allocateSellerRefund($items,$cumulative,StripeService::cents($order['tax_amount']??0));$bySeller=[];
+        foreach($items as $item){$id=(int)$item['id'];$designer=(int)$item['designer_id'];$gross=StripeService::cents($item['total_price']);$originalSeller=$gross-(int)round($gross*(float)$item['commission_rate']);$refundShare=$allocation[$id]??['gross_refund_cents'=>0,'seller_refund_cents'=>0];$desiredSeller=max(0,$originalSeller-$refundShare['seller_refund_cents']);if(($item['seller_payout_status']??'')!=='transferred')DB::exec('update order_items set seller_payout_amount=? where id=? and seller_payout_status<>"transferred"',[$desiredSeller/100,$id]);$bySeller[$designer]['gross']=(($bySeller[$designer]['gross']??0)+max(0,$gross-$refundShare['gross_refund_cents']));$bySeller[$designer]['seller']=(($bySeller[$designer]['seller']??0)+$desiredSeller);}
+        foreach($bySeller as $designer=>$amounts){$commission=max(0,$amounts['gross']-$amounts['seller']);DB::exec('update seller_payouts set gross_amount=?,platform_commission_amount=?,seller_payout_amount=?,updated_at=now() where order_id=? and designer_id=? and payout_status<>"transferred"',[$amounts['gross']/100,$commission/100,$amounts['seller']/100,$orderId,$designer]);}
+    }
+
     public function success(): void
     {
         H::requireLogin();
@@ -316,6 +339,7 @@ class StripeController
             if(!$partial)DB::exec('update order_items set manual_delivery_status=case when fulfillment_type="google_drive" then "cancelled_refunded" else manual_delivery_status end where order_id=?',[$order['id']]);
         }
         StripeService::logTransaction((int)$order['id'],$eventId,$refunded<$total?'partial_refund':'refund',$refunded<$total?'partially_refunded':'refunded',$refunded/100,strtolower($charge['currency'] ?? StripeService::currency()),['charge'=>$charge['id'] ?? null,'intent'=>$charge['payment_intent'] ?? null],$decision['meaningful']?'Refund status received from Stripe.':'Refund observation recorded without a state transition.');
+        $this->reconcileRefundPayouts((int)$order['id']);
         if($decision['meaningful']||$decision['communication_recovery'])$this->communicationAttempt('refund_status',fn()=>$this->notifyRefundTransition(array_merge($order,['payment_status'=>$status]),$status,$refunded));
     }
 

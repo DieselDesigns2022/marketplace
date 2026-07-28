@@ -114,15 +114,28 @@ class AdminController
     public function home()
     {
         $this->gate();
-        H::view('admin/home',['s'=>DB::row('select
-            (select count(*) from users where status="active") active_users,
+        $adminId=(int)H::user()['id'];
+        $stats=DB::row('select
+            (select count(*) from users) total_users,
+            (select count(*) from users where role="buyer") total_buyers,
             (select count(*) from designers where status="approved") approved_designers,
             (select count(*) from designer_applications where status="pending") pending_apps,
             (select count(*) from products where status="pending_review") pending_products,
+            (select count(*) from product_ip_risk_states where review_status in ("pending_review","published_flagged")) ip_risk_products,
+            (select count(*) from products where status in ("approved","published")) active_products,
+            (select count(*) from products where status="draft") draft_products,
+            (select count(*) from orders where payment_status in ("failed","manual_review") or manual_review_required=1) payment_warnings,
+            (select count(*) from seller_payouts where payout_status="transfer_failed" or stripe_transfer_error is not null) failed_transfers,
+            (select count(*) from designers where status="approved" and stripe_connect_account_id is null) stripe_missing,
+            (select count(*) from designers where status="approved" and stripe_connect_account_id is not null and (stripe_details_submitted=0 or stripe_payouts_enabled=0)) payout_incomplete,
+            (select count(*) from stripe_events where processing_status="failed" or processing_error is not null) webhook_issues,
             (select count(*) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_paid_orders,
             (select coalesce(round(sum(total),2),0) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_gross_sales,
-            (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") asset_moth_commission
-        ')]);
+            (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") asset_moth_commission,
+            (select coalesce(round(sum(seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where o.stripe_checkout_session_id like "cs_live_%" and sp.payout_status not in ("transfer_failed","reversed")) seller_payouts,
+            (select count(*) from waitlist_entries) waitlist_total');
+        $waitlist=DB::row('select count(*) total,sum(created_at>=date_sub(now(),interval 7 day)) recent,sum(interest_type in ("buyer","both")) buyer_interest,sum(interest_type in ("seller","both")) seller_interest,sum(confirmation_sent_at is not null) confirmed,sum(invited_at is not null) invited,sum(status="subscribed" and invited_at is null) awaiting_invitation from waitlist_entries');
+        H::view('admin/home',['s'=>$stats,'waitlist'=>$waitlist,'recentActivity'=>DB::rows('select * from admin_logs order by created_at desc,id desc limit 8'),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc,id desc limit 8',[$adminId]),'unreadCount'=>(int)(DB::row('select count(*) c from notifications where user_id=? and read_at is null',[$adminId])['c']??0)]);
 
     }
     public function users()

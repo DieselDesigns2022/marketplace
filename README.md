@@ -247,3 +247,9 @@ Asset Moth includes an advisory IP-risk warning workflow for seller product meta
 
 ## Phase 10.5 — emails, notifications, and launch waitlist
 Phase 10.5 provides authenticated notifications, a consent-aware public waitlist, admin waitlist/campaign tools, and a durable email queue. Development uses `MAIL_TRANSPORT=log`; run `php scripts/process_email_queue.php 50`. See [the operational guide](docs/EMAILS_NOTIFICATIONS_WAITLIST.md).
+
+
+
+## Phase 10.6 dashboard usability (2026-07-28)
+
+Buyer, approved-seller, and admin workspaces now use role-aware secondary navigation, responsive summaries, actionable warnings, recent activity, and guided empty states. Buyers receive per-file protected download history. Approved sellers may customize future buyer receipts with a plain-text note and safely processed image. Registration and login include accessible password visibility controls. Seven canonical marketplace categories are active without changing zero-total checkout or fulfillment rules. Buyer availability now requires a readable regular file resolving inside protected product storage, and seller/admin navigation also includes Account. Invalid optional receipt settings are omitted during checkout rather than interrupting payment. Source images are capped at 25 megapixels before GD decoding.

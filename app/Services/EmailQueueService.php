@@ -43,10 +43,10 @@ final class EmailQueueService
     {
         $o=DB::row('select o.*,u.email,u.name from orders o join users u on u.id=o.user_id where o.id=? and o.payment_status="paid" and o.manual_review_required=0',[$orderId]);
         if(!$o)return;
-        $items=DB::rows('select oi.id,oi.product_id,oi.product_title, p.title legacy_live_title,oi.license_type,oi.license_name,oi.license_snapshot,oi.unit_price,oi.license_price,oi.total_price,oi.coupon_discount from order_items oi left join products p on p.id=oi.product_id where oi.order_id=? order by oi.id',[$orderId]);
+        $items=DB::rows('select oi.id,oi.product_id,oi.product_title, p.title legacy_live_title,oi.license_type,oi.license_name,oi.license_snapshot,oi.unit_price,oi.license_price,oi.total_price,oi.coupon_discount,oi.designer_id,oi.seller_name,oi.seller_receipt_note_snapshot,oi.seller_receipt_image_path_snapshot from order_items oi left join products p on p.id=oi.product_id where oi.order_id=? order by oi.id',[$orderId]);
         foreach ($items as &$item) $item['title']=self::receiptTitle($item['product_title']??null,$item['legacy_live_title']??null);
         unset($item);
-        self::queue('transactional',$o['email'],'Your Asset Moth receipt','purchase_receipt',['name'=>$o['name'],'order'=>$o,'items'=>$items],"order:$orderId:receipt");
+        self::queue('transactional',$o['email'],'Your Asset Moth receipt','purchase_receipt',['name'=>$o['name'],'order'=>$o,'items'=>$items,'seller_groups'=>SellerReceiptService::groupItemsBySeller($items)],"order:$orderId:receipt");
         self::queue('transactional',$o['email'],'Your downloads are ready','download_ready',['name'=>$o['name'],'order_id'=>$orderId],"order:$orderId:downloads");
     }
     public static function refund(int $orderId,string $status,int $cumulativeRefundCents,string $transitionKey): void { $o=DB::row('select o.*,u.email,u.name from orders o join users u on u.id=o.user_id where o.id=?',[$orderId]); if($o)self::queue('transactional',$o['email'],'Refund status update','refund_status',['name'=>$o['name'],'order'=>$o,'refund_status'=>$status,'cumulative_refund_amount'=>$cumulativeRefundCents/100],$transitionKey.':email'); }

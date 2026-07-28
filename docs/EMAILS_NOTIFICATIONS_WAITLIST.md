@@ -46,3 +46,9 @@ Refund progression uses the highest cumulative refund amount already stored in `
 Every verified paid, non-manual-review event re-attempts only the stable deduplicated buyer/seller communication set. A replay of an already processed event may perform that same nonblocking communication recovery, but does not repeat coupon accounting, earnings changes, payout-ledger preparation, transfers, delivery unlock, or payment transaction logging. Processed refund replay likewise re-attempts only the current authoritative transition communication.
 
 `OperationalErrorSanitizer` removes stack traces, markup, controls, email addresses, authorization values, common API-key header/assignment variants, Stripe signatures/secrets/identifiers, credential assignments, database DSNs/passwords, URL userinfo, token-bearing URLs, and unsubscribe-token-shaped values before Phase 10.5 diagnostics reach protected logs or database error fields. Webhook administrator alerts remain controlled copy and never receive exception text.
+
+
+
+## Phase 10.6 purchase receipts
+
+Paid-order receipt queue data includes the order-item seller receipt snapshots. Purchase-receipt email items are grouped by seller, and only that group's allowlisted image and escaped plain-text note appear in its seller section. Order number, date, payment status, licenses, stored prices, coupon, tax, final total, and order link remain Asset Moth-controlled. Notification, consent, waitlist, campaign, deduplication, and retry behavior is unchanged.

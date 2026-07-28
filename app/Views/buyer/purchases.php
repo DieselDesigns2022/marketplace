@@ -1,33 +1,3 @@
-<h1>Purchases</h1>
-<?php if(!$orders):?>
-    <p>You have not purchased anything yet.</p>
-<?php else:?>
-    <table>
-        <tr>
-           <th>Order</th>
-           <th>Date</th>
-           <th>Products</th>
-           <th>Total</th><th>Payment</th>
-           <th>
-           </th>
-        </tr>
-        <?php foreach($orders as $o):?>
-           <tr>
-               <td>#<?=$o['id']?>
-               </td>
-               <td>
-               <?=$o['created_at']?>
-               </td>
-               <td>
-               <?=H::e($o['product_titles'])?>
-               </td>
-               <td>
-               <?=H::money($o['total'])?>
-               </td><td><?=H::e($o['payment_status'] ?? $o['status'])?></td>
-               <td>
-               <a class="btn" href="/dashboard/order/<?=$o['id']?>">View order</a>
-               </td>
-           </tr>
-        <?php endforeach;?>
-    </table>
-<?php endif;?>
+<?php use App\Core\Helpers as H; ?>
+<header class="dashboard-heading"><div><h1>Purchases</h1><p class="muted">Review payment and refund status, receipt details, licenses, and protected downloads.</p></div><a class="btn alt" href="/dashboard/downloads">Download history</a></header>
+<?php if(!$orders):?><section class="card empty-state"><h2>No purchases yet</h2><p>Browse independent designers to find your first digital product.</p><a class="btn" href="/browse">Browse marketplace</a></section><?php else:?><div class="responsive-table"><table><thead><tr><th>Order</th><th>Date</th><th>Products and licenses</th><th>Total</th><th>Payment / refund status</th><th>Actions</th></tr></thead><tbody><?php foreach($orders as $o):$status=$o['payment_status']??$o['status'];?><tr><td><a href="/dashboard/order/<?=(int)$o['id']?>">#<?=(int)$o['id']?></a></td><td><?=H::e($o['created_at'])?></td><td><?=H::e($o['product_titles'])?></td><td><?=H::money($o['total'])?></td><td><span class="status-badge <?=in_array($status,['paid'],true)?'ok':(str_contains($status,'refund')?'warning':'neutral')?>"><?=H::e(ucwords(str_replace('_',' ',$status)))?></span></td><td><div class="quick-actions"><a class="btn" href="/dashboard/order/<?=(int)$o['id']?>">View receipt</a><?php if($status==='paid'):?><a href="/dashboard/downloads">Downloads</a><?php endif;?></div></td></tr><?php endforeach;?></tbody></table></div><?php endif;?>

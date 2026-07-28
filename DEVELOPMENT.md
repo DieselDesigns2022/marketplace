@@ -230,3 +230,9 @@ Seller Stripe transfers now include `source_transaction` when Asset Moth has the
 Keep `MAIL_TRANSPORT=log` locally. Apply `database/migrations/2026_07_20_phase_10_5_emails_notifications_waitlist.sql`, ensure `storage/logs` is writable, then run `php scripts/process_email_queue.php 50`. The JSON-lines mail log intentionally records recipient hashes, not addresses or unsubscribe tokens.
 
 Generate `EMAIL_UNSUBSCRIBE_SECRET` as an environment-only random value of at least 32 bytes before queueing waitlist or marketing mail. Do not rotate it without an unsubscribe-link migration plan. Campaign and launch-invite messages include HMAC-signed unsubscribe URLs. Complete unsubscribe tokens, recipient addresses, and signing secrets are not written to delivery logs.
+
+
+
+## Phase 10.6 development notes
+
+Dashboard controller queries must remain scoped to the authenticated buyer, seller, or admin. Seller receipt settings are read authoritatively inside checkout transactions and copied to order-item snapshots; never accept receipt values from checkout input. Use `SellerReceiptService` for note normalization, public-path validation, upload processing, grouping, and deletion decisions. Keep new dashboard tables inside `.responsive-table`, and derive navigation from authenticated roles rather than treating navigation visibility as authorization. Receipt snapshot creation must use `SellerReceiptService::snapshotFromSeller()` so invalid optional values become `null` and never fail checkout. Buyer availability must use filesystem containment, regular-file, and readability checks—not database presence alone.

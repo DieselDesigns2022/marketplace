@@ -285,3 +285,11 @@ The baseline schema repeats the additive Phase 10.5 migration definitions. The u
 
 ### Phase 10.5 refund communication state
 No duplicate refund-total column is added. Existing `payment_transactions` rows with `transaction_type` `partial_refund` or `refund` store Stripe's cumulative refunded amount in `amount`; their maximum amount is the authoritative prior cumulative value for monotonic communication decisions. Stable refund communication keys include order, resulting partial/full state, and cumulative refunded cents. Older, equal, or smaller observations may remain in protected transaction history but cannot regress the order or create another buyer message.
+
+
+
+## Phase 10.6 receipt and category data
+
+`designers.receipt_note VARCHAR(500)` and `designers.receipt_image_path VARCHAR(255)` store the current seller setting. `order_items.seller_receipt_note_snapshot VARCHAR(500)` and `order_items.seller_receipt_image_path_snapshot VARCHAR(255)` preserve what applied when checkout created the item, so later settings do not rewrite old receipts. Snapshot references prevent historical images from being removed.
+
+The canonical categories are Engagement Graphics (`engagement-graphics`), Social Media Graphics (`social-media-graphics`), Libby Wraps (`libby-wraps`), Digital Papers (`digital-papers`), Freebies (`freebies`), Digital Services (`digital-services`), and Customs / Personalized (`customs-personalized`). The migration normalizes case and punctuation/spacing/slash/hyphen variants, moves product assignments, consolidates category coupon restrictions, and deactivates rather than deletes duplicate history. Invalid current seller values are omitted (`NULL`) from new snapshots rather than blocking checkout; valid historical snapshot references continue to retain their images. Category cleanup deterministically selects at most one target for each duplicate: normalized canonical slug wins over normalized name, ties use stable canonical sequence/ID ordering, and a category never maps to its own ID.
