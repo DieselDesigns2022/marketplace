@@ -972,6 +972,11 @@ class SellerController
                             }
                             $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
                         }
+                        $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
+                        if ($status === 'pending_review' && !$requiresIpReview) {
+                            $status = 'approved';
+                            DB::exec('update products set status="approved",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']]);
+                        }
                         DB::commit();
                     } catch (Throwable $e) {
                         if (DB::pdo()->inTransaction()) {
@@ -1021,6 +1026,11 @@ class SellerController
                                 H::redirect('/seller/product/' . $productId);
                             }
                             $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
+                        }
+                        $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
+                        if ($status === 'pending_review' && !$requiresIpReview) {
+                            $status = 'approved';
+                            DB::exec('update products set status="approved",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']]);
                         }
                     } catch (Throwable $e) {
                         error_log(
@@ -1192,18 +1202,18 @@ class SellerController
         $productId = (int)$id;
         $p = DB::row('select status,fulfillment_type,manual_delivery_instructions from products where id=? and designer_id=?', [$productId, $d['id']]) ?? H::abort(404);
         if (in_array($p['status'], ['archived','deleted'], true)) {
-            H::flash('error', 'Archived or deleted products must be restored to draft before they can be submitted for review.');
+            H::flash('error', 'Archived or deleted products must be restored to draft before they can be submitted.');
             H::redirect('/seller/products?status='.$p['status']);
         }
         if (($p['status'] ?? '') === 'disabled') {
-            H::flash('error', 'Disabled products cannot be submitted for review. Contact an admin if this product should be re-enabled.');
+            H::flash('error', 'Disabled products cannot be submitted. Contact an admin if this product should be re-enabled.');
             H::redirect('/seller/products?status=disabled');
         }
-        if (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen(trim((string)($p['manual_delivery_instructions'] ?? ''))) < 5)
-        {
+        if (($p['fulfillment_type'] ?? 'downloadable') === 'google_drive' && mb_strlen(trim((string)($p['manual_delivery_instructions'] ?? ''))) < 5) {
             H::flash('error','Manual delivery instructions are required before submitting a Google Drive delivery product.');
             H::redirect('/seller/product/'.$productId);
         }
+
         $ipWorkflow = new ProductIpRiskWorkflow();
         try {
             DB::begin();
@@ -1216,7 +1226,10 @@ class SellerController
                 }
                 $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
             }
-            DB::exec( 'update products set status="pending_review",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']] );
+
+            $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
+            $nextStatus = $requiresIpReview ? 'pending_review' : 'approved';
+            DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$nextStatus, $productId, $d['id']]);
             DB::commit();
         } catch (Throwable $e) {
             if (DB::pdo()->inTransaction()) {
@@ -1225,9 +1238,11 @@ class SellerController
             H::flash('error','Product could not be submitted safely. Please try again.');
             H::redirect('/seller/product/'.$productId);
         }
-        H::redirect('/seller/products');
 
+        H::flash('success', $nextStatus === 'approved' ? 'Product published.' : 'Product flagged and submitted for IP review.');
+        H::redirect('/seller/products');
     }
+
     public function disableProduct($id)
     {
         $this->requireOnboardingComplete();

@@ -9,7 +9,7 @@ use RuntimeException;
 final class SellerReceiptService
 {
     public const MAX_NOTE_LENGTH = 500;
-    public const MAX_IMAGE_BYTES = 5242880;
+    public const MAX_IMAGE_BYTES = 10485760;
     public const MAX_IMAGE_DIMENSION = 1600;
     public const MAX_SOURCE_PIXELS = 25000000;
     public const PUBLIC_PREFIX = '/uploads/receipt_images/';
@@ -81,7 +81,7 @@ final class SellerReceiptService
     {
         if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) throw new RuntimeException('Receipt image upload failed.');
         $size = (int)($upload['size'] ?? 0);
-        if ($size < 1 || $size > self::MAX_IMAGE_BYTES) throw new RuntimeException('Receipt image must be 5 MB or smaller.');
+        if ($size < 1 || $size > self::MAX_IMAGE_BYTES) throw new RuntimeException('Receipt image must be 10 MB or smaller.');
         $tmp = (string)($upload['tmp_name'] ?? '');
         $extension = strtolower(pathinfo((string)($upload['name'] ?? ''), PATHINFO_EXTENSION));
         if (!in_array($extension, ['jpg','jpeg','png','webp'], true) || !is_file($tmp) || !is_uploaded_file($tmp)) throw new RuntimeException('Receipt image must be a valid uploaded JPG, PNG, or WEBP file.');

@@ -1,7 +1,7 @@
 <?php
 use App\Core\Helpers as H;
 $role=H::user()['role'] ?? '';
-$area=$path==='/notifications' ? ($role==='admin'?'admin':($role==='designer'?'seller':'buyer')) : (str_starts_with($path,'/admin')?'admin':(str_starts_with($path,'/seller')?'seller':'buyer'));
+$area=($path==='/notifications'||$path==='/account') ? ($role==='admin'?'admin':($role==='designer'?'seller':'buyer')) : (str_starts_with($path,'/admin')?'admin':(str_starts_with($path,'/seller')?'seller':'buyer'));
 $links=[];
 if($area==='buyer') $links=[['/dashboard','Overview',['/dashboard']],['/dashboard/purchases','Purchases',['/dashboard/purchases','/dashboard/order/']],['/dashboard/downloads','Downloads',['/dashboard/downloads']],['/dashboard/wishlist','Wishlist',['/dashboard/wishlist']],['/dashboard/following','Following',['/dashboard/following']],['/dashboard/referrals','Referrals',['/dashboard/referrals']],['/account','Account',['/account']],['/notifications','Notifications',['/notifications']]];
 elseif($area==='seller'&&in_array($role,['designer','admin'],true)) $links=[['/seller','Seller overview',['/seller']],['/seller/onboarding','Readiness',['/seller/onboarding']],['/seller/products','Products',['/seller/products','/seller/product/']],['/seller/sales','Sales / orders',['/seller/sales','/seller/order-item/']],['/seller/store','Store & licenses',['/seller/store']],['/seller/receipt-settings','Receipts',['/seller/receipt-settings']],['/seller/stripe','Payouts / Stripe',['/seller/stripe']],['/seller/coupons','Coupons',['/seller/coupons']],['/seller/referrals','Referrals',['/seller/referrals']],['/seller/rank','Rank',['/seller/rank']],['/account','Account',['/account']],['/notifications','Notifications',['/notifications']]];

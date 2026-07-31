@@ -1101,3 +1101,159 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .storefront-banner { width:100%; min-height:0; aspect-ratio:3 / 1; background-size:cover; background-position:center; }
 .storefront-banner.small { min-height:0; aspect-ratio:3 / 1; }
 @media(max-width:600px){.admin-dashboard-section{padding:.9rem}.admin-dashboard-hero{align-items:stretch}.admin-dashboard-hero .btn{width:100%}.permanent-delete-form{min-width:220px}.minimal-shell{width:min(100% - 1.25rem,560px)}}
+
+/* Phase 10.6 live mobile navigation and table access. */
+@media (max-width: 760px) {
+  .top {
+    display: block;
+    padding: 12px;
+  }
+
+  .top > .brand {
+    display: flex;
+    width: fit-content;
+    margin: 0 auto;
+  }
+
+  .top > nav {
+    width: 100%;
+    margin-top: 12px;
+    justify-content: center;
+    gap: .55rem .8rem;
+  }
+
+  .top > nav a,
+  .top .nav-logout,
+  .top .nav-logout button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .top .nav-logout {
+    margin: 0;
+  }
+
+  .top .nav-logout button {
+    font-size: inherit;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-nav a {
+    flex: 1 1 calc(50% - .4rem);
+    min-width: 0;
+    justify-content: center;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboard-nav a {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .responsive-table {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 8px 22px #2319420d;
+  }
+
+  .responsive-table::before {
+    content: "Swipe left or right to see all table details";
+    display: block;
+    padding: .7rem .85rem;
+    color: var(--muted);
+    font-size: .88rem;
+    font-weight: 700;
+  }
+
+  .responsive-table table {
+    margin: 0;
+  }
+}
+
+/* Phase 10.6 live action-control polish. */
+.product-actions {
+  display: grid;
+  gap: .45rem;
+  min-width: 155px;
+}
+
+.product-actions > a,
+.product-actions > form,
+.product-actions > form > button {
+  width: 100%;
+  margin: 0;
+}
+
+.product-actions > a,
+.product-actions > form > button {
+  text-align: center;
+}
+
+.product-actions .muted {
+  display: block;
+  font-size: .85rem;
+  line-height: 1.4;
+}
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem;
+}
+
+.user-actions > form {
+  margin: 0;
+}
+
+.permanent-delete {
+  margin-top: .35rem;
+}
+
+.permanent-delete > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #9b2632;
+  font-size: .9rem;
+  font-weight: 800;
+}
+
+.permanent-delete[open] > summary {
+  margin-bottom: .5rem;
+}
+
+.permanent-delete-form {
+  min-width: 0;
+  max-width: 360px;
+  margin-top: 0;
+  padding: .7rem;
+}
+
+.permanent-delete-form input {
+  margin-top: .35rem;
+}
+
+.permanent-delete-form .danger-button {
+  width: auto;
+  align-self: start;
+  padding: .6rem .9rem;
+}
+
+@media (max-width: 600px) {
+  .product-actions {
+    min-width: 140px;
+  }
+
+  .permanent-delete-form {
+    min-width: 0;
+    width: 100%;
+  }
+}

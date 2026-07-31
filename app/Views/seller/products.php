@@ -9,7 +9,7 @@
 <?php if(!$products): ?>
 <div class="card empty"><h2>No products found.</h2><p>Create a product draft and submit it for review when it is ready.</p><a class="btn" href="/seller/product/new">Create Product</a></div>
 <?php else: ?>
-    <table>
+    <div class="responsive-table"><table>
         <tr><th>Thumbnail</th><th>Product Name</th><th>Status</th><th>Orders</th><th>Price</th><th>Category</th><th>Updated Date</th><th>Actions</th></tr>
         <?php foreach($products as $p): $safeDelete = ((int)($p['completed_order_count'] ?? 0) === 0) && in_array($p['status'], ['draft','rejected','archived','disabled','deleted'], true); ?>
            <tr>
@@ -21,9 +21,10 @@
                <td><?=H::e($p['category_name']??'Uncategorized')?></td>
                <td><?=H::e($p['updated_at'])?></td>
                <td>
-                   <a href="/seller/product/<?=$p['id']?>">Edit</a>
+                   <div class="product-actions">
+                   <a class="btn" href="/seller/product/<?=$p['id']?>">Edit</a>
                    <form method="post" action="/seller/product/<?=$p['id']?>/duplicate" onsubmit="return confirm('Create a draft copy of this product? Product files and preview images will not be copied.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Duplicate</button></form>
-                   <?php if(in_array($p['status'], ['approved','published'], true)):?><a href="/product/<?=H::e($p['slug'])?>">View Public Page</a><?php endif;?>
+                   <?php if(in_array($p['status'], ['approved','published'], true)):?><a class="btn" href="/product/<?=H::e($p['slug'])?>">View Public Page</a><?php endif;?>
                    <?php if(!in_array($p['status'], ['archived','deleted'], true)):?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/archive" onsubmit="return confirm('Archive this product and hide it from public listings? Order history will remain available.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Archive / Hide</button></form>
                    <?php endif;?>
@@ -34,8 +35,9 @@
                    <?php if($safeDelete):?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/delete" onsubmit="return confirm('Permanently delete this product? This cannot be undone.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Permanent Delete</button></form>
                    <?php else:?><small class="muted">Permanent delete unavailable; archive instead.</small><?php endif;?>
+                   </div>
                </td>
            </tr>
         <?php endforeach;?>
-    </table>
+    </table></div>
 <?php endif; ?>

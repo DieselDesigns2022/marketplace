@@ -23,3 +23,7 @@
 
 ## Live-testing corrections (2026-07-28)
 Metric cards now stack their value and label consistently. The admin overview uses a cohesive accessible pastel operations surface without changing its data or destinations. The waitlist has a dedicated form-only shell. Eligible pre-launch users can be permanently deleted by an admin only after exact-email confirmation and retention checks. New store banners are safely normalized to 2400 × 800 (3:1). Google Drives and Bundles & Collaborations are active canonical seller categories.
+
+## Final live-testing closure
+
+Live testing confirmed the seller, buyer, admin, desktop, iPad, and phone paths after direct VPS corrections. Clean submitted products publish automatically, while products with current IP-risk matches remain in review. Receipt images accept JPG, PNG, and WEBP up to 10 MB. Payment, transfer, and webhook queues retain history after an admin marks an issue resolved. Eligible pre-launch accounts and waitlist entries have exact-email-confirmed deletion flows. Product ZIP uploads use the live 600 MB PHP-FPM file limit and 650 MB PHP-FPM/Nginx request limit.

@@ -38,6 +38,45 @@ final class AdminWaitlistController
         }
         [$w,$p]=$this->where($f);$page=max(1,(int)($_GET['page']??1));$total=(int)(DB::row('select count(*) c from waitlist_entries where '.$w,$p)['c']??0);$pages=max(1,(int)ceil($total/25));$page=min($page,$pages);$rows=DB::rows('select * from waitlist_entries where '.$w.' order by created_at desc,id desc limit 25 offset '.(($page-1)*25),$p);$counts=DB::rows('select status,count(*) count from waitlist_entries group by status');[$ew,$ep]=$this->where($f,true);$eligible=(int)(DB::row('select count(*) c from waitlist_entries where '.$ew,$ep)['c']??0);H::view('admin/waitlist/index',['entries'=>$rows,'counts'=>$counts,'page'=>$page,'pages'=>$pages,'total'=>$total,'filters'=>$f,'query'=>self::query($f),'eligible'=>$eligible]);
     }
+    public function delete($id): void
+    {
+        $this->admin();
+        $filters = $this->state($_POST);
+        $entry = DB::row('select id,email from waitlist_entries where id=?', [(int)$id]);
+
+        if (!$entry) {
+            H::flash('warning', 'That waitlist entry no longer exists.');
+            $this->back($filters);
+        }
+        if (!hash_equals((string)$entry['email'], trim((string)($_POST['confirm_email'] ?? '')))) {
+            H::flash('warning', 'Enter the exact email address to permanently delete this waitlist entry.');
+            $this->back($filters);
+        }
+
+        try {
+            DB::begin();
+            DB::exec(
+                'delete em from email_messages em left join email_campaign_recipients cr on cr.id=em.campaign_recipient_id where em.waitlist_entry_id=? or cr.waitlist_entry_id=?',
+                [(int)$entry['id'], (int)$entry['id']]
+            );
+            DB::exec('delete from email_campaign_recipients where waitlist_entry_id=?', [(int)$entry['id']]);
+            DB::exec('delete from waitlist_entries where id=?', [(int)$entry['id']]);
+            DB::exec(
+                'insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)',
+                [(int)H::user()['id'], 'permanently_deleted_waitlist_entry', 'waitlist_entry', (int)$entry['id'], json_encode(['personal_data_retained'=>false])]
+            );
+            DB::commit();
+            H::flash('success', 'Waitlist entry and its waitlist email records were permanently deleted.');
+        } catch (\Throwable $e) {
+            if (DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+            H::flash('error', 'Waitlist entry could not be permanently deleted. Please try again.');
+        }
+
+        $this->back($filters);
+    }
+
     public function export():void{$this->admin();$f=$this->state($_GET);[$w,$p]=$this->where($f);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="asset-moth-waitlist.csv"');$out=fopen('php://output','w');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Name','Email','Interest','Business','Source','Status','Confirmation sent','Invited','Created']);foreach(DB::rows('select name,email,interest_type,business_name,source,status,confirmation_sent_at,invited_at,created_at from waitlist_entries where '.$w.' order by created_at desc',$p) as $r)fputcsv($out,array_map([self::class,'csvCell'],array_values($r)));fclose($out);}
     public static function csvCell($v):string{$v=(string)$v;return preg_match('/^\s*[=+\-@]/u',$v)?"'".$v:$v;}
     public function invite():void

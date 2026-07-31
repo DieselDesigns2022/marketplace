@@ -377,3 +377,7 @@ Commands: `find app public tests -name '*.php' -print0 | xargs -0 -n1 php -l`, `
 
 ### Phase 10.6 live-fix regression
 `php tests/Phase106DashboardUsabilityTest.php` asserts source-level metric stacking, category merge ordering, seller placeholder removal, the form-only waitlist shell, deletion guards and transaction hooks, post-commit cleanup ordering, admin navigation/dashboard continuity, banner-processing/path-policy implementation, and contained legacy `.jpeg` banner cleanup. It does not fully prove migrated-database deletion, real file cleanup, multipart upload handling, GD processing, physical 2400 × 800 output, or browser rendering. Environment-dependent validation still requires migrated MariaDB deletion integration, real filesystem cleanup, multipart upload validation, GD decode/re-encode and output inspection, and browser banner-display checks.
+
+### Phase 10.6 final live-testing results
+
+Completed live checks covered seller, buyer, and admin workflows on desktop, iPad, and phone; receipt-image uploads; protected downloads; product submission and IP-risk behavior; account and waitlist deletion flows; payment/webhook resolution queues; seller product action controls; and responsive navigation/table behavior. A real product ZIP upload also passed after the marketplace PHP-FPM limits were verified at 600 MB per file / 650 MB request and Nginx was aligned to `client_max_body_size 650M`.

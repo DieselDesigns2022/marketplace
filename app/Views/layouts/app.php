@@ -76,8 +76,8 @@ if ($json && json_decode($json) !== null):
 <script type="application/ld+json"><?=$json?></script>
 <?php endif; ?>
 <?php endforeach; ?>
-<link rel="stylesheet" href="/assets/css/app.css">
-<script defer src="/assets/js/app.js"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=<?=filemtime(public_path('assets/css/app.css'))?>">
+<script defer src="/assets/js/app.js?v=<?=filemtime(public_path('assets/js/app.js'))?>"></script>
 </head>
 <body>
 <header class="top">
@@ -103,7 +103,7 @@ if ($json && json_decode($json) !== null):
     </nav>
 </header>
 <main class="wrap">
-<?php if ($u && ($path==='/dashboard'||str_starts_with($path,'/dashboard/')||$path==='/seller'||str_starts_with($path,'/seller/')||$path==='/admin'||str_starts_with($path,'/admin/')||$path==='/notifications')) require app_path('app/Views/partials/dashboard_nav.php'); ?>
+<?php if ($u && ($path==='/dashboard'||str_starts_with($path,'/dashboard/')||$path==='/seller'||str_starts_with($path,'/seller/')||$path==='/admin'||str_starts_with($path,'/admin/')||$path==='/notifications'||$path==='/account')) require app_path('app/Views/partials/dashboard_nav.php'); ?>
 <?php foreach (H::flashes() as $flash): ?><div class="notice <?=H::e($flash['type'])?>"><?=H::e($flash['message'])?></div><?php endforeach; ?>
 <?php require app_path('app/Views/'.$view.'.php'); ?>
 </main>

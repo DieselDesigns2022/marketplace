@@ -183,7 +183,7 @@ The public browse UI preserves filters, sort, and pagination parameters. Categor
 - Regenerate watermark actions use `product_images.original_image_path` as the source and write to the existing public preview path, avoiding repeated watermarking.
 - Storefront social links must be http/https URLs and are optional.
 
-- Avatar uploads remain JPG, PNG, or WEBP up to 25MB. Newly uploaded store banners must be genuine JPG, PNG, or WEBP uploads up to 25MB; Fileinfo and GD verify and decode them, then proportionally scale and center-crop them without stretching to exactly 2400 × 800 pixels under randomized filenames. Existing store banners render responsively at a 3:1 aspect ratio. Production PHP-FPM upload limits are controlled by `public/.user.ini` using `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`.
+- Avatar uploads remain JPG, PNG, or WEBP up to 25MB. Newly uploaded store banners must be genuine JPG, PNG, or WEBP uploads up to 25MB; Fileinfo and GD verify and decode them, then proportionally scale and center-crop them without stretching to exactly 2400 × 800 pixels under randomized filenames. Existing store banners render responsively at a 3:1 aspect ratio. Production PHP-FPM product-upload limits are `upload_max_filesize=600M`, `post_max_size=650M`, and `max_file_uploads=200`; the marketplace Nginx server uses `client_max_body_size 650M` for the same upload path.
 - Watermark rendering preserves transparent PNG alpha, applies 50% opacity to the watermark pixels, places the watermark in the bottom-left corner, and uses retained private originals for regeneration/backfill.
 
 ## Phase 9 development notes

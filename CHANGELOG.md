@@ -274,3 +274,11 @@ Intentionally postponed:
 - Made `/waitlist` form-only, added guarded permanent admin user deletion, and standardized newly uploaded store banners at 2400 × 800.
 - Hardened eligible account deletion against retained campaign/mail identity data, completed post-commit seller avatar/banner cleanup, and added contained cleanup for legacy `.jpeg` banners.
 - Current seller avatar and store-banner uploads use a 25MB application limit; the earlier Phase 8.75 increase from 2MB to 15MB remains recorded above as historical behavior.
+
+## Phase 10.6 final live-testing closure — 2026-07-31
+
+- Completed seller, buyer, admin, desktop, iPad, and phone live testing.
+- Clean product submissions now publish automatically; only products with a current IP-risk match enter review.
+- Raised receipt-image uploads to 10 MB and recorded the live product-file upload path at 600 MB per file / 650 MB request.
+- Added admin waitlist-entry deletion, clearer payment/webhook resolution queues, responsive mobile navigation/table behavior, compact destructive controls, and role-aware Account navigation.
+- Applied the idempotent issue-resolution migration for resolved transfer and webhook records.

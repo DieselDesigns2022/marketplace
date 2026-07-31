@@ -1049,3 +1049,7 @@ Completed role-aware dashboard navigation and responsive buyer, seller, and admi
 Metric cards now separate values from labels, and the admin overview has cohesive accessible Asset Moth styling. Public `/waitlist` uses a form-only shell. Admins can permanently delete only eligible pre-launch accounts after exact-email confirmation and schema-aware retention checks, with eligible mutable data removed transactionally. Newly uploaded seller banners are normalized without stretching to 2400 × 800 pixels and displayed responsively at 3:1. Google Drives and Bundles & Collaborations extend the canonical category set to nine.
 
 The application behavior and database-independent regression coverage above are implemented. Applying both Phase 10.6 migrations against real data, exercising GD/Fileinfo banner processing with server encoders, validating writable upload directories, and completing browser checks at production breakpoints remain environment-dependent deployment validation.
+
+## Phase 10.6 final live-testing closure
+
+Final live testing completed across seller, buyer, admin, phone, iPad, and desktop workflows. The live-testing branch added clean-product auto-publish with current IP-risk review, 10 MB receipt images, guarded waitlist deletion, payment/webhook resolution queues, responsive navigation and tables, compact action controls, Account navigation, and 600 MB product-file uploads within a 650 MB request limit.
