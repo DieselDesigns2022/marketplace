@@ -49,7 +49,7 @@ final class WaitlistController
                 }
             }
         }
-        H::view('public/waitlist',compact('errors','success','values'));
+        H::minimalView('public/waitlist',compact('errors','success','values'));
     }
 
     private function saveSignup(array $values): bool

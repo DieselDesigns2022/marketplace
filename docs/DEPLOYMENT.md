@@ -54,7 +54,7 @@ Phase 10.1 deployments must apply `database/migrations/2026_07_07_phase_10_1_pro
 
 ## Upload folder permissions
 
-Upload folders must be writable by the PHP/Nginx runtime user but must not be committed to Git. Public preview uploads may be web-accessible. Protected product files must not be directly web-accessible.
+Upload folders must be writable by the PHP/Nginx runtime user but must not be committed to Git. Public preview uploads may be web-accessible. Protected product files must not be directly web-accessible. Phase 10.6 banner normalization additionally requires an application-writable `public/uploads/store_banners/` directory with script execution prohibited.
 
 ## Error log
 
@@ -124,6 +124,12 @@ Configure `EMAIL_UNSUBSCRIBE_SECRET` before accepting waitlist signups, administ
 
 ## Phase 10.6 deployment
 
-Run `database/migrations/2026_07_28_phase_10_6_dashboard_cleanup_usability.sql` in each non-production validation environment before production deployment. PHP must provide Fileinfo, GD decoding, and JPEG/PNG/WEBP encoders. Create `public/uploads/receipt_images/` as a web-readable, application-writable image directory and configure the web server to prohibit script execution there. Uploads are decoded/re-encoded and receive random names; do not restore submitted names.
+First validate `database/migrations/2026_07_28_phase_10_6_dashboard_cleanup_usability.sql`, followed by `database/migrations/2026_07_28_phase_10_6_live_fixes.sql`, then `database/migrations/2026_07_29_phase_10_6_issue_resolution.sql` in a disposable MariaDB environment. During deployment, apply each once in that order: the live-fixes migration follows the original Phase 10.6 migration, and issue resolution follows both.
 
-After deployment, run PHP lint and both Phase 10.6 and Phase 10.5 behavioral suites, verify migration idempotency in disposable MariaDB, exercise note/image replace/remove/restore flows, confirm historical images remain, and check buyer/seller/admin layouts at 320px and desktop widths. The receipt processor rejects source images over 25,000,000 pixels before GD decode. Deployment verification must also confirm buyer availability ignores missing, unreadable, and out-of-directory protected-file records.
+PHP must provide Fileinfo, GD decoding, and working JPEG, PNG, and WEBP encoders. Store-banner sources over 40,000,000 pixels are rejected before decode, and normalization must preserve PNG/WEBP transparency while producing the exact 2400 × 800 canvas. Create `public/uploads/receipt_images/` and `public/uploads/store_banners/` as web-readable, application-writable image directories and configure the web server to prohibit script execution in both. Uploads are decoded/re-encoded and receive random names; do not restore submitted names.
+
+After deployment, run PHP lint and both Phase 10.6 and Phase 10.5 behavioral suites, verify migration idempotency in disposable MariaDB, exercise note/image replace/remove/restore flows, confirm historical images remain, and check buyer/seller/admin layouts at 320px and desktop widths. Upload non-3:1 JPG, PNG, and WEBP store banners and verify each saved result is exactly 2400 × 800 without stretching, transparent PNG/WEBP inputs retain transparency, sources over 40,000,000 pixels are rejected, centered responsive 3:1 display is consistent, and old allowlisted files are replaced only after a successful database save. Verify `/waitlist` contains only its form or success/validation state and has no global header, footer, logo, or navigation links. The receipt processor rejects source images over 25,000,000 pixels before GD decode. Deployment verification must also confirm buyer availability ignores missing, unreadable, and out-of-directory protected-file records.
+
+### Phase 10.6 live-tested upload configuration
+
+The marketplace production product-upload path uses PHP-FPM `upload_max_filesize=600M`, `post_max_size=650M`, and `max_file_uploads=200`. Its Nginx virtual host uses `client_max_body_size 650M`. Keep the complete multipart request within 650 MB. Receipt images remain application-limited to 10 MB, and seller avatars/store banners remain application-limited to 25 MB.

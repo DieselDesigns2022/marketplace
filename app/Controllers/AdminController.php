@@ -121,14 +121,14 @@ class AdminController
             (select count(*) from designers where status="approved") approved_designers,
             (select count(*) from designer_applications where status="pending") pending_apps,
             (select count(*) from products where status="pending_review") pending_products,
-            (select count(*) from product_ip_risk_states where review_status in ("pending_review","published_flagged")) ip_risk_products,
+            (select count(*) from products p join product_ip_risk_states s on s.product_id=p.id where p.status="pending_review" and s.review_status="pending_review" and exists (select 1 from product_ip_risk_detections d where d.product_id=p.id and d.scan_id=s.latest_scan_id and d.is_active=1 limit 1)) ip_risk_products,
             (select count(*) from products where status in ("approved","published")) active_products,
             (select count(*) from products where status="draft") draft_products,
             (select count(*) from orders where payment_status in ("failed","manual_review") or manual_review_required=1) payment_warnings,
-            (select count(*) from seller_payouts where payout_status="transfer_failed" or stripe_transfer_error is not null) failed_transfers,
+            (select count(*) from seller_payouts where (payout_status="transfer_failed" or stripe_transfer_error is not null) and admin_resolved_at is null) failed_transfers,
             (select count(*) from designers where status="approved" and stripe_connect_account_id is null) stripe_missing,
             (select count(*) from designers where status="approved" and stripe_connect_account_id is not null and (stripe_details_submitted=0 or stripe_payouts_enabled=0)) payout_incomplete,
-            (select count(*) from stripe_events where processing_status="failed" or processing_error is not null) webhook_issues,
+            (select count(*) from stripe_events where (processing_status="failed" or processing_error is not null) and admin_resolved_at is null) webhook_issues,
             (select count(*) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_paid_orders,
             (select coalesce(round(sum(total),2),0) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_gross_sales,
             (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") asset_moth_commission,
@@ -142,8 +142,93 @@ class AdminController
     {
         $this->gate();
         if($_POST) DB::exec('update users set status=? where id=?',[$_POST['status'],$_POST['id']]);
-        H::view('admin/table',['title'=>'Users','rows'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
+        H::view('admin/users',['users'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
 
+    }
+    private function userDeletionBlockReason(array $user): ?string
+    {
+        $id=(int)$user['id'];
+        if ($id===(int)H::user()['id']) return 'You cannot permanently delete your own account.';
+        if (($user['role']??'')==='admin') return 'Admin accounts cannot be permanently deleted.';
+        if (DB::row('select id from orders where user_id=? limit 1',[$id])) return 'This account has an order that must be retained.';
+        if (DB::row('select id from coupon_usages where user_id=? limit 1',[$id])) return 'This account has coupon usage history that must be retained.';
+        if (DB::row('select id from seller_earnings where buyer_id=? limit 1',[$id])) return 'This account has buyer earnings history that must be retained.';
+        if (DB::row('select id from referrals where (referrer_user_id=? or referred_user_id=?) and estimated_earnings<>0 limit 1',[$id,$id])) return 'This account has referral earnings history that must be retained.';
+        if (DB::row('select id from email_campaigns where created_by=? limit 1',[$id])) return 'This account has email campaign author history that must be retained.';
+        if (DB::row('select id from coupons where created_by=? limit 1',[$id])) return 'This account has coupon author history that must be retained.';
+        if (DB::row('select id from designer_applications where user_id=? and status="approved" limit 1',[$id])) return 'This account has approved seller application history that must be retained.';
+        $designer=DB::row('select id,status from designers where user_id=? limit 1',[$id]);
+        if ($designer) {
+            if ($designer['status']==='approved') return 'This account has an approved seller store that must be retained.';
+            if (DB::row('select id from products where designer_id=? limit 1',[$designer['id']])) return 'This seller account has products that must be retained.';
+            if (DB::row('select id from seller_payouts where designer_id=? limit 1',[$designer['id']])) return 'This seller account has payout or transfer history that must be retained.';
+            if (DB::row('select id from seller_earnings where designer_id=? limit 1',[$designer['id']])) return 'This seller account has financial earnings history that must be retained.';
+            if (DB::row('select id from platform_commissions where designer_id=? limit 1',[$designer['id']])) return 'This seller account has commission history that must be retained.';
+            if (DB::row('select id from ads where designer_id=? limit 1',[$designer['id']])) return 'This seller account has advertising history that must be retained.';
+            if (DB::row('select id from creator_rank_history where designer_id=? limit 1',[$designer['id']])) return 'This seller account has creator rank history that must be retained.';
+            if (DB::row('select c.id from coupons c left join coupon_usages cu on cu.coupon_id=c.id where c.seller_id=? and (c.usage_count>0 or cu.id is not null) limit 1',[$designer['id']])) return 'This seller account has coupon redemption history that must be retained.';
+            if (DB::row('select id from order_items where designer_id=? limit 1',[$designer['id']])) return 'This seller account has order-item history that must be retained.';
+            if (DB::row('select id from reviews where designer_id=? limit 1',[$designer['id']])) return 'This seller account has store review history that must be retained.';
+        }
+        if (DB::row('select id from product_ip_risk_scans where seller_id=? limit 1',[$id])||DB::row('select id from product_ip_rights_confirmations where seller_id=? limit 1',[$id])) return 'This seller account has IP compliance history that must be retained.';
+        if (DB::row('select id from ip_risk_terms where created_by_admin_id=? or updated_by_admin_id=? limit 1',[$id,$id])||DB::row('select product_id from product_ip_risk_states where reviewed_by_admin_id=? limit 1',[$id])||DB::row('select id from product_ip_risk_review_history where admin_id=? limit 1',[$id])||DB::row('select id from admin_logs where admin_user_id=? limit 1',[$id])) return 'This account has administration or review history that must be retained.';
+        if (DB::row('select pt.id from payment_transactions pt join orders o on o.id=pt.order_id where o.user_id=? limit 1',[$id])) return 'This account has payment transaction history that must be retained.';
+        if (DB::row('select id from downloads where user_id=? limit 1',[$id])||DB::row('select id from reviews where user_id=? limit 1',[$id])) return 'This account has marketplace history that must be retained.';
+        return null;
+    }
+    private function removeDeletedStoreFile(?string $path, string $folder): void
+    {
+        if (!in_array($folder,['store_avatars','store_banners'],true)||!$path||!preg_match('#^/uploads/'.preg_quote($folder,'#').'/[a-f0-9]{24,64}\.(?:jpe?g|png|webp)$#',$path)) return;
+        $base=realpath(public_path('uploads/'.$folder));
+        $file=realpath(public_path(ltrim($path,'/')));
+        if ($base&&$file&&str_starts_with($file,$base.DIRECTORY_SEPARATOR)&&is_file($file)) @unlink($file);
+    }
+    public function deleteUser($id): void
+    {
+        $this->gate(); $id=(int)$id;
+        $user=DB::row('select id,name,email,role,status from users where id=?',[$id]);
+        if (!$user) { H::flash('error','User not found.'); H::redirect('/admin/users'); }
+        $reason=$this->userDeletionBlockReason($user);
+        if ($reason) { H::flash('error',$reason); H::redirect('/admin/users'); }
+        if (!hash_equals((string)$user['email'],trim((string)($_POST['confirm_email']??'')))) { H::flash('error','Type the target user’s exact email address to confirm permanent deletion.'); H::redirect('/admin/users'); }
+        $storeFiles=[];
+        try {
+            DB::begin();
+            $designer=DB::row('select id,avatar_path,banner_path from designers where user_id=?',[$id]); $designerId=(int)($designer['id']??0);
+            if ($designer) $storeFiles=['avatar'=>$designer['avatar_path']??null,'banner'=>$designer['banner_path']??null];
+            DB::exec('delete from notifications where user_id=?',[$id]);
+            DB::exec('delete from email_preferences where user_id=?',[$id]);
+            DB::exec('delete from email_messages where lower(recipient_email)=lower(?)',[$user['email']]);
+            DB::exec('delete from email_campaign_recipients where user_id=? or lower(email)=lower(?)',[$id,$user['email']]);
+            DB::exec('delete from cart_items where user_id=?',[$id]);
+            DB::exec('delete from wishlists where user_id=?',[$id]);
+            DB::exec('delete from follows where user_id=?',[$id]);
+            DB::exec('delete from marketplace_credits where user_id=?',[$id]);
+            DB::exec('delete from credit_transactions where user_id=?',[$id]);
+            DB::exec('delete from referrals where referrer_user_id=? or referred_user_id=?',[$id,$id]);
+            if ($designerId) DB::exec('delete from referrals where referred_designer_id=?',[$designerId]);
+            DB::exec('delete from designer_applications where user_id=? and status in ("pending","denied")',[$id]);
+            if ($designerId) {
+                DB::exec('delete from follows where designer_id=?',[$designerId]);
+                DB::exec('delete from homepage_features where feature_type="designer" and feature_id=?',[$designerId]);
+                DB::exec('delete from coupon_restrictions where restrictable_type="seller" and restrictable_id=?',[$designerId]);
+                DB::exec('delete from seller_license_presets where designer_id=?',[$designerId]);
+                DB::exec('delete cr from coupon_restrictions cr join coupons c on c.id=cr.coupon_id where c.seller_id=? and c.usage_count=0',[$designerId]);
+                DB::exec('delete from coupons where seller_id=? and usage_count=0',[$designerId]);
+                DB::exec('delete from designers where id=? and status<>"approved"',[$designerId]);
+            }
+            DB::exec('delete from waitlist_entries where lower(email)=lower(?)',[$user['email']]);
+            DB::exec('delete from users where id=?',[$id]);
+            $this->log('permanently_deleted_user','user',$id,['personal_data_retained'=>false]);
+            DB::commit();
+            $this->removeDeletedStoreFile($storeFiles['avatar']??null,'store_avatars');
+            $this->removeDeletedStoreFile($storeFiles['banner']??null,'store_banners');
+            H::flash('success','User permanently deleted. The email address can register again.');
+        } catch (Throwable $e) {
+            if (DB::pdo()->inTransaction()) DB::rollBack();
+            H::flash('error','Permanent deletion failed. No account records were changed.');
+        }
+        H::redirect('/admin/users');
     }
     public function applications($id=null)
     {
@@ -485,6 +570,41 @@ class AdminController
     public function paymentLogs()
     {
         $this->gate();
+        $issue = in_array($_GET['issue'] ?? '', ['failed_transfers','webhook_issues'], true) ? $_GET['issue'] : '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $action = $_POST['action'] ?? '';
+            $id = (int)($_POST['id'] ?? 0);
+            $note = mb_substr(trim((string)($_POST['resolution_note'] ?? '')), 0, 500);
+
+            try {
+                if ($action === 'resolve_transfer_issue') {
+                    $row = DB::row('select id from seller_payouts where id=? and admin_resolved_at is null and (payout_status="transfer_failed" or stripe_transfer_error is not null)', [$id]);
+                    if (!$row) {
+                        H::flash('warning', 'That open seller-transfer issue was not found.');
+                    } else {
+                        DB::exec('update seller_payouts set admin_resolved_at=now(),admin_resolved_by=?,admin_resolution_note=?,updated_at=now() where id=?', [(int)H::user()['id'], $note !== '' ? $note : null, $id]);
+                        $this->log('resolved_seller_transfer_issue', 'seller_payout', $id, ['resolution_note_provided'=>$note !== '']);
+                        H::flash('success', 'Seller-transfer issue marked resolved.');
+                    }
+                } elseif ($action === 'resolve_webhook_issue') {
+                    $row = DB::row('select id from stripe_events where id=? and admin_resolved_at is null and (processing_status="failed" or processing_error is not null)', [$id]);
+                    if (!$row) {
+                        H::flash('warning', 'That open webhook issue was not found.');
+                    } else {
+                        DB::exec('update stripe_events set admin_resolved_at=now(),admin_resolved_by=?,admin_resolution_note=? where id=?', [(int)H::user()['id'], $note !== '' ? $note : null, $id]);
+                        $this->log('resolved_webhook_issue', 'stripe_event', $id, ['resolution_note_provided'=>$note !== '']);
+                        H::flash('success', 'Webhook issue marked resolved.');
+                    }
+                } else {
+                    H::flash('warning', 'Choose a valid issue action.');
+                }
+            } catch (Throwable $e) {
+                H::flash('error', 'The issue could not be updated. Please try again.');
+            }
+
+            H::redirect('/admin/payment-logs'.($issue !== '' ? '?issue='.$issue : ''));
+        }
 
         $summary = DB::row('select
             (select count(distinct o.id) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") paid_orders,
@@ -494,7 +614,7 @@ class AdminController
             (select coalesce(round(sum(oi.seller_payout_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") seller_payouts,
             (select coalesce(round(sum(coalesce(o.stripe_fee_total,0)),2),0) from orders o where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") stripe_fees_recorded,
             (select coalesce(round(sum(sp.seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where sp.payout_status="transferred" and o.stripe_checkout_session_id like "cs_live_%") seller_transfers_sent,
-            (select coalesce(round(sum(sp.seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where sp.payout_status="transfer_failed" and o.stripe_checkout_session_id like "cs_live_%") seller_transfers_failed
+            (select coalesce(round(sum(sp.seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where sp.payout_status="transfer_failed" and sp.admin_resolved_at is null and o.stripe_checkout_session_id like "cs_live_%") seller_transfers_failed
         ');
 
         $commissionRows = DB::rows('select
@@ -531,8 +651,14 @@ class AdminController
         order by o.id desc, oi.id desc
         limit 200');
 
+        $transferIssues = DB::rows('select sp.*,o.id order_id,d.display_name seller_name,u.email seller_email from seller_payouts sp join orders o on o.id=sp.order_id join designers d on d.id=sp.designer_id join users u on u.id=d.user_id where (sp.payout_status="transfer_failed" or sp.stripe_transfer_error is not null) and sp.admin_resolved_at is null order by sp.updated_at desc,sp.id desc limit 100');
+        $webhookIssues = DB::rows('select * from stripe_events where (processing_status="failed" or processing_error is not null) and admin_resolved_at is null order by created_at desc,id desc limit 100');
+
         H::view('admin/payment_logs',[
             'summary'=>$summary,
+            'issue'=>$issue,
+            'transferIssues'=>$transferIssues,
+            'webhookIssues'=>$webhookIssues,
             'commissionRows'=>$commissionRows,
             'transactions'=>DB::rows('select pt.*,u.email buyer_email from payment_transactions pt left join orders o on o.id=pt.order_id left join users u on u.id=o.user_id order by pt.created_at desc limit 200'),
             'events'=>DB::rows('select * from stripe_events order by created_at desc limit 200')

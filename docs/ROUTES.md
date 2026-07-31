@@ -232,3 +232,14 @@ There are no public term-list endpoints and no state-changing GET routes.
 ## Phase 10.6 seller receipt route
 
 `GET|POST /seller/receipt-settings` maps to `SellerController::receiptSettings`. Access requires the authenticated seller's approved designer record and completed onboarding. GET displays current future-order settings; POST requires CSRF and accepts the explicit `save`, `remove_note`, `remove_image`, or `restore` action for that seller only. Successful changes affect snapshots created for later order items and never mutate existing snapshots. Seller and admin secondary navigation now includes the existing `/account` shortcut. Buyer download links are displayed only after the corresponding protected file passes containment, regular-file, and readability checks.
+
+### Phase 10.6 live fixes
+- `GET|POST /waitlist` renders through a navigation-free minimal shell; submission behavior is unchanged.
+- `POST /admin/users/{id}/delete` is admin-only, globally CSRF-protected, exact-email-confirmed permanent deletion for accounts that pass retention checks.
+
+### Phase 10.6 final live-testing routes
+
+- `POST /admin/waitlist/{id}/delete` — admin only + CSRF + exact target-email confirmation — permanently deletes an eligible waitlist entry and its directly linked email records.
+- `GET /admin/payment-logs?issue=failed_transfers` — admin only — lists unresolved seller-transfer issues.
+- `GET /admin/payment-logs?issue=webhook_issues` — admin only — lists unresolved Stripe webhook issues.
+- `POST /admin/payment-logs` — admin only + CSRF — records resolution of an eligible transfer or webhook issue while preserving its original history.

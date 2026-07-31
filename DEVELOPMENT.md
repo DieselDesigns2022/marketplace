@@ -183,7 +183,7 @@ The public browse UI preserves filters, sort, and pagination parameters. Categor
 - Regenerate watermark actions use `product_images.original_image_path` as the source and write to the existing public preview path, avoiding repeated watermarking.
 - Storefront social links must be http/https URLs and are optional.
 
-- Live testing confirmed preview/avatar/banner upload validation is 15MB at the application layer. Production PHP-FPM upload limits are controlled by `public/.user.ini` using `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`.
+- Avatar uploads remain JPG, PNG, or WEBP up to 25MB. Newly uploaded store banners must be genuine JPG, PNG, or WEBP uploads up to 25MB; Fileinfo and GD verify and decode them, then proportionally scale and center-crop them without stretching to exactly 2400 × 800 pixels under randomized filenames. Existing store banners render responsively at a 3:1 aspect ratio. Production PHP-FPM product-upload limits are `upload_max_filesize=600M`, `post_max_size=650M`, and `max_file_uploads=200`; the marketplace Nginx server uses `client_max_body_size 650M` for the same upload path.
 - Watermark rendering preserves transparent PNG alpha, applies 50% opacity to the watermark pixels, places the watermark in the bottom-left corner, and uses retained private originals for regeneration/backfill.
 
 ## Phase 9 development notes
@@ -236,3 +236,5 @@ Generate `EMAIL_UNSUBSCRIBE_SECRET` as an environment-only random value of at le
 ## Phase 10.6 development notes
 
 Dashboard controller queries must remain scoped to the authenticated buyer, seller, or admin. Seller receipt settings are read authoritatively inside checkout transactions and copied to order-item snapshots; never accept receipt values from checkout input. Use `SellerReceiptService` for note normalization, public-path validation, upload processing, grouping, and deletion decisions. Keep new dashboard tables inside `.responsive-table`, and derive navigation from authenticated roles rather than treating navigation visibility as authorization. Receipt snapshot creation must use `SellerReceiptService::snapshotFromSeller()` so invalid optional values become `null` and never fail checkout. Buyer availability must use filesystem containment, regular-file, and readability checks—not database presence alone.
+
+Public `/waitlist` intentionally renders through the navigation-free minimal layout. Do not reintroduce the global header, footer, logo, or navigation links there; preserve the existing signup, validation, consent, confirmation, unsubscribe, and administrator-notification flow.

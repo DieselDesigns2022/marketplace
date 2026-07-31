@@ -71,6 +71,7 @@
     <label>Banner image upload <small>JPG, PNG, or WEBP up to 25MB.</small>
     <input type="file" name="banner" accept=".jpg,.jpeg,.png,.webp">
     </label>
+    <p class="help-text"><strong>Recommended banner size: 2400 × 800 px (3:1).</strong> Place important text and graphics in the center area because the banner is shown responsively.</p>
     <button class="btn">Save Store Settings</button>
 </form>
 <section class="card page-section">

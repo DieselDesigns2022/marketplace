@@ -61,6 +61,26 @@
 </section>
 
 <section class="card">
+    <h2>Open attention items</h2>
+    <p class="muted">Mark an item resolved after you have investigated it. The original Stripe status and error stay in the history below.</p>
+    <p><a class="btn" href="/admin/payment-logs?issue=failed_transfers">Open failed seller transfers (<?=count($transferIssues)?>)</a> <a class="btn alt" href="/admin/payment-logs?issue=webhook_issues">Open webhook / Stripe issues (<?=count($webhookIssues)?>)</a></p>
+
+    <?php if($issue === '' || $issue === 'failed_transfers'):?>
+        <h3>Failed seller transfers</h3>
+        <?php if(!$transferIssues):?><p class="muted">No open failed seller transfers.</p><?php else:?><div class="money-scroll"><table><tr><th>Order</th><th>Seller</th><th>Amount</th><th>Status</th><th>Stripe error</th><th>Resolve</th></tr>
+        <?php foreach($transferIssues as $transfer):?><tr><td><a href="/admin/order/<?=(int)$transfer['order_id']?>">#<?=(int)$transfer['order_id']?></a></td><td class="money-wrap"><?=H::e($transfer['seller_name'])?><br><span class="muted money-small"><?=H::e($transfer['seller_email'])?></span></td><td><?=H::money($transfer['seller_payout_amount'])?></td><td><?=H::e($transfer['payout_status'])?></td><td class="money-wrap"><?=H::e($transfer['stripe_transfer_error'] ?? '')?></td><td><form method="post" action="/admin/payment-logs?issue=failed_transfers"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="resolve_transfer_issue"><input type="hidden" name="id" value="<?=(int)$transfer['id']?>"><label>Resolution note <textarea name="resolution_note" maxlength="500" rows="2"></textarea></label><button>Mark transfer issue resolved</button></form></td></tr><?php endforeach;?>
+        </table></div><?php endif;?>
+    <?php endif;?>
+
+    <?php if($issue === '' || $issue === 'webhook_issues'):?>
+        <h3>Webhook / Stripe issues</h3>
+        <?php if(!$webhookIssues):?><p class="muted">No open webhook or Stripe issues.</p><?php else:?><div class="money-scroll"><table><tr><th>Event</th><th>Type</th><th>Status</th><th>Error</th><th>Resolve</th></tr>
+        <?php foreach($webhookIssues as $event):?><tr><td class="money-wrap"><?=H::e($event['stripe_event_id'])?></td><td><?=H::e($event['event_type'])?></td><td><?=H::e($event['processing_status'])?></td><td class="money-wrap"><?=H::e($event['processing_error'] ?? '')?></td><td><form method="post" action="/admin/payment-logs?issue=webhook_issues"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="resolve_webhook_issue"><input type="hidden" name="id" value="<?=(int)$event['id']?>"><label>Resolution note <textarea name="resolution_note" maxlength="500" rows="2"></textarea></label><button>Mark webhook issue resolved</button></form></td></tr><?php endforeach;?>
+        </table></div><?php endif;?>
+    <?php endif;?>
+</section>
+
+<section class="card">
     <h2>Commission detail</h2>
     <p class="muted">Use this table to verify each paid order's gross sale, order-level tax collected, Asset Moth commission, seller payout amount, and Stripe transfer status. Summary Tax Collected is authoritative; order tax is shown once per order below and is excluded from commission and seller payout calculations.</p>
     <table>

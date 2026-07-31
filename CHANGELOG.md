@@ -2,7 +2,7 @@
 
 ## Current status
 
-The project currently includes the original MVP plus implemented phases through Phase 10.1. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
+The project currently includes the original MVP plus implemented phases through Phase 10.6. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
 
 ## Original MVP — completed 2026-06-22
 
@@ -262,8 +262,23 @@ Intentionally postponed:
 - Completed buyer, seller, and admin dashboard summaries, warnings, navigation, recent activity, responsive tables, and empty states.
 - Added protected per-file buyer download history and expiry/refund status clarity.
 - Added seller receipt settings with secure GD image processing and immutable order-item snapshots grouped by seller on web and email receipts.
-- Added accessible password visibility controls and seven canonical marketplace categories with duplicate and coupon-restriction consolidation.
+- Added accessible password visibility controls and the initial seven Phase 10.6 canonical marketplace categories with duplicate and coupon-restriction consolidation.
 - Preserved Stripe Checkout/Tax, live financial reporting, payout, protected download, coupon, fulfillment, and authorization rules.
 - Required readable, contained protected files for buyer availability counts and buttons; added a 25-megapixel pre-decode receipt-image limit and non-blocking invalid snapshot fallback.
 - Corrected seller payout warnings, admin manual-review payment warnings, Account shortcuts, and receipt image URL generation.
 - Final Phase 10.6 hardening derives seller refund adjustments from maximum cumulative refund transactions, reconciles non-transferred payout ledgers without replay drift, rejects image trailing payloads, and maps Stripe requirements to actionable account states.
+
+## Phase 10.6 live-testing corrections — 2026-07-28
+- Stacked dashboard metric values and labels and polished the admin operations dashboard.
+- Removed seller rank placeholder copy and added Google Drives plus Bundles & Collaborations categories with safe canonical duplicate migration, extending the current canonical category set from seven to nine.
+- Made `/waitlist` form-only, added guarded permanent admin user deletion, and standardized newly uploaded store banners at 2400 × 800.
+- Hardened eligible account deletion against retained campaign/mail identity data, completed post-commit seller avatar/banner cleanup, and added contained cleanup for legacy `.jpeg` banners.
+- Current seller avatar and store-banner uploads use a 25MB application limit; the earlier Phase 8.75 increase from 2MB to 15MB remains recorded above as historical behavior.
+
+## Phase 10.6 final live-testing closure — 2026-07-31
+
+- Completed seller, buyer, admin, desktop, iPad, and phone live testing.
+- Clean product submissions now publish automatically; only products with a current IP-risk match enter review.
+- Raised receipt-image uploads to 10 MB and recorded the live product-file upload path at 600 MB per file / 650 MB request.
+- Added admin waitlist-entry deletion, clearer payment/webhook resolution queues, responsive mobile navigation/table behavior, compact destructive controls, and role-aware Account navigation.
+- Applied the idempotent issue-resolution migration for resolved transfer and webhook records.

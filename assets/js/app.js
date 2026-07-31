@@ -90,3 +90,16 @@ function updateCategoryGuidance() {
 }
 document.addEventListener("change", (event) => { if (event.target.matches("[data-category-guidance-source]")) updateCategoryGuidance(); });
 updateCategoryGuidance();
+
+document.querySelectorAll("main table").forEach((table) => {
+  if (table.closest(".responsive-table, .table-scroll, .money-scroll")) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "responsive-table";
+  wrapper.tabIndex = 0;
+  wrapper.setAttribute("role", "region");
+  wrapper.setAttribute("aria-label", "Scrollable table. Swipe left or right to see all details.");
+
+  table.parentNode.insertBefore(wrapper, table);
+  wrapper.appendChild(table);
+});
