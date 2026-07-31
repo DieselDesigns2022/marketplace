@@ -1,6 +1,22 @@
 <?php
 
+// bootstrap.php loads the application's .env file into $_ENV. Preserve the
+// disposable database and Stripe settings supplied by the parent integration
+// test so this subprocess cannot silently reconnect to the developer/VPS
+// database named in that file.
+$processEnvironment = [];
+foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_CHARSET', 'STRIPE_SECRET_KEY'] as $name) {
+    $value = getenv($name);
+    if ($value !== false) {
+        $processEnvironment[$name] = $value;
+    }
+}
+
 require dirname(__DIR__, 2) . '/app/bootstrap.php';
+
+foreach ($processEnvironment as $name => $value) {
+    $_ENV[$name] = $value;
+}
 
 use App\Controllers\AdminCreditController;
 use App\Services\StripeService;
