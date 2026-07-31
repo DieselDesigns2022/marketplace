@@ -153,7 +153,8 @@ class AdminController
         if (DB::row('select id from orders where user_id=? limit 1',[$id])) return 'This account has an order that must be retained.';
         if (DB::row('select id from coupon_usages where user_id=? limit 1',[$id])) return 'This account has coupon usage history that must be retained.';
         if (DB::row('select id from seller_earnings where buyer_id=? limit 1',[$id])) return 'This account has buyer earnings history that must be retained.';
-        if (DB::row('select id from referrals where (referrer_user_id=? or referred_user_id=?) and estimated_earnings<>0 limit 1',[$id,$id])) return 'This account has referral earnings history that must be retained.';
+        if (DB::row('select id from referrals where referrer_user_id=? or referred_user_id=? limit 1',[$id,$id])) return 'This account has immutable referral history that must be retained.';
+        if (DB::row('select id from credit_transactions where user_id=? limit 1',[$id])) return 'This account has an immutable financial credit ledger that must be retained.';
         if (DB::row('select id from email_campaigns where created_by=? limit 1',[$id])) return 'This account has email campaign author history that must be retained.';
         if (DB::row('select id from coupons where created_by=? limit 1',[$id])) return 'This account has coupon author history that must be retained.';
         if (DB::row('select id from designer_applications where user_id=? and status="approved" limit 1',[$id])) return 'This account has approved seller application history that must be retained.';
@@ -562,7 +563,7 @@ class AdminController
             H::redirect('/admin/order/'.(int)$id);
         }
         $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404);
-        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,d.stripe_account_status,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled,u.email designer_email,se.seller_earning,pc.commission_amount,sp.payout_status ledger_payout_status,sp.stripe_transfer_id ledger_transfer_id,sp.stripe_transfer_error ledger_transfer_error from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,d.stripe_account_status,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled,u.email designer_email,se.seller_earning,pc.commission_amount,sp.id seller_payout_id,sp.payout_status ledger_payout_status,sp.stripe_transfer_id ledger_transfer_id,sp.stripe_transfer_error ledger_transfer_error,sp.platform_credit_settled_at,sp.platform_credit_settled_by from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.order_id=?',[$order['id']]);
         H::view('admin/order_detail',['order'=>$order,'items'=>$items,'transactions'=>DB::rows('select * from payment_transactions where order_id=? order by created_at desc',[$order['id']]),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 20')]);
 
     }
@@ -570,7 +571,7 @@ class AdminController
     public function paymentLogs()
     {
         $this->gate();
-        $issue = in_array($_GET['issue'] ?? '', ['failed_transfers','webhook_issues'], true) ? $_GET['issue'] : '';
+        $issue = in_array($_GET['issue'] ?? '', ['failed_transfers','webhook_issues','platform_credit_holds'], true) ? $_GET['issue'] : '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $action = $_POST['action'] ?? '';
@@ -652,12 +653,14 @@ class AdminController
         limit 200');
 
         $transferIssues = DB::rows('select sp.*,o.id order_id,d.display_name seller_name,u.email seller_email from seller_payouts sp join orders o on o.id=sp.order_id join designers d on d.id=sp.designer_id join users u on u.id=d.user_id where (sp.payout_status="transfer_failed" or sp.stripe_transfer_error is not null) and sp.admin_resolved_at is null order by sp.updated_at desc,sp.id desc limit 100');
+        $platformCreditHolds = DB::rows('select sp.*,o.id order_id,o.internally_completed,o.manual_review_required,o.stripe_charge_id,d.display_name seller_name,d.stripe_connect_account_id,d.stripe_payouts_enabled,d.stripe_details_submitted,u.email seller_email from seller_payouts sp join orders o on o.id=sp.order_id join designers d on d.id=sp.designer_id join users u on u.id=d.user_id where sp.payout_status="platform_credit_hold" order by sp.updated_at desc,sp.id desc limit 100');
         $webhookIssues = DB::rows('select * from stripe_events where (processing_status="failed" or processing_error is not null) and admin_resolved_at is null order by created_at desc,id desc limit 100');
 
         H::view('admin/payment_logs',[
             'summary'=>$summary,
             'issue'=>$issue,
             'transferIssues'=>$transferIssues,
+            'platformCreditHolds'=>$platformCreditHolds,
             'webhookIssues'=>$webhookIssues,
             'commissionRows'=>$commissionRows,
             'transactions'=>DB::rows('select pt.*,u.email buyer_email from payment_transactions pt left join orders o on o.id=pt.order_id left join users u on u.id=o.user_id order by pt.created_at desc limit 200'),
@@ -669,12 +672,6 @@ class AdminController
     {
         $this->gate();
         H::view('admin/table',['title'=>'Download logs','rows'=>DB::rows('select dl.id,dl.order_id,dl.order_item_id,dl.product_id,dl.product_file_id,dl.status,dl.message,u.email user_email,dl.ip_address,dl.created_at from downloads dl join users u on u.id=dl.user_id order by dl.created_at desc limit 200')]);
-    }
-    public function referrals()
-    {
-        $this->gate();
-        H::view('admin/table',['title'=>'Referrals','rows'=>DB::rows('select * from referrals order by created_at desc')]);
-
     }
     public function homepage()
     {

@@ -1,5 +1,8 @@
 <h1>Order #<?=$order['id']?>
 </h1>
+<section class="card"><h2>Payment breakdown</h2>
+<p>Subtotal: <?=H::money($order['subtotal'])?><br>Coupon discount: −<?=H::money($order['coupon_discount']??0)?><br>Tax: +<?=H::money($order['tax_amount']??0)?><br>Store credit redeemed: −<?=H::money($order['credits_applied']??0)?><br>Stripe paid: <?=H::money($order['stripe_paid_amount']??0)?><br><strong>Final order total: <?=H::money($order['total'])?></strong></p>
+<p>Credit status: <?=H::e(['none'=>'Not used','reserved'=>'Reserved','finalized'=>'Redeemed','released'=>'Released'][$order['credit_payment_status']??'none']??'Unknown')?> · Completion: <?=!empty($order['internally_completed'])?'Completed internally with store credit':'Completed through Stripe'?></p></section>
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?> · Date: <?=$order['created_at']?>
 </p>
 <?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>.</p><?php endif;?>

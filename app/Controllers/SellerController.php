@@ -345,6 +345,15 @@ class SellerController
 
     public function apply()
     {
+        if (array_key_exists('seller_ref', $_GET)) {
+            $sellerReferral = \App\Services\ReferralService::normalize((string)$_GET['seller_ref']);
+            if ($sellerReferral !== '' && (new \App\Services\ReferralService)->referrer($sellerReferral)) {
+                $_SESSION['seller_referral_intent'] = $sellerReferral;
+            } else {
+                unset($_SESSION['seller_referral_intent']);
+                if ($sellerReferral !== '') H::flash('warning', 'That seller referral code is invalid. You may still apply.');
+            }
+        }
         if (!H::user()) {
             $_SESSION['after_login_redirect'] = '/apply';
             $_SESSION['seller_intent'] = true;
@@ -352,6 +361,19 @@ class SellerController
             H::redirect('/register');
         }
         H::requireLogin();
+        if (!empty($_SESSION['seller_referral_intent'])) {
+            try {
+                DB::begin();
+                (new \App\Services\ReferralService)->attach((int)H::user()['id'], $_SESSION['seller_referral_intent'], 'seller');
+                DB::commit();
+                unset($_SESSION['seller_referral_intent']);
+            } catch (Throwable $error) {
+                if (DB::pdo()->inTransaction()) DB::rollBack();
+                error_log('Seller referral attachment failed: ' . $error->getMessage());
+                unset($_SESSION['seller_referral_intent']);
+                H::flash('warning', 'The seller referral could not be attached. Your application can still continue.');
+            }
+        }
         $designer = $this->d();
         if ($designer && $designer['status'] === 'approved')
         {
@@ -420,7 +442,7 @@ class SellerController
         $stats=array_merge($stats??[],DB::row('select count(*) sales_count,coalesce(sum(gross_sale),0) gross_sales,coalesce(sum(seller_earning),0) seller_earnings from seller_earnings where designer_id=?',[$id])??[],DB::row('select sum(review_status in ("pending_review","published_flagged")) flagged_products from product_ip_risk_states s join products p on p.id=s.product_id where p.designer_id=?',[$id])??[]);
         $refunds=$this->refundSummary($id);$stats['gross_sales']=max(0,(float)$stats['gross_sales']-$refunds['gross_refund_cents']/100);$stats['seller_earnings']=max(0,(float)$stats['seller_earnings']-$refunds['seller_refund_cents']/100);$stats['refund_adjustments']=$refunds['seller_refund_cents']/100;
         $stats['pending_payouts']=0.0;$stats['transferred_payouts']=0.0;$stats['payout_issues']=0;
-        foreach(DB::rows('select order_id,seller_payout_amount,payout_status,stripe_transfer_error from seller_payouts where designer_id=?',[$id]) as $payout){$orderId=(int)$payout['order_id'];$amount=(float)$payout['seller_payout_amount'];if(in_array($payout['payout_status'],['pending_payment','pending_transfer','pending_stripe_onboarding'],true))$stats['pending_payouts']+=isset($refunds['original_by_order'][$orderId])?max(0,($refunds['original_by_order'][$orderId]-($refunds['by_order'][$orderId]??0))/100):$amount;if($payout['payout_status']==='transferred')$stats['transferred_payouts']+=$amount;if($payout['payout_status']==='transfer_failed'||!empty($payout['stripe_transfer_error']))$stats['payout_issues']++;}
+        foreach(DB::rows('select order_id,seller_payout_amount,payout_status,stripe_transfer_error from seller_payouts where designer_id=?',[$id]) as $payout){$orderId=(int)$payout['order_id'];$amount=(float)$payout['seller_payout_amount'];if(in_array($payout['payout_status'],['pending_payment','pending_transfer','pending_stripe_onboarding','platform_credit_hold'],true))$stats['pending_payouts']+=isset($refunds['original_by_order'][$orderId])?max(0,($refunds['original_by_order'][$orderId]-($refunds['by_order'][$orderId]??0))/100):$amount;if($payout['payout_status']==='transferred')$stats['transferred_payouts']+=$amount;if($payout['payout_status']==='transfer_failed'||!empty($payout['stripe_transfer_error']))$stats['payout_issues']++;}
         $accountStatus=(string)($d['stripe_account_status']??'');
         if (empty($d['stripe_connect_account_id'])) $stripeState='not_connected';
         elseif (in_array($accountStatus,['restricted','disabled','error'],true)) $stripeState='payout_issue';
@@ -1276,7 +1298,9 @@ class SellerController
     {
         $this->requireOnboardingComplete();
         H::requireSeller();
-        H::view('seller/referrals', [ 'refs' => DB::rows('select * from referrals where referrer_user_id=?', [H::user()['id']]), ]);
+        $data = (new \App\Services\ReferralService)->dashboard((int)H::user()['id']);
+        $sellerReferrals = array_values(array_filter($data['made'], static fn(array $referral): bool => !empty($referral['seller_intent'])));
+        H::view('seller/referrals', ['refs' => $sellerReferrals, 'referralCode' => $data['code']]);
 
     }
     public function rank()

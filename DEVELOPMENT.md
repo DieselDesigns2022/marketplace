@@ -40,7 +40,8 @@ Routes are defined in `public/index.php`. Dynamic route parameters use `{name}` 
 - `BuyerController`: buyer dashboard, purchases, orders, downloads, wishlist, following, referrals, wishlist/follow toggles.
 - `SellerController`: applications, seller dashboard, storefront settings, product management, sales, referrals, rank.
 - `CartController`: cart display, add/remove/update, checkout, order creation.
-- `AdminController`: admin home, users, applications, designers, products, categories, orders, referrals, homepage features, ads.
+- `AdminController`: admin home, users, applications, designers, products, categories, orders, homepage features, ads, and payment logs.
+- `AdminCreditController`: admin-only Credits & Referrals search, immutable ledger/referral review, and CSRF-protected audited adjustments.
 
 ## Views
 
@@ -201,7 +202,7 @@ Cart totals and license prices are recalculated server-side and snapshotted into
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
+- International VAT/GST expansion and seller refund/cancellation requests remain future work. Phase 11 referrals and store credit are implemented as described below.
 
 ### Phase 10 development guidance
 - Browser redirects are never trusted as payment proof; only verified Stripe webhooks may mark orders paid or unlock delivery/downloads.
@@ -238,3 +239,12 @@ Generate `EMAIL_UNSUBSCRIBE_SECRET` as an environment-only random value of at le
 Dashboard controller queries must remain scoped to the authenticated buyer, seller, or admin. Seller receipt settings are read authoritatively inside checkout transactions and copied to order-item snapshots; never accept receipt values from checkout input. Use `SellerReceiptService` for note normalization, public-path validation, upload processing, grouping, and deletion decisions. Keep new dashboard tables inside `.responsive-table`, and derive navigation from authenticated roles rather than treating navigation visibility as authorization. Receipt snapshot creation must use `SellerReceiptService::snapshotFromSeller()` so invalid optional values become `null` and never fail checkout. Buyer availability must use filesystem containment, regular-file, and readability checks—not database presence alone.
 
 Public `/waitlist` intentionally renders through the navigation-free minimal layout. Do not reintroduce the global header, footer, logo, or navigation links there; preserve the existing signup, validation, consent, confirmation, unsubscribe, and administrator-notification flow.
+
+
+## Phase 11 development notes
+
+Each referred user has one immutable referrer. The relationship tracks buyer and seller qualification independently: buyer rewards are $1.50 per party after the first eligible positive-payment order, and seller rewards are $5.00 per party after the approved seller's first eligible sale. Credits are non-expiring, non-transferable, marketplace-only, and have no cash value. `CreditService` is the sole balance mutation gateway; its row-locked operations append idempotent reservation, redemption, release, grant, or admin-adjustment ledger rows.
+
+Checkout ordering is subtotal minus coupon discount plus authoritative tax minus credit. Stripe Tax uses a Calculation before credit reservation and an idempotent Tax Transaction during finalization. Captured Stripe payments use `captured_pending_finalization` until credit, tax, coupon, earnings, commission, payout, fulfillment, and referral mutations commit atomically; failure leaves durable `manual_review` recovery data and preserves the reservation. Fully credited orders finalize internally through the same service. Their seller obligations use `platform_credit_hold` and require an admin/platform-balance transfer because there is no buyer source charge. Communications queue only after financial commit. Redeemed credit is not automatically restored on refund in this launch version.
+
+`PlatformCreditPayoutService` is the sole settlement path for `platform_credit_hold`. Its POST controller requires an active admin and CSRF token, locks the payout/order, revalidates the internally funded paid order and payout-ready connected account, and makes an idempotent platform-balance transfer with the order transfer group and no `source_transaction`. CLI tests may install `StripeService::setTestTransport()`; the hook is unavailable outside CLI and cannot be selected by request data.

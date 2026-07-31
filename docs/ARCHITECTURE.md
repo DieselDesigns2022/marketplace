@@ -68,3 +68,10 @@ All new SQL should use prepared statements.
 - Public assets and preview images may be served from web-accessible public upload folders.
 - Product files for purchases must be protected from direct public access.
 - Download routes should validate ownership/order access before serving product files.
+
+
+## Phase 11 financial services
+
+`CreditService` owns exact-cent balances and the append-only ledger; `ReferralService` owns immutable referrer attachment plus independent buyer/seller qualification; and `OrderFinalizationService` owns atomic tax, credit, coupon, earnings, commission, payout, fulfillment, and reward completion. `CartController` obtains the Stripe Tax Calculation before reserving credit. `StripeController` validates captured payment data and billing-location consistency, then invokes the finalizer inside the locked transaction. Receipt, sale, coupon, download, and referral communications run after commit with stable deduplication keys. Admin credit/referral workflows are isolated in `AdminCreditController`.
+
+`PlatformCreditPayoutService` separately settles internally funded `platform_credit_hold` obligations. It revalidates and locks the payout and order, then uses the stored obligation amount, connected account, stable idempotency key, and order transfer group for a Stripe platform-balance transfer without a buyer source charge. Success and retryable failure outcomes are retained in the payout and immutable admin log.

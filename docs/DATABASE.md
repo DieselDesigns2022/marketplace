@@ -48,7 +48,7 @@ Stores buyer cart entries by user, product, normalized selected license keys, qu
 
 ### `orders`
 
-Stores buyer orders with statuses including `pending`, future `paid`/`failed`, `cancelled`, `refunded`, `partially_fulfilled`, and `fulfilled`; legacy `completed` remains accepted for existing data compatibility. Phase 9 also adds tax/coupon/fulfillment placeholders and pending-payment foundation metadata.
+Stores buyer order and payment snapshots. Phase 11 adds reserved/redeemed credit, Stripe-paid amount, normalized billing address, Stripe Tax Calculation/Transaction identifiers and states, internal-completion marker, and finalization key. Captured Stripe payments remain non-deliverable in `captured_pending_finalization` or `manual_review` until atomic finalization succeeds.
 
 ### `order_items`
 
@@ -72,7 +72,7 @@ Planned/current foundational table for product/designer reviews. Includes rating
 
 ### `referrals`
 
-Tracks buyer/designer referrals, status, reward status, sales count, and estimated earnings.
+Stores one immutable referrer relationship per referred user. Buyer and seller intent, qualification status, reward amount per party, qualifying order/item, event key, and rewarded timestamp are separate so the $1.50 buyer and $5.00 seller events never overwrite one another.
 
 ### `creator_rank_history`
 
@@ -80,11 +80,11 @@ Tracks designer rank changes, old/new rank, admin changer, reason, and timestamp
 
 ### `marketplace_credits`
 
-Stores user marketplace credit balance.
+Stores exact `DECIMAL(12,2)` total and reserved balances; available credit is total minus reserved. Credits never expire, are marketplace-only, non-transferable, and have no cash value.
 
 ### `credit_transactions`
 
-Stores credit balance changes with type and description.
+Append-only credit ledger with reservation, redemption, release, grant, and admin-adjustment types; unique idempotency key; status/timestamps; and optional order, referral, acting-admin, and related-reservation references. Existing ledger rows are not rewritten during normal processing.
 
 ### `seller_earnings`
 
@@ -108,10 +108,10 @@ Stores admin actions with entity type/id and JSON metadata.
 
 ## Key relationships
 
-- `users.id` links to `designer_applications.user_id`, `designers.user_id`, `orders.user_id`, `cart_items.user_id`, `wishlists.user_id`, and `follows.user_id`.
+- `users.id` links to `designer_applications.user_id`, `designers.user_id`, `orders.user_id`, `cart_items.user_id`, `wishlists.user_id`, `follows.user_id`, referral participants, credit balances, and ledger users/admin actors.
 - `designers.id` links to `products.designer_id`, `order_items.designer_id`, `seller_earnings.designer_id`, and `platform_commissions.designer_id`.
 - `products.id` links to images, files, cart items, order items, downloads, wishlists, reviews, and tags.
-- `orders.id` links to `order_items.order_id`, `seller_earnings.order_id`, and `platform_commissions.order_id`.
+- `orders.id` links to `order_items.order_id`, `seller_earnings.order_id`, `platform_commissions.order_id`, seller payout obligations, coupon usage, payment transactions, and credit ledger rows.
 
 ## Important status fields
 
@@ -237,10 +237,10 @@ Pending seller payout retries are scoped to payout-ready designers and webhook-c
 - `coupon_usages` stores paid-order usage rows with `coupon_id`, `user_id`, `order_id`, code snapshot, discount amount, a unique order key, and coupon/user lookup index.
 - `orders.coupon_discount`, `orders.coupon_id`, `orders.coupon_code`, and `orders.coupon_snapshot` snapshot order-level coupon state.
 - `order_items.coupon_id`, `order_items.coupon_code`, and `order_items.coupon_discount` snapshot item-level allocation; `order_items.total_price` stores the discounted item total used for commission and seller payout calculations.
-- Phase 10.3B stores Stripe Tax results on orders; credit/referral redemption remains Phase 11 placeholder behavior.
+- Phase 10.3B introduced Stripe Tax snapshots; Phase 11 now applies credit after authoritative tax and implements referral rewards.
 
 ## Phase 10.3B Stripe Tax compliance
-Phase 10.3B uses Stripe Tax through Stripe Checkout. `orders.tax_amount` stores Stripe-returned tax, `orders.tax_provider` identifies `stripe_tax`, `orders.tax_status` stores the Stripe automatic-tax status, `orders.tax_liability_owner` stores the normalized marketplace owner such as `platform`, `orders.tax_snapshot` stores escaped admin-review context from Stripe Checkout, and `orders.tax_collected_at` records when tax was confirmed. Asset Moth is US-only at launch, sells digital files only, has no shipping, and excludes tax from seller earnings, seller payouts, gross-sales commission calculations, and platform commission. International VAT/GST remains future work; 1099 reporting is handled through Stripe Connect and Stripe tax forms setup, not homemade IRS form generation.
+Phase 10.3B introduced Stripe Tax fields. In the current Phase 11 lifecycle, `tax_status=calculated` and `tax_calculation_id` identify the pre-credit calculation; `tax_snapshot` and `billing_address_snapshot` retain authoritative context. `tax_transaction_id`, `tax_transaction_status`, and `tax_collected_at` are populated only after idempotent `create_from_calculation` succeeds during finalization. Tax remains excluded from seller earnings, payouts, and commission math.
 
 ## Seller license presets
 
@@ -300,3 +300,13 @@ The current nine canonical categories are Engagement Graphics (`engagement-graph
 ### Phase 10.6 issue-resolution data
 
 `2026_07_29_phase_10_6_issue_resolution.sql` adds nullable admin-resolution timestamp, admin user, and note fields to the Phase 10 Stripe migration's `seller_payouts` and `stripe_events` tables. Resolution removes an item from the active dashboard queue while retaining the original payout or webhook record and its historical details.
+
+### Phase 11 data model
+`users.referral_code` is unique and URL-safe. `referrals` has one non-null `referred_user_id` per account, immutable referrer/code snapshots, buyer and seller intent/status, qualifying order/item references, reward amounts, and reward timestamps. Rejected duplicate legacy rows remain as audit rows with a null referred-user attachment.
+
+`marketplace_credits` stores `total_balance` and `reserved_balance` as `DECIMAL(12,2)` with the invariant `0 <= reserved <= total`. `credit_transactions` is append-only: reservation, redemption, release, grant, and admin-adjustment rows have unique idempotency keys and optional order, referral, admin, and related-reservation references. Balance changes and ledger inserts share one row-locked transaction. Orders snapshot tax, credit reserved/redeemed, Stripe-paid amount, completion mode, and finalization key. Buyer qualifying order, seller qualifying order, and seller qualifying item columns have lookup indexes and `ON DELETE RESTRICT` foreign keys so order/referral history cannot be orphaned.
+
+#### Phase 11 tax and reward lifecycle correction
+Orders retain `tax_calculation_id`, the immutable calculation snapshot, normalized `billing_address_snapshot`, and distinct `tax_transaction_id` / `tax_transaction_status`. A pending order is only `calculated`; `tax_collected_at` is written after Stripe Tax `create_from_calculation` succeeds. Referral relationships retain independent buyer and seller referrer/referred amount snapshots, event keys, qualifying references, and timestamps. Platform-funded credit orders use `platform_credit_hold` payout obligations because no buyer charge exists for a source-transaction transfer; an admin/platform-balance transfer workflow must resolve the hold. Legacy conversions preserve already migrated states on rerun.
+
+`seller_payouts.platform_credit_attempt_key` uniquely identifies settlement attempts; `platform_credit_settled_at` and `platform_credit_settled_by` audit successful admin settlement. A failed Stripe call returns the row to `platform_credit_hold` with a sanitized retry reason; `transferred` stores the Stripe transfer ID. The settlement-admin foreign key uses `ON DELETE RESTRICT`.

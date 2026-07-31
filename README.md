@@ -214,7 +214,7 @@ Phase 9 added the foundation for carts, order records, downloadable delivery, an
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
+- International VAT/GST expansion and seller refund/cancellation requests remain future work; referrals and store credit are implemented in Phase 11.
 
 ### Phase 10 Stripe marketplace payments and seller onboarding
 Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Asset Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Asset Moth's 18% commission.
@@ -231,15 +231,15 @@ Seller transfers use the original Stripe charge as `source_transaction` when `st
 - Added platform and seller coupon management with normalized unique coupon codes, active status, percent/fixed discounts, start/end dates, minimum eligible cart amount, total and per-user usage limits, and seller/product/category restrictions.
 - Admins manage all coupons at `/admin/coupons`; approved sellers manage only their seller-scoped coupons at `/seller/coupons` and server-side ownership checks prevent cross-seller coupon/product access.
 - Buyers can apply or remove coupon codes in cart/checkout. Invalid, inactive, expired, not-yet-started, over-limit, below-minimum, and non-applicable coupons are rejected server-side.
-- Checkout totals sent to Stripe follow: subtotal minus coupon discount plus Stripe Tax returned at Checkout minus the existing Phase 11 credits placeholder equals the final captured total. International VAT/GST remains future work; credits/referrals remain Phase 11.
+- Phase 11 checkout authoritatively calculates Stripe Tax before store credit and sends Stripe only the remaining total. International VAT/GST remains future work.
 - Coupon snapshots are stored on orders and order items. Coupon usage is recorded only after Stripe confirms a successful paid order, with an order-level uniqueness guard to avoid webhook/retry double counting.
 - Platform commission, seller earnings, and payout ledger amounts are calculated from discounted order item totals after coupon discounts are allocated across eligible items.
-- Coupons that reduce checkout to `$0.00` are intentionally blocked until a dedicated free-order checkout flow exists.
+- A coupon alone may not create a `$0.00` checkout; an otherwise positive order may reach `$0.00` only when store credit covers the coupon-adjusted total plus authoritative tax.
 
 ### Phase 10.3B Stripe Tax and tax compliance
-Phase 10.3B uses Stripe Tax in Stripe Checkout for automatic sales-tax calculation. Asset Moth is US-only at launch, sellers are US-only at launch, products are digital files only, and there is no shipping. Sellers do not enter tax rates or manual sales-tax settings; tax is returned by Stripe after checkout confirmation and is excluded from seller payouts and marketplace commission math. International VAT/GST is future work. 1099 reporting is handled through Stripe Connect and Stripe tax forms setup rather than homemade IRS form generation.
+Phase 10.3B introduced Stripe Tax. The current Phase 11 flow creates an authoritative Tax Calculation from the normalized US billing address before applying credit, then creates an idempotent Tax Transaction during atomic order finalization. Tax is excluded from seller payouts and marketplace commission math. Asset Moth remains US-only, sells digital files only, and has no shipping; international VAT/GST remains future work. 1099 reporting remains a Stripe Connect/tax-forms concern rather than a homemade filing system.
 
-Delivery unlock requires webhook-confirmed payment and a complete Stripe Tax status for tax-enabled Checkout Sessions.
+Delivery unlock requires committed finalization and a created Stripe Tax Transaction: verified Stripe payment for a remaining balance, or atomic internal finalization for a fully credit-funded order.
 
 ### Phase 10.4 — Advisory IP Risk Warning
 
@@ -259,3 +259,8 @@ Live-testing corrections give public `/waitlist` a form-only shell with no globa
 ### Phase 10.6 live-testing completion
 
 Phase 10.6 completed live testing across seller, buyer, and admin workflows. Seller product ZIP uploads support files up to 600 MB where the full request remains within the 650 MB PHP-FPM and Nginx limits. Admins can resolve transfer and webhook attention items without deleting their financial or event history, and eligible pre-launch waitlist entries can be permanently removed after exact-email confirmation.
+
+## Phase 11: referrals and store credit
+Each referred user has one immutable referrer. The relationship records buyer and seller qualification independently: the referrer and referred buyer each receive $1.50 after the first eligible positive-payment order, and the same referrer and later approved seller each receive $5.00 after the first eligible sale. Credit is reserved atomically, applied after tax, finalized with the order, and released on terminal checkout failure; it may fully fund an internally completed order. The append-only ledger and `/admin/referrals` controls are the audit source. Credits never expire, are marketplace-only, non-transferable, and have no cash value. Fully credit-funded seller obligations use `platform_credit_hold`; an active admin explicitly settles an eligible hold from the Stripe platform balance through the CSRF-protected payment-log action, without a buyer source charge. Launch limitation: refunds do not automatically restore redeemed credit.
+
+> Phase 11 database/migration readiness requires the disposable MariaDB suite to run without `SKIP`; a skipped environment is not release verification. Stripe Tax uses a Calculation followed by an idempotent Tax Transaction after successful financial finalization.

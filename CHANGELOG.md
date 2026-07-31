@@ -198,7 +198,7 @@ Intentionally postponed:
 - Buyer-facing “payment not completed/cancel” wording refers only to an incomplete Stripe payment before purchase access unlocked; buyers cannot self-cancel completed digital purchases.
 - Phase 10 records/reflects webhook refund status when Stripe reports it, but does not build a buyer cancellation flow or seller refund-request approval workflow.
 - Future intended seller refund/cancellation flow: seller requests refund/cancellation → admin reviews → admin approves or denies → Stripe refund/cancellation action happens only after admin approval.
-- Phase 11 credits/referrals, international VAT/GST expansion, and seller refund/cancellation requests remain future work.
+- International VAT/GST expansion and seller refund/cancellation requests remain future work; referrals and store credit are implemented in Phase 11.
 
 ## Phase 10 refinement - seller onboarding and Stripe Connect payout readiness
 - Added seller onboarding and Stripe payout setup routes/views for approved sellers.
@@ -227,7 +227,7 @@ Intentionally postponed:
 - Added platform and seller coupon management with normalized unique coupon codes, active status, percent/fixed discounts, start/end dates, minimum eligible cart amount, total and per-user usage limits, and seller/product/category restrictions.
 - Admins manage all coupons at `/admin/coupons`; approved sellers manage only their seller-scoped coupons at `/seller/coupons` and server-side ownership checks prevent cross-seller coupon/product access.
 - Buyers can apply or remove coupon codes in cart/checkout. Invalid, inactive, expired, not-yet-started, over-limit, below-minimum, and non-applicable coupons are rejected server-side.
-- Checkout totals now use Stripe Tax for Phase 10.3B: subtotal minus coupon discount plus Stripe-returned tax minus the existing Phase 11 credits placeholder equals the final captured total. International VAT/GST remains future work; credits/referrals remain Phase 11.
+- Phase 11 checkout now calculates Stripe Tax before applying store credit and sends Stripe only the remaining total. International VAT/GST remains future work.
 - Coupon snapshots are stored on orders and order items. Coupon usage is recorded only after Stripe confirms a successful paid order, with an order-level uniqueness guard to avoid webhook/retry double counting.
 - Platform commission, seller earnings, and payout ledger amounts are calculated from discounted order item totals after coupon discounts are allocated across eligible items.
 - Coupons that reduce checkout to `$0.00` are intentionally blocked until a dedicated free-order checkout flow exists.
@@ -282,3 +282,11 @@ Intentionally postponed:
 - Raised receipt-image uploads to 10 MB and recorded the live product-file upload path at 600 MB per file / 650 MB request.
 - Added admin waitlist-entry deletion, clearer payment/webhook resolution queues, responsive mobile navigation/table behavior, compact destructive controls, and role-aware Account navigation.
 - Applied the idempotent issue-resolution migration for resolved transfer and webhook records.
+
+## Phase 11 — 2026-07-31
+- Added one immutable referrer per referred user, independent idempotent buyer rewards ($1.50 per party) and seller rewards ($5.00 per party), exact store-credit balances/append-only ledger, checkout reservation/finalization/release, internally finalized credit-only orders, admin adjustment/audit controls, and credit/referral notifications.
+- Credits do not reduce commissionable item snapshots. Refunded orders do not automatically restore redeemed credits in this launch version.
+- Corrected Phase 11 to distinguish Stripe Tax calculations from reportable transactions, atomically finalize captured payments, defer communications until after commit, retain independent buyer/seller reward snapshots, and hold platform-funded seller payouts for explicit transfer handling. Database readiness is not asserted when disposable MariaDB tests skip.
+- Documentation audit aligned current Phase 11 terminology, routes, Stripe Tax Calculation/Transaction lifecycle, captured-payment recovery, independent rewards, `platform_credit_hold`, testing limits, and the no-credit-restoration refund limitation; historical phase-scoped future-work notes remain historical.
+- Added the admin-only, CSRF-protected settlement workflow for `platform_credit_hold`, stable Stripe transfer idempotency, immutable outcome logging, retry-safe failures, qualifying-reference foreign keys/indexes, and deterministic CLI Stripe transport tests.
+- Expanded Phase 11 disposable integration coverage for three-run migration/canonical comparisons, separate-connection credit and payout races, referral eligibility and dual rewards, full internal/captured finalization and recovery, communication failure isolation, and controller authorization/CSRF paths; corrected seller qualification to exclude unresolved review and refunded sales.
