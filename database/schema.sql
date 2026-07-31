@@ -476,6 +476,8 @@ CREATE TABLE orders
     coupon_code VARCHAR(80) NULL,
     coupon_snapshot JSON NULL,
     total DECIMAL(10,2),
+    manual_review_required TINYINT(1) NOT NULL DEFAULT 0,
+    manual_review_reason TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY orders_finalization_key_unique(finalization_key)
