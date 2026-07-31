@@ -83,10 +83,10 @@ Phase 6 was validated on the VPS deployment path `/var/www/marketplace.dieseldes
 - Apply `database/migrations/2026_07_07_phase_10_2_coupons_discounts_commission_rules.sql` before enabling coupon UI in a deployed environment.
 - The migration creates coupon definition, restriction, and usage tables and adds order/order item coupon snapshot columns.
 - The migration includes idempotent `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements for existing environments.
-- Phase 10.2 did not include Stripe Tax or Phase 11 credit/referral redemption; Stripe Tax deployment is documented below in Phase 10.3B, while credits/referrals remain Phase 11.
+- Phase 10.2 did not include Stripe Tax or credit/referral redemption; those capabilities were subsequently implemented in Phases 10.3B and 11.
 
 ## Phase 10.3B Stripe Tax compliance
-Apply `database/migrations/2026_07_08_phase_10_3b_stripe_tax_compliance.sql` before deploying the Phase 10.3B code so `orders.tax_amount` and the Stripe Tax metadata columns exist. In Stripe Dashboard, confirm Stripe Tax is enabled/configured, the digital artwork tax category is set, prices/shipping behavior match launch policy, USD-only checkout is expected, no shipping address or shipping rates are configured by the app, and the Stripe webhook endpoint is active. After deploy, test a Stripe Checkout Session and webhook confirmation to verify `automatic_tax` is enabled, billing address collection is required, Stripe-returned tax is stored, and delivery unlocks only after a valid webhook-confirmed paid order. Include a negative webhook/test case for non-complete `automatic_tax.status` to confirm the order remains in manual review and delivery/download unlock stays blocked.
+Apply `database/migrations/2026_07_08_phase_10_3b_stripe_tax_compliance.sql` in its historical order before the Phase 11 migration. For the current deployment, confirm Stripe Tax and the digital-product tax code are configured, USD/US-only rules are expected, and the webhook is active. Verify the Phase 11 standalone Tax Calculation, normalized billing snapshot, post-capture Tax Transaction, address-mismatch manual review, and delivery lock; do not expect Checkout `automatic_tax` to be enabled because the remaining Stripe line item already includes the authoritative precomputed tax after credits.
 
 ## Upload size requirements
 
@@ -133,3 +133,16 @@ After deployment, run PHP lint and both Phase 10.6 and Phase 10.5 behavioral sui
 ### Phase 10.6 live-tested upload configuration
 
 The marketplace production product-upload path uses PHP-FPM `upload_max_filesize=600M`, `post_max_size=650M`, and `max_file_uploads=200`. Its Nginx virtual host uses `client_max_body_size 650M`. Keep the complete multipart request within 650 MB. Receipt images remain application-limited to 10 MB, and seller avatars/store banners remain application-limited to 25 MB.
+
+### Phase 11 deployment
+After Phase 10.6, back up MariaDB and apply `database/migrations/2026_07_31_phase_11_referrals_credits_store_credit.sql`; it uses rerunnable column/index operations and deterministic legacy backfills. Verify referral-code uniqueness, no negative/reserved-over-total balances, ledger keys, and foreign keys, then rerun the migration test. `APP_URL`, Stripe secret/webhook secrets, USD currency, Stripe Tax registration, and the digital-product tax code must be configured. Checkout now calls Stripe Tax before credit reservation, including credit-only orders, so Tax API availability is required. Rollback should be forward-fix/data-preserving rather than dropping immutable financial history.
+
+#### Required Phase 11 correction verification
+Use the deployed MariaDB version and a disposable pre-Phase-11 database. Run `PHASE11_ALLOW_FIXTURE=1 DB_HOST=127.0.0.1 DB_NAME=marketplace_test_control DB_USER=... DB_PASS=... php tests/Phase11DatabaseIntegrationTest.php`. The test creates a randomized disposable database, applies the migration three times, and compares `information_schema` plus referral/credit/ledger data after each rerun. Verify Stripe Tax in test mode by creating a Calculation, completing both a Stripe-funded and credit-funded order, and confirming the resulting `tax_` Transaction created with the order reference. Platform-credit payout holds require an explicit admin/platform-balance transfer process; they are not eligible for automatic source-charge transfers.
+
+Before enabling settlement, verify the Phase 11 qualifying-reference foreign keys/indexes and the `seller_payouts` settlement audit columns. In Stripe test mode, use an active admin to POST the CSRF-protected settlement action for a disposable internal order and confirm the transfer has no `source_transaction`, uses `order_{id}` as its transfer group, and records the transfer ID, actor, and timestamp. A failure must remain `platform_credit_hold` and retry with the same idempotency key. The deterministic CLI transport tests API construction and failure/replay behavior, but do not replace this Stripe test-mode check.
+
+The disposable suite requires `proc_open`, permission to create/drop randomized databases, and at least two concurrent MariaDB connections. It executes CLI-only controller and connection probes from `tests/helpers`; these helpers cannot be selected by web requests or production configuration.
+
+
+Codex could not connect to MariaDB or execute live Stripe test-mode requests during the Phase 11 audit. A `SKIP` from the fixture suite and unexecuted Stripe API verification are deployment blockers, not passes.

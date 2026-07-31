@@ -28,6 +28,9 @@ final class NotificationService
     public static function admins(string $type, string $title, string $message, string $eventKey, ?string $url=null): void
     { foreach (DB::rows('select id from users where role="admin" and status="active"') as $u) self::create((int)$u['id'],$type,'admin',$title,$message,$eventKey,$url); }
     public static function creditReferralUpdate(int $userId,string $eventKey,string $message): bool { return self::create($userId,'credit_referral','buyer','Credit or referral update',$message,$eventKey,'/dashboard/referrals'); }
+    public static function buyerReferralReward(int $userId,string $key):bool{return self::creditReferralUpdate($userId,$key,'Buyer referral reward earned: $1.50 store credit.');}
+    public static function sellerReferralReward(int $userId,string $key):bool{return self::creditReferralUpdate($userId,$key,'Seller referral reward earned: $5.00 store credit.');}
+    public static function adminCreditAdjustment(int $userId,string $key,string $amount):bool{return self::creditReferralUpdate($userId,$key,'An administrator adjusted your store credit by $'.$amount.'.');}
     public static function sellerTaxReminder(int $userId,string $eventKey,string $message): bool { return self::create($userId,'tax_reminder','designer','Tax information reminder',$message,$eventKey,'/seller/stripe'); }
     public static function promoStatus(int $userId,string $eventKey,string $message): bool { return self::create($userId,'promo_status','designer','Promotion status',$message,$eventKey); }
     public static function bundleInvitation(int $userId,string $eventKey,string $message): bool { return self::create($userId,'bundle_invitation','designer','Bundle invitation',$message,$eventKey); }

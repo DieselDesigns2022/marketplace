@@ -141,3 +141,11 @@ Inspect the protected administrator payment logs and server logs. The in-app not
 ### Paid or refund communication is missing after a webhook
 
 Safely replay the same verified Stripe event after correcting the database/queue fault. For a processed paid event, replay only re-attempts stable deduplicated communications for a paid, non-manual-review order; it does not repeat financial mutations. Refund replay only recovers the current authoritative cumulative transition. Operational diagnostics are deliberately redacted, so correlate the normalized context with protected payment/server logs rather than expecting credentials, tokens, Stripe identifiers, or stack traces in the stored message.
+
+### Stripe payment was captured but Phase 11 finalization did not complete
+
+The order must remain `manual_review` with its Stripe references and reserved credit intact; do not release credit or charge the buyer again. Correct the database or Stripe Tax Transaction fault, then replay the same signed webhook so the locked, idempotent finalization path can recover. Delivery, coupon usage, earnings, commissions, payout obligations, and referral rewards must remain unavailable until finalization commits. If `tax_transaction_status=failed`, verify the stored Tax Calculation and the idempotent `create_from_calculation` request. Communications are post-commit and may be retried separately with stable keys.
+
+### Platform-credit seller payout remains held
+
+Confirm the order is paid, internally completed, unrefunded, outside manual review, and has no Stripe charge. Confirm the seller's connected account is approved, details-submitted, and payout-enabled. An active admin can retry the hold from **Admin → Payment Logs → Platform-credit holds**; the POST action reuses the stable Stripe idempotency key and order transfer group. Do not manually add a buyer `source_transaction`, edit the obligation amount, or mark the ledger transferred. The UI exposes only the sanitized retry reason; the immutable admin log retains the outcome.

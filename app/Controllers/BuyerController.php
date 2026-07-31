@@ -90,7 +90,8 @@ class BuyerController
     public function referrals()
     {
         H::requireLogin();
-        H::view('buyer/referrals',['credits'=>DB::row('select * from marketplace_credits where user_id=?',[H::user()['id']]),'tx'=>DB::rows('select * from credit_transactions where user_id=?',[H::user()['id']])]);
+        $credit=new \App\Services\CreditService;$ref=new \App\Services\ReferralService;$id=(int)H::user()['id'];
+        H::view('buyer/referrals',['balances'=>$credit->balances($id),'tx'=>$credit->ledger($id),'referrals'=>$ref->dashboard($id)]);
 
     }
     public function toggleWishlist($id)

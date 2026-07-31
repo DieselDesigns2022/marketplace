@@ -223,21 +223,12 @@ Recommended manual checks:
 - Percentage coupon math discounts only the eligible subtotal.
 - Fixed coupon math is capped to eligible subtotal and never creates a negative total.
 - Seller-scoped coupons in mixed-seller carts discount only eligible items from that seller.
-- A coupon that makes checkout total `$0.00` is rejected because this phase does not implement free-order checkout.
-- Checkout without a coupon still creates a Stripe Checkout session.
+- A coupon-only `$0.00` checkout remains rejected; a positive merchandise/tax total may reach `$0.00` only through reserved store credit and the internal finalizer.
+- Checkout without a coupon creates a Stripe Checkout Session only when store credit leaves a positive remainder; full credit coverage uses internal finalization.
 - Stripe paid webhook records coupon usage once and repeated webhook/retry processing does not double-count usage.
 
-## Phase 10.3B Stripe Tax compliance
-Use this checklist for Phase 10.3B validation:
-- Stripe Checkout Session has `automatic_tax` enabled.
-- Billing address collection is required.
-- No shipping address or shipping rates are collected.
-- US checkout works.
-- Non-US billing country gets manual review and no delivery/download unlock if detected on the Checkout Session.
-- Checkout Session `automatic_tax.status` must be `complete`; `failed` or `requires_location_inputs` gets manual review and no delivery/download unlock.
-- Stripe webhook stores `total_details.amount_tax` into `orders.tax_amount`.
-- Tax is excluded from seller earnings, seller payouts, and platform commission.
-- Coupons still reduce item totals before commission.
+## Stripe Tax compliance (Phase 10.3B foundation, Phase 11 current lifecycle)
+The Phase 10.3B automatic-Tax checklist is superseded for current checkout. Validate that Phase 11 creates a standalone Tax Calculation from the normalized US billing address before credit reservation; stores the calculation ID/snapshot while leaving `tax_collected_at` null; rejects non-US or materially mismatched completed billing data into manual review; and creates one idempotent Tax Transaction during atomic finalization before marking tax complete/collected. Stripe Checkout automatic tax is disabled because its single remaining-total line item already includes the authoritative tax after credits. No shipping address/rates are collected. Tax remains excluded from seller earnings, payouts, and commission, while coupons reduce item totals before tax/commission snapshots.
 - `$0.00` coupon checkout remains blocked.
 - Admin order detail and payment logs show tax separately; payment-log detail shows order-level tax once per order while the summary remains authoritative.
 - Seller pages state tax is handled by Asset Moth/Stripe Tax and excluded from payout.
@@ -381,3 +372,9 @@ Commands: `find app public tests -name '*.php' -print0 | xargs -0 -n1 php -l`, `
 ### Phase 10.6 final live-testing results
 
 Completed live checks covered seller, buyer, and admin workflows on desktop, iPad, and phone; receipt-image uploads; protected downloads; product submission and IP-risk behavior; account and waitlist deletion flows; payment/webhook resolution queues; seller product action controls; and responsive navigation/table behavior. A real product ZIP upload also passed after the marketplace PHP-FPM limits were verified at 600 MB per file / 650 MB request and Nginx was aligned to `client_max_body_size 650M`.
+
+### Phase 11 verification
+Run `php tests/Phase11ReferralsCreditsStoreCreditTest.php` for strict money, checkout arithmetic, referral-code and billing-address behavior, plus deterministic Tax Calculation, Tax Transaction success/failure, and platform-balance transfer request/replay assertions. Run `PHASE11_ALLOW_FIXTURE=1 DB_HOST=127.0.0.1 DB_NAME=marketplace_test_control DB_USER=... DB_PASS=... php tests/Phase11DatabaseIntegrationTest.php` with disposable-database privileges. The fixture applies the migration three times, compares Phase 11 migrated metadata to canonical schema, preserves legacy data, runs separate-connection credit and payout races, exercises independent referral rewards and ineligible events, completes and recovers real shared finalization, injects Stripe/communication failures, and invokes actual admin controller actions for role/CSRF/adjustment/settlement coverage. CLI-only helpers under `tests/helpers/` isolate concurrent connections and controller requests. A missing MariaDB connection or fixture flag reports `SKIP`, which is not a pass. Run every `tests/*.php`, lint PHP files, and run `git diff --check`.
+
+#### Phase 11 correction matrix
+The disposable suite must pass before completion review; its cases existing in source is not a substitute for execution. Live Stripe Tax and platform-balance transfer verification remains a staging check because automated tests use the CLI-only deterministic transport. A MariaDB `SKIP` is an environment result, not a pass or release signal.

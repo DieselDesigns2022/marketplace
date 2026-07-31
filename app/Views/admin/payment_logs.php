@@ -63,7 +63,15 @@
 <section class="card">
     <h2>Open attention items</h2>
     <p class="muted">Mark an item resolved after you have investigated it. The original Stripe status and error stay in the history below.</p>
-    <p><a class="btn" href="/admin/payment-logs?issue=failed_transfers">Open failed seller transfers (<?=count($transferIssues)?>)</a> <a class="btn alt" href="/admin/payment-logs?issue=webhook_issues">Open webhook / Stripe issues (<?=count($webhookIssues)?>)</a></p>
+    <p><a class="btn" href="/admin/payment-logs?issue=failed_transfers">Open failed seller transfers (<?=count($transferIssues)?>)</a> <a class="btn" href="/admin/payment-logs?issue=platform_credit_holds">Platform-credit holds (<?=count($platformCreditHolds)?>)</a> <a class="btn alt" href="/admin/payment-logs?issue=webhook_issues">Open webhook / Stripe issues (<?=count($webhookIssues)?>)</a></p>
+
+    <?php if($issue === '' || $issue === 'platform_credit_holds'):?>
+        <h3>Platform-funded credit payout holds</h3>
+        <p class="muted">These paid internal-credit orders have no buyer source charge. Settlement transfers the stored obligation from the Asset Moth platform balance.</p>
+        <?php if(!$platformCreditHolds):?><p class="muted">No platform-credit payout holds.</p><?php else:?><div class="money-scroll"><table><thead><tr><th>Order</th><th>Seller</th><th>Amount</th><th>Stripe readiness</th><th>Last safe error</th><th>Settlement</th></tr></thead><tbody>
+        <?php foreach($platformCreditHolds as $hold):?><tr><td><a href="/admin/order/<?=(int)$hold['order_id']?>">#<?=(int)$hold['order_id']?></a></td><td><?=H::e($hold['seller_name'])?></td><td><?=H::money($hold['seller_payout_amount'])?> <?=H::e(strtoupper($hold['currency']))?></td><td><?=!empty($hold['stripe_connect_account_id'])&&!empty($hold['stripe_payouts_enabled'])&&!empty($hold['stripe_details_submitted'])?'Payout enabled':'Seller setup required'?></td><td class="money-wrap"><?=H::e($hold['stripe_transfer_error']??'')?></td><td><form method="post" action="/admin/platform-credit-payouts/<?=(int)$hold['id']?>/settle"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button <?=empty($hold['stripe_connect_account_id'])||empty($hold['stripe_payouts_enabled'])||empty($hold['stripe_details_submitted'])?'disabled':''?>>Transfer from platform balance</button></form></td></tr><?php endforeach;?>
+        </tbody></table></div><?php endif;?>
+    <?php endif;?>
 
     <?php if($issue === '' || $issue === 'failed_transfers'):?>
         <h3>Failed seller transfers</h3>

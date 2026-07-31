@@ -1,5 +1,5 @@
 <h1>Secure checkout</h1>
-<p class="notice warning">You will be redirected to Stripe for secure payment. Downloads and Google Drive/manual delivery unlock only after Stripe confirms payment by webhook.</p>
+<p class="notice warning">Asset Moth will calculate US sales tax before applying store credit. If credit covers the authoritative total, the order completes immediately; otherwise Stripe securely collects only the remainder.</p>
 <?php if(!$items):?>
     <p>Your cart is empty.</p>
 <?php else:?>
@@ -19,10 +19,21 @@
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
       <p class="muted">Sales tax calculated at checkout when required. Asset Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
-      <h2>Subtotal after discounts before tax: <?=H::money($finalTotal ?? $subtotal)?></h2>
+      <p>Tax: <strong>calculated as applicable</strong></p><p>Available store credit: <strong><?=H::money($balances['available']??0)?></strong></p>
+      <h2>Subtotal − coupon + tax − credits = final total</h2><p>Before tax and selected credits: <strong><?=H::money($finalTotal ?? $subtotal)?></strong></p>
     </div>
     <form method="post" class="form card">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <fieldset>
+          <legend>US billing address for sales tax</legend>
+          <label>Address line 1<input name="billing_line1" required autocomplete="billing address-line1" value="<?=H::e($_POST['billing_line1'] ?? '')?>"></label>
+          <label>Address line 2<input name="billing_line2" autocomplete="billing address-line2" value="<?=H::e($_POST['billing_line2'] ?? '')?>"></label>
+          <label>City<input name="billing_city" required autocomplete="billing address-level2" value="<?=H::e($_POST['billing_city'] ?? '')?>"></label>
+          <label>State<input name="billing_state" required maxlength="2" autocomplete="billing address-level1" value="<?=H::e($_POST['billing_state'] ?? '')?>"></label>
+          <label>ZIP code<input name="billing_postal_code" required autocomplete="billing postal-code" inputmode="numeric" value="<?=H::e($_POST['billing_postal_code'] ?? '')?>"></label>
+          <input type="hidden" name="billing_country" value="US">
+        </fieldset>
+        <label><input type="checkbox" name="use_credits" value="1" <?=((float)($balances['available']??0)>0)?'':'disabled'?>> Use available store credit (up to the final total)</label><p class="help-text">Credit can cover the entire eligible order. A $0.00 credit-funded order completes securely without Stripe.</p>
         <?php if($needsDrive):?>
           <div class="notice warning">
             <strong>Google Drive delivery instructions</strong>
@@ -35,6 +46,6 @@
           <label>Google Drive email required for manual delivery<input type="email" name="google_drive_email" required value="<?=H::e($_POST['google_drive_email'] ?? H::user()['email'] ?? '')?>"></label>
           <p class="help-text">Sellers use this email to manually grant Google Drive access outside Asset Moth.</p>
         <?php endif;?>
-        <button class="btn">Continue to secure Stripe checkout</button>
+        <button class="btn">Calculate tax and complete checkout</button>
     </form>
 <?php endif;?>
