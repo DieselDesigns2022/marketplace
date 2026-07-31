@@ -141,7 +141,13 @@ try {
     $pdo->beginTransaction();$credits->grant($concurrentUser,'10.00','concurrent:grant:'.$suffix);$pdo->commit();
     $pdo->beginTransaction();
     $credits->reserve($concurrentUser,'10.00',$concurrentOrderA,'concurrent:reserve:a:'.$suffix);
-    $environment=['DB_HOST'=>(string)($_ENV['DB_HOST']??'127.0.0.1'),'DB_NAME'=>$fixture,'DB_USER'=>(string)($_ENV['DB_USER']??'root'),'DB_PASS'=>(string)($_ENV['DB_PASS']??'')];
+    $environment=[
+        'DB_HOST'=>(string)($_ENV['DB_HOST']??getenv('DB_HOST')?:'127.0.0.1'),
+        'DB_NAME'=>$fixture,
+        'DB_USER'=>(string)($_ENV['DB_USER']??getenv('DB_USER')?:'root'),
+        'DB_PASS'=>(string)($_ENV['DB_PASS']??getenv('DB_PASS')?:''),
+        'DB_CHARSET'=>(string)($_ENV['DB_CHARSET']??getenv('DB_CHARSET')?:'utf8mb4'),
+    ];
     $command=[PHP_BINARY,__DIR__.'/helpers/Phase11CreditReservationProbe.php',(string)$concurrentUser,'10.00',(string)$concurrentOrderB,'concurrent:reserve:b:'.$suffix];
     $pipes=[];$process=proc_open($command,[1=>['pipe','w'],2=>['pipe','w']],$pipes,null,$environment);
     usleep(250000);
@@ -199,7 +205,7 @@ try {
         $pdo->prepare('insert into users(name,email,password_hash,role,status,referral_code) values (?,?,?,?,?,?)')->execute(['Eligibility user','elig-user-'.$caseIndex.'-'.$suffix.'@example.test','x','buyer','active','AMEU'.$caseIndex.$suffix]);
         $eligUser=(int)$pdo->lastInsertId();
         $referrals->attach($eligUser,'AMER'.$caseIndex.$suffix,'buyer');
-        $pdo->prepare('insert into orders(user_id,status,payment_status,subtotal,coupon_discount,tax_amount,credits_applied,total,stripe_paid_amount,manual_review_required) values (?,?,?,?,0,0,0,10,?,?)')->execute([$eligUser,$status,$payment,$stripePaid,$manualReview]);
+        $pdo->prepare('insert into orders(user_id,status,payment_status,subtotal,coupon_discount,tax_amount,credits_applied,total,stripe_paid_amount,manual_review_required) values (?,?,?,10,0,0,0,10,?,?)')->execute([$eligUser,$status,$payment,$stripePaid,$manualReview]);
         $check(!$referrals->qualifyBuyer((int)$pdo->lastInsertId(),'eligibility:'.$caseIndex.':'.$suffix),'failed/cancelled/refunded/unpaid/manual-review/credit-only buyer order does not qualify case '.$caseIndex);
     }
     $pdo->rollBack();
