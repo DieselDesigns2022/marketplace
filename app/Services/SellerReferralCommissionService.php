@@ -59,13 +59,13 @@ final class SellerReferralCommissionService
             if ($amount === 0) {
                 continue;
             }
-            $inserted = DB::exec(
+            $statement = DB::pdo()->prepare(
                 'insert ignore into seller_referral_commission_ledger
                  (referral_id,order_id,order_item_id,entry_type,amount_cents,seller_earning_cents,event_key)
-                 values (?,?,?,"accrual",?,?,?)',
-                [$referral['id'], $orderId, $item['id'], $amount, $earning, 'seller-referral:accrual:item:' . $item['id']]
+                 values (?,?,?,"accrual",?,?,?)'
             );
-            if ($inserted) {
+            $statement->execute([$referral['id'], $orderId, $item['id'], $amount, $earning, 'seller-referral:' . $referral['id'] . ':item:' . $item['id'] . ':accrual']);
+            if ($statement->rowCount() === 1) {
                 $total += $amount;
             }
         }
@@ -110,11 +110,12 @@ final class SellerReferralCommissionService
         if (!in_array($reason, ['store_disabled', 'store_inactive', 'store_deleted'], true)) {
             throw new DomainException('Invalid permanent commission stop reason.');
         }
-        return DB::exec(
+        $statement = DB::pdo()->prepare(
             'update referrals set commission_end_reason=?,commission_ended_at=utc_timestamp()
-             where referred_user_id=? and seller_reward_type="lifetime_commission" and commission_ended_at is null',
-            [$reason, $referredUserId]
-        ) > 0;
+             where referred_user_id=? and seller_reward_type="lifetime_commission" and commission_ended_at is null'
+        );
+        $statement->execute([$reason, $referredUserId]);
+        return $statement->rowCount() > 0;
     }
 
     public function notifyPermanentStop(int $referredUserId): void

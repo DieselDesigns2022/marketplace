@@ -115,17 +115,17 @@ final class ReferralService
                 if ($ownsTransaction) DB::rollBack();
                 return false;
             }
-            $firstItem = DB::row('select min(id) id from order_items where order_id=? and designer_id=?', [$orderId, $designerId]);
-            $prior = DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status="paid" and o.status not in ("failed","cancelled","refunded","partially_refunded") and coalesce(o.manual_review_required,0)=0 and o.refunded_at is null and o.partially_refunded_at is null and o.id<? limit 1', [$designerId, $orderId]);
+            $firstItem = DB::row('select id from order_items where order_id=? and designer_id=? order by id limit 1', [$orderId, $designerId]);
+            $prior = DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and oi.order_id<>? and o.payment_status="paid" and o.status not in ("failed","cancelled","refunded","partially_refunded") and coalesce(o.manual_review_required,0)=0 and o.refunded_at is null and o.partially_refunded_at is null and o.id<? order by o.id,oi.id limit 1', [$designerId, $orderId, $orderId]);
             $referral = DB::row('select * from referrals where referred_user_id=? and seller_intent=1 for update', [(int)$designer['user_id']]);
-            if ($prior || !$referral || !empty($referral['seller_reward_type'])) {
+            if (!$firstItem || $prior || !$referral || !empty($referral['seller_reward_type'])) {
                 if ($ownsTransaction) DB::rollBack();
                 return false;
             }
             $approvedReferrer=DB::row('select id from designers where user_id=? and status="approved"',[$referral['referrer_user_id']]);
             $rewardType=$approvedReferrer?'lifetime_commission':'store_credit';
             if($rewardType==='store_credit'){
-                $this->credits->grant((int)$referral['referrer_user_id'],self::SELLER_REWARD,'referral:'.$referral['id'].':seller:referrer',['referral_id'=>(int)$referral['id'],'description'=>'Seller referral reward']);
+                $this->credits->grant((int)$referral['referrer_user_id'],self::SELLER_REWARD,'referral:'.$referral['id'].':seller-store-credit:referrer:v2',['referral_id'=>(int)$referral['id'],'description'=>'Seller referral reward']);
             }
             DB::exec('update referrals set seller_reward_type=?,seller_reward_type_selected_at=now(),seller_status="rewarded",seller_referrer_reward_amount=?,seller_referred_reward_amount=0,seller_qualifying_order_id=?,seller_qualifying_order_item_id=?,seller_reward_event_key=?,seller_rewarded_at=now(),status="qualified",reward_status="rewarded",qualified_at=coalesce(qualified_at,now()),rewarded_at=coalesce(rewarded_at,now()) where id=? and seller_reward_type is null', [$rewardType,$rewardType==='store_credit'?self::SELLER_REWARD:'0.00',$orderId,$firstItem['id']??null,$eventKey,$referral['id']]);
             if ($ownsTransaction) DB::commit();

@@ -51,7 +51,7 @@ CREATE TABLE designers
     announcement TEXT,
     receipt_note VARCHAR(500) NULL,
     receipt_image_path VARCHAR(255) NULL,
-    status ENUM('approved','disabled','inactive','deleted') DEFAULT 'approved',
+    status ENUM('approved','disabled','inactive','deleted') NOT NULL DEFAULT 'approved',
     creator_rank ENUM('Bronze','Silver','Gold','Platinum','Legend') DEFAULT 'Bronze',
     rank_override BOOLEAN DEFAULT 0,
     is_featured BOOLEAN DEFAULT 0,

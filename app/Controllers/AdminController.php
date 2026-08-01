@@ -148,12 +148,11 @@ class AdminController
             $status = ($_POST['status'] ?? '') === 'active' ? 'active' : 'disabled';
             DB::begin();
             try {
-                if ($status === 'disabled') {
-                    (new SellerReferralCommissionService())->permanentlyStop($userId, 'store_disabled');
-                }
+                $commissionStopped = $status === 'disabled'
+                    && (new SellerReferralCommissionService())->permanentlyStop($userId, 'store_disabled');
                 DB::exec('update users set status=? where id=?', [$status, $userId]);
                 DB::commit();
-                if ($status === 'disabled') {
+                if ($commissionStopped) {
                     (new SellerReferralCommissionService())->notifyPermanentStop($userId);
                 }
             } catch (Throwable $error) {
@@ -302,10 +301,12 @@ class AdminController
                     if (!$owner) {
                         throw new \DomainException('Seller was not found.');
                     }
-                    (new SellerReferralCommissionService())->permanentlyStop((int)$owner['user_id'], $reason);
+                    $commissionStopped = (new SellerReferralCommissionService())->permanentlyStop((int)$owner['user_id'], $reason);
                     DB::exec('update designers set status=?, updated_at=now() where id=?', [$status, $id]);
                     DB::commit();
-                    (new SellerReferralCommissionService())->notifyPermanentStop((int)$owner['user_id']);
+                    if ($commissionStopped) {
+                        (new SellerReferralCommissionService())->notifyPermanentStop((int)$owner['user_id']);
+                    }
                     H::flash('success', 'Seller status updated. Referral commission cannot restart.');
                 } catch (Throwable $error) {
                     DB::rollBack();
