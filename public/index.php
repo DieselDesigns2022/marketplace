@@ -113,6 +113,7 @@ use App\Controllers\AdminCreditController;
  $router->get('/admin/credits', [AdminCreditController::class, 'index']);
  $router->post('/admin/credits/adjust', [AdminCreditController::class, 'adjust']);
  $router->post('/admin/platform-credit-payouts/{id}/settle', [AdminCreditController::class, 'settlePlatformCreditPayout']);
+ $router->post('/admin/seller-referral-payouts/{id}/retry', [AdminCreditController::class, 'retrySellerReferralPayout']);
  $router->match(['GET','POST'], '/admin/homepage', [AdminController::class, 'homepage']);
  $router->match(['GET','POST'], '/admin/ads', [AdminController::class, 'ads']);
  $router->dispatch($_SERVER['REQUEST_METHOD'], parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));

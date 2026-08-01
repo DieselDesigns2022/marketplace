@@ -8,6 +8,7 @@ use App\Services\OrderFinalizationService;
 use App\Services\PlatformCreditPayoutService;
 use App\Services\ReferralService;
 use App\Services\StripeService;
+use App\Services\SellerReferralCommissionService;
 
 $failures = [];
 $check = function (bool $condition, string $message) use (&$failures): void {
@@ -47,6 +48,8 @@ try {
     $pdo->exec('delete from credit_transactions where type is null');
     $check($nullUserRejected && $orphanUserRejected && $nullTypeRejected, 'migration rejects null/orphan credit actors and null transaction types before changing legacy data');
     $pdo->exec($migration);
+    $sellerReferralMigration = file_get_contents(dirname(__DIR__) . '/database/migrations/2026_08_01_phase_11_seller_referral_lifetime_commission.sql');
+    $pdo->exec($sellerReferralMigration);
     $snapshot = static function (PDO $pdo): string {
         $schema = $pdo->query("select table_name,column_name,column_type,is_nullable,column_default from information_schema.columns where table_schema=database() order by table_name,ordinal_position")->fetchAll(PDO::FETCH_ASSOC);
         $indexes = $pdo->query("select table_name,index_name,column_name,non_unique from information_schema.statistics where table_schema=database() order by table_name,index_name,seq_in_index")->fetchAll(PDO::FETCH_ASSOC);
@@ -56,14 +59,16 @@ try {
     };
     $first = $snapshot($pdo);
     $pdo->exec($migration);
+    $pdo->exec($sellerReferralMigration);
     $second = $snapshot($pdo);
     $pdo->exec($migration);
+    $pdo->exec($sellerReferralMigration);
     $third = $snapshot($pdo);
-    $check($first === $second && $second === $third, 'migration second and third runs preserve schema and data');
+    $check($first === $second && $second === $third, 'both Phase 11 migrations preserve schema and data on second and third runs');
     $phase11Structure = static function(PDO $pdo): array {
-        $columns=$pdo->query("select table_name,column_name,column_type,is_nullable,column_default from information_schema.columns where table_schema=database() and ((table_name='referrals' and column_name in ('buyer_status','seller_status','buyer_qualifying_order_id','seller_qualifying_order_id','seller_qualifying_order_item_id','buyer_referrer_reward_amount','buyer_referred_reward_amount','seller_referrer_reward_amount','seller_referred_reward_amount','buyer_reward_event_key','seller_reward_event_key')) or (table_name='marketplace_credits') or (table_name='credit_transactions') or (table_name='orders' and column_name in ('credit_reserved','credit_payment_status','internally_completed','stripe_paid_amount','tax_calculation_id','tax_transaction_id','tax_transaction_status','billing_address_snapshot','finalization_key','finalized_at')) or (table_name='seller_payouts' and column_name in ('platform_credit_attempt_key','platform_credit_settled_at','platform_credit_settled_by'))) order by table_name,column_name")->fetchAll(PDO::FETCH_ASSOC);
-        $indexes=$pdo->query("select table_name,index_name,column_name,non_unique,seq_in_index from information_schema.statistics where table_schema=database() and (index_name like 'referrals_%' or index_name in ('credit_transactions_idempotency_unique','credit_transactions_user_created_idx','credit_transactions_order_idx','credit_transactions_referral_idx','credit_transactions_related_idx','orders_finalization_key_unique','seller_payouts_platform_credit_attempt_unique')) order by table_name,index_name,seq_in_index")->fetchAll(PDO::FETCH_ASSOC);
-        $foreignKeys=$pdo->query("select table_name,constraint_name,column_name,referenced_table_name,referenced_column_name from information_schema.key_column_usage where table_schema=database() and constraint_name like 'phase11_%' order by table_name,constraint_name,ordinal_position")->fetchAll(PDO::FETCH_ASSOC);
+        $columns=$pdo->query("select table_name,column_name,column_type,is_nullable,column_default from information_schema.columns where table_schema=database() and ((table_name='referrals' and column_name in ('buyer_status','seller_status','buyer_qualifying_order_id','seller_qualifying_order_id','seller_qualifying_order_item_id','buyer_referrer_reward_amount','buyer_referred_reward_amount','seller_referrer_reward_amount','seller_referred_reward_amount','buyer_reward_event_key','seller_reward_event_key','seller_reward_type','seller_reward_type_selected_at','commission_ended_at','commission_end_reason','seller_legacy_pair_credit')) or table_name in ('seller_referral_commission_ledger','seller_referral_payout_batches','seller_referral_payout_items','seller_referral_transfer_attempts','seller_referral_admin_audits','marketplace_credits','credit_transactions') or (table_name='designers' and column_name='status') or (table_name='orders' and column_name in ('credit_reserved','credit_payment_status','internally_completed','stripe_paid_amount','tax_calculation_id','tax_transaction_id','tax_transaction_status','billing_address_snapshot','finalization_key','finalized_at')) or (table_name='seller_payouts' and column_name in ('platform_credit_attempt_key','platform_credit_settled_at','platform_credit_settled_by'))) order by table_name,column_name")->fetchAll(PDO::FETCH_ASSOC);
+        $indexes=$pdo->query("select table_name,index_name,column_name,non_unique,seq_in_index from information_schema.statistics where table_schema=database() and (index_name like 'referrals_%' or index_name like 'seller_ref_%' or index_name in ('credit_transactions_idempotency_unique','credit_transactions_user_created_idx','credit_transactions_order_idx','credit_transactions_referral_idx','credit_transactions_related_idx','orders_finalization_key_unique','seller_payouts_platform_credit_attempt_unique')) order by table_name,index_name,seq_in_index")->fetchAll(PDO::FETCH_ASSOC);
+        $foreignKeys=$pdo->query("select table_name,constraint_name,column_name,referenced_table_name,referenced_column_name from information_schema.key_column_usage where table_schema=database() and (constraint_name like 'phase11_%' or constraint_name like 'seller_ref_%') order by table_name,constraint_name,ordinal_position")->fetchAll(PDO::FETCH_ASSOC);
         return [$columns,$indexes,$foreignKeys];
     };
     $migratedStructure=$phase11Structure($pdo);
@@ -184,10 +189,43 @@ try {
     $pdo->prepare('insert into order_items(order_id,designer_id,product_id,total_price,commission_rate) values (?,?,1,10,.18),(?,?,2,10,.18)')->execute([$sellerRewardOrder,$rewardDesigner,$sellerRewardOrder,$rewardDesigner]);
     $check($referrals->qualifySeller($sellerRewardOrder,$rewardDesigner,'reward:seller:'.$suffix) && !$referrals->qualifySeller($sellerRewardOrder,$rewardDesigner,'reward:seller:'.$suffix),'multiple same-seller items and replay reward seller once');
     $rewardRow=$pdo->query('select * from referrals where id='.$relationship)->fetch(PDO::FETCH_ASSOC);
-    $check($rewardRow['buyer_referrer_reward_amount']==='1.50' && $rewardRow['buyer_referred_reward_amount']==='1.50' && $rewardRow['seller_referrer_reward_amount']==='5.00' && $rewardRow['seller_referred_reward_amount']==='5.00','buyer and seller grant exact independent dual-party amounts');
+    $check($rewardRow['buyer_referrer_reward_amount']==='1.50' && $rewardRow['buyer_referred_reward_amount']==='1.50' && $rewardRow['seller_referrer_reward_amount']==='5.00' && $rewardRow['seller_referred_reward_amount']==='0.00','non-seller referrer receives $5 and referred seller receives no matching seller credit');
     $check($rewardRow['buyer_reward_event_key']===$buyerSnapshot['buyer_reward_event_key'] && $rewardRow['buyer_qualifying_order_id']===$buyerSnapshot['buyer_qualifying_order_id'],'seller qualification does not overwrite buyer reward history');
     $grantRows=$pdo->query("select amount from credit_transactions where referral_id=$relationship and type='grant' order by amount")->fetchAll(PDO::FETCH_COLUMN);
-    $check($grantRows===['1.50','1.50','5.00','5.00'],'ledger is financial source for both reward pairs exactly once');
+    $check($grantRows===['1.50','1.50','5.00'],'ledger contains the buyer pair and only the seller referrer $5 grant exactly once');
+    $pdo->rollBack();
+
+    // Approved-seller referrer selects immutable lifetime commission and accrues per stored item earnings.
+    $pdo->beginTransaction();
+    $pdo->prepare('insert into users(name,email,password_hash,role,status,referral_code) values (?,?,?,?,?,?)')->execute(['Seller referrer','seller-ref-'.$suffix.'@example.test','x','designer','active','AMSELLREF'.$suffix]);
+    $sellerReferrer=(int)$pdo->lastInsertId();
+    $pdo->prepare('insert into designers(user_id,status,stripe_connect_account_id,stripe_details_submitted,stripe_payouts_enabled) values (?,"approved","acct_referrer",1,1)')->execute([$sellerReferrer]);
+    $pdo->prepare('insert into users(name,email,password_hash,role,status,referral_code) values (?,?,?,?,?,?)')->execute(['New seller','new-seller-'.$suffix.'@example.test','x','buyer','active','AMNEWSELL'.$suffix]);
+    $newSeller=(int)$pdo->lastInsertId();
+    $sellerRelationship=$referrals->attach($newSeller,'AMSELLREF'.$suffix,'seller');
+    $pdo->prepare('insert into designers(user_id,status) values (?,"approved")')->execute([$newSeller]);
+    $newDesigner=(int)$pdo->lastInsertId();
+    $pdo->prepare('insert into orders(user_id,status,payment_status,subtotal,coupon_discount,tax_amount,credits_applied,total,stripe_paid_amount,manual_review_required) values (?,"paid","paid",2,0,0,0,2,2,0)')->execute([$sellerReferrer]);
+    $commissionOrder=(int)$pdo->lastInsertId();
+    $pdo->prepare('insert into order_items(order_id,designer_id,product_id,total_price,commission_rate,seller_payout_amount) values (?,?,501,.49,0,.49),(?,?,502,.50,0,.50),(?,?,503,1.49,0,1.49),(?,?,504,1.50,0,1.50)')->execute([$commissionOrder,$newDesigner,$commissionOrder,$newDesigner,$commissionOrder,$newDesigner,$commissionOrder,$newDesigner]);
+    $check($referrals->qualifySeller($commissionOrder,$newDesigner,'commission:qualify:'.$suffix),'approved referred seller qualifies on first paid sale');
+    $commissionService=new SellerReferralCommissionService();
+    $check($commissionService->accrueOrder($commissionOrder,$newDesigner)===4 && $commissionService->accrueOrder($commissionOrder,$newDesigner)===0,'multiple items accrue exact rounded cents once under replay');
+    $selected=$pdo->query('select seller_reward_type,seller_referrer_reward_amount,seller_referred_reward_amount from referrals where id='.$sellerRelationship)->fetch(PDO::FETCH_ASSOC);
+    $check($selected['seller_reward_type']==='lifetime_commission' && $selected['seller_referrer_reward_amount']==='0.00' && $selected['seller_referred_reward_amount']==='0.00','approved seller gets immutable lifetime commission and no store credit pair');
+    $check((int)$pdo->query('select count(*) from credit_transactions where referral_id='.$sellerRelationship)->fetchColumn()===0,'lifetime commission creates no buyer Stripe onboarding or store credit');
+    $beforePayouts=$pdo->query('select id,seller_payout_amount from order_items where order_id='.$commissionOrder.' order by id')->fetchAll(PDO::FETCH_ASSOC);
+    $pdo->exec('update order_items set seller_payout_amount=0 where order_id='.$commissionOrder);
+    $commissionService->reconcileRefund($commissionOrder,200);
+    $adjustmentCount=(int)$pdo->query("select count(*) from seller_referral_commission_ledger where order_id=$commissionOrder and entry_type='refund_adjustment'")->fetchColumn();
+    $commissionService->reconcileRefund($commissionOrder,200);
+    $check($adjustmentCount===3 && (int)$pdo->query("select count(*) from seller_referral_commission_ledger where order_id=$commissionOrder and entry_type='refund_adjustment'")->fetchColumn()===3,'full refund appends linked adjustments and cumulative replay adds none');
+    $afterPayouts=$pdo->query('select id,seller_payout_amount from order_items where order_id='.$commissionOrder.' order by id')->fetchAll(PDO::FETCH_ASSOC);
+    $check($beforePayouts!==$afterPayouts,'refund fixture changes seller payout before commission reconciliation without commission mutating it');
+    $check($commissionService->permanentlyStop($newSeller,'store_disabled') && !$commissionService->permanentlyStop($newSeller,'store_deleted'),'first permanent stop wins and cannot be overwritten');
+    $stop=$pdo->query('select commission_ended_at,commission_end_reason from referrals where id='.$sellerRelationship)->fetch(PDO::FETCH_ASSOC);
+    $pdo->exec('update designers set status="approved" where id='.$newDesigner);
+    $check($stop['commission_end_reason']==='store_disabled' && $commissionService->accrueOrder($commissionOrder,$newDesigner)===0,'reactivation cannot restart accrual after permanent stop');
     $pdo->rollBack();
 
     $pdo->beginTransaction();

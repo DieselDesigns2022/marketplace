@@ -1300,7 +1300,7 @@ class SellerController
         H::requireSeller();
         $data = (new \App\Services\ReferralService)->dashboard((int)H::user()['id']);
         $sellerReferrals = array_values(array_filter($data['made'], static fn(array $referral): bool => !empty($referral['seller_intent'])));
-        H::view('seller/referrals', ['refs' => $sellerReferrals, 'referralCode' => $data['code']]);
+        H::view('seller/referrals', ['refs' => $sellerReferrals, 'payouts' => $data['payouts'], 'referralCode' => $data['code']]);
 
     }
     public function rank()

@@ -146,3 +146,19 @@ The disposable suite requires `proc_open`, permission to create/drop randomized 
 
 
 Codex could not connect to MariaDB or execute live Stripe test-mode requests during the Phase 11 audit. A `SKIP` from the fixture suite and unexecuted Stripe API verification are deployment blockers, not passes.
+# Monthly seller-referral commissions (Phase 11)
+
+After applying `2026_08_01_phase_11_seller_referral_lifetime_commission.sql`, run the
+following once per month for the prior closed UTC month (the optional argument is
+the payout month):
+
+```bash
+php scripts/pay_seller_referral_commissions.php YYYY-MM
+```
+
+The command uses each approved referrer's existing Stripe Connect account and a
+stable seller/month idempotency key. It intentionally creates platform-balance
+transfers without a source transaction. A non-zero status requires operator
+attention; failed or onboarding-incomplete earnings remain in the unpaid ledger.
+
+The monthly period is a closed UTC calendar month. Omitting `YYYY-MM` selects the previous closed UTC month. Processing claims expire after 15 minutes; an admin retry recovers stale processing with the same batch idempotency key. Failed/not-ready batches retain claimed unpaid ledger entries for controlled retry. Later adjustments after a paid batch are included in a new sequence for that period or offset a future positive batch; negative balances never produce Stripe transfers.

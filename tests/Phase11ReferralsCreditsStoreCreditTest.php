@@ -4,6 +4,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Services\CreditService;
 use App\Services\ReferralService;
+use App\Services\SellerReferralCommissionService;
 use App\Services\StripeService;
 
 $failures = [];
@@ -31,6 +32,12 @@ $check($partial === ['subtotal_cents'=>1000,'discount_cents'=>200,'tax_cents'=>8
 $full = CreditService::checkoutBreakdown('10.00', '2.00', '0.80', '20.00', true);
 $check($full['credit_cents'] === 880 && $full['final_cents'] === 0, 'credit can cover merchandise and tax exactly');
 $check(ReferralService::validFormat('AM12_ABCD') && !ReferralService::validFormat('12345678') && !ReferralService::validFormat('bad!'), 'referral codes are URL-safe and numeric IDs are rejected');
+$check(SellerReferralCommissionService::commissionCents(0)===0 && SellerReferralCommissionService::commissionCents(49)===0 && SellerReferralCommissionService::commissionCents(50)===1 && SellerReferralCommissionService::commissionCents(149)===1 && SellerReferralCommissionService::commissionCents(150)===2, 'seller referral 1% uses exact integer cents with half-up rounding');
+$check(SellerReferralCommissionService::periodBounds('2024-02')===['2024-02-01 00:00:00','2024-03-01 00:00:00'], 'monthly payout uses exact UTC calendar boundaries including leap months');
+foreach (['2024-00','2024-13','2024-1','not-a-month'] as $invalidPeriod) {
+    try { SellerReferralCommissionService::periodBounds($invalidPeriod); $periodRejected=false; } catch (DomainException) { $periodRejected=true; }
+    $check($periodRejected, 'invalid payout period rejected: '.$invalidPeriod);
+}
 $check(ReferralService::BUYER_REWARD === '1.50' && ReferralService::SELLER_REWARD === '5.00', 'reward constants are exact');
 $address = ['line1'=>' 1 main st ','city'=>'Town','state'=>'ca','postal_code'=>'90210','country'=>'us'];
 $check(StripeService::billingAddressMatches(StripeService::normalizeBillingAddress($address), ['line1'=>'1 MAIN ST','city'=>'TOWN','state'=>'CA','postal_code'=>'90210','country'=>'US']), 'normalized authoritative billing address matches Stripe response');
