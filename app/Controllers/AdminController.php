@@ -711,13 +711,235 @@ class AdminController
     public function homepage()
     {
         $this->gate();
-        if($_POST)
-        {
-           DB::exec('insert into homepage_features (feature_type,feature_id,sort_order,is_active) values (?,?,?,1)',[$_POST['feature_type'],$_POST['feature_id'],$_POST['sort_order']]);
 
+        if ($_POST) {
+            H::verifyCsrf();
+
+            $action = trim((string)($_POST['action'] ?? 'add'));
+
+            if ($action === 'delete') {
+                $featureRecordId = (int)($_POST['feature_record_id'] ?? 0);
+                $feature = DB::row(
+                    'select id from homepage_features where id=?',
+                    [$featureRecordId]
+                );
+
+                if (!$feature) {
+                    H::flash('error', 'Homepage feature not found.');
+                    H::redirect('/admin/homepage');
+                }
+
+                DB::exec(
+                    'delete from homepage_features where id=?',
+                    [$featureRecordId]
+                );
+
+                H::flash('success', 'Homepage feature removed.');
+                H::redirect('/admin/homepage');
+            }
+
+            if ($action === 'update') {
+                $featureRecordId = (int)($_POST['feature_record_id'] ?? 0);
+                $isActive = isset($_POST['is_active']) ? 1 : 0;
+
+                $feature = DB::row(
+                    'select id from homepage_features where id=?',
+                    [$featureRecordId]
+                );
+
+                if (!$feature) {
+                    H::flash('error', 'Homepage feature not found.');
+                    H::redirect('/admin/homepage');
+                }
+
+                DB::exec(
+                    'update homepage_features
+                     set is_active=?,updated_at=now()
+                     where id=?',
+                    [$isActive, $featureRecordId]
+                );
+
+                H::flash('success', 'Homepage feature updated.');
+                H::redirect('/admin/homepage');
+            }
+
+            if ($action === 'reorder') {
+                $featureType = trim((string)($_POST['feature_type'] ?? ''));
+                $allowedTypes = ['product', 'designer', 'category'];
+
+                if (!in_array($featureType, $allowedTypes, true)) {
+                    H::flash('error', 'Invalid homepage feature type.');
+                    H::redirect('/admin/homepage');
+                }
+
+                $rawOrder = trim((string)($_POST['feature_order'] ?? ''));
+                $ids = array_values(array_unique(array_filter(
+                    array_map(
+                        static fn($value) => ctype_digit(trim($value))
+                            ? (int)trim($value)
+                            : 0,
+                        explode(',', $rawOrder)
+                    ),
+                    static fn($value) => $value > 0
+                )));
+
+                $existingRows = DB::rows(
+                    'select id
+                     from homepage_features
+                     where feature_type=?
+                     order by sort_order,id',
+                    [$featureType]
+                );
+
+                $existingIds = array_map(
+                    static fn($row) => (int)$row['id'],
+                    $existingRows
+                );
+
+                $submittedIds = $ids;
+                sort($existingIds);
+                sort($submittedIds);
+
+                if ($existingIds !== $submittedIds) {
+                    H::flash(
+                        'error',
+                        'The homepage order could not be saved. Refresh and try again.'
+                    );
+                    H::redirect('/admin/homepage');
+                }
+
+                try {
+                    DB::begin();
+
+                    foreach ($ids as $position => $id) {
+                        DB::exec(
+                            'update homepage_features
+                             set sort_order=?,updated_at=now()
+                             where id=? and feature_type=?',
+                            [$position, $id, $featureType]
+                        );
+                    }
+
+                    DB::commit();
+                    H::flash('success', 'Homepage order saved.');
+                } catch (Throwable $error) {
+                    DB::rollBack();
+                    H::flash('error', 'The homepage order could not be saved.');
+                }
+
+                H::redirect('/admin/homepage');
+            }
+
+            $target = trim((string)($_POST['feature_target'] ?? ''));
+
+            [$featureType, $rawId] = array_pad(explode(':', $target, 2), 2, '');
+            $allowedTypes = ['product', 'designer', 'category'];
+
+            if (!in_array($featureType, $allowedTypes, true) || !ctype_digit($rawId) || (int)$rawId < 1) {
+                H::flash('error', 'Please choose a valid homepage feature.');
+                H::redirect('/admin/homepage');
+            }
+
+            $featureId = (int)$rawId;
+
+            $exists = match ($featureType) {
+                'designer' => DB::row(
+                    'select id from designers where id=? and status="approved"',
+                    [$featureId]
+                ),
+                'product' => DB::row(
+                    'select id from products where id=? and status in ("approved","published")',
+                    [$featureId]
+                ),
+                'category' => DB::row(
+                    'select id from categories where id=? and is_active=1',
+                    [$featureId]
+                ),
+            };
+
+            if (!$exists) {
+                H::flash('error', 'That item is not available to feature.');
+                H::redirect('/admin/homepage');
+            }
+
+            $duplicate = DB::row(
+                'select id from homepage_features where feature_type=? and feature_id=? limit 1',
+                [$featureType, $featureId]
+            );
+
+            if ($duplicate) {
+                H::flash('warning', 'That item is already listed as a homepage feature.');
+                H::redirect('/admin/homepage');
+            }
+
+            $nextOrder = (int)(
+                DB::row(
+                    'select coalesce(max(sort_order),-1)+1 next_order
+                     from homepage_features
+                     where feature_type=?',
+                    [$featureType]
+                )['next_order'] ?? 0
+            );
+
+            DB::exec(
+                'insert into homepage_features
+                 (feature_type,feature_id,sort_order,is_active)
+                 values (?,?,?,1)',
+                [$featureType, $featureId, $nextOrder]
+            );
+
+            H::flash('success', 'Homepage feature added.');
+            H::redirect('/admin/homepage');
         }
-        H::view('admin/homepage',['features'=>DB::rows('select * from homepage_features')]);
 
+        $features = DB::rows(
+            'select hf.*,
+                    case
+                        when hf.feature_type="designer" then coalesce(d.display_name,d.store_slug,concat("Designer #",hf.feature_id))
+                        when hf.feature_type="product" then coalesce(p.title,concat("Product #",hf.feature_id))
+                        when hf.feature_type="category" then coalesce(c.name,concat("Category #",hf.feature_id))
+                        else concat("Item #",hf.feature_id)
+                    end feature_name
+             from homepage_features hf
+             left join designers d on hf.feature_type="designer" and d.id=hf.feature_id
+             left join products p on hf.feature_type="product" and p.id=hf.feature_id
+             left join categories c on hf.feature_type="category" and c.id=hf.feature_id
+             order by hf.sort_order,hf.id'
+        );
+
+        $groupedFeatures = [
+            'product' => [],
+            'designer' => [],
+            'category' => [],
+        ];
+
+        foreach ($features as $feature) {
+            $type = $feature['feature_type'];
+
+            if (isset($groupedFeatures[$type])) {
+                $groupedFeatures[$type][] = $feature;
+            }
+        }
+
+        H::view('admin/homepage', [
+            'features' => $features,
+            'groupedFeatures' => $groupedFeatures,
+            'designers' => DB::rows(
+                'select id,coalesce(display_name,store_slug,concat("Designer #",id)) label
+                 from designers where status="approved" order by label'
+            ),
+            'products' => DB::rows(
+                'select p.id,concat(coalesce(p.title,concat("Product #",p.id))," — ",coalesce(d.display_name,d.store_slug,"Unknown seller")) label
+                 from products p
+                 left join designers d on d.id=p.designer_id
+                 where p.status in ("approved","published")
+                 order by label'
+            ),
+            'categories' => DB::rows(
+                'select id,coalesce(name,concat("Category #",id)) label
+                 from categories where is_active=1 order by label'
+            ),
+        ]);
     }
     public function ads()
     {

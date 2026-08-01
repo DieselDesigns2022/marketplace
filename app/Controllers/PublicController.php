@@ -56,9 +56,42 @@ class PublicController
     public function home(): void
     {
         $cats = $this->visibleCategories(8);
-        $products = DB::rows("select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status='approved' and d.status='approved' and p.is_featured=1 order by p.updated_at desc,p.id desc limit 8");
+        $products = DB::rows(
+            'select p.*,
+                    1 is_featured,
+                    d.display_name,
+                    d.store_slug,
+                    c.name category_name,
+                    c.slug category_slug,
+                    (
+                        select image_path
+                        from product_images pi
+                        where pi.product_id=p.id
+                        order by pi.sort_order,pi.id
+                        limit 1
+                    ) preview_image
+             from homepage_features hf
+             join products p on p.id=hf.feature_id
+             join designers d on d.id=p.designer_id
+             left join categories c on c.id=p.category_id
+             where hf.feature_type="product"
+               and hf.is_active=1
+               and p.status in ("approved","published")
+               and d.status="approved"
+             order by hf.sort_order,hf.id
+             limit 8'
+        );
         $recentProducts = DB::rows("select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status='approved' and d.status='approved' order by p.created_at desc,p.id desc limit 8");
-        $designers = DB::rows('select * from designers where status="approved" and is_featured=1 order by updated_at desc,id desc limit 6');
+        $designers = DB::rows(
+            'select d.*
+             from homepage_features hf
+             join designers d on d.id=hf.feature_id
+             where hf.feature_type="designer"
+               and hf.is_active=1
+               and d.status="approved"
+             order by hf.sort_order,hf.id
+             limit 6'
+        );
         $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Asset Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
         H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'meta'=>$this->pageMeta('Asset Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
     }
