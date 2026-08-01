@@ -46,5 +46,9 @@ if ($action === 'adjust') {
     $_POST += ['user_id'=>$targetId, 'amount'=>$argv[7] ?? '', 'reason'=>$argv[8] ?? ''];
     $controller->adjust();
 }
+if ($action === 'retry-referral') {
+    StripeService::setTestTransport(static fn(): array => ['id'=>'tr_referral_retry_fixture']);
+    $controller->retrySellerReferralPayout($targetId);
+}
 
 http_response_code(400);

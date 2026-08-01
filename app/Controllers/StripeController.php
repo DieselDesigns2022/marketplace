@@ -10,6 +10,7 @@ use App\Services\NotificationService;
 use App\Services\OperationalErrorSanitizer;
 use App\Services\OrderFinalizationService;
 use App\Services\CreditService;
+use App\Services\SellerReferralCommissionService;
 use Throwable;
 
 class StripeController
@@ -35,6 +36,7 @@ class StripeController
         $order=DB::row('select tax_amount from orders where id=?',[$orderId]);$items=DB::rows('select id,designer_id,total_price,commission_rate,seller_payout_status from order_items where order_id=? order by id',[$orderId]);$allocation=self::allocateSellerRefund($items,$cumulative,StripeService::cents($order['tax_amount']??0));$bySeller=[];
         foreach($items as $item){$id=(int)$item['id'];$designer=(int)$item['designer_id'];$gross=StripeService::cents($item['total_price']);$originalSeller=$gross-(int)round($gross*(float)$item['commission_rate']);$refundShare=$allocation[$id]??['gross_refund_cents'=>0,'seller_refund_cents'=>0];$desiredSeller=max(0,$originalSeller-$refundShare['seller_refund_cents']);if(($item['seller_payout_status']??'')!=='transferred')DB::exec('update order_items set seller_payout_amount=? where id=? and seller_payout_status<>"transferred"',[$desiredSeller/100,$id]);$bySeller[$designer]['gross']=(($bySeller[$designer]['gross']??0)+max(0,$gross-$refundShare['gross_refund_cents']));$bySeller[$designer]['seller']=(($bySeller[$designer]['seller']??0)+$desiredSeller);}
         foreach($bySeller as $designer=>$amounts){$commission=max(0,$amounts['gross']-$amounts['seller']);DB::exec('update seller_payouts set gross_amount=?,platform_commission_amount=?,seller_payout_amount=?,updated_at=now() where order_id=? and designer_id=? and payout_status<>"transferred"',[$amounts['gross']/100,$commission/100,$amounts['seller']/100,$orderId,$designer]);}
+        (new SellerReferralCommissionService)->reconcileRefund($orderId, $cumulative);
     }
 
     public function success(): void

@@ -56,6 +56,8 @@
                    <button name="action" value="enable" onclick="return confirm('Enable this seller?');">Enable seller</button>
                <?php else: ?>
                    <button name="action" value="disable" onclick="return confirm('Disable this seller? Their seller account will no longer be approved.');">Disable seller</button>
+                   <button name="action" value="inactive" onclick="return confirm('Mark this store permanently inactive? Referral commission can never restart.');">Mark inactive</button>
+                   <button name="action" value="delete" onclick="return confirm('Mark this store deleted? Financial history will remain.');">Mark deleted</button>
                <?php endif; ?>
            </form>
            </td>

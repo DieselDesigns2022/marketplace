@@ -7,6 +7,7 @@ use App\Core\Helpers as H;
 use App\Services\CreditService;
 use App\Services\NotificationService;
 use App\Services\PlatformCreditPayoutService;
+use App\Services\SellerReferralCommissionService;
 use InvalidArgumentException;
 use Throwable;
 
@@ -29,7 +30,61 @@ final class AdminCreditController
         $selected = $selectedId ? DB::row('select u.id,u.name,u.email,coalesce(c.total_balance,0.00) total_balance,coalesce(c.reserved_balance,0.00) reserved_balance,coalesce(c.total_balance,0.00)-coalesce(c.reserved_balance,0.00) available_balance from users u left join marketplace_credits c on c.user_id=u.id where u.id=?', [$selectedId]) : null;
         $ledger = $selected ? DB::rows('select ct.*,a.name admin_name from credit_transactions ct left join users a on a.id=ct.admin_user_id where ct.user_id=? order by ct.id desc limit 100', [$selectedId]) : [];
         $referrals = DB::rows('select r.*,a.name referrer_name,b.name referred_name from referrals r join users a on a.id=r.referrer_user_id join users b on b.id=r.referred_user_id where (?=0 or r.referrer_user_id=? or r.referred_user_id=?) order by r.id desc limit 100', [$selectedId, $selectedId, $selectedId]);
-        H::view('admin/credits', compact('users', 'selected', 'ledger', 'referrals', 'query', 'page'));
+        $payoutStatus = in_array($_GET['payout_status'] ?? '', ['processing','paid','failed','not_ready'], true) ? $_GET['payout_status'] : '';
+        $payouts = DB::rows(
+            'select b.*,u.name referrer_name,d.display_name,d.store_slug,d.stripe_details_submitted,d.stripe_payouts_enabled,
+                    (select count(*) from seller_referral_transfer_attempts a where a.batch_id=b.id) attempt_count
+             from seller_referral_payout_batches b join users u on u.id=b.referrer_user_id
+             left join designers d on d.user_id=b.referrer_user_id
+             where (?="" or b.status=?) order by b.id desc limit 100',
+            [$payoutStatus, $payoutStatus]
+        );
+        $attempts = DB::rows('select * from seller_referral_transfer_attempts where batch_id in (select id from seller_referral_payout_batches order by id desc) order by id desc limit 300');
+        $commissionTotals = DB::rows(
+            'select r.id referral_id,ru.name referrer_name,du.display_name referred_store,r.commission_ended_at,r.commission_end_reason,
+                    coalesce(sum(case when l.payout_item_id is null then l.amount_cents else 0 end),0) unpaid_cents,
+                    coalesce(sum(case when l.payout_item_id is not null then l.amount_cents else 0 end),0) paid_cents,
+                    coalesce(sum(case when l.entry_type="recovery_adjustment" then l.amount_cents else 0 end),0) recovery_cents,
+                    coalesce(sum(l.amount_cents),0) lifetime_cents
+             from referrals r join users ru on ru.id=r.referrer_user_id left join designers du on du.user_id=r.referred_user_id
+             left join seller_referral_commission_ledger l on l.referral_id=r.id where r.seller_reward_type="lifetime_commission"
+             group by r.id,ru.name,du.display_name,r.commission_ended_at,r.commission_end_reason order by r.id desc'
+        );
+        H::view('admin/credits', compact('users', 'selected', 'ledger', 'referrals', 'query', 'page', 'payoutStatus', 'payouts', 'attempts', 'commissionTotals'));
+    }
+
+    public function retrySellerReferralPayout($id): void
+    {
+        H::requireRole('admin');
+        H::verifyCsrf();
+        $adminId = (int)H::user()['id'];
+        $active = DB::row('select id from users where id=? and role="admin" and status="active"', [$adminId]);
+        if (!$active) {
+            H::abort(403);
+        }
+        $batch = DB::row('select * from seller_referral_payout_batches where id=?', [(int)$id]);
+        if (!$batch) {
+            H::abort(404);
+        }
+        try {
+            $result = (new SellerReferralCommissionService())->retryBatch((int)$id);
+            $fresh = DB::row('select * from seller_referral_payout_batches where id=?', [(int)$id]);
+            DB::exec(
+                'insert into seller_referral_admin_audits(admin_user_id,batch_id,action,amount_cents,result_status,reason,stripe_transfer_id)
+                 values (?, ?, "retry", ?, ?, ?, ?)',
+                [$adminId, $id, $batch['amount_cents'], $result['status'], $fresh['failure_reason'] ?? null, $fresh['stripe_transfer_id'] ?? null]
+            );
+            H::flash($result['status'] === 'paid' ? 'success' : 'warning', 'Referral payout retry result: ' . str_replace('_', ' ', $result['status']) . '.');
+        } catch (Throwable $error) {
+            $safe = \App\Services\OperationalErrorSanitizer::sanitize($error->getMessage(), 500);
+            DB::exec(
+                'insert into seller_referral_admin_audits(admin_user_id,batch_id,action,amount_cents,result_status,reason)
+                 values (?, ?, "retry", ?, "rejected", ?)',
+                [$adminId, $id, $batch['amount_cents'], $safe]
+            );
+            H::flash('error', 'Referral payout retry was rejected.');
+        }
+        H::redirect('/admin/referrals?payout_status=' . rawurlencode((string)($batch['status'] ?? '')));
     }
 
     public function adjust(): void
