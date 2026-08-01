@@ -378,3 +378,11 @@ Run `php tests/Phase11ReferralsCreditsStoreCreditTest.php` for strict money, che
 
 #### Phase 11 correction matrix
 The disposable suite must pass before completion review; its cases existing in source is not a substitute for execution. Live Stripe Tax and platform-balance transfer verification remains a staging check because automated tests use the CLI-only deterministic transport. A MariaDB `SKIP` is an environment result, not a pass or release signal.
+# Phase 11 seller-referral commission checks
+
+Run `php tests/Phase11ReferralsCreditsStoreCreditTest.php` for deterministic cents,
+Stripe transport, and referral checks. The disposable database suite is
+`php tests/Phase11DatabaseIntegrationTest.php`; it requires the test MariaDB
+environment and applies the real Phase 11 migrations before exercising services.
+
+The correction suite must apply both Phase 11 migrations three times and compare canonical metadata. A MariaDB `SKIP` is a release blocker, not a pass. Required verification includes service/controller authorization and CSRF, exact cents, replay and concurrent payout claims, append-only refunds/recovery, permanent stop irreversibility, notification idempotency, and retry audit history.

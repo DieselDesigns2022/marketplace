@@ -290,3 +290,7 @@ Intentionally postponed:
 - Documentation audit aligned current Phase 11 terminology, routes, Stripe Tax Calculation/Transaction lifecycle, captured-payment recovery, independent rewards, `platform_credit_hold`, testing limits, and the no-credit-restoration refund limitation; historical phase-scoped future-work notes remain historical.
 - Added the admin-only, CSRF-protected settlement workflow for `platform_credit_hold`, stable Stripe transfer idempotency, immutable outcome logging, retry-safe failures, qualifying-reference foreign keys/indexes, and deterministic CLI Stripe transport tests.
 - Expanded Phase 11 disposable integration coverage for three-run migration/canonical comparisons, separate-connection credit and payout races, referral eligibility and dual rewards, full internal/captured finalization and recovery, communication failure isolation, and controller authorization/CSRF paths; corrected seller qualification to exclude unresolved review and refunded sales.
+
+## Phase 11 seller-referral correction
+- Replaced paired seller credits with referrer-only $5 credit or immutable approved-seller lifetime 1% commission.
+- Added append-only accrual/refund recovery, permanent store stops, monthly UTC Stripe Connect batches, notifications, and CSRF-protected admin retries.

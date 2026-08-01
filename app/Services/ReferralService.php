@@ -51,8 +51,8 @@ final class ReferralService
         if ((int)$referrer['id'] === $userId) {
             throw new DomainException('Self-referrals are not allowed.');
         }
-        if ($intent === 'seller' && DB::row('select id from designers where user_id=? and status="approved"', [$userId])) {
-            throw new DomainException('An approved seller cannot attach a seller referral.');
+        if ($intent === 'seller' && DB::row('select id from designers where user_id=?', [$userId])) {
+            throw new DomainException('An existing or previously approved seller cannot attach a seller referral.');
         }
         if ($intent === 'buyer' && DB::row('select id from orders where user_id=? limit 1', [$userId])) {
             throw new DomainException('A buyer referral cannot be attached after ordering.');
@@ -115,15 +115,19 @@ final class ReferralService
                 if ($ownsTransaction) DB::rollBack();
                 return false;
             }
-            $firstItem = DB::row('select min(id) id from order_items where order_id=? and designer_id=?', [$orderId, $designerId]);
-            $prior = DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and o.payment_status="paid" and o.status not in ("failed","cancelled","refunded","partially_refunded") and coalesce(o.manual_review_required,0)=0 and o.refunded_at is null and o.partially_refunded_at is null and o.id<? limit 1', [$designerId, $orderId]);
+            $firstItem = DB::row('select id from order_items where order_id=? and designer_id=? order by id limit 1', [$orderId, $designerId]);
+            $prior = DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where oi.designer_id=? and oi.order_id<>? and o.payment_status="paid" and o.status not in ("failed","cancelled","refunded","partially_refunded") and coalesce(o.manual_review_required,0)=0 and o.refunded_at is null and o.partially_refunded_at is null and o.id<? order by o.id,oi.id limit 1', [$designerId, $orderId, $orderId]);
             $referral = DB::row('select * from referrals where referred_user_id=? and seller_intent=1 for update', [(int)$designer['user_id']]);
-            if ($prior || !$referral || !empty($referral['seller_rewarded_at'])) {
+            if (!$firstItem || $prior || !$referral || !empty($referral['seller_reward_type'])) {
                 if ($ownsTransaction) DB::rollBack();
                 return false;
             }
-            $this->grantPair($referral, self::SELLER_REWARD, 'seller');
-            DB::exec('update referrals set seller_status="rewarded",seller_referrer_reward_amount=?,seller_referred_reward_amount=?,seller_qualifying_order_id=?,seller_qualifying_order_item_id=?,seller_reward_event_key=?,seller_rewarded_at=now(),status="qualified",reward_status="rewarded",qualified_at=coalesce(qualified_at,now()),rewarded_at=coalesce(rewarded_at,now()) where id=?', [self::SELLER_REWARD, self::SELLER_REWARD, $orderId, $firstItem['id'] ?? null, $eventKey, $referral['id']]);
+            $approvedReferrer=DB::row('select id from designers where user_id=? and status="approved"',[$referral['referrer_user_id']]);
+            $rewardType=$approvedReferrer?'lifetime_commission':'store_credit';
+            if($rewardType==='store_credit'){
+                $this->credits->grant((int)$referral['referrer_user_id'],self::SELLER_REWARD,'referral:'.$referral['id'].':seller-store-credit:referrer:v2',['referral_id'=>(int)$referral['id'],'description'=>'Seller referral reward']);
+            }
+            DB::exec('update referrals set seller_reward_type=?,seller_reward_type_selected_at=now(),seller_status="rewarded",seller_referrer_reward_amount=?,seller_referred_reward_amount=0,seller_qualifying_order_id=?,seller_qualifying_order_item_id=?,seller_reward_event_key=?,seller_rewarded_at=now(),status="qualified",reward_status="rewarded",qualified_at=coalesce(qualified_at,now()),rewarded_at=coalesce(rewarded_at,now()) where id=? and seller_reward_type is null', [$rewardType,$rewardType==='store_credit'?self::SELLER_REWARD:'0.00',$orderId,$firstItem['id']??null,$eventKey,$referral['id']]);
             if ($ownsTransaction) DB::commit();
             return true;
         } catch (Throwable $error) {
@@ -138,8 +142,15 @@ final class ReferralService
     {
         return [
             'code' => (string)(DB::row('select referral_code from users where id=?', [$userId])['referral_code'] ?? ''),
-            'made' => DB::rows('select * from referrals where referrer_user_id=? order by id desc', [$userId]),
+            'made' => DB::rows('select r.*,u.name referred_name,d.display_name referred_store,d.store_slug,
+                (select coalesce(sum(l.amount_cents),0) from seller_referral_commission_ledger l where l.referral_id=r.id) lifetime_commission_cents,
+                (select greatest(0,coalesce(sum(l.amount_cents),0)) from seller_referral_commission_ledger l where l.referral_id=r.id and l.payout_item_id is null) pending_commission_cents,
+                (select coalesce(sum(l.amount_cents),0) from seller_referral_commission_ledger l where l.referral_id=r.id and l.payout_item_id is not null) paid_commission_cents,
+                (select coalesce(sum(l.amount_cents),0) from seller_referral_commission_ledger l where l.referral_id=r.id and l.entry_type="recovery_adjustment") recovery_commission_cents
+                from referrals r join users u on u.id=r.referred_user_id left join designers d on d.user_id=r.referred_user_id
+                where r.referrer_user_id=? order by r.id desc', [$userId]),
             'connected' => DB::row('select * from referrals where referred_user_id=?', [$userId]),
+            'payouts' => DB::rows('select period_start,period_end,sequence_no,amount_cents,status,succeeded_at,failure_reason from seller_referral_payout_batches where referrer_user_id=? order by id desc limit 12', [$userId]),
         ];
     }
 

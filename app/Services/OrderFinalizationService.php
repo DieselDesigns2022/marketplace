@@ -46,6 +46,7 @@ final class OrderFinalizationService
             $this->referrals->qualifyBuyer($orderId, $eventKey . ':buyer');
             foreach (DB::rows('select distinct designer_id from order_items where order_id=?', [$orderId]) as $seller) {
                 $this->referrals->qualifySeller($orderId, (int)$seller['designer_id'], $eventKey . ':seller:' . $seller['designer_id']);
+                (new SellerReferralCommissionService)->accrueOrder($orderId, (int)$seller['designer_id']);
             }
             if ($ownsTransaction) {
                 DB::commit();
@@ -112,8 +113,11 @@ final class OrderFinalizationService
                 $this->communicationAttempt('buyer_referral_reward', fn() => NotificationService::buyerReferralReward((int)$referral['referred_user_id'], 'referral:' . $referral['id'] . ':buyer:notify:referred'));
             }
             if (!empty($referral['seller_rewarded_at'])) {
-                $this->communicationAttempt('seller_referral_reward', fn() => NotificationService::sellerReferralReward((int)$referral['referrer_user_id'], 'referral:' . $referral['id'] . ':seller:notify:referrer'));
-                $this->communicationAttempt('seller_referral_reward', fn() => NotificationService::sellerReferralReward((int)$referral['referred_user_id'], 'referral:' . $referral['id'] . ':seller:notify:referred'));
+                if (($referral['seller_reward_type'] ?? '') === 'store_credit') {
+                    $this->communicationAttempt('seller_referral_credit', fn() => NotificationService::sellerReferralCredit((int)$referral['referrer_user_id'], 'referral:' . $referral['id'] . ':seller-credit:notify'));
+                } elseif (($referral['seller_reward_type'] ?? '') === 'lifetime_commission') {
+                    $this->communicationAttempt('seller_referral_lifetime', fn() => NotificationService::sellerReferralLifetimeQualified((int)$referral['referrer_user_id'], 'referral:' . $referral['id'] . ':seller-lifetime:notify'));
+                }
             }
         }
     }

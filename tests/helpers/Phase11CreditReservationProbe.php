@@ -5,6 +5,16 @@ require dirname(__DIR__, 2) . '/app/bootstrap.php';
 use App\Core\Database as DB;
 use App\Services\CreditService;
 
+// CLI installations can exclude environment variables from $_ENV. The parent
+// integration test supplies the disposable fixture through the process
+// environment, so copy those values after bootstrap has read any local .env.
+foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_CHARSET'] as $name) {
+    $value = getenv($name);
+    if ($value !== false) {
+        $_ENV[$name] = $value;
+    }
+}
+
 DB::begin();
 try {
     $service=new CreditService();

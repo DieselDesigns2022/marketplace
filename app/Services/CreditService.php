@@ -120,7 +120,8 @@ final class CreditService
         $this->lock($userId);
         $reservation = $this->openReservation($userId, $orderId);
         if (!$reservation) {
-            return $this->replayAnyAmount($key, $userId, $orderId, 'redemption');
+            $this->replayAnyAmount($key, $userId, $orderId, 'redemption');
+            return false;
         }
         $cents = abs(self::parseCents((string)$reservation['amount']));
         if ($this->replay($key, $userId, $orderId, $cents, 'redemption')) {
@@ -142,7 +143,8 @@ final class CreditService
         $this->lock($userId);
         $reservation = $this->openReservation($userId, $orderId);
         if (!$reservation) {
-            return $this->replayAnyAmount($key, $userId, $orderId, 'release');
+            $this->replayAnyAmount($key, $userId, $orderId, 'release');
+            return false;
         }
         $cents = abs(self::parseCents((string)$reservation['amount']));
         if ($this->replay($key, $userId, $orderId, $cents, 'release')) {

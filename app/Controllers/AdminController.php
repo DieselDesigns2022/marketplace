@@ -8,6 +8,7 @@ use App\Services\WatermarkService;
 use App\Repositories\IpRiskRepository;
 use App\Services\NotificationService;
 use App\Services\EmailQueueService;
+use App\Services\SellerReferralCommissionService;
 use Throwable;
 class AdminController
 {
@@ -141,7 +142,24 @@ class AdminController
     public function users()
     {
         $this->gate();
-        if($_POST) DB::exec('update users set status=? where id=?',[$_POST['status'],$_POST['id']]);
+        if ($_POST) {
+            H::verifyCsrf();
+            $userId = (int)($_POST['id'] ?? 0);
+            $status = ($_POST['status'] ?? '') === 'active' ? 'active' : 'disabled';
+            DB::begin();
+            try {
+                $commissionStopped = $status === 'disabled'
+                    && (new SellerReferralCommissionService())->permanentlyStop($userId, 'store_disabled');
+                DB::exec('update users set status=? where id=?', [$status, $userId]);
+                DB::commit();
+                if ($commissionStopped) {
+                    (new SellerReferralCommissionService())->notifyPermanentStop($userId);
+                }
+            } catch (Throwable $error) {
+                DB::rollBack();
+                H::flash('error', 'Account status was not changed.');
+            }
+        }
         H::view('admin/users',['users'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
 
     }
@@ -274,9 +292,26 @@ class AdminController
                     DB::exec('update designers set creator_rank=?, updated_at=now() where id=?',[$rank,$id]);
                     H::flash('success','Seller rank updated.');
                 }
-            } elseif ($action === 'disable') {
-                DB::exec('update designers set status="disabled", updated_at=now() where id=?',[$id]);
-                H::flash('success','Seller disabled.');
+            } elseif (in_array($action, ['disable', 'inactive', 'delete'], true)) {
+                $owner = DB::row('select user_id from designers where id=?', [$id]);
+                $status = ['disable' => 'disabled', 'inactive' => 'inactive', 'delete' => 'deleted'][$action];
+                $reason = ['disable' => 'store_disabled', 'inactive' => 'store_inactive', 'delete' => 'store_deleted'][$action];
+                DB::begin();
+                try {
+                    if (!$owner) {
+                        throw new \DomainException('Seller was not found.');
+                    }
+                    $commissionStopped = (new SellerReferralCommissionService())->permanentlyStop((int)$owner['user_id'], $reason);
+                    DB::exec('update designers set status=?, updated_at=now() where id=?', [$status, $id]);
+                    DB::commit();
+                    if ($commissionStopped) {
+                        (new SellerReferralCommissionService())->notifyPermanentStop((int)$owner['user_id']);
+                    }
+                    H::flash('success', 'Seller status updated. Referral commission cannot restart.');
+                } catch (Throwable $error) {
+                    DB::rollBack();
+                    H::flash('error', 'Seller status was not changed.');
+                }
             } elseif ($action === 'enable') {
                 DB::exec('update designers set status="approved", updated_at=now() where id=?',[$id]);
                 H::flash('success','Seller enabled.');
