@@ -10,6 +10,7 @@
         <?php if(!empty($p['is_featured'])):?><span class="badge rank">Featured</span><?php endif;?>
         <?php if(!empty($p['created_at']) && strtotime($p['created_at']) >= strtotime('-30 days')):?><span class="badge ok">New</span><?php endif;?>
         <?php if(!empty($p['ai_disclosure'])):?><span class="badge ai"><?=H::e($p['ai_disclosure'])?></span><?php endif;?>
+        <?php if(!empty($p['is_hand_drawn'])):?><span class="badge hand-drawn">✏️ Hand Drawn</span><?php endif;?>
         <span class="badge <?= !empty($p['pod_allowed']) ? 'ok' : 'no' ?>"><?= !empty($p['pod_allowed']) ? 'POD allowed' : 'No POD' ?></span>
         <?php if(!empty($p['commercial_license_enabled'])):?><span class="badge">Commercial available</span><?php endif;?>
         <?php

@@ -1,0 +1,3 @@
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS is_hand_drawn BOOLEAN NOT NULL DEFAULT 0
+AFTER ai_disclosure;
