@@ -27,6 +27,9 @@
         <span class="badge ai">
         <?=H::e($p['ai_disclosure'])?>
         </span>
+        <?php if(!empty($p['is_hand_drawn'])):?>
+        <span class="badge hand-drawn">✏️ Hand Drawn</span>
+        <?php endif;?>
         <span class="badge <?=$p['pod_allowed']?'ok':'no'?>">
         <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
         </span>

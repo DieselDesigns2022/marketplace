@@ -67,6 +67,10 @@
                <span class="badge ai">
                <?=H::e($p['ai_disclosure'])?>
                </span>
+               <?php if(!empty($p['is_hand_drawn'])):?>
+               <br>
+               <span class="badge hand-drawn">✏️ Hand Drawn</span>
+               <?php endif;?>
                </td>
                <td>
                <?=H::money($p['line_total'])?>

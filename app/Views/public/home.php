@@ -17,7 +17,7 @@
     </div>
 </section>
 <?php $featuredProducts = $products ?? []; ?>
-<section class="page-section">
+<section class="page-section featured-products-section">
     <h2>Featured products</h2>
     <p class="muted">Reviewed public listings appear here when products are featured for launch.</p>
     <?php if(empty($products)):?><div class="card empty-state"><h3>No featured products yet</h3><p>Featured products will appear after designers submit approved listings.</p><a class="btn" href="/browse">Browse Digital Designs</a></div><?php else: include app_path('app/Views/public/product_grid.php'); endif;?>

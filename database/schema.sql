@@ -94,6 +94,7 @@ CREATE TABLE products
     pod_allowed BOOLEAN DEFAULT 0,
     digital_resale_prohibited BOOLEAN DEFAULT 1,
     ai_disclosure ENUM('No AI Used','AI Assisted','AI Generated') NOT NULL,
+    is_hand_drawn BOOLEAN NOT NULL DEFAULT 0,
     seo_title VARCHAR(70),
     seo_description VARCHAR(170),
     status ENUM('draft','pending_review','approved','published','rejected','disabled','archived','deleted') DEFAULT 'draft',
