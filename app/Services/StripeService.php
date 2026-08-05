@@ -7,6 +7,13 @@ use Throwable;
 
 class StripeService
 {
+    private static $testTransport = null;
+
+    public static function setTestTransport(?callable $transport): void
+    {
+        if (PHP_SAPI !== 'cli') throw new \LogicException('Stripe test transport is CLI-only.');
+        self::$testTransport = $transport;
+    }
     public static function secretKey(): string { return trim((string)($_ENV['STRIPE_SECRET_KEY'] ?? '')); }
     public static function webhookSecret(): string { return trim((string)($_ENV['STRIPE_WEBHOOK_SECRET'] ?? '')); }
     public static function connectWebhookSecret(): string { return trim((string)($_ENV['STRIPE_CONNECT_WEBHOOK_SECRET'] ?? '')); }
@@ -14,33 +21,109 @@ class StripeService
     public static function commissionRate(): float { return max(0, min(100, (float)($_ENV['PLATFORM_COMMISSION_PERCENT'] ?? 18))) / 100; }
     public static function appUrl(): string
     {
-        $url = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
-        if ($url !== '') return $url;
-        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-        return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        return \App\Core\Helpers::baseUrl();
     }
     public static function configured(): bool { return self::secretKey() !== ''; }
-    public static function cents($amount): int { return (int)round(((float)$amount) * 100); }
+    public static function cents($amount): int { return CreditService::parseCents((string)$amount); }
+
+    public static function calculateTax(array $items, array $address, string $idempotencyKey): array
+    {
+        if (!self::configured()) {
+            throw new \RuntimeException('Stripe is not configured for authoritative tax calculation.');
+        }
+        $country = strtoupper(trim((string)($address['country'] ?? '')));
+        if ($country !== 'US') {
+            throw new \InvalidArgumentException('Asset Moth checkout is currently limited to US billing addresses.');
+        }
+        foreach (['line1', 'city', 'state', 'postal_code'] as $field) {
+            if (trim((string)($address[$field] ?? '')) === '') {
+                throw new \InvalidArgumentException('A complete US billing address is required.');
+            }
+        }
+        if (!preg_match('/^[A-Z]{2}$/', strtoupper(trim((string)$address['state']))) || !preg_match('/^\d{5}(?:-\d{4})?$/', trim((string)$address['postal_code']))) {
+            throw new \InvalidArgumentException('A valid US state and ZIP code are required.');
+        }
+        $lineItems = [];
+        foreach ($items as $index => $item) {
+            $lineItems[] = [
+                'amount' => self::cents((string)$item['total_price']),
+                'reference' => 'item_' . ($item['id'] ?? $index),
+                'tax_code' => (string)($_ENV['STRIPE_DIGITAL_TAX_CODE'] ?? 'txcd_10103000'),
+            ];
+        }
+        $calculation = self::request('POST', '/v1/tax/calculations', [
+            'currency' => self::currency(),
+            'customer_details' => [
+                'address' => [
+                    'line1' => trim((string)$address['line1']),
+                    'line2' => trim((string)($address['line2'] ?? '')),
+                    'city' => trim((string)$address['city']),
+                    'state' => strtoupper(trim((string)$address['state'])),
+                    'postal_code' => trim((string)$address['postal_code']),
+                    'country' => 'US',
+                ],
+                'address_source' => 'billing',
+            ],
+            'line_items' => $lineItems,
+        ], $idempotencyKey);
+        return [
+            'id' => $calculation['id'] ?? null,
+            'tax_cents' => (int)($calculation['tax_amount_exclusive'] ?? 0) + (int)($calculation['tax_amount_inclusive'] ?? 0),
+            'total_cents' => (int)($calculation['amount_total'] ?? 0),
+            'snapshot' => json_encode($calculation, JSON_UNESCAPED_SLASHES),
+            'address' => $address,
+        ];
+    }
+
+    public static function normalizeBillingAddress(array $address): array
+    {
+        return [
+            'line1' => strtoupper(trim((string)($address['line1'] ?? ''))),
+            'line2' => strtoupper(trim((string)($address['line2'] ?? ''))),
+            'city' => strtoupper(trim((string)($address['city'] ?? ''))),
+            'state' => strtoupper(trim((string)($address['state'] ?? ''))),
+            'postal_code' => strtoupper(str_replace(' ', '', trim((string)($address['postal_code'] ?? '')))),
+            'country' => strtoupper(trim((string)($address['country'] ?? ''))),
+        ];
+    }
+
+    public static function billingAddressMatches(array $authoritative, array $returned): bool
+    {
+        $expected = self::normalizeBillingAddress($authoritative);
+        $actual = self::normalizeBillingAddress($returned);
+        foreach (['line1', 'city', 'state', 'postal_code', 'country'] as $field) {
+            if ($actual[$field] !== '' && $actual[$field] !== $expected[$field]) return false;
+        }
+        return $actual['country'] === '' || $actual['country'] === 'US';
+    }
+
+    public static function createTaxTransaction(string $calculationId, int $orderId): array
+    {
+        if (!preg_match('/^taxcalc_[A-Za-z0-9]+$/', $calculationId)) {
+            throw new \InvalidArgumentException('A valid Stripe Tax Calculation is required.');
+        }
+        return self::request('POST', '/v1/tax/transactions/create_from_calculation', [
+            'calculation' => $calculationId,
+            'reference' => 'asset_moth_order_' . $orderId,
+            'expand' => ['line_items'],
+        ], 'asset_moth_tax_transaction_order_' . $orderId);
+    }
 
     public static function createCheckoutSession(array $order, array $items): array
     {
         if (!self::configured()) throw new \RuntimeException('Stripe is not configured. Set STRIPE_SECRET_KEY before creating live checkout sessions.');
         $currency = self::currency();
         if ($currency !== 'usd') throw new \RuntimeException('Asset Moth checkout is US-only at launch and requires USD Stripe Checkout.');
-        $lineItems = [];
-        foreach ($items as $item) {
-            $lineItems[] = [
-                'quantity' => 1,
-                'price_data' => [
-                    'currency' => $currency,
-                    'unit_amount' => self::cents($item['total_price']),
-                    'product_data' => [
-                        'name' => mb_substr((string)($item['product_title'] ?: 'Asset Moth product'), 0, 250),
-                        'description' => mb_substr((string)($item['license_name'] ?: $item['license_type'] ?: 'License'), 0, 250),
-                    ],
-                ],
-            ];
-        }
+        $remainingCents = CreditService::parseCents((string)$order['total'], false);
+        if ($remainingCents <= 0) throw new \RuntimeException('Stripe Checkout requires a positive remaining total.');
+        $lineItems = [[
+            'quantity' => 1,
+            'price_data' => [
+                'currency' => $currency,
+                'unit_amount' => $remainingCents,
+                'product_data' => ['name' => 'Asset Moth order #' . (int)$order['id']],
+            ],
+        ]];
         $base = self::appUrl();
         return self::request('POST', '/v1/checkout/sessions', [
             'mode' => 'payment',
@@ -49,10 +132,7 @@ class StripeService
             'cancel_url' => $base . '/checkout/cancel?order_id=' . (int)$order['id'],
             'metadata' => ['order_id' => (string)$order['id'], 'buyer_user_id' => (string)$order['user_id']],
             'payment_intent_data' => ['metadata' => ['order_id' => (string)$order['id'], 'buyer_user_id' => (string)$order['user_id']]],
-            'automatic_tax' => [
-                'enabled' => 'true',
-                'liability' => ['type' => 'self'],
-            ],
+            'automatic_tax' => ['enabled' => 'false'],
             'billing_address_collection' => 'required',
             'line_items' => $lineItems,
         ]);
@@ -120,6 +200,9 @@ class StripeService
 
     public static function request(string $method, string $path, array $params = [], ?string $idempotencyKey = null): array
     {
+        if (self::$testTransport !== null) {
+            return (self::$testTransport)($method,$path,$params,$idempotencyKey);
+        }
         $ch = curl_init('https://api.stripe.com' . $path);
         $headers = [];
         if ($idempotencyKey) $headers[] = 'Idempotency-Key: ' . $idempotencyKey;

@@ -5,10 +5,12 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\StripeService;
-use App\Services\CouponService;
 use App\Services\EmailQueueService;
 use App\Services\NotificationService;
 use App\Services\OperationalErrorSanitizer;
+use App\Services\OrderFinalizationService;
+use App\Services\CreditService;
+use App\Services\SellerReferralCommissionService;
 use Throwable;
 
 class StripeController
@@ -34,6 +36,7 @@ class StripeController
         $order=DB::row('select tax_amount from orders where id=?',[$orderId]);$items=DB::rows('select id,designer_id,total_price,commission_rate,seller_payout_status from order_items where order_id=? order by id',[$orderId]);$allocation=self::allocateSellerRefund($items,$cumulative,StripeService::cents($order['tax_amount']??0));$bySeller=[];
         foreach($items as $item){$id=(int)$item['id'];$designer=(int)$item['designer_id'];$gross=StripeService::cents($item['total_price']);$originalSeller=$gross-(int)round($gross*(float)$item['commission_rate']);$refundShare=$allocation[$id]??['gross_refund_cents'=>0,'seller_refund_cents'=>0];$desiredSeller=max(0,$originalSeller-$refundShare['seller_refund_cents']);if(($item['seller_payout_status']??'')!=='transferred')DB::exec('update order_items set seller_payout_amount=? where id=? and seller_payout_status<>"transferred"',[$desiredSeller/100,$id]);$bySeller[$designer]['gross']=(($bySeller[$designer]['gross']??0)+max(0,$gross-$refundShare['gross_refund_cents']));$bySeller[$designer]['seller']=(($bySeller[$designer]['seller']??0)+$desiredSeller);}
         foreach($bySeller as $designer=>$amounts){$commission=max(0,$amounts['gross']-$amounts['seller']);DB::exec('update seller_payouts set gross_amount=?,platform_commission_amount=?,seller_payout_amount=?,updated_at=now() where order_id=? and designer_id=? and payout_status<>"transferred"',[$amounts['gross']/100,$commission/100,$amounts['seller']/100,$orderId,$designer]);}
+        (new SellerReferralCommissionService)->reconcileRefund($orderId, $cumulative);
     }
 
     public function success(): void
@@ -49,6 +52,7 @@ class StripeController
         $order = $this->buyerOrder((int)($_GET['order_id'] ?? 0));
         if (!in_array($order['payment_status'] ?? $order['status'], ['paid','refunded','partially_refunded'], true)) {
             DB::exec('update orders set payment_status="canceled",status="cancelled",canceled_at=coalesce(canceled_at,now()) where id=? and user_id=?', [$order['id'], H::user()['id']]);
+            (new OrderFinalizationService)->release((int)$order['id'],'buyer-cancel:'.$order['id'].':credit-release');
             $order = $this->buyerOrder((int)$order['id']);
         }
         H::view('buyer/payment_cancel', ['order' => $order]);
@@ -68,11 +72,23 @@ class StripeController
             H::redirect('/dashboard/order/' . (int)$order['id']);
         }
         try {
+            if (($order['credit_payment_status'] ?? '') === 'released' && CreditService::parseCents((string)($order['credit_reserved'] ?? '0.00')) > 0) {
+                DB::begin();
+                $gross = CreditService::parseCents((string)$order['subtotal']) - CreditService::parseCents((string)$order['coupon_discount']) + CreditService::parseCents((string)$order['tax_amount']);
+                $requested = min(CreditService::parseCents((string)$order['credit_reserved']), $gross);
+                $reserved = (new CreditService)->reserve((int)$order['user_id'], CreditService::formatCents($requested), (int)$order['id'], 'order:' . $order['id'] . ':credit:retry:' . ((int)($order['payment_retry_count'] ?? 0) + 1));
+                $remaining = $gross - CreditService::parseCents($reserved);
+                DB::exec('update orders set credits_applied=?,credit_payment_status="reserved",total=?,stripe_amount_total=? where id=?', [$reserved, CreditService::formatCents($remaining), $remaining, $order['id']]);
+                DB::commit();
+                $order = $this->buyerOrder((int)$order['id']);
+            }
             $items = DB::rows('select * from order_items where order_id=?', [$order['id']]);
             $session = StripeService::createCheckoutSession($order, $items);
             DB::exec('update orders set payment_provider="stripe",payment_processor="stripe",payment_mode="checkout",payment_status="pending",status="pending",stripe_checkout_session_id=?,stripe_currency=?,stripe_amount_total=?,payment_retry_count=coalesce(payment_retry_count,0)+1,payment_error=null where id=?', [$session['id'] ?? null, StripeService::currency(), StripeService::cents($order['total']), $order['id']]);
             header('Location: ' . $session['url'], true, 303); exit;
         } catch (Throwable $e) {
+            if (DB::pdo()->inTransaction()) DB::rollBack();
+            (new OrderFinalizationService)->release((int)$order['id'], 'retry-failed:' . $order['id'] . ':' . ((int)($order['payment_retry_count'] ?? 0) + 1));
             $safeError=OperationalErrorSanitizer::sanitize($e->getMessage(),500);
             DB::exec('update orders set payment_error=? where id=?', [$safeError, $order['id']]);
             H::flash('error', 'Payment could not be started. Please try again or contact support.');
@@ -179,7 +195,7 @@ class StripeController
         if(!is_array($object))return;
         if((str_starts_with($type,'checkout.session.')&&in_array($type,['checkout.session.completed','checkout.session.async_payment_succeeded'],true))||$type==='payment_intent.succeeded'){
             $order=$this->orderFromObject($object);
-            if($order&&self::paidCommunicationEligible($order))$this->notifyPaidOrder((int)$order['id']);
+            if($order&&self::paidCommunicationEligible($order))(new OrderFinalizationService)->communicate((int)$order['id']);
             return;
         }
         if(!in_array($type,['charge.refunded','charge.updated'],true)||(int)($object['amount_refunded']??0)<=0)return;
@@ -224,7 +240,7 @@ class StripeController
         $hasTaxDetails = isset($intent['total_details']['amount_tax']) || isset($intent['automatic_tax']);
         if ($taxEnabled && !$hasTaxDetails) {
             if(self::paidCommunicationEligible($order)){
-                $this->communicationAttempt('paid_intent_communication_recovery',fn()=>$this->notifyPaidOrder((int)$order['id']));
+                $this->communicationAttempt('paid_intent_communication_recovery',fn()=>(new OrderFinalizationService)->communicate((int)$order['id']));
                 return;
             }
             $amount = (int)($intent['amount_received'] ?? $intent['amount'] ?? 0);
@@ -273,55 +289,59 @@ class StripeController
         $paymentIntentId = $isPaymentIntent ? ($object['id'] ?? null) : ($object['payment_intent'] ?? null);
         $chargeId = $object['latest_charge'] ?? $object['charge'] ?? null;
         if (!$chargeId && !empty($object['charges']['data'][0]['id'])) $chargeId = $object['charges']['data'][0]['id'];
-
-        $amount = (int)($object['amount_total'] ?? $object['amount_received'] ?? 0); $currency = strtolower((string)($object['currency'] ?? StripeService::currency()));
-        $taxData = $this->stripeTaxData($object);
-        $base = max(0, round((float)($order['subtotal'] ?? 0) - (float)($order['coupon_discount'] ?? 0) - (float)($order['credits_applied'] ?? 0), 2));
-        $expected = StripeService::cents($base) + $taxData['cents']; $expectedCurrency = strtolower((string)($order['stripe_currency'] ?: StripeService::currency()));
-        $metadataOrderId = (int)($object['metadata']['order_id'] ?? $order['id']);
-        $review = $amount !== $expected || $currency !== $expectedCurrency || $metadataOrderId !== (int)$order['id'];
-        $reason = $review ? 'Stripe amount, currency, or metadata did not match the order snapshot.' : null;
-        $country = strtoupper((string)($object['customer_details']['address']['country'] ?? ''));
-        if ($isCheckoutSession && (($order['tax_provider'] ?? '') === 'stripe_tax') && !empty($taxData['has_status']) && $taxData['status'] !== 'complete') {
-            $review = true;
-            $reason = 'Stripe Tax calculation was not completed successfully. Admin review is required before delivery unlock.';
-        }
-        if ($isCheckoutSession && $country !== '' && $country !== 'US') {
-            $review = true;
-            $reason = 'Asset Moth is currently available for US purchases only. International checkout will be added in a future expansion.';
-        }
-        $alreadyPaid = (($order['payment_status'] ?? '') === 'paid');
+        $amount = (int)($object['amount_total'] ?? $object['amount_received'] ?? 0);
+        $currency = strtolower((string)($object['currency'] ?? StripeService::currency()));
+        $finalizer = new OrderFinalizationService();
+        $captured = false;
         try {
             DB::begin();
-            DB::exec('update orders set status=?,payment_status=?,payment_provider="stripe",payment_processor="stripe",stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_customer_id=coalesce(?,stripe_customer_id),stripe_charge_id=coalesce(?,stripe_charge_id),stripe_payment_status=?,stripe_amount_total=?,stripe_currency=?,tax_amount=?,tax_provider=?,tax_status=?,tax_liability_owner=?,tax_snapshot=?,tax_collected_at=case when ?>0 and ?=0 then coalesce(tax_collected_at,now()) else tax_collected_at end,total=?,paid_at=case when ?=0 then coalesce(paid_at,now()) else paid_at end,manual_review_required=?,manual_review_reason=? where id=?', [$review?'pending':'paid',$review?'manual_review':'paid',$sessionId,$paymentIntentId,$object['customer'] ?? null,$chargeId,$object['payment_status'] ?? $object['status'] ?? 'paid',$amount,$currency,$taxData['amount'],$taxData['provider'],$taxData['status'],$taxData['liability_owner'],$taxData['snapshot'],$taxData['cents'],$review?1:0,round($amount / 100, 2),$review?1:0,$review?1:0,$reason,$order['id']]);
-            if (!$review && !$alreadyPaid) {
-                DB::exec('update order_items set paid_at=coalesce(paid_at,now()), payout_ready_at=coalesce(payout_ready_at,now()), manual_delivery_status=case when fulfillment_type="google_drive" and manual_delivery_status in ("pending_delivery","buyer_email_needed","ready_for_seller_delivery") then "ready_for_seller_delivery" else manual_delivery_status end where order_id=?', [$order['id']]);
-                DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$order['id']]);
-                CouponService::recordUsage((int)$order['id']);
-                $this->preparePayoutLedgers((int)$order['id'], $currency);
+            $locked = DB::row('select * from orders where id=? for update', [$order['id']]);
+            if (!$locked) throw new \RuntimeException('Order disappeared during payment finalization.');
+            if (!empty($locked['finalization_key'])) {
+                DB::commit();
+                $finalizer->communicate((int)$locked['id']);
+                return;
             }
-            StripeService::logTransaction((int)$order['id'], $eventId, $source, $review?'manual_review':'paid', $amount/100, $currency, ['session'=>$sessionId ?? $order['stripe_checkout_session_id'], 'intent'=>$paymentIntentId, 'charge'=>$chargeId], $reason ?? 'Payment confirmed by Stripe webhook.', $review);
+            $expected = CreditService::parseCents((string)$locked['total']);
+            $expectedCurrency = strtolower((string)($locked['stripe_currency'] ?: StripeService::currency()));
+            $metadataOrderId = (int)($object['metadata']['order_id'] ?? $locked['id']);
+            $review = $amount !== $expected || $currency !== $expectedCurrency || $metadataOrderId !== (int)$locked['id'];
+            $reason = $review ? 'Stripe amount, currency, or metadata did not match the order snapshot.' : null;
+            if (($locked['tax_status'] ?? '') !== 'calculated' || empty($locked['tax_calculation_id'])) {
+                $review = true;
+                $reason = 'The authoritative Stripe Tax Calculation is unavailable.';
+            }
+            $returnedAddress = is_array($object['customer_details']['address'] ?? null) ? $object['customer_details']['address'] : [];
+            $authoritativeAddress = json_decode((string)($locked['billing_address_snapshot'] ?? ''), true) ?: [];
+            if ($isCheckoutSession && !StripeService::billingAddressMatches($authoritativeAddress, $returnedAddress)) {
+                $review = true;
+                $reason = 'Stripe billing location differs from the authoritative tax address.';
+            }
+            $captured = true;
+            DB::exec('update orders set status="pending",payment_status=?,payment_provider="stripe",payment_processor="stripe",stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_customer_id=coalesce(?,stripe_customer_id),stripe_charge_id=coalesce(?,stripe_charge_id),stripe_payment_status=?,stripe_amount_total=?,stripe_paid_amount=?,stripe_currency=?,manual_review_required=?,manual_review_reason=? where id=?', [$review ? 'manual_review' : 'captured_pending_finalization',$sessionId,$paymentIntentId,$object['customer'] ?? null,$chargeId,$object['payment_status'] ?? $object['status'] ?? 'paid',$amount,CreditService::formatCents($amount),$currency,$review ? 1 : 0,$reason,$locked['id']]);
+            StripeService::logTransaction((int)$locked['id'], $eventId, $source, $review ? 'manual_review' : 'captured_pending_finalization', CreditService::formatCents($amount), $currency, ['session'=>$sessionId ?? $locked['stripe_checkout_session_id'],'intent'=>$paymentIntentId,'charge'=>$chargeId], $reason ?? 'Stripe payment captured; atomic finalization started.', $review);
+            if ($review) {
+                DB::commit();
+                return;
+            }
+            $finalizer->finalize((int)$locked['id'], 'stripe:' . $eventId, false);
             DB::commit();
-            if (!$review) {
-                $this->communicationAttempt('paid_order_communication_recovery', fn() => $this->notifyPaidOrder((int)$order['id']));
+            $finalizer->communicate((int)$locked['id']);
+            $this->attemptPendingTransfers((int)$locked['id'], $currency);
+        } catch (Throwable $error) {
+            if (DB::pdo()->inTransaction()) DB::rollBack();
+            if ($captured) {
+                DB::exec('update orders set status="pending",payment_status="manual_review",manual_review_required=1,manual_review_reason=?,payment_error=?,stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_charge_id=coalesce(?,stripe_charge_id),stripe_amount_total=?,stripe_paid_amount=?,stripe_currency=?,tax_transaction_status=case when ? like "%Tax Transaction%" then "failed" else tax_transaction_status end where id=? and finalization_key is null', ['Stripe payment was captured but atomic finalization failed. Replay the webhook or recover from payment review.', OperationalErrorSanitizer::sanitize($error->getMessage(), 1000), $sessionId, $paymentIntentId, $chargeId, $amount, CreditService::formatCents($amount), $currency, $error->getMessage(), $order['id']]);
+                StripeService::logTransaction((int)$order['id'], $eventId . ':recovery', 'captured_finalization_failed', 'manual_review', CreditService::formatCents($amount), $currency, ['session'=>$sessionId,'intent'=>$paymentIntentId,'charge'=>$chargeId], 'Captured payment requires idempotent finalization recovery.', true);
             }
-            if (!$review && !$alreadyPaid) {
-                try {
-                    $this->attemptPendingTransfers((int)$order['id'], $currency);
-                } catch (Throwable $e) {
-                    error_log('Seller payout transfer attempt failed after paid order commit for order ' . (int)$order['id'] . ': ' . OperationalErrorSanitizer::sanitize($e->getMessage(),240));
-                }
-            }
-        } catch (Throwable $e) {
-            DB::rollBack();
-            throw $e;
+            throw $error;
         }
     }
 
     private function markFailed(array $order, string $eventId, array $object, string $message): void
-    { $safeMessage=OperationalErrorSanitizer::sanitize($message,1000);DB::exec('update orders set status="failed",payment_status="failed",failed_at=coalesce(failed_at,now()),payment_error=? where id=? and payment_status<>"paid"', [$safeMessage,$order['id']]); StripeService::logTransaction((int)$order['id'],$eventId,'payment_failed','failed',($object['amount_total'] ?? $object['amount'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null,'intent'=>$object['payment_intent'] ?? $object['id'] ?? null],$safeMessage); try{NotificationService::admins('payment_failed','Payment needs attention','A payment failed for order #'.(int)$order['id'].'.',"stripe:$eventId:failed",'/admin/order/'.(int)$order['id']);}catch(Throwable $e){NotificationService::reportFailure('payment_failed',$e);} }
+    { $safeMessage=OperationalErrorSanitizer::sanitize($message,1000);DB::exec('update orders set status="failed",payment_status="failed",failed_at=coalesce(failed_at,now()),payment_error=? where id=? and payment_status<>"paid"', [$safeMessage,$order['id']]); (new OrderFinalizationService)->release((int)$order['id'],'stripe:'.$eventId.':credit-release'); StripeService::logTransaction((int)$order['id'],$eventId,'payment_failed','failed',($object['amount_total'] ?? $object['amount'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null,'intent'=>$object['payment_intent'] ?? $object['id'] ?? null],$safeMessage); try{NotificationService::admins('payment_failed','Payment needs attention','A payment failed for order #'.(int)$order['id'].'.',"stripe:$eventId:failed",'/admin/order/'.(int)$order['id']);}catch(Throwable $e){NotificationService::reportFailure('payment_failed',$e);} }
     private function markCanceled(array $order, string $eventId, array $object, string $status): void
-    { DB::exec('update orders set status="cancelled",payment_status=?,canceled_at=coalesce(canceled_at,now()) where id=? and payment_status<>"paid"', [$status,$order['id']]); StripeService::logTransaction((int)$order['id'],$eventId,'checkout_'.$status,$status,($object['amount_total'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null], 'Checkout session '.$status.'.'); }
+    { DB::exec('update orders set status="cancelled",payment_status=?,canceled_at=coalesce(canceled_at,now()) where id=? and payment_status<>"paid"', [$status,$order['id']]); (new OrderFinalizationService)->release((int)$order['id'],'stripe:'.$eventId.':credit-release'); StripeService::logTransaction((int)$order['id'],$eventId,'checkout_'.$status,$status,($object['amount_total'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null], 'Checkout session '.$status.'.'); }
 
     private function processChargeRefund(array $charge, string $eventId, string $type): void
     {
@@ -350,33 +370,7 @@ class StripeController
         $this->communicationAttempt('buyer_refund_email',fn()=>EmailQueueService::refund((int)$order['id'],$label,$cumulativeCents,$key));
     }
 
-    private function notifyPaidOrder(int $orderId): void
-    {
-        $order=DB::row('select user_id,coupon_id,coupon_code,payment_status,manual_review_required from orders where id=? and payment_status="paid" and manual_review_required=0',[$orderId]); if(!$order||!self::paidCommunicationEligible($order))return;
-        $this->communicationAttempt('buyer_paid_emails',fn()=>EmailQueueService::paidOrder($orderId));
-        $this->communicationAttempt('buyer_purchase_notification',fn()=>NotificationService::create((int)$order['user_id'],'purchase_receipt','buyer','Purchase complete','Your paid order #'.$orderId.' is complete.',"order:$orderId:buyer:paid",'/dashboard/order/'.$orderId));
-        $this->communicationAttempt('buyer_download_notification',fn()=>NotificationService::create((int)$order['user_id'],'download_ready','buyer','Downloads ready','Your files for order #'.$orderId.' are ready to download.',"order:$orderId:buyer:download-ready",'/dashboard/order/'.$orderId));
-        $coupon=!empty($order['coupon_id'])?DB::row('select id,scope,seller_id,code from coupons where id=?',[$order['coupon_id']]):null;
-        foreach(DB::rows('select d.user_id,oi.designer_id,u.email,u.name,sum(coalesce(oi.coupon_discount,0)) coupon_discount from order_items oi join designers d on d.id=oi.designer_id join users u on u.id=d.user_id where oi.order_id=? group by d.user_id,oi.designer_id,u.email,u.name',[$orderId]) as $s){$saleEvent="order:$orderId:seller:".$s['designer_id'];$this->communicationAttempt('seller_sale_notification',fn()=>NotificationService::create((int)$s['user_id'],'new_sale','designer','New sale','You made a sale in order #'.$orderId.'.',$saleEvent,'/seller/sales'));$this->communicationAttempt('seller_sale_email',fn()=>EmailQueueService::foundationSellerEmail($s['email'],'new_sale',['name'=>$s['name'],'title'=>'New sale','message'=>'You made a sale in order #'.$orderId.'.','action_url'=>'/seller/sales'],$saleEvent.':email'));$affected=$coupon&&(float)$s['coupon_discount']>0&&($coupon['scope']==='platform'||(int)$coupon['seller_id']===(int)$s['designer_id']);if($affected){$couponEvent="order:$orderId:coupon:".$coupon['id'].':seller:'.$s['designer_id'];$this->communicationAttempt('seller_coupon_notification',fn()=>NotificationService::create((int)$s['user_id'],'coupon_used','designer','Coupon used','Coupon '.$coupon['code'].' affected your items in order #'.$orderId.'.',$couponEvent,'/seller/sales'));$this->communicationAttempt('seller_coupon_email',fn()=>EmailQueueService::foundationSellerEmail($s['email'],'coupon_used',['name'=>$s['name'],'title'=>'Coupon used','message'=>'Coupon '.$coupon['code'].' affected your items in order #'.$orderId.'.','action_url'=>'/seller/sales'],$couponEvent.':email'));}}
-    }
     private function communicationAttempt(string $context,callable $operation):void{try{$operation();}catch(Throwable $e){try{NotificationService::reportFailure($context,$e);}catch(Throwable $ignored){error_log('Asset Moth communication failure reporting failed for '.OperationalErrorSanitizer::context($context).'.');}}}
-
-    private function preparePayoutLedgers(int $orderId, string $currency): void
-    {
-        $rows = DB::rows('select oi.designer_id,sum(oi.total_price) gross,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted from order_items oi join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,d.stripe_connect_account_id,d.stripe_charges_enabled,d.stripe_payouts_enabled,d.stripe_details_submitted', [$orderId]);
-        foreach ($rows as $row) {
-            $gross = (float)$row['gross'];
-            $commission = round($gross * StripeService::commissionRate(), 2);
-            $payout = max(0, round($gross - $commission, 2));
-            $status = (!empty($row['stripe_connect_account_id']) && (int)$row['stripe_details_submitted'] === 1 && (int)$row['stripe_payouts_enabled'] === 1 && $payout > 0) ? 'pending_transfer' : 'pending_stripe_onboarding';
-            DB::exec('insert into seller_payouts (order_id,designer_id,gross_amount,platform_commission_amount,seller_payout_amount,currency,payout_status) values (?,?,?,?,?,?,?) on duplicate key update gross_amount=values(gross_amount),platform_commission_amount=values(platform_commission_amount),seller_payout_amount=values(seller_payout_amount),currency=values(currency),payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end,updated_at=now()', [$orderId,$row['designer_id'],$gross,$commission,$payout,$currency,$status]);
-            foreach (DB::rows('select id,total_price from order_items where order_id=? and designer_id=?', [$orderId, $row['designer_id']]) as $item) {
-                $itemCommission = round(((float)$item['total_price']) * StripeService::commissionRate(), 2);
-                $itemPayout = max(0, round(((float)$item['total_price']) - $itemCommission, 2));
-                DB::exec('update order_items set platform_commission_amount=?,seller_payout_amount=?,seller_payout_status=case when seller_payout_status="transferred" then seller_payout_status else ? end where id=?', [$itemCommission,$itemPayout,$status,$item['id']]);
-            }
-        }
-    }
 
     private function attemptPendingTransfers(int $orderId, string $currency): void
     {

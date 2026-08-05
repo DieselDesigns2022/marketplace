@@ -74,8 +74,10 @@ Routes are registered in `public/index.php`.
 | GET/POST | `/admin/products/{id}` | `AdminController::productDetail` | Admin protected |
 | GET/POST | `/admin/categories` | `AdminController::categories` | Admin protected |
 | GET | `/admin/orders` | `AdminController::orders` | Admin protected |
-| GET | `/admin/order/{id}` | `AdminController::orderDetail` | Admin protected |
-| GET | `/admin/referrals` | `AdminController::referrals` | Admin protected |
+| GET/POST | `/admin/order/{id}` | `AdminController::orderDetail` | Admin protected + CSRF on POST |
+| GET | `/admin/referrals` | `AdminCreditController::index` | Admin protected |
+| GET | `/admin/credits` | `AdminCreditController::index` | Admin protected alias |
+| POST | `/admin/credits/adjust` | `AdminCreditController::adjust` | Admin protected + CSRF |
 | GET/POST | `/admin/homepage` | `AdminController::homepage` | Admin protected |
 | GET/POST | `/admin/ads` | `AdminController::ads` | Admin protected |
 
@@ -192,7 +194,7 @@ Buyer self-cancellation of completed digital purchases is not a route behavior. 
 - Stripe checkout routes remain unchanged; coupon usage is recorded from the paid webhook path, not at code entry time.
 
 ## Phase 10.3B Stripe Tax compliance
-No new public tax routes are added in Phase 10.3B. Existing checkout and Stripe webhook routes now handle Stripe Tax behavior: checkout creates a tax-enabled Stripe Checkout Session, and webhooks persist Stripe-returned tax details while keeping tax separate from seller payout and commission math.
+No new public tax routes were added in Phase 10.3B, and Phase 11 still uses the existing checkout and signed webhook routes. The current checkout creates a standalone Stripe Tax Calculation before applying credit; atomic internal/webhook finalization creates the corresponding Tax Transaction. Tax remains separate from seller payout and commission math.
 
 ### Phase 10.4 routes
 
@@ -243,3 +245,15 @@ There are no public term-list endpoints and no state-changing GET routes.
 - `GET /admin/payment-logs?issue=failed_transfers` — admin only — lists unresolved seller-transfer issues.
 - `GET /admin/payment-logs?issue=webhook_issues` — admin only — lists unresolved Stripe webhook issues.
 - `POST /admin/payment-logs` — admin only + CSRF — records resolution of an eligible transfer or webhook issue while preserving its original history.
+
+### Phase 11 routes
+- `GET /dashboard/referrals` — authenticated buyer balances, ledger, referrals made, and attached referral.
+- `GET /seller/referrals` — approved seller referral link and seller qualification status.
+- `GET /admin/referrals` — admin-only primary Credits & Referrals search/review page.
+- `POST /admin/platform-credit-payouts/{id}/settle` — active-admin, CSRF-protected settlement of one eligible `platform_credit_hold` from Stripe platform balance; idempotent replay returns the existing transfer.
+- `GET /admin/credits` — admin-only alias of the primary page.
+- `POST /admin/credits/adjust` — admin-only, CSRF-protected audited adjustment.
+- `GET|POST /register` accepts an optional normalized `ref`; `GET|POST /apply` preserves optional `seller_ref` intent.
+
+### Phase 11 seller-referral lifetime commission
+Seller-referral qualification permanently selects either referrer-only $5 store credit or, when the referrer is then an approved seller, an Asset Moth-funded 1% commission calculated per stored seller-payout item using integer-cent half-up rounding. Accruals and linked refund/recovery adjustments are append-only. Disabled, inactive, and deleted store states permanently stop new accrual without cancelling earned balances. Closed UTC-month platform-balance transfers reuse the seller's existing Stripe Connect account, omit `source_transaction`, and retain stable idempotency, processing leases, attempt history, and retryable failures. Active admins retry failed/not-ready batches only through CSRF-protected `POST /admin/seller-referral-payouts/{id}/retry`; immutable audit rows record the result. Unpaid prior-period amounts and post-payout recovery adjustments roll into the next positive batch, and no negative transfer is created.

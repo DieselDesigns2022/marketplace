@@ -8,7 +8,8 @@ CREATE TABLE users
     status ENUM('active','disabled') DEFAULT 'active',
     referral_code VARCHAR(40),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY users_referral_code_unique(referral_code)
 );
 
 CREATE TABLE designer_applications
@@ -50,7 +51,7 @@ CREATE TABLE designers
     announcement TEXT,
     receipt_note VARCHAR(500) NULL,
     receipt_image_path VARCHAR(255) NULL,
-    status ENUM('approved','disabled') DEFAULT 'approved',
+    status ENUM('approved','disabled','inactive','deleted') NOT NULL DEFAULT 'approved',
     creator_rank ENUM('Bronze','Silver','Gold','Platinum','Legend') DEFAULT 'Bronze',
     rank_override BOOLEAN DEFAULT 0,
     is_featured BOOLEAN DEFAULT 0,
@@ -93,6 +94,7 @@ CREATE TABLE products
     pod_allowed BOOLEAN DEFAULT 0,
     digital_resale_prohibited BOOLEAN DEFAULT 1,
     ai_disclosure ENUM('No AI Used','AI Assisted','AI Generated') NOT NULL,
+    is_hand_drawn BOOLEAN NOT NULL DEFAULT 0,
     seo_title VARCHAR(70),
     seo_description VARCHAR(170),
     status ENUM('draft','pending_review','approved','published','rejected','disabled','archived','deleted') DEFAULT 'draft',
@@ -458,15 +460,28 @@ CREATE TABLE orders
     tax_status VARCHAR(60) DEFAULT 'pending',
     tax_liability_owner VARCHAR(60) DEFAULT 'platform',
     tax_snapshot JSON NULL,
+    tax_calculation_id VARCHAR(190) NULL,
+    tax_transaction_id VARCHAR(190) NULL,
+    tax_transaction_status ENUM('pending','created','failed') NOT NULL DEFAULT 'pending',
+    billing_address_snapshot JSON NULL,
     tax_collected_at TIMESTAMP NULL,
     credits_applied DECIMAL(10,2) DEFAULT 0,
+    credit_reserved DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    credit_payment_status ENUM('none','reserved','finalized','released') NOT NULL DEFAULT 'none',
+    internally_completed TINYINT(1) NOT NULL DEFAULT 0,
+    stripe_paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    finalization_key VARCHAR(190) NULL,
+    finalized_at TIMESTAMP NULL,
     coupon_discount DECIMAL(10,2) DEFAULT 0.00,
     coupon_id BIGINT NULL,
     coupon_code VARCHAR(80) NULL,
     coupon_snapshot JSON NULL,
     total DECIMAL(10,2),
+    manual_review_required TINYINT(1) NOT NULL DEFAULT 0,
+    manual_review_reason TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY orders_finalization_key_unique(finalization_key)
 );
 
 -- order_items retain selected license snapshots; license_price is 0.00 for included/free permissions and stores selected paid add-on prices where applicable.
@@ -542,16 +557,85 @@ CREATE TABLE reviews
 CREATE TABLE referrals
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    referrer_user_id BIGINT,
-    referred_user_id BIGINT,
-    referred_designer_id BIGINT,
-    referral_type ENUM('buyer','designer'),
-    status ENUM('pending','approved','eligible') DEFAULT 'pending',
+    referrer_user_id BIGINT NOT NULL,
+    referred_user_id BIGINT NULL,
+    referred_designer_id BIGINT NULL,
+    referral_type ENUM('buyer','seller') NULL,
+    seller_intent TINYINT(1) NOT NULL DEFAULT 0,
+    referral_code_snapshot VARCHAR(40) NULL,
+    status ENUM('attached','qualified','rejected') NOT NULL DEFAULT 'attached',
+    reward_status ENUM('pending','rewarded','rejected') NOT NULL DEFAULT 'pending',
+    buyer_status ENUM('pending','rewarded','rejected') NOT NULL DEFAULT 'pending',
+    seller_status ENUM('pending','rewarded','rejected') NOT NULL DEFAULT 'pending',
+    buyer_qualifying_order_id BIGINT NULL,
+    seller_qualifying_order_id BIGINT NULL,
+    seller_qualifying_order_item_id BIGINT NULL,
+    referrer_reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    referred_reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    qualification_event_key VARCHAR(190) NULL,
+    reward_idempotency_key VARCHAR(190) NULL,
+    qualified_at TIMESTAMP NULL,
+    rewarded_at TIMESTAMP NULL,
+    buyer_rewarded_at TIMESTAMP NULL,
+    seller_rewarded_at TIMESTAMP NULL,
+    buyer_referrer_reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    buyer_referred_reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    buyer_reward_event_key VARCHAR(190) NULL,
+    seller_referrer_reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    seller_referred_reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    seller_reward_event_key VARCHAR(190) NULL,
+    seller_reward_type ENUM('store_credit','lifetime_commission','legacy_store_credit_pair') NULL,
+    seller_reward_type_selected_at TIMESTAMP NULL,
+    commission_ended_at TIMESTAMP NULL,
+    commission_end_reason ENUM('store_disabled','store_inactive','store_deleted') NULL,
+    seller_legacy_pair_credit TINYINT(1) NOT NULL DEFAULT 0,
     sales_count INT DEFAULT 0,
-    reward_status ENUM('pending','active','inactive') DEFAULT 'pending',
     estimated_earnings DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY referrals_one_referrer_per_user(referred_user_id),
+    UNIQUE KEY referrals_reward_key_unique(reward_idempotency_key),
+    UNIQUE KEY referrals_buyer_reward_event_unique(buyer_reward_event_key),
+    UNIQUE KEY referrals_seller_reward_event_unique(seller_reward_event_key),
+    KEY referrals_referrer_status_idx(referrer_user_id,status),
+    KEY referrals_commission_processing_idx(seller_reward_type,commission_ended_at,referrer_user_id),
+    KEY referrals_buyer_qualifying_order_idx(buyer_qualifying_order_id),
+    KEY referrals_seller_qualifying_order_idx(seller_qualifying_order_id),
+    KEY referrals_seller_qualifying_item_idx(seller_qualifying_order_item_id),
+    KEY referrals_seller_qualification_lookup_idx(referred_user_id,seller_status,seller_qualifying_order_id),
+    CONSTRAINT phase11_referrals_referrer_fk FOREIGN KEY(referrer_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_referrals_referred_fk FOREIGN KEY(referred_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_referrals_buyer_order_fk FOREIGN KEY(buyer_qualifying_order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_referrals_seller_order_fk FOREIGN KEY(seller_qualifying_order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_referrals_seller_item_fk FOREIGN KEY(seller_qualifying_order_item_id) REFERENCES order_items(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE seller_payouts
+(
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    designer_id BIGINT NOT NULL,
+    gross_amount DECIMAL(10,2) DEFAULT 0.00,
+    platform_commission_amount DECIMAL(10,2) DEFAULT 0.00,
+    seller_payout_amount DECIMAL(10,2) DEFAULT 0.00,
+    currency VARCHAR(10) DEFAULT 'usd',
+    payout_status VARCHAR(60) DEFAULT 'pending_payment',
+    stripe_transfer_id VARCHAR(255) NULL,
+    stripe_transfer_error TEXT NULL,
+    admin_resolved_at TIMESTAMP NULL,
+    admin_resolved_by BIGINT NULL,
+    admin_resolution_note VARCHAR(500) NULL,
+    platform_credit_attempt_key VARCHAR(190) NULL,
+    platform_credit_settled_at TIMESTAMP NULL,
+    platform_credit_settled_by BIGINT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY seller_payouts_order_designer_phase10(order_id,designer_id),
+    UNIQUE KEY seller_payouts_platform_credit_attempt_unique(platform_credit_attempt_key),
+    KEY seller_payouts_designer_phase10(designer_id),
+    KEY seller_payouts_status_phase10(payout_status),
+    KEY seller_payouts_resolution_phase106(admin_resolved_at),
+    CONSTRAINT phase11_platform_credit_admin_fk FOREIGN KEY(platform_credit_settled_by) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE creator_rank_history
@@ -569,21 +653,40 @@ CREATE TABLE creator_rank_history
 CREATE TABLE marketplace_credits
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNIQUE,
-    balance DECIMAL(10,2) DEFAULT 0,
+    user_id BIGINT UNIQUE NOT NULL,
+    total_balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    reserved_balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT phase11_credit_user_fk FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
-
 CREATE TABLE credit_transactions
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT,
-    amount DECIMAL(10,2),
-    type VARCHAR(40),
+    user_id BIGINT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    type VARCHAR(40) NOT NULL,
+    status ENUM('reserved','finalized','released') NOT NULL DEFAULT 'finalized',
+    idempotency_key VARCHAR(190) NOT NULL,
+    order_id BIGINT NULL,
+    referral_id BIGINT NULL,
+    admin_user_id BIGINT NULL,
+    related_transaction_id BIGINT NULL,
     description TEXT,
+    finalized_at TIMESTAMP NULL,
+    released_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY credit_transactions_idempotency_unique(idempotency_key),
+    KEY credit_transactions_user_created_idx(user_id,created_at),
+    KEY credit_transactions_order_idx(order_id),
+    KEY credit_transactions_referral_idx(referral_id),
+    KEY credit_transactions_related_idx(related_transaction_id),
+    CONSTRAINT phase11_ledger_user_fk FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_ledger_order_fk FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_ledger_referral_fk FOREIGN KEY(referral_id) REFERENCES referrals(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_ledger_admin_fk FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT phase11_ledger_related_fk FOREIGN KEY(related_transaction_id) REFERENCES credit_transactions(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE seller_earnings
@@ -867,4 +970,25 @@ CREATE TABLE email_messages (
  CONSTRAINT fk_message_campaign FOREIGN KEY (campaign_id) REFERENCES email_campaigns(id) ON DELETE SET NULL,
  CONSTRAINT fk_message_recipient FOREIGN KEY (campaign_recipient_id) REFERENCES email_campaign_recipients(id) ON DELETE SET NULL,
  CONSTRAINT fk_message_waitlist FOREIGN KEY (waitlist_entry_id) REFERENCES waitlist_entries(id) ON DELETE SET NULL
+);
+
+
+-- Phase 11 seller referral lifetime commission accounting.
+CREATE TABLE seller_referral_payout_batches (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,referrer_user_id BIGINT NOT NULL,period_start DATE NOT NULL,period_end DATE NOT NULL,sequence_no INT NOT NULL DEFAULT 1,amount_cents BIGINT NOT NULL,status ENUM('processing','paid','failed','not_ready') NOT NULL,stripe_transfer_id VARCHAR(255) NULL,idempotency_key VARCHAR(190) NOT NULL,failure_reason VARCHAR(500) NULL,claim_token VARCHAR(64) NULL,processing_started_at TIMESTAMP NULL,attempted_at TIMESTAMP NULL,succeeded_at TIMESTAMP NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY seller_ref_payout_period_sequence_unique(referrer_user_id,period_start,period_end,sequence_no),UNIQUE KEY seller_ref_payout_key_unique(idempotency_key),KEY seller_ref_payout_processing_idx(status,processing_started_at),KEY seller_ref_payout_referrer_idx(referrer_user_id,status),CONSTRAINT seller_ref_payout_user_fk FOREIGN KEY(referrer_user_id) REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE TABLE seller_referral_commission_ledger (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,referral_id BIGINT NOT NULL,order_id BIGINT NOT NULL,order_item_id BIGINT NOT NULL,entry_type ENUM('accrual','refund_adjustment','recovery_adjustment') NOT NULL,amount_cents BIGINT NOT NULL,seller_earning_cents BIGINT NOT NULL DEFAULT 0,related_entry_id BIGINT NULL,event_key VARCHAR(190) NOT NULL,claimed_batch_id BIGINT NULL,payout_item_id BIGINT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY seller_ref_commission_event_unique(event_key),KEY seller_ref_commission_unpaid_idx(referral_id,payout_item_id,claimed_batch_id,created_at),KEY seller_ref_commission_order_idx(order_id,order_item_id),KEY seller_ref_commission_claim_idx(claimed_batch_id),CONSTRAINT seller_ref_commission_referral_fk FOREIGN KEY(referral_id) REFERENCES referrals(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_commission_order_fk FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_commission_item_fk FOREIGN KEY(order_item_id) REFERENCES order_items(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_commission_related_fk FOREIGN KEY(related_entry_id) REFERENCES seller_referral_commission_ledger(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_commission_claim_fk FOREIGN KEY(claimed_batch_id) REFERENCES seller_referral_payout_batches(id) ON DELETE RESTRICT
+);
+CREATE TABLE seller_referral_payout_items (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,batch_id BIGINT NOT NULL,ledger_entry_id BIGINT NOT NULL,amount_cents BIGINT NOT NULL,UNIQUE KEY seller_ref_payout_ledger_unique(ledger_entry_id),KEY seller_ref_payout_batch_idx(batch_id),CONSTRAINT seller_ref_payout_item_batch_fk FOREIGN KEY(batch_id) REFERENCES seller_referral_payout_batches(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_payout_item_ledger_fk FOREIGN KEY(ledger_entry_id) REFERENCES seller_referral_commission_ledger(id) ON DELETE RESTRICT
+);
+ALTER TABLE seller_referral_commission_ledger ADD CONSTRAINT seller_ref_commission_payout_item_fk FOREIGN KEY(payout_item_id) REFERENCES seller_referral_payout_items(id) ON DELETE RESTRICT;
+CREATE TABLE seller_referral_transfer_attempts (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,batch_id BIGINT NOT NULL,status ENUM('attempted','succeeded','failed','not_ready') NOT NULL,stripe_transfer_id VARCHAR(255) NULL,failure_reason VARCHAR(500) NULL,attempted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,succeeded_at TIMESTAMP NULL,KEY seller_ref_attempt_batch_idx(batch_id,attempted_at),CONSTRAINT seller_ref_attempt_batch_fk FOREIGN KEY(batch_id) REFERENCES seller_referral_payout_batches(id) ON DELETE RESTRICT
+);
+CREATE TABLE seller_referral_admin_audits (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,admin_user_id BIGINT NOT NULL,batch_id BIGINT NOT NULL,action VARCHAR(80) NOT NULL,amount_cents BIGINT NOT NULL,result_status VARCHAR(40) NOT NULL,reason VARCHAR(500) NULL,stripe_transfer_id VARCHAR(255) NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,KEY seller_ref_admin_audit_batch_idx(batch_id,created_at),CONSTRAINT seller_ref_admin_audit_admin_fk FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_admin_audit_batch_fk FOREIGN KEY(batch_id) REFERENCES seller_referral_payout_batches(id) ON DELETE RESTRICT
 );

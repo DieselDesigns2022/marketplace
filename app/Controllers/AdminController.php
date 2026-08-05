@@ -8,6 +8,7 @@ use App\Services\WatermarkService;
 use App\Repositories\IpRiskRepository;
 use App\Services\NotificationService;
 use App\Services\EmailQueueService;
+use App\Services\SellerReferralCommissionService;
 use Throwable;
 class AdminController
 {
@@ -141,7 +142,24 @@ class AdminController
     public function users()
     {
         $this->gate();
-        if($_POST) DB::exec('update users set status=? where id=?',[$_POST['status'],$_POST['id']]);
+        if ($_POST) {
+            H::verifyCsrf();
+            $userId = (int)($_POST['id'] ?? 0);
+            $status = ($_POST['status'] ?? '') === 'active' ? 'active' : 'disabled';
+            DB::begin();
+            try {
+                $commissionStopped = $status === 'disabled'
+                    && (new SellerReferralCommissionService())->permanentlyStop($userId, 'store_disabled');
+                DB::exec('update users set status=? where id=?', [$status, $userId]);
+                DB::commit();
+                if ($commissionStopped) {
+                    (new SellerReferralCommissionService())->notifyPermanentStop($userId);
+                }
+            } catch (Throwable $error) {
+                DB::rollBack();
+                H::flash('error', 'Account status was not changed.');
+            }
+        }
         H::view('admin/users',['users'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
 
     }
@@ -153,7 +171,8 @@ class AdminController
         if (DB::row('select id from orders where user_id=? limit 1',[$id])) return 'This account has an order that must be retained.';
         if (DB::row('select id from coupon_usages where user_id=? limit 1',[$id])) return 'This account has coupon usage history that must be retained.';
         if (DB::row('select id from seller_earnings where buyer_id=? limit 1',[$id])) return 'This account has buyer earnings history that must be retained.';
-        if (DB::row('select id from referrals where (referrer_user_id=? or referred_user_id=?) and estimated_earnings<>0 limit 1',[$id,$id])) return 'This account has referral earnings history that must be retained.';
+        if (DB::row('select id from referrals where referrer_user_id=? or referred_user_id=? limit 1',[$id,$id])) return 'This account has immutable referral history that must be retained.';
+        if (DB::row('select id from credit_transactions where user_id=? limit 1',[$id])) return 'This account has an immutable financial credit ledger that must be retained.';
         if (DB::row('select id from email_campaigns where created_by=? limit 1',[$id])) return 'This account has email campaign author history that must be retained.';
         if (DB::row('select id from coupons where created_by=? limit 1',[$id])) return 'This account has coupon author history that must be retained.';
         if (DB::row('select id from designer_applications where user_id=? and status="approved" limit 1',[$id])) return 'This account has approved seller application history that must be retained.';
@@ -273,9 +292,26 @@ class AdminController
                     DB::exec('update designers set creator_rank=?, updated_at=now() where id=?',[$rank,$id]);
                     H::flash('success','Seller rank updated.');
                 }
-            } elseif ($action === 'disable') {
-                DB::exec('update designers set status="disabled", updated_at=now() where id=?',[$id]);
-                H::flash('success','Seller disabled.');
+            } elseif (in_array($action, ['disable', 'inactive', 'delete'], true)) {
+                $owner = DB::row('select user_id from designers where id=?', [$id]);
+                $status = ['disable' => 'disabled', 'inactive' => 'inactive', 'delete' => 'deleted'][$action];
+                $reason = ['disable' => 'store_disabled', 'inactive' => 'store_inactive', 'delete' => 'store_deleted'][$action];
+                DB::begin();
+                try {
+                    if (!$owner) {
+                        throw new \DomainException('Seller was not found.');
+                    }
+                    $commissionStopped = (new SellerReferralCommissionService())->permanentlyStop((int)$owner['user_id'], $reason);
+                    DB::exec('update designers set status=?, updated_at=now() where id=?', [$status, $id]);
+                    DB::commit();
+                    if ($commissionStopped) {
+                        (new SellerReferralCommissionService())->notifyPermanentStop((int)$owner['user_id']);
+                    }
+                    H::flash('success', 'Seller status updated. Referral commission cannot restart.');
+                } catch (Throwable $error) {
+                    DB::rollBack();
+                    H::flash('error', 'Seller status was not changed.');
+                }
             } elseif ($action === 'enable') {
                 DB::exec('update designers set status="approved", updated_at=now() where id=?',[$id]);
                 H::flash('success','Seller enabled.');
@@ -562,7 +598,7 @@ class AdminController
             H::redirect('/admin/order/'.(int)$id);
         }
         $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404);
-        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,d.stripe_account_status,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled,u.email designer_email,se.seller_earning,pc.commission_amount,sp.payout_status ledger_payout_status,sp.stripe_transfer_id ledger_transfer_id,sp.stripe_transfer_error ledger_transfer_error from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,d.stripe_account_status,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled,u.email designer_email,se.seller_earning,pc.commission_amount,sp.id seller_payout_id,sp.payout_status ledger_payout_status,sp.stripe_transfer_id ledger_transfer_id,sp.stripe_transfer_error ledger_transfer_error,sp.platform_credit_settled_at,sp.platform_credit_settled_by from order_items oi join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id=oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id=oi.product_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.order_id=?',[$order['id']]);
         H::view('admin/order_detail',['order'=>$order,'items'=>$items,'transactions'=>DB::rows('select * from payment_transactions where order_id=? order by created_at desc',[$order['id']]),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 20')]);
 
     }
@@ -570,7 +606,7 @@ class AdminController
     public function paymentLogs()
     {
         $this->gate();
-        $issue = in_array($_GET['issue'] ?? '', ['failed_transfers','webhook_issues'], true) ? $_GET['issue'] : '';
+        $issue = in_array($_GET['issue'] ?? '', ['failed_transfers','webhook_issues','platform_credit_holds'], true) ? $_GET['issue'] : '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $action = $_POST['action'] ?? '';
@@ -652,12 +688,14 @@ class AdminController
         limit 200');
 
         $transferIssues = DB::rows('select sp.*,o.id order_id,d.display_name seller_name,u.email seller_email from seller_payouts sp join orders o on o.id=sp.order_id join designers d on d.id=sp.designer_id join users u on u.id=d.user_id where (sp.payout_status="transfer_failed" or sp.stripe_transfer_error is not null) and sp.admin_resolved_at is null order by sp.updated_at desc,sp.id desc limit 100');
+        $platformCreditHolds = DB::rows('select sp.*,o.id order_id,o.internally_completed,o.manual_review_required,o.stripe_charge_id,d.display_name seller_name,d.stripe_connect_account_id,d.stripe_payouts_enabled,d.stripe_details_submitted,u.email seller_email from seller_payouts sp join orders o on o.id=sp.order_id join designers d on d.id=sp.designer_id join users u on u.id=d.user_id where sp.payout_status="platform_credit_hold" order by sp.updated_at desc,sp.id desc limit 100');
         $webhookIssues = DB::rows('select * from stripe_events where (processing_status="failed" or processing_error is not null) and admin_resolved_at is null order by created_at desc,id desc limit 100');
 
         H::view('admin/payment_logs',[
             'summary'=>$summary,
             'issue'=>$issue,
             'transferIssues'=>$transferIssues,
+            'platformCreditHolds'=>$platformCreditHolds,
             'webhookIssues'=>$webhookIssues,
             'commissionRows'=>$commissionRows,
             'transactions'=>DB::rows('select pt.*,u.email buyer_email from payment_transactions pt left join orders o on o.id=pt.order_id left join users u on u.id=o.user_id order by pt.created_at desc limit 200'),
@@ -670,22 +708,238 @@ class AdminController
         $this->gate();
         H::view('admin/table',['title'=>'Download logs','rows'=>DB::rows('select dl.id,dl.order_id,dl.order_item_id,dl.product_id,dl.product_file_id,dl.status,dl.message,u.email user_email,dl.ip_address,dl.created_at from downloads dl join users u on u.id=dl.user_id order by dl.created_at desc limit 200')]);
     }
-    public function referrals()
-    {
-        $this->gate();
-        H::view('admin/table',['title'=>'Referrals','rows'=>DB::rows('select * from referrals order by created_at desc')]);
-
-    }
     public function homepage()
     {
         $this->gate();
-        if($_POST)
-        {
-           DB::exec('insert into homepage_features (feature_type,feature_id,sort_order,is_active) values (?,?,?,1)',[$_POST['feature_type'],$_POST['feature_id'],$_POST['sort_order']]);
 
+        if ($_POST) {
+            H::verifyCsrf();
+
+            $action = trim((string)($_POST['action'] ?? 'add'));
+
+            if ($action === 'delete') {
+                $featureRecordId = (int)($_POST['feature_record_id'] ?? 0);
+                $feature = DB::row(
+                    'select id from homepage_features where id=?',
+                    [$featureRecordId]
+                );
+
+                if (!$feature) {
+                    H::flash('error', 'Homepage feature not found.');
+                    H::redirect('/admin/homepage');
+                }
+
+                DB::exec(
+                    'delete from homepage_features where id=?',
+                    [$featureRecordId]
+                );
+
+                H::flash('success', 'Homepage feature removed.');
+                H::redirect('/admin/homepage');
+            }
+
+            if ($action === 'update') {
+                $featureRecordId = (int)($_POST['feature_record_id'] ?? 0);
+                $isActive = isset($_POST['is_active']) ? 1 : 0;
+
+                $feature = DB::row(
+                    'select id from homepage_features where id=?',
+                    [$featureRecordId]
+                );
+
+                if (!$feature) {
+                    H::flash('error', 'Homepage feature not found.');
+                    H::redirect('/admin/homepage');
+                }
+
+                DB::exec(
+                    'update homepage_features
+                     set is_active=?,updated_at=now()
+                     where id=?',
+                    [$isActive, $featureRecordId]
+                );
+
+                H::flash('success', 'Homepage feature updated.');
+                H::redirect('/admin/homepage');
+            }
+
+            if ($action === 'reorder') {
+                $featureType = trim((string)($_POST['feature_type'] ?? ''));
+                $allowedTypes = ['product', 'designer', 'category'];
+
+                if (!in_array($featureType, $allowedTypes, true)) {
+                    H::flash('error', 'Invalid homepage feature type.');
+                    H::redirect('/admin/homepage');
+                }
+
+                $rawOrder = trim((string)($_POST['feature_order'] ?? ''));
+                $ids = array_values(array_unique(array_filter(
+                    array_map(
+                        static fn($value) => ctype_digit(trim($value))
+                            ? (int)trim($value)
+                            : 0,
+                        explode(',', $rawOrder)
+                    ),
+                    static fn($value) => $value > 0
+                )));
+
+                $existingRows = DB::rows(
+                    'select id
+                     from homepage_features
+                     where feature_type=?
+                     order by sort_order,id',
+                    [$featureType]
+                );
+
+                $existingIds = array_map(
+                    static fn($row) => (int)$row['id'],
+                    $existingRows
+                );
+
+                $submittedIds = $ids;
+                sort($existingIds);
+                sort($submittedIds);
+
+                if ($existingIds !== $submittedIds) {
+                    H::flash(
+                        'error',
+                        'The homepage order could not be saved. Refresh and try again.'
+                    );
+                    H::redirect('/admin/homepage');
+                }
+
+                try {
+                    DB::begin();
+
+                    foreach ($ids as $position => $id) {
+                        DB::exec(
+                            'update homepage_features
+                             set sort_order=?,updated_at=now()
+                             where id=? and feature_type=?',
+                            [$position, $id, $featureType]
+                        );
+                    }
+
+                    DB::commit();
+                    H::flash('success', 'Homepage order saved.');
+                } catch (Throwable $error) {
+                    DB::rollBack();
+                    H::flash('error', 'The homepage order could not be saved.');
+                }
+
+                H::redirect('/admin/homepage');
+            }
+
+            $target = trim((string)($_POST['feature_target'] ?? ''));
+
+            [$featureType, $rawId] = array_pad(explode(':', $target, 2), 2, '');
+            $allowedTypes = ['product', 'designer', 'category'];
+
+            if (!in_array($featureType, $allowedTypes, true) || !ctype_digit($rawId) || (int)$rawId < 1) {
+                H::flash('error', 'Please choose a valid homepage feature.');
+                H::redirect('/admin/homepage');
+            }
+
+            $featureId = (int)$rawId;
+
+            $exists = match ($featureType) {
+                'designer' => DB::row(
+                    'select id from designers where id=? and status="approved"',
+                    [$featureId]
+                ),
+                'product' => DB::row(
+                    'select id from products where id=? and status in ("approved","published")',
+                    [$featureId]
+                ),
+                'category' => DB::row(
+                    'select id from categories where id=? and is_active=1',
+                    [$featureId]
+                ),
+            };
+
+            if (!$exists) {
+                H::flash('error', 'That item is not available to feature.');
+                H::redirect('/admin/homepage');
+            }
+
+            $duplicate = DB::row(
+                'select id from homepage_features where feature_type=? and feature_id=? limit 1',
+                [$featureType, $featureId]
+            );
+
+            if ($duplicate) {
+                H::flash('warning', 'That item is already listed as a homepage feature.');
+                H::redirect('/admin/homepage');
+            }
+
+            $nextOrder = (int)(
+                DB::row(
+                    'select coalesce(max(sort_order),-1)+1 next_order
+                     from homepage_features
+                     where feature_type=?',
+                    [$featureType]
+                )['next_order'] ?? 0
+            );
+
+            DB::exec(
+                'insert into homepage_features
+                 (feature_type,feature_id,sort_order,is_active)
+                 values (?,?,?,1)',
+                [$featureType, $featureId, $nextOrder]
+            );
+
+            H::flash('success', 'Homepage feature added.');
+            H::redirect('/admin/homepage');
         }
-        H::view('admin/homepage',['features'=>DB::rows('select * from homepage_features')]);
 
+        $features = DB::rows(
+            'select hf.*,
+                    case
+                        when hf.feature_type="designer" then coalesce(d.display_name,d.store_slug,concat("Designer #",hf.feature_id))
+                        when hf.feature_type="product" then coalesce(p.title,concat("Product #",hf.feature_id))
+                        when hf.feature_type="category" then coalesce(c.name,concat("Category #",hf.feature_id))
+                        else concat("Item #",hf.feature_id)
+                    end feature_name
+             from homepage_features hf
+             left join designers d on hf.feature_type="designer" and d.id=hf.feature_id
+             left join products p on hf.feature_type="product" and p.id=hf.feature_id
+             left join categories c on hf.feature_type="category" and c.id=hf.feature_id
+             order by hf.sort_order,hf.id'
+        );
+
+        $groupedFeatures = [
+            'product' => [],
+            'designer' => [],
+            'category' => [],
+        ];
+
+        foreach ($features as $feature) {
+            $type = $feature['feature_type'];
+
+            if (isset($groupedFeatures[$type])) {
+                $groupedFeatures[$type][] = $feature;
+            }
+        }
+
+        H::view('admin/homepage', [
+            'features' => $features,
+            'groupedFeatures' => $groupedFeatures,
+            'designers' => DB::rows(
+                'select id,coalesce(display_name,store_slug,concat("Designer #",id)) label
+                 from designers where status="approved" order by label'
+            ),
+            'products' => DB::rows(
+                'select p.id,concat(coalesce(p.title,concat("Product #",p.id))," — ",coalesce(d.display_name,d.store_slug,"Unknown seller")) label
+                 from products p
+                 left join designers d on d.id=p.designer_id
+                 where p.status in ("approved","published")
+                 order by label'
+            ),
+            'categories' => DB::rows(
+                'select id,coalesce(name,concat("Category #",id)) label
+                 from categories where is_active=1 order by label'
+            ),
+        ]);
     }
     public function ads()
     {

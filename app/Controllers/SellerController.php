@@ -345,6 +345,15 @@ class SellerController
 
     public function apply()
     {
+        if (array_key_exists('seller_ref', $_GET)) {
+            $sellerReferral = \App\Services\ReferralService::normalize((string)$_GET['seller_ref']);
+            if ($sellerReferral !== '' && (new \App\Services\ReferralService)->referrer($sellerReferral)) {
+                $_SESSION['seller_referral_intent'] = $sellerReferral;
+            } else {
+                unset($_SESSION['seller_referral_intent']);
+                if ($sellerReferral !== '') H::flash('warning', 'That seller referral code is invalid. You may still apply.');
+            }
+        }
         if (!H::user()) {
             $_SESSION['after_login_redirect'] = '/apply';
             $_SESSION['seller_intent'] = true;
@@ -352,6 +361,19 @@ class SellerController
             H::redirect('/register');
         }
         H::requireLogin();
+        if (!empty($_SESSION['seller_referral_intent'])) {
+            try {
+                DB::begin();
+                (new \App\Services\ReferralService)->attach((int)H::user()['id'], $_SESSION['seller_referral_intent'], 'seller');
+                DB::commit();
+                unset($_SESSION['seller_referral_intent']);
+            } catch (Throwable $error) {
+                if (DB::pdo()->inTransaction()) DB::rollBack();
+                error_log('Seller referral attachment failed: ' . $error->getMessage());
+                unset($_SESSION['seller_referral_intent']);
+                H::flash('warning', 'The seller referral could not be attached. Your application can still continue.');
+            }
+        }
         $designer = $this->d();
         if ($designer && $designer['status'] === 'approved')
         {
@@ -420,7 +442,7 @@ class SellerController
         $stats=array_merge($stats??[],DB::row('select count(*) sales_count,coalesce(sum(gross_sale),0) gross_sales,coalesce(sum(seller_earning),0) seller_earnings from seller_earnings where designer_id=?',[$id])??[],DB::row('select sum(review_status in ("pending_review","published_flagged")) flagged_products from product_ip_risk_states s join products p on p.id=s.product_id where p.designer_id=?',[$id])??[]);
         $refunds=$this->refundSummary($id);$stats['gross_sales']=max(0,(float)$stats['gross_sales']-$refunds['gross_refund_cents']/100);$stats['seller_earnings']=max(0,(float)$stats['seller_earnings']-$refunds['seller_refund_cents']/100);$stats['refund_adjustments']=$refunds['seller_refund_cents']/100;
         $stats['pending_payouts']=0.0;$stats['transferred_payouts']=0.0;$stats['payout_issues']=0;
-        foreach(DB::rows('select order_id,seller_payout_amount,payout_status,stripe_transfer_error from seller_payouts where designer_id=?',[$id]) as $payout){$orderId=(int)$payout['order_id'];$amount=(float)$payout['seller_payout_amount'];if(in_array($payout['payout_status'],['pending_payment','pending_transfer','pending_stripe_onboarding'],true))$stats['pending_payouts']+=isset($refunds['original_by_order'][$orderId])?max(0,($refunds['original_by_order'][$orderId]-($refunds['by_order'][$orderId]??0))/100):$amount;if($payout['payout_status']==='transferred')$stats['transferred_payouts']+=$amount;if($payout['payout_status']==='transfer_failed'||!empty($payout['stripe_transfer_error']))$stats['payout_issues']++;}
+        foreach(DB::rows('select order_id,seller_payout_amount,payout_status,stripe_transfer_error from seller_payouts where designer_id=?',[$id]) as $payout){$orderId=(int)$payout['order_id'];$amount=(float)$payout['seller_payout_amount'];if(in_array($payout['payout_status'],['pending_payment','pending_transfer','pending_stripe_onboarding','platform_credit_hold'],true))$stats['pending_payouts']+=isset($refunds['original_by_order'][$orderId])?max(0,($refunds['original_by_order'][$orderId]-($refunds['by_order'][$orderId]??0))/100):$amount;if($payout['payout_status']==='transferred')$stats['transferred_payouts']+=$amount;if($payout['payout_status']==='transfer_failed'||!empty($payout['stripe_transfer_error']))$stats['payout_issues']++;}
         $accountStatus=(string)($d['stripe_account_status']??'');
         if (empty($d['stripe_connect_account_id'])) $stripeState='not_connected';
         elseif (in_array($accountStatus,['restricted','disabled','error'],true)) $stripeState='payout_issue';
@@ -539,7 +561,7 @@ class SellerController
         $price = $_POST['price'] ?? ($existing['price'] ?? '0.00');
         $commercialEnabled = isset($_POST['license_enabled']['commercial']);
         $commercialLicensePrice = $_POST['license_price']['commercial'] ?? ($existing['commercial_license_price'] ?? '0.00');
-        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
+        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'is_hand_drawn' => isset($_POST['is_hand_drawn']) ? 1 : 0, 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
     }
 
@@ -957,7 +979,7 @@ class SellerController
                     $productId = (int)$p['id'];
                     try {
                         DB::begin();
-                        DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
+                        DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,is_hand_drawn=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['is_hand_drawn'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
                         $this->syncTags($productId, $values['tags']);
                         LicenseService::syncProductLicenses($productId, $postedLicenses);
                         $ipRiskResult = $ipWorkflow->scanProduct($productId, (int)H::user()['id']);
@@ -998,7 +1020,7 @@ class SellerController
                 } else {
                     $productId = 0;
                     try {
-                        DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['seo_title'], $values['seo_description'], $status, ] );
+                        DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,is_hand_drawn,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['is_hand_drawn'], $values['seo_title'], $values['seo_description'], $status, ] );
                         $productId = (int)DB::id();
                         $this->syncTags($productId, $values['tags']);
                         LicenseService::syncProductLicenses($productId, $postedLicenses);
@@ -1121,8 +1143,8 @@ class SellerController
         $slug = $this->uniqueProductSlug($copyTitle);
         try {
             DB::begin();
-            DB::exec('insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,"draft")', [
-                $d['id'], $source['category_id'], $copyTitle, $slug, $source['short_description'], $source['description'], $source['price'], $source['fulfillment_type'], $source['manual_delivery_instructions'], null, $source['file_types'], $source['commercial_license_enabled'], $source['commercial_license_price'], $source['pod_allowed'], $source['digital_resale_prohibited'], $source['ai_disclosure'], $source['seo_title'], $source['seo_description'],
+            DB::exec('insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,is_hand_drawn,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,"draft")', [
+                $d['id'], $source['category_id'], $copyTitle, $slug, $source['short_description'], $source['description'], $source['price'], $source['fulfillment_type'], $source['manual_delivery_instructions'], null, $source['file_types'], $source['commercial_license_enabled'], $source['commercial_license_price'], $source['pod_allowed'], $source['digital_resale_prohibited'], $source['ai_disclosure'], $source['is_hand_drawn'], $source['seo_title'], $source['seo_description'],
             ]);
             $newId = (int)DB::id();
             foreach (DB::rows('select tag_id from product_tags where product_id=?', [(int)$source['id']]) as $tag) {
@@ -1276,7 +1298,9 @@ class SellerController
     {
         $this->requireOnboardingComplete();
         H::requireSeller();
-        H::view('seller/referrals', [ 'refs' => DB::rows('select * from referrals where referrer_user_id=?', [H::user()['id']]), ]);
+        $data = (new \App\Services\ReferralService)->dashboard((int)H::user()['id']);
+        $sellerReferrals = array_values(array_filter($data['made'], static fn(array $referral): bool => !empty($referral['seller_intent'])));
+        H::view('seller/referrals', ['refs' => $sellerReferrals, 'payouts' => $data['payouts'], 'referralCode' => $data['code']]);
 
     }
     public function rank()

@@ -16,6 +16,9 @@
     </p>
     <p>AI Disclosure: <?=H::e($p['ai_disclosure'])?>
     </p>
+    <p>Hand Drawn:
+        <?=!empty($p['is_hand_drawn']) ? '✏️ Yes' : 'No'?>
+    </p>
     <p>Completed Orders: <?= (int)($p['completed_order_count'] ?? 0) ?> <?php if((int)($p['completed_order_count'] ?? 0)>0):?><span class="muted">Permanent delete is blocked; archive to hide this product while preserving order history.</span><?php endif;?></p>
     <p>SEO Title: <?=H::e($p['seo_title']?:'Fallback to product title')?>
     </p>

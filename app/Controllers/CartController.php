@@ -7,6 +7,8 @@ use App\Services\LicenseService;
 use App\Services\StripeService;
 use App\Services\CouponService;
 use App\Services\SellerReceiptService;
+use App\Services\CreditService;
+use App\Services\OrderFinalizationService;
 use Throwable;
 
 class CartController
@@ -256,18 +258,52 @@ class CartController
                 $coupon = ($couponResult && $couponResult['ok']) ? $couponResult['coupon'] : null;
                 $couponDiscount = $coupon ? (float)$couponResult['discount'] : 0.0;
                 $allocations = $coupon ? CouponService::allocateDiscount($coupon, $valid, $couponDiscount) : [];
-                $tax = 0.0; // Stripe Tax calculates and returns the final tax amount by webhook.
-                $credits = 0.0; // Phase 11 placeholder only.
-                $total=max(0, round($subtotal - $couponDiscount + $tax - $credits, 2));
-                if ($total <= 0) {
-                    DB::rollBack();
-                    H::flash('error','This coupon reduces the order to $0.00. Free coupon checkout is not available yet; please remove the coupon or add another paid item.');
-                    H::redirect('/cart');
+                $billingAddress = [
+                    'line1' => trim((string)($_POST['billing_line1'] ?? '')),
+                    'line2' => trim((string)($_POST['billing_line2'] ?? '')),
+                    'city' => trim((string)($_POST['billing_city'] ?? '')),
+                    'state' => trim((string)($_POST['billing_state'] ?? '')),
+                    'postal_code' => trim((string)($_POST['billing_postal_code'] ?? '')),
+                    'country' => strtoupper(trim((string)($_POST['billing_country'] ?? 'US'))),
+                ];
+                $billingAddress = StripeService::normalizeBillingAddress($billingAddress);
+                $taxableItems = [];
+                foreach ($valid as $index => $product) {
+                    $taxableItems[] = [
+                        'id' => $product['id'],
+                        'total_price' => CreditService::formatCents(
+                            CreditService::parseCents((string)$product['line_total'])
+                            - CreditService::parseCents((string)($allocations[$index] ?? '0.00'))
+                        ),
+                    ];
                 }
+                $taxCalculation = StripeService::calculateTax(
+                    $taxableItems,
+                    $billingAddress,
+                    'tax-checkout:' . (int)H::user()['id'] . ':' . hash('sha256', json_encode([$taxableItems, $billingAddress]))
+                );
+                $tax = CreditService::formatCents($taxCalculation['tax_cents']);
+                $useCredits = ($_POST['use_credits'] ?? '') === '1';
+                $available = (new CreditService)->balances((int)H::user()['id'])['available'];
+                $breakdown = CreditService::checkoutBreakdown((string)$subtotal, (string)$couponDiscount, $tax, $available, $useCredits);
+                $grossCents = $breakdown['subtotal_cents'] - $breakdown['discount_cents'] + $breakdown['tax_cents'];
+                if ((int)$taxCalculation['total_cents'] !== $grossCents) {
+                    throw new \RuntimeException('Stripe Tax total did not match the authoritative merchandise snapshot.');
+                }
+                $creditCents = $breakdown['credit_cents'];
+                $credits = CreditService::formatCents($creditCents);
+                $total = CreditService::formatCents(max(0, $grossCents - $creditCents));
+                if ($total <= 0 && $creditCents <= 0) { DB::rollBack();H::flash('error','Coupon-only free checkout is not available.');H::redirect('/cart'); }
                 $commissionRate = StripeService::commissionRate();
                 $platformCommissionTotal = 0.0;
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,tax_provider,tax_status,tax_liability_owner,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,'stripe_tax','pending','platform',$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),StripeService::cents($total),0]);
+                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,tax_provider,tax_status,tax_liability_owner,tax_snapshot,tax_calculation_id,tax_transaction_status,billing_address_snapshot,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,stripe_paid_amount,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,'stripe_tax','calculated','platform',$taxCalculation['snapshot'],$taxCalculation['id'],'pending',json_encode($billingAddress,JSON_THROW_ON_ERROR),$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),CreditService::parseCents($total),$total,0]);
                 $order=DB::id();
+                if ($creditCents > 0) {
+                    $credits = (new CreditService)->reserve((int)H::user()['id'], $credits, (int)$order, 'order:' . $order . ':credit:reserve');
+                    $creditCents = CreditService::parseCents($credits);
+                    $total = CreditService::formatCents($grossCents - $creditCents);
+                    DB::exec('update orders set credits_applied=?,credit_reserved=?,credit_payment_status=?,total=?,stripe_amount_total=?,stripe_paid_amount=? where id=?', [$credits, $credits, $creditCents > 0 ? 'reserved' : 'none', $total, $grossCents - $creditCents, $total, $order]);
+                }
                 foreach($valid as $idx=>$p)
                {
                    // Read receipt settings authoritatively inside this transaction; cart/request values are never trusted.
@@ -289,6 +325,15 @@ class CartController
                 DB::exec('update orders set platform_commission_total=? where id=?', [$platformCommissionTotal,$order]);
                 $createdOrder = DB::row('select * from orders where id=?', [$order]);
                 $createdItems = DB::rows('select * from order_items where order_id=?', [$order]);
+                if (CreditService::parseCents($total) === 0) {
+                    $finalizer = new OrderFinalizationService();
+                    $finalizer->finalize((int)$order, 'internal-credit-order:' . $order, true);
+                    DB::exec('delete from cart_items where user_id=?', [H::user()['id']]);
+                    unset($_SESSION['coupon_code']);
+                    DB::commit();
+                    $finalizer->communicate((int)$order);
+                    H::redirect('/dashboard/order/' . (int)$order);
+                }
                 $session = StripeService::createCheckoutSession($createdOrder, $createdItems);
                 DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?', [$session['id'] ?? null, $order]);
                 DB::exec('delete from cart_items where user_id=?',[H::user()['id']]);
@@ -309,7 +354,7 @@ class CartController
         }
         $couponResult = $this->currentCoupon($items);
         $discount = ($couponResult && $couponResult['ok']) ? (float)$couponResult['discount'] : 0.0;
-        H::view('buyer/checkout',['items'=>$items,'subtotal'=>$total,'couponResult'=>$couponResult,'discount'=>$discount,'finalTotal'=>max(0, round($total - $discount, 2))]);
+        $balances=(new CreditService)->balances((int)H::user()['id']);H::view('buyer/checkout',['items'=>$items,'subtotal'=>$total,'couponResult'=>$couponResult,'discount'=>$discount,'balances'=>$balances,'finalTotal'=>max(0, round($total - $discount, 2))]);
 
     }
 

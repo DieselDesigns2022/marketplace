@@ -222,7 +222,8 @@
     <p>Refunds may not be granted for changing your mind, not reading the product description, not understanding software requirements, buying the wrong product by mistake, expecting a physical item, lack of knowledge about how to use the file, compatibility issues not caused by the seller or Asset Moth, or violating the product license or these Terms.</p>
 
     <h3>14. Buyer credits and referrals</h3>
-    <p>Asset Moth may offer buyer referral links, marketplace credits, rewards, discounts, or promotional credits. Credits may only be used on Asset Moth and may not be transferred, sold, exchanged for cash, or used outside the marketplace unless Asset Moth clearly says otherwise.</p>
+    <p>One user account may be attached to only one immutable referrer. The referrer and new buyer each earn $1.50 after the buyer’s first completed order with a positive payment after credits. Fully credit-funded, refunded, failed, cancelled, unpaid, and unresolved review orders do not qualify; an order legitimately approved and completed after review may qualify.</p>
+    <p>Asset Moth may offer buyer referral links, marketplace credits, rewards, discounts, or promotional credits. Credits never expire, may only be used on Asset Moth, and may not be transferred, sold, exchanged for cash, or used outside the marketplace. Credits redeemed on an order are not automatically restored after a refund during this launch version. Self-referrals, duplicate accounts, fraud, and abuse are forbidden. Asset Moth may reverse fraudulently awarded credit with an auditable adjustment; existing ledger history is never rewritten.</p>
 
     <h2>Seller and designer terms</h2>
 
@@ -273,6 +274,7 @@
     <p>Sellers are responsible for understanding and handling their own income taxes, business taxes, records, and tax obligations outside Asset Moth checkout. For Asset Moth marketplace checkout at US launch, applicable sales tax is handled through Asset Moth’s Stripe Tax configuration. Asset Moth does not provide tax advice.</p>
 
     <h3>29. Seller referrals</h3>
+    <p>A buyer who later becomes a seller keeps the same original referrer. That referrer and the approved seller each earn $5.00 only after the seller’s first completed, non-refunded sale. Application or approval alone does not qualify.</p>
     <p>Asset Moth may offer designer referral rewards. Asset Moth may deny, pause, revoke, or adjust referral rewards if there is fraud, self-referral, duplicate accounts, abuse, fake sales, chargebacks, refunds, policy violations, or technical errors.</p>
 
     <h3>30. Creator ranks</h3>

@@ -56,9 +56,42 @@ class PublicController
     public function home(): void
     {
         $cats = $this->visibleCategories(8);
-        $products = DB::rows("select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status='approved' and d.status='approved' and p.is_featured=1 order by p.updated_at desc,p.id desc limit 8");
+        $products = DB::rows(
+            'select p.*,
+                    1 is_featured,
+                    d.display_name,
+                    d.store_slug,
+                    c.name category_name,
+                    c.slug category_slug,
+                    (
+                        select image_path
+                        from product_images pi
+                        where pi.product_id=p.id
+                        order by pi.sort_order,pi.id
+                        limit 1
+                    ) preview_image
+             from homepage_features hf
+             join products p on p.id=hf.feature_id
+             join designers d on d.id=p.designer_id
+             left join categories c on c.id=p.category_id
+             where hf.feature_type="product"
+               and hf.is_active=1
+               and p.status in ("approved","published")
+               and d.status="approved"
+             order by hf.sort_order,hf.id
+             limit 8'
+        );
         $recentProducts = DB::rows("select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status='approved' and d.status='approved' order by p.created_at desc,p.id desc limit 8");
-        $designers = DB::rows('select * from designers where status="approved" and is_featured=1 order by updated_at desc,id desc limit 6');
+        $designers = DB::rows(
+            'select d.*
+             from homepage_features hf
+             join designers d on d.id=hf.feature_id
+             where hf.feature_type="designer"
+               and hf.is_active=1
+               and d.status="approved"
+             order by hf.sort_order,hf.id
+             limit 6'
+        );
         $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Asset Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
         H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'meta'=>$this->pageMeta('Asset Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
     }
@@ -221,7 +254,7 @@ class PublicController
         if ($preview) $schema['image'] = H::assetUrl($preview);
         if ($p['price'] !== null) $schema['offers'] = ['@type'=>'Offer','price'=>(string)$p['price'],'priceCurrency'=>'USD','url'=>$productUrl];
         $owned = H::user() ? (bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where o.user_id=? and oi.product_id=? and o.payment_status="paid" limit 1', [H::user()['id'], $p['id']]) : false;
-        H::view('public/product', ['p'=>$p,'owned'=>$owned,'licenses'=>$licenses,'defaultLicense'=>$defaultLicense,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>$images,'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" and d.status="approved" and p.id<>? order by p.updated_at desc,p.id desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(case when p.category_id <=> ? then 20 else 0 end + (select count(*)*10 from product_tags pt where pt.product_id=p.id and pt.tag_id in (select tag_id from product_tags where product_id=?))) related_score from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status="approved" and d.status="approved" and p.id<>? and (p.category_id <=> ? or exists (select 1 from product_tags pt2 where pt2.product_id=p.id and pt2.tag_id in (select tag_id from product_tags where product_id=?))) order by related_score desc,p.updated_at desc,p.id desc limit 4',[$p['category_id'],$p['id'],$p['id'],$p['category_id'],$p['id']]),'shareUrl'=>$productUrl,'shareText'=>$p['title'].' on Asset Moth','meta'=>$this->pageMeta($title, $description, '/product/'.$p['slug'], $schema, ['og_type'=>'product','og_image'=>$preview,'twitter_image'=>$preview,'twitter_card'=>'summary_large_image'])]);
+        H::view('public/product', ['p'=>$p,'owned'=>$owned,'licenses'=>$licenses,'defaultLicense'=>$defaultLicense,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>$images,'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" and d.status="approved" and p.id<>? order by p.updated_at desc,p.id desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(case when p.category_id <=> ? then 20 else 0 end + (select count(*)*10 from product_tags pt where pt.product_id=p.id and pt.tag_id in (select tag_id from product_tags where product_id=?))) related_score from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status="approved" and d.status="approved" and p.id<>? and (p.category_id <=> ? or exists (select 1 from product_tags pt2 where pt2.product_id=p.id and pt2.tag_id in (select tag_id from product_tags where product_id=?))) order by related_score desc,p.updated_at desc,p.id desc limit 4',[$p['category_id'],$p['id'],$p['id'],$p['category_id'],$p['id']]),'shareUrl'=>$productUrl,'shareText'=>$p['title'].' on Asset Moth','meta'=>$this->pageMeta($title, $description, '/product/'.$p['slug'], $schema, ['og_type'=>'product','og_image'=>$preview,'twitter_image'=>$preview,'twitter_card'=>'summary_large_image'])]);
     }
 
     public function store($slug): void

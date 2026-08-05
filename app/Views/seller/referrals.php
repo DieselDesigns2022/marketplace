@@ -1,25 +1,9 @@
-<h1>Designer Referrals</h1>
-<p>Your referral link: <code>/apply?designer_ref=<?=H::e(H::user()['id'])?>
-</code>
-</p>
-<p>Rewards activate after a referred designer reaches 10 sales; reward is 1% of marketplace commission.</p>
-<table>
-    <tr>
-        <th>Type</th>
-        <th>Status</th>
-        <th>Reward</th>
-    </tr>
-    <?php foreach($refs as $r):?>
-        <tr>
-           <td>
-           <?=$r['referral_type']?>
-           </td>
-           <td>
-           <?=$r['status']?>
-           </td>
-           <td>
-           <?=$r['reward_status']?>
-           </td>
-        </tr>
-    <?php endforeach;?>
-</table>
+<h1>Seller referrals</h1>
+<p>Your seller referral link: <code><?= H::e(H::baseUrl() . '/apply?seller_ref=' . rawurlencode($referralCode)) ?></code></p>
+<p>If you are an approved seller when the referral qualifies, you earn 1% of that store's net seller earnings for its eligible lifetime, funded by Asset Moth. Otherwise you earn one $5.00 store credit. The referred seller receives no matching credit.</p>
+<p>The account keeps one immutable referrer. Store credit never expires, is marketplace-only, non-transferable, and has no cash value.</p>
+<div class="responsive-table"><table><thead><tr><th>Status</th><th>Qualifying sale</th><th>Reward</th></tr></thead><tbody>
+<?php if (!$refs): ?><tr><td colspan="3">No seller referrals yet.</td></tr><?php endif; ?>
+<?php foreach ($refs as $referral): ?><tr><td><?= H::e($referral['commission_ended_at']?'Permanently stopped':'Active / '.ucfirst($referral['seller_status'])) ?><?= $referral['commission_ended_at']?'<br>'.H::e($referral['commission_ended_at'].' · '.ucwords(str_replace('store_','store ',$referral['commission_end_reason']))):'' ?></td><td><?= H::e($referral['referred_store'] ?? $referral['referred_name']) ?><br><?= $referral['seller_qualifying_order_id'] ? 'Order #' . (int)$referral['seller_qualifying_order_id'] . ', item #' . (int)$referral['seller_qualifying_order_item_id'] : 'Waiting for the first eligible sale' ?></td><td><?= H::e($referral['seller_reward_type']?ucwords(str_replace('_',' ',$referral['seller_reward_type'])):'Reward selected at qualification') ?><?php if(($referral['seller_reward_type']??'')==='lifetime_commission'):?><br>Pending <?= H::money(((int)$referral['pending_commission_cents'])/100) ?> · Paid <?= H::money(((int)$referral['paid_commission_cents'])/100) ?> · Recovery <?= H::money(((int)$referral['recovery_commission_cents'])/100) ?> · Lifetime net <?= H::money(((int)$referral['lifetime_commission_cents'])/100) ?><?php endif;?></td></tr><?php endforeach; ?>
+</tbody></table></div>
+<h2>Recent monthly payouts</h2><div class="responsive-table"><table><thead><tr><th>Period</th><th>Amount</th><th>Status</th><th>Completed / problem</th></tr></thead><tbody><?php if(!$payouts):?><tr><td colspan="4">No monthly payouts yet.</td></tr><?php endif;?><?php foreach($payouts as $payout):?><tr><td><?=H::e($payout['period_start'])?>–<?=H::e($payout['period_end'])?></td><td><?=H::money(((int)$payout['amount_cents'])/100)?></td><td><?=H::e(ucwords(str_replace('_',' ',$payout['status'])))?></td><td><?=H::e($payout['succeeded_at']??($payout['status']==='not_ready'?'Your payout account is not ready; earnings remain unpaid.':($payout['status']==='failed'?'Transfer failed; earnings remain unpaid for retry.':'—')))?></td></tr><?php endforeach;?></tbody></table></div>
