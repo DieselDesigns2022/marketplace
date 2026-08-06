@@ -1738,3 +1738,4 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: 0 2px 6px rgba(216, 155, 0, .24);
   font-weight: 800;
 }
+.badge.founder{border:2px solid currentColor;font-weight:700}.rank-progress{height:1rem;border:1px solid currentColor;border-radius:999px;overflow:hidden;background:#eee}.rank-progress span{display:block;height:100%;background:#6941c6}.rank-levels{display:grid;gap:.5rem}.creator-rank-card{max-width:48rem}
