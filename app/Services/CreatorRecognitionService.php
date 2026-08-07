@@ -74,12 +74,16 @@ final class CreatorRecognitionService
             // Required universal order: designer, global Founder mutex, occupied positions.
             $d=DB::row('select * from designers where id=? for update',[$designerId]);
             if(!$d)throw new DomainException('Seller not found.');
+            $position=$d['founder_position']!==null?(int)$d['founder_position']:null;
+            // Acquire the Founder mutex before the first consistent recognition read.
+            // This prevents a transaction that waited on the mutex from planning
+            // positions from a pre-lock REPEATABLE READ snapshot.
+            $needsFounderLock=$position!==null||$d['status']==='approved';
+            if($needsFounderLock&&!$dryRun)DB::row('select id from creator_recognition_lock where id=1 for update');
             $orders=$this->qualifyingOrders($designerId);$count=count($orders);$calculated=self::rankForSales($count);
             $effective=!empty($d['rank_override'])&&$d['rank_override_value']?$d['rank_override_value']:$calculated;
-            $last=$count?$orders[$count-1]['at']:null;$position=$d['founder_position']!==null?(int)$d['founder_position']:null;
+            $last=$count?$orders[$count-1]['at']:null;
             $earned=$d['founder_earned_at']??null;$tenthId=$d['founder_qualifying_order_id']??null;
-            $needsFounderLock=$position!==null||($d['status']==='approved'&&$count>=10);
-            if($needsFounderLock&&!$dryRun)DB::row('select id from creator_recognition_lock where id=1 for update');
             if($position===null&&$d['status']==='approved'&&$count>=10){
                 $occupied=array_map('intval',array_column(DB::rows('select founder_position from designers where founder_position is not null order by founder_position'),'founder_position'));
                 $candidates=[];
