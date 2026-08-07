@@ -78,9 +78,6 @@
                                 <?php endif; ?>
                             </a>
 
-                            <span class="badge rank">
-                                <?=H::e($d['creator_rank'] ?: 'Bronze')?>
-                            </span>
                         </div>
 
                         <h3>

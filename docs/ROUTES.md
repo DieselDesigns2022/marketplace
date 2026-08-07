@@ -257,3 +257,10 @@ There are no public term-list endpoints and no state-changing GET routes.
 
 ### Phase 11 seller-referral lifetime commission
 Seller-referral qualification permanently selects either referrer-only $5 store credit or, when the referrer is then an approved seller, an Asset Moth-funded 1% commission calculated per stored seller-payout item using integer-cent half-up rounding. Accruals and linked refund/recovery adjustments are append-only. Disabled, inactive, and deleted store states permanently stop new accrual without cancelling earned balances. Closed UTC-month platform-balance transfers reuse the seller's existing Stripe Connect account, omit `source_transaction`, and retain stable idempotency, processing leases, attempt history, and retryable failures. Active admins retry failed/not-ready batches only through CSRF-protected `POST /admin/seller-referral-payouts/{id}/retry`; immutable audit rows record the result. Unpaid prior-period amounts and post-payout recovery adjustments roll into the next positive batch, and no negative transfer is created.
+
+### Phase 12 recognition routes
+- `GET /seller/rank` shows private calculated/effective rank progress and Founder state.
+- `GET /store/{slug}` and `GET /product/{slug}` show effective rank and only an active Founder badge.
+- Existing `GET|POST /admin/designers` handles `set_rank_override`, `remove_rank_override`, `grant`, `force_active`, `force_inactive`, `restore`, and `automatic`. Every recognition POST uses the existing CSRF field, seller ID, and a 3–500 character reason; no public recognition directory or additional badge route exists.
+
+Founder `restore` and `automatic` both return the badge to the current UTC automatic calculation; `restore` emails only when an inactive badge actually becomes eligible and active. `force_active` is the sole persistent inactivity exception.

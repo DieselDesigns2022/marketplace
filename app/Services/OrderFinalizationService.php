@@ -98,6 +98,7 @@ final class OrderFinalizationService
 
     public function communicate(int $orderId): void
     {
+        foreach(DB::rows('select distinct designer_id from order_items where order_id=?',[$orderId]) as $seller){$designerId=(int)$seller['designer_id'];$this->communicationAttempt('creator_recognition_payment',fn()=>(new CreatorRecognitionService)->recalculate($designerId,false,true,'payment',null,'recognition:paid:order:'.$orderId.':seller:'.$designerId));}
         $this->communicationAttempt('paid_order_communications', function () use ($orderId): void {
             $this->queueCommunications($orderId);
         });
