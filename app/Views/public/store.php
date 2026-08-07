@@ -27,6 +27,7 @@
                <span class="badge rank">
                <?=H::e($d['creator_rank'] ?: 'Bronze')?>
                </span>
+               <?php if(!empty($d['founder_active'])&&!empty($d['founder_position'])):?><span class="badge founder" aria-label="Active Founder badge, position <?=(int)$d['founder_position']?>">Founder #<?=(int)$d['founder_position']?></span><?php endif;?>
                <span class="badge ok">Approved seller</span>
            </div>
            <div class="follow-box">

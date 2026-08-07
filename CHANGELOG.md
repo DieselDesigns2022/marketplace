@@ -294,3 +294,12 @@ Intentionally postponed:
 ## Phase 11 seller-referral correction
 - Replaced paired seller credits with referrer-only $5 credit or immutable approved-seller lifetime 1% commission.
 - Added append-only accrual/refund recovery, permanent store stops, monthly UTC Stripe Connect batches, notifications, and CSRF-protected admin retries.
+
+### Phase 12 creator recognition
+- Added refund-aware Bronze–Diamond ranks, calculated/effective override separation, deterministic permanently reserved Founder positions, 60-day inactivity/reactivation, audited admin controls, deduplicated communications, public/private badge displays, repeatable migration/backfill tooling, and focused behavior/disposable-database tests.
+- Correction pass aligned lock ordering, complete state change detection, unique dry-run planning, tenth-order auditing, Founder action semantics, active-admin/no-op validation, email types, migration reruns, terms, and test claims.
+
+- Second correction pass fixed proportional refund fixtures, real concurrent service assignment coverage, restore eligibility, durable audit-ID communication keys, event-specific notification titles, explicit UTC clocks, guarded Phase 12 audit foreign keys, and rank/badge history separation.
+
+- Third correction added silent apply versus communicating daily CLI modes, durable automatic event IDs, webhook recovery trigger keys, neutral admin-rank messaging, locked Founder-position replanning, and authoritative Founder admin refresh.
+- Final correction restricted automatic event snapshots to recognition fields, repaired missing Founder audit timestamps from the authoritative tenth sale, preserved separate rank events during Founder admin refresh, and completed second-daily-run idempotency coverage.

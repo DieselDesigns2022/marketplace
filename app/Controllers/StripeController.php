@@ -205,6 +205,7 @@ class StripeController
         if($incoming!==$highest)return;
         $status=$incoming>=$total||($order['payment_status']??'')==='refunded'?'refunded':'partially_refunded';
         if(($order['payment_status']??'')!==$status)return;
+        $this->recalculateRecognitionForRefund((int)$order['id'],$status,$incoming);
         $this->notifyRefundTransition($order,$status,$incoming);
     }
 
@@ -360,6 +361,7 @@ class StripeController
         }
         StripeService::logTransaction((int)$order['id'],$eventId,$refunded<$total?'partial_refund':'refund',$refunded<$total?'partially_refunded':'refunded',$refunded/100,strtolower($charge['currency'] ?? StripeService::currency()),['charge'=>$charge['id'] ?? null,'intent'=>$charge['payment_intent'] ?? null],$decision['meaningful']?'Refund status received from Stripe.':'Refund observation recorded without a state transition.');
         $this->reconcileRefundPayouts((int)$order['id']);
+        if($decision['meaningful']||$decision['communication_recovery'])$this->recalculateRecognitionForRefund((int)$order['id'],$status,$refunded);
         if($decision['meaningful']||$decision['communication_recovery'])$this->communicationAttempt('refund_status',fn()=>$this->notifyRefundTransition(array_merge($order,['payment_status'=>$status]),$status,$refunded));
     }
 
@@ -368,6 +370,12 @@ class StripeController
         $key=self::refundTransitionKey((int)$order['id'],$status,$cumulativeCents);$label=$status==='refunded'?'refunded':'partially refunded';$amount=number_format($cumulativeCents/100,2);
         $this->communicationAttempt('buyer_refund_notification',fn()=>NotificationService::create((int)$order['user_id'],'refund_status','buyer','Refund status updated','Your order #'.(int)$order['id'].' is '.$label.' (cumulative refund $'.$amount.').',$key.':notification','/dashboard/order/'.(int)$order['id']));
         $this->communicationAttempt('buyer_refund_email',fn()=>EmailQueueService::refund((int)$order['id'],$label,$cumulativeCents,$key));
+    }
+
+    public function recalculateRecognitionForRefund(int $orderId,string $status,int $cumulativeCents):void
+    {
+        if(!in_array($status,['partially_refunded','refunded'],true)||$cumulativeCents<1)return;
+        foreach(DB::rows('select distinct designer_id from order_items where order_id=?',[$orderId]) as $seller){$designerId=(int)$seller['designer_id'];$key='recognition:refund:order:'.$orderId.':seller:'.$designerId.':'.$status.':'.$cumulativeCents;$this->communicationAttempt('creator_recognition_refund',fn()=>(new \App\Services\CreatorRecognitionService)->recalculate($designerId,false,true,'refund',null,$key));}
     }
 
     private function communicationAttempt(string $context,callable $operation):void{try{$operation();}catch(Throwable $e){try{NotificationService::reportFailure($context,$e);}catch(Throwable $ignored){error_log('Asset Moth communication failure reporting failed for '.OperationalErrorSanitizer::context($context).'.');}}}

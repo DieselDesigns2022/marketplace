@@ -38,7 +38,13 @@ final class NotificationService
     public static function sellerTaxReminder(int $userId,string $eventKey,string $message): bool { return self::create($userId,'tax_reminder','designer','Tax information reminder',$message,$eventKey,'/seller/stripe'); }
     public static function promoStatus(int $userId,string $eventKey,string $message): bool { return self::create($userId,'promo_status','designer','Promotion status',$message,$eventKey); }
     public static function bundleInvitation(int $userId,string $eventKey,string $message): bool { return self::create($userId,'bundle_invitation','designer','Bundle invitation',$message,$eventKey); }
-    public static function rankBadge(int $userId,string $eventKey,string $message): bool { return self::create($userId,'rank_badge','designer','Rank or badge earned',$message,$eventKey,'/seller/rank'); }
+    public static function recognition(int $userId,string $eventKey,string $title,string $message): bool
+    {
+        $allowed=['Creator rank earned','Creator rank updated','Founder recognition earned','Founder badge restored','Founder badge inactive','Founder status updated'];
+        if(!in_array($title,$allowed,true))return false;
+        return self::create($userId,'rank_badge','designer',$title,$message,$eventKey,'/seller/rank');
+    }
+    public static function rankBadge(int $userId,string $eventKey,string $message): bool { return self::recognition($userId,$eventKey,'Creator rank earned',$message); }
     /** Foundation only: call when a future compliant seller-tax transition exists. */
     public static function sellerTaxEnabled(string $eventKey,string $message,?string $url=null): void { self::admins('seller_tax_enabled','Seller tax status enabled',$message,$eventKey,$url); }
     /** Foundation only: call when a future promotional-submission record is created. */

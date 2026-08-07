@@ -20,23 +20,25 @@
     <?php foreach($designers as $d):?>
         <tr>
            <td>
-           <?=$d['display_name']?>
+           <?=H::e($d['display_name'])?>
            </td>
            <td>
-           <?=$d['email']?>
+           <?=H::e($d['email'])?>
            </td>
            <td>
-           <a href="/store/<?=$d['store_slug']?>">/store/<?=$d['store_slug']?>
+           <a href="/store/<?=H::e($d['store_slug'])?>">/store/<?=H::e($d['store_slug'])?>
            </a>
            </td>
            <td>
-           <?=$d['status']?>
+           <?=H::e($d['status'])?>
            </td>
            <td>
            <?=$d['follower_count']??0?>
            </td>
            <td>
-           <?=$d['creator_rank']?>
+           <?=H::e($d['creator_rank'])?> effective / <?=H::e($d['calculated_rank'])?> calculated<br>
+           <?=number_format((int)$d['qualifying_sales_count'])?> qualifying sales
+           <?php if($d['founder_position']):?><br>Founder #<?=(int)$d['founder_position']?> — <?=$d['founder_active']?'active':'inactive'?> (<?=H::e($d['founder_override_state'])?>)<br><small>Earned <?=H::e($d['founder_earned_at'])?>; latest sale <?=H::e($d['last_qualifying_sale_at']??'none')?></small><?php endif;?>
            </td>
            <td><?=H::e($d['stripe_account_status'] ?? 'not_connected')?><br><span class="muted"><?=!empty($d['stripe_connect_account_id']) ? H::e($d['stripe_connect_account_id']) : 'Not connected'?></span></td>
            <td><?=(!empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled'])) ? '<span class="badge ok">payout-ready</span>' : '<span class="badge pending">onboarding incomplete</span>'?></td>
@@ -49,15 +51,22 @@
                <option>Silver</option>
                <option>Gold</option>
                <option>Platinum</option>
-               <option>Legend</option>
+               <option>Diamond</option>
                </select>
-               <button name="action" value="change_rank">Change rank</button>
+               <input name="reason" minlength="3" maxlength="500" required placeholder="Required audit reason">
+               <button name="action" value="set_rank_override">Set rank override</button>
+               <button name="action" value="remove_rank_override">Remove override</button>
+               <button name="action" value="grant">Grant Founder</button>
+               <button name="action" value="force_active">Lock Founder active</button>
+               <button name="action" value="force_inactive">Force Founder inactive</button>
+               <button name="action" value="restore">Restore Founder</button>
+               <button name="action" value="automatic">Return Founder to automatic</button>
                <?php if(($d['status'] ?? '') === 'disabled'): ?>
-                   <button name="action" value="enable" onclick="return confirm('Enable this seller?');">Enable seller</button>
+                   <button formnovalidate name="action" value="enable" onclick="return confirm('Enable this seller?');">Enable seller</button>
                <?php else: ?>
-                   <button name="action" value="disable" onclick="return confirm('Disable this seller? Their seller account will no longer be approved.');">Disable seller</button>
-                   <button name="action" value="inactive" onclick="return confirm('Mark this store permanently inactive? Referral commission can never restart.');">Mark inactive</button>
-                   <button name="action" value="delete" onclick="return confirm('Mark this store deleted? Financial history will remain.');">Mark deleted</button>
+                   <button formnovalidate name="action" value="disable" onclick="return confirm('Disable this seller? Their seller account will no longer be approved.');">Disable seller</button>
+                   <button formnovalidate name="action" value="inactive" onclick="return confirm('Mark this store permanently inactive? Referral commission can never restart.');">Mark inactive</button>
+                   <button formnovalidate name="action" value="delete" onclick="return confirm('Mark this store deleted? Financial history will remain.');">Mark deleted</button>
                <?php endif; ?>
            </form>
            </td>

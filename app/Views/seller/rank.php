@@ -1,12 +1,10 @@
+<?php $progress=\App\Services\CreatorRecognitionService::progress((int)$d['qualifying_sales_count']); ?>
 <h1>Creator Rank</h1>
-<p>Current rank: <span class="badge rank">
-<?=H::e($d['creator_rank'])?>
-</span>
-</p>
-<ul>
-    <li>Bronze: default approved seller</li>
-    <li>Silver: 25 sales</li>
-    <li>Gold: 100 sales</li>
-    <li>Platinum: 500 sales</li>
-    <li>Legend: 1500 sales</li>
-</ul>
+<section class="card creator-rank-card"><h2><span class="badge rank" aria-label="Effective creator rank: <?=H::e($d['creator_rank'])?>"><?=H::e($d['creator_rank'])?></span></h2>
+<p><strong><?=number_format((int)$d['qualifying_sales_count'])?></strong> qualifying sale<?=((int)$d['qualifying_sales_count']===1?'':'s')?>.</p>
+<?php if(!$d['qualifying_sales_count']):?><p class="empty-state">Your first completed, non-refunded seller order will begin your progress.</p><?php endif;?>
+<?php if($d['rank_override']):?><div class="notice warning">An administrator controls your displayed rank. Your automatic calculated rank is <strong><?=H::e($d['calculated_rank'])?></strong> and continues to update.</div><?php endif;?>
+<?php if($progress['next']):?><p><?=number_format($progress['needed'])?> more qualifying sale<?=($progress['needed']===1?'':'s')?> to <?=H::e($progress['next'])?>.</p><div class="rank-progress" role="progressbar" aria-label="Progress from <?=H::e($progress['rank'])?> to <?=H::e($progress['next'])?>" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?=$progress['percent']?>"><span style="width:<?=$progress['percent']?>%"></span></div><?php else:?><p>You have completed the Diamond rank.</p><?php endif;?>
+<p>Last qualifying sale: <?=H::e($d['last_qualifying_sale_at']??'None yet')?></p></section>
+<section class="card"><h2>Rank thresholds</h2><ol class="rank-levels"><li>Bronze — 0</li><li>Silver — 25</li><li>Gold — 100</li><li>Platinum — 500</li><li>Diamond — 1,500</li></ol></section>
+<?php if($d['founder_position']):?><section class="card"><h2>Founder #<?=(int)$d['founder_position']?></h2><p><span class="badge founder"><?=$d['founder_active']?'Active Founder badge':'Founder badge inactive'?></span></p><p>Earned <?=H::e($d['founder_earned_at'])?>. Your position remains permanently reserved.</p><p>An automatically managed Founder badge stays active through 60 complete days after the latest qualifying sale, becomes inactive only after more than 60 days, and returns with the same position after your next qualifying sale.</p></section><?php endif;?>
