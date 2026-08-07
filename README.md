@@ -267,3 +267,12 @@ Each referred user has one immutable referrer. The relationship records buyer an
 
 ### Phase 11 seller referrals
 Seller referrals select one immutable reward at the referred seller's first qualifying paid sale: a non-seller referrer alone receives $5 store credit, while an approved seller referrer receives an Asset Moth-funded 1% of each stored net seller earning. Integer cents use half-up rounding. Disabled, inactive, or deleted stores permanently stop new accrual; prior earnings remain payable through UTC monthly Stripe Connect platform-balance transfers.
+
+GitHub issue #57 remains open and deferred for live validation of the complete seller-referral flow: registration through an approved seller's referral link, permanent attachment, a qualifying sale and 1% commission, refund/reversal behavior, and the resulting seller/admin referral-page records.
+
+## Creator recognition (Phase 12)
+Creator ranks use one qualifying completed paid order per participating seller: Bronze 0, Silver 25, Gold 100, Platinum 500, and Diamond 1,500. An order counts once for each represented seller regardless of item count; cumulative refunds remove that seller's participation only when the existing proportional allocation leaves no positive merchandise value. Calculated rank continues behind an audited effective override. The first 50 approved sellers reaching ten qualifying orders receive permanently reserved positions ordered by tenth-sale time, tenth order ID, then seller ID. Automatic Founder display remains active through exactly 60 complete UTC days, becomes inactive only after more than 60 days, and returns at the same position after a new qualifying sale. Public badges are limited to storefront and product seller details.
+
+Founder restore removes forced inactivity and returns to current UTC automatic eligibility; an ineligible stale badge stays inactive. Only an explicit force-active admin action bypasses inactivity.
+
+Phase 12 operations use write-free `--dry-run` for review, `--apply` once for silent historical state, and `--daily` for recurring UTC transition communications.

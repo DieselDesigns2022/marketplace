@@ -15,6 +15,8 @@
         <p>by <a href="/store/<?=H::e($p['store_slug'])?>">
         <?=H::e($p['display_name'])?>
         </a>
+        <span class="badge rank" aria-label="Seller creator rank: <?=H::e($p['creator_rank']?:'Bronze')?>"><?=H::e($p['creator_rank']?:'Bronze')?></span>
+        <?php if(!empty($p['founder_active'])&&!empty($p['founder_position'])):?><span class="badge founder" aria-label="Active Founder badge, position <?=(int)$p['founder_position']?>">Founder #<?=(int)$p['founder_position']?></span><?php endif;?>
         </p>
         <p>Category: <?php if($p['category_slug']):?>
         <a href="/category/<?=H::e($p['category_slug'])?>">

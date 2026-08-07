@@ -12,7 +12,7 @@ final class EmailQueueService
     public static function retryDelay(int $attempt): ?int { return [1=>5,2=>30][$attempt]??null; }
     public static function sellerSubject(string $type): string
     {
-        return ['new_sale'=>'You made a sale on Asset Moth','coupon_used'=>'A coupon was used on your Asset Moth sale','product_approved'=>'Your Asset Moth product was approved','product_rejected'=>'Your Asset Moth product needs changes','product_flagged'=>'Your Asset Moth product was flagged for review'][$type]??'Asset Moth seller update';
+        return ['new_sale'=>'You made a sale on Asset Moth','coupon_used'=>'A coupon was used on your Asset Moth sale','product_approved'=>'Your Asset Moth product was approved','product_rejected'=>'Your Asset Moth product needs changes','product_flagged'=>'Your Asset Moth product was flagged for review','creator_rank'=>'Your Asset Moth creator rank changed','founder_badge'=>'Your Asset Moth Founder recognition'][$type]??'Asset Moth seller update';
     }
     public static function receiptTitle(?string $snapshot, ?string $legacyLiveTitle): string
     {
