@@ -241,8 +241,14 @@ final class CreatorRecognitionService
         if(!empty($event['rank_changed']))$fields=array_merge($fields,self::RANK_FIELDS);
         if(!empty($event['founder_changed']))$fields=array_merge($fields,self::FOUNDER_FIELDS);
         foreach(array_unique($fields) as $field)if((string)($current[$field]??'')!==(string)($after[$field]??''))return false;
-        if(!empty($event['rank_changed'])&&DB::row('select id from creator_recognition_events where designer_id=? and rank_changed=1 and id>? limit 1',[(int)$event['designer_id'],(int)$event['id']]))return false;
-        if(!empty($event['founder_changed'])&&DB::row('select id from creator_recognition_events where designer_id=? and founder_changed=1 and id>? limit 1',[(int)$event['designer_id'],(int)$event['id']]))return false;
+        if(!empty($event['rank_changed'])){
+            $latest=DB::row('select event_key from creator_rank_history where designer_id=? order by id desc limit 1',[(int)$event['designer_id']]);
+            if(!$latest||$latest['event_key']!=='recognition-event:'.(int)$event['id'].':rank')return false;
+        }
+        if(!empty($event['founder_changed'])){
+            $latest=DB::row('select event_key from creator_badge_history where designer_id=? order by id desc limit 1',[(int)$event['designer_id']]);
+            if(!$latest||$latest['event_key']!=='recognition-event:'.(int)$event['id'].':founder')return false;
+        }
         return (bool)$fields;
     }
 
