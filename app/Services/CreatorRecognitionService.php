@@ -178,6 +178,7 @@ final class CreatorRecognitionService
             $active=$position!==null&&self::founderActive($last,$mode,self::utcNow());
             $before=['position'=>$d['founder_position']!==null?(int)$d['founder_position']:null,'active'=>(bool)$d['founder_active'],'mode'=>$d['founder_override_state']];
             $after=['position'=>$position,'active'=>$active,'mode'=>$mode];$founderChanged=$before!==$after;
+            $automaticFounderRefresh=$actionNoOp&&$founderChanged;$adminFounderChanged=$founderChanged&&!$actionNoOp;
 
             if(!$founderChanged&&!$rankChanged){
                 if($stateRefresh||$auditRepair)DB::exec('update designers set qualifying_sales_count=?,calculated_rank=?,creator_rank=?,last_qualifying_sale_at=?,founder_qualifying_order_id=?,founder_earned_at=? where id=?',[$count,$calculated,$effective,$last,$qualificationOrder,$earnedAt,$designerId]);
@@ -185,15 +186,15 @@ final class CreatorRecognitionService
             }
 
             $adminEvent=null;
-            if($founderChanged){
+            if($adminFounderChanged){
                 DB::exec('insert into admin_logs(admin_user_id,action,entity_type,entity_id,metadata) values(?,?,?,?,?)',[$adminId,'creator_founder_'.$action,'designer',$designerId,json_encode(['reason'=>$reason,'position'=>$position])]);
                 $adminEvent='admin-recognition:'.(int)DB::id();
             }
             if(!$earnedAt&&$position!==null)$earnedAt=self::utcNow();
             $inactiveAt=$active?null:($d['founder_inactive_at']?:self::utcNow());
-            DB::exec('update designers set qualifying_sales_count=?,calculated_rank=?,creator_rank=?,last_qualifying_sale_at=?,founder_position=?,founder_earned_at=?,founder_qualifying_order_id=?,founder_active=?,founder_override_state=?,founder_override_reason=case when ? then ? else founder_override_reason end,founder_override_admin_id=case when ? then ? else founder_override_admin_id end,founder_inactive_at=? where id=?',[$count,$calculated,$effective,$last,$position,$earnedAt,$qualificationOrder,$active?1:0,$mode,$founderChanged?1:0,$reason,$founderChanged?1:0,$adminId,$inactiveAt,$designerId]);
+            DB::exec('update designers set qualifying_sales_count=?,calculated_rank=?,creator_rank=?,last_qualifying_sale_at=?,founder_position=?,founder_earned_at=?,founder_qualifying_order_id=?,founder_active=?,founder_override_state=?,founder_override_reason=case when ? then ? else founder_override_reason end,founder_override_admin_id=case when ? then ? else founder_override_admin_id end,founder_inactive_at=? where id=?',[$count,$calculated,$effective,$last,$position,$earnedAt,$qualificationOrder,$active?1:0,$mode,$adminFounderChanged?1:0,$reason,$adminFounderChanged?1:0,$adminId,$inactiveAt,$designerId]);
 
-            $rankEventResult=null;
+            $rankEventResult=null;$founderEventResult=null;
             if($rankChanged){
                 $recognitionAfter=['qualifying_sales_count'=>$count,'calculated_rank'=>$calculated,'creator_rank'=>$effective,'last_qualifying_sale_at'=>$last,'founder_position'=>$position,'founder_earned_at'=>$earnedAt,'founder_qualifying_order_id'=>$qualificationOrder,'founder_active'=>$active?1:0,'founder_inactive_at'=>$inactiveAt,'founder_override_state'=>$mode];
                 DB::exec('insert into creator_recognition_events(designer_id,source,before_state,after_state,rank_changed,founder_changed) values(?,?,?,?,1,0)',[$designerId,'admin_founder_refresh',json_encode($this->recognitionState($d)),json_encode($this->recognitionState($recognitionAfter))]);
@@ -201,9 +202,18 @@ final class CreatorRecognitionService
                 DB::exec('insert into creator_rank_history(designer_id,previous_calculated_rank,new_calculated_rank,previous_effective_rank,new_effective_rank,qualifying_sales_count,change_source,changed_by,reason,event_key) values(?,?,?,?,?,?,?,?,?,?)',[$designerId,$d['calculated_rank'],$calculated,$d['creator_rank'],$effective,$count,'admin_founder_refresh',$adminId,$reason,$rankEvent.':rank']);
                 $rankEventResult=$recognitionAfter+['designer_id'=>$designerId,'previous'=>$this->recognitionState($d),'event_key'=>$rankEvent,'rank_changed'=>true,'founder_changed'=>false];
             }
-            if($founderChanged)DB::exec('insert into creator_badge_history(designer_id,action,before_state,after_state,founder_position,change_source,admin_user_id,reason,event_key) values(?,?,?,?,?,?,?,?,?)',[$designerId,$action,json_encode($before),json_encode($after),$position,'admin',$adminId,$reason,$adminEvent.':founder']);
+            if($automaticFounderRefresh){
+                $recognitionAfter=['qualifying_sales_count'=>$count,'calculated_rank'=>$calculated,'creator_rank'=>$effective,'last_qualifying_sale_at'=>$last,'founder_position'=>$position,'founder_earned_at'=>$earnedAt,'founder_qualifying_order_id'=>$qualificationOrder,'founder_active'=>$active?1:0,'founder_inactive_at'=>$inactiveAt,'founder_override_state'=>$mode];
+                DB::exec('insert into creator_recognition_events(designer_id,source,before_state,after_state,rank_changed,founder_changed) values(?,?,?,?,0,1)',[$designerId,'admin_founder_refresh',json_encode($this->recognitionState($d)),json_encode($this->recognitionState($recognitionAfter))]);
+                $founderEvent='recognition-event:'.(int)DB::id();
+                DB::exec('insert into creator_badge_history(designer_id,action,before_state,after_state,founder_position,change_source,event_key) values(?,?,?,?,?,?,?)',[$designerId,$active?'reactivated':'inactive',json_encode($this->founderState($d)),json_encode($this->founderState($recognitionAfter)),$position,'automatic',$founderEvent.':founder']);
+                $founderEventResult=$recognitionAfter+['designer_id'=>$designerId,'previous'=>$this->recognitionState($d),'event_key'=>$founderEvent,'rank_changed'=>false,'founder_changed'=>true];
+            }
+            if($adminFounderChanged)DB::exec('insert into creator_badge_history(designer_id,action,before_state,after_state,founder_position,change_source,admin_user_id,reason,event_key) values(?,?,?,?,?,?,?,?,?)',[$designerId,$action,json_encode($before),json_encode($after),$position,'admin',$adminId,$reason,$adminEvent.':founder']);
             DB::commit();
             if($rankEventResult)$this->communicate($rankEventResult);
+            if($founderEventResult)$this->communicate($founderEventResult);
+            if($actionNoOp)return false;
             if(!$founderChanged)return false;
             $becameActive=!$before['active']&&$active;$title=$action==='force_inactive'?'Founder status updated':($becameActive?'Founder badge restored':'Founder status updated');
             $message=$active?'Founder position #'.$position.' is active.':'Founder position #'.$position.' remains reserved but its badge is inactive.';
@@ -231,6 +241,8 @@ final class CreatorRecognitionService
         if(!empty($event['rank_changed']))$fields=array_merge($fields,self::RANK_FIELDS);
         if(!empty($event['founder_changed']))$fields=array_merge($fields,self::FOUNDER_FIELDS);
         foreach(array_unique($fields) as $field)if((string)($current[$field]??'')!==(string)($after[$field]??''))return false;
+        if(!empty($event['rank_changed'])&&DB::row('select id from creator_recognition_events where designer_id=? and rank_changed=1 and id>? limit 1',[(int)$event['designer_id'],(int)$event['id']]))return false;
+        if(!empty($event['founder_changed'])&&DB::row('select id from creator_recognition_events where designer_id=? and founder_changed=1 and id>? limit 1',[(int)$event['designer_id'],(int)$event['id']]))return false;
         return (bool)$fields;
     }
 
