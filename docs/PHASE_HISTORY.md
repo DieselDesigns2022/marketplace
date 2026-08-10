@@ -1070,3 +1070,7 @@ Implemented qualifying-order Bronze–Diamond calculation, seller-specific refun
 The second correction established UTC-only recognition time, eligible automatic restore semantics, durable audit-row action identities, semantic rank/badge histories, guarded new-data foreign keys, and real multiprocess Founder assignment tests.
 
 Phase 12 third correction separated backfill/daily operation and introduced durable automatic transition events plus payment/refund replay recovery and locked Founder proposal revalidation.
+
+### Phase 12.1 — Digital Product License Expansion
+
+Phase 12.1 extended the Phase 8.5 data-driven license catalog with the normalized `digital-product` permission. Sellers can enable it per product and set a zero or paid add-on price; buyers can combine it with existing permissions. Existing server-authoritative cart/checkout validation and order-item snapshot fields preserve the purchased key, name, description, price, and full selected-license collection after later seller changes. Licensing Help explains that only a modified or incorporated completed digital design may be sold and that the original/source asset cannot be resold, redistributed, shared, given away, sublicensed, or exposed as an extractable file. Focused static and disposable-MariaDB tests cover availability, pricing, multiple permissions, invalid keys, disable-after-cart behavior, and historical snapshots.
