@@ -432,6 +432,7 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
     <h2>Asset Moth Licensing Help</h2>
     <p>Asset Moth products may include different license options depending on what the seller enables for that listing. Personal use is included with the product base price. Other license permissions may be offered as add-ons, and sellers may set those add-ons as free or paid.</p>
     <p>Always review the product page, selected license options, order details, and seller-provided product information before using a file.</p>
+    <p><strong>Digital Product License:</strong> When a seller enables this permission, a buyer may use the purchased asset as part of a finished digital product they create and sell. The asset must be modified or incorporated into a new completed design. The seller's original/source file may not be resold as-is, redistributed, shared, given away, sublicensed, uploaded or provided as the original file, or exposed to the end customer as a separate or extractable file. The buyer may not represent the seller's original asset as their own standalone digital file.</p>
 </section>
 
 <section class="card">
@@ -511,7 +512,7 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
 <section class="card page-section">
     <h2>Licenses and presets</h2>
     <h3>How do license options work?</h3>
-    <p>Every product includes personal use with the base price. Depending on the product, sellers may enable additional license permissions such as commercial, POD, wholesale, fabric, VA, reseller, or extended commercial use. Product-level license settings are what buyers see and what checkout records for the order.</p>
+    <p>Every product includes personal use with the base price. Depending on the product, sellers may enable additional license permissions such as commercial, digital product, POD, wholesale, fabric, VA, reseller, or extended commercial use. Product-level license settings are what buyers see and what checkout records for the order.</p>
     <h3>Can I save default license settings?</h3>
     <p>Yes. Store-level license presets let you save default enabled license options, prices, and descriptions for new products. Presets are optional, only prefill new product forms, and do not change existing products. You can still edit licenses per product before saving.</p>
     <p>For details on license language, review <a href="/licensing-help">Licensing Help</a>.</p>

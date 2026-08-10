@@ -1,5 +1,9 @@
 # Changelog
 
+### Phase 12.1 digital product license expansion
+- Added the seller-enabled `digital-product` permission as a free or paid per-product add-on using the existing LicenseService selection, cart, checkout validation, pricing, and order snapshot paths.
+- Added complete source-file protections to license details and Licensing Help, seller visibility of saved license descriptions/prices, a repeatable MariaDB seed migration, canonical schema data, and focused static/database tests.
+
 ## Current status
 
 The project currently includes the original MVP plus implemented phases through Phase 10.6. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
