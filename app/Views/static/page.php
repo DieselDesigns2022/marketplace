@@ -278,7 +278,7 @@
     <p>Asset Moth may offer designer referral rewards. Asset Moth may deny, pause, revoke, or adjust referral rewards if there is fraud, self-referral, duplicate accounts, abuse, fake sales, chargebacks, refunds, policy violations, or technical errors.</p>
 
     <h3>30. Creator ranks</h3>
-    <p>Asset Moth may offer creator ranks such as Bronze, Silver, Gold, Platinum, and Legend. Creator ranks may be based on sales, reviews, referrals, activity, account standing, product quality, or other marketplace factors.</p>
+    <p>Asset Moth currently calculates creator ranks only from qualifying completed paid sales: Bronze at 0, Silver at 25, Gold at 100, Platinum at 500, and Diamond at 1,500. One order counts once for each participating seller regardless of item count. Full or partial cumulative refunds remove a seller’s participation only when the platform’s proportional allocation leaves that seller with no positive merchandise value. Asset Moth may change or discontinue the creator-rank program in the future by updating these Terms and applicable program information.</p>
 
     <h3>31. Sponsored listings and featured placements</h3>
     <p>Asset Moth may allow sellers to promote products, storefronts, collections, or bundle participation through sponsored listings or featured placements. Asset Moth does not guarantee sales, clicks, views, ranking, or profit from sponsored listings.</p>

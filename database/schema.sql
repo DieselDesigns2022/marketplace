@@ -52,8 +52,23 @@ CREATE TABLE designers
     receipt_note VARCHAR(500) NULL,
     receipt_image_path VARCHAR(255) NULL,
     status ENUM('approved','disabled','inactive','deleted') NOT NULL DEFAULT 'approved',
-    creator_rank ENUM('Bronze','Silver','Gold','Platinum','Legend') DEFAULT 'Bronze',
+    creator_rank ENUM('Bronze','Silver','Gold','Platinum','Diamond') NOT NULL DEFAULT 'Bronze',
+    calculated_rank ENUM('Bronze','Silver','Gold','Platinum','Diamond') NOT NULL DEFAULT 'Bronze',
+    qualifying_sales_count INT UNSIGNED NOT NULL DEFAULT 0,
+    last_qualifying_sale_at DATETIME NULL,
     rank_override BOOLEAN DEFAULT 0,
+    rank_override_value ENUM('Bronze','Silver','Gold','Platinum','Diamond') NULL,
+    rank_override_reason VARCHAR(500) NULL,
+    rank_override_admin_id BIGINT NULL,
+    rank_override_at DATETIME NULL,
+    founder_position TINYINT UNSIGNED NULL,
+    founder_earned_at DATETIME NULL,
+    founder_qualifying_order_id BIGINT NULL,
+    founder_active TINYINT(1) NOT NULL DEFAULT 0,
+    founder_inactive_at DATETIME NULL,
+    founder_override_state ENUM('automatic','force_active','force_inactive') NOT NULL DEFAULT 'automatic',
+    founder_override_reason VARCHAR(500) NULL,
+    founder_override_admin_id BIGINT NULL,
     is_featured BOOLEAN DEFAULT 0,
     sales_count INT DEFAULT 0,
     follower_count INT DEFAULT 0,
@@ -61,7 +76,12 @@ CREATE TABLE designers
     seo_title VARCHAR(70),
     seo_description VARCHAR(170),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY designers_founder_position_unique(founder_position),
+    KEY designers_recognition_idx(status,qualifying_sales_count,calculated_rank),
+    CONSTRAINT designers_founder_position_check CHECK(founder_position IS NULL OR founder_position BETWEEN 1 AND 50),
+    CONSTRAINT designers_rank_override_admin_fk FOREIGN KEY(rank_override_admin_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT designers_founder_override_admin_fk FOREIGN KEY(founder_override_admin_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE categories
@@ -509,6 +529,8 @@ CREATE TABLE order_items
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+ALTER TABLE designers ADD CONSTRAINT designers_founder_qualifying_order_fk FOREIGN KEY(founder_qualifying_order_id) REFERENCES orders(id) ON DELETE RESTRICT;
+
 CREATE TABLE downloads
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -642,12 +664,32 @@ CREATE TABLE creator_rank_history
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     designer_id BIGINT,
+    previous_calculated_rank VARCHAR(40),
+    new_calculated_rank VARCHAR(40),
+    previous_effective_rank VARCHAR(40),
+    new_effective_rank VARCHAR(40),
+    qualifying_sales_count INT UNSIGNED NOT NULL DEFAULT 0,
+    change_source VARCHAR(40) NOT NULL DEFAULT 'legacy',
+    event_key VARCHAR(190),
     old_rank VARCHAR(40),
     new_rank VARCHAR(40),
     changed_by BIGINT,
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY creator_rank_history_event_unique(event_key),
+    KEY creator_rank_history_designer_created_idx(designer_id,created_at)
+);
+
+CREATE TABLE creator_recognition_lock (id TINYINT PRIMARY KEY,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);
+INSERT INTO creator_recognition_lock(id) VALUES(1);
+CREATE TABLE creator_recognition_events (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,designer_id BIGINT NOT NULL,source VARCHAR(40) NOT NULL,trigger_key VARCHAR(190) NULL,before_state JSON NOT NULL,after_state JSON NOT NULL,rank_changed TINYINT(1) NOT NULL DEFAULT 0,founder_changed TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY creator_recognition_events_trigger_unique(trigger_key),KEY creator_recognition_events_designer_created_idx(designer_id,created_at),CONSTRAINT creator_recognition_events_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT
+);
+CREATE TABLE creator_badge_history (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,designer_id BIGINT NOT NULL,action VARCHAR(40) NOT NULL,before_state JSON NULL,after_state JSON NULL,founder_position TINYINT UNSIGNED NULL,change_source VARCHAR(40) NOT NULL,admin_user_id BIGINT NULL,reason VARCHAR(500) NULL,event_key VARCHAR(190) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY creator_badge_history_event_unique(event_key),KEY creator_badge_history_designer_idx(designer_id,created_at),CONSTRAINT creator_badge_history_position_check CHECK(founder_position IS NULL OR founder_position BETWEEN 1 AND 50),CONSTRAINT creator_badge_history_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT,CONSTRAINT creator_badge_history_admin_fk FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE marketplace_credits

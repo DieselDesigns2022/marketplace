@@ -9,12 +9,14 @@ use App\Repositories\IpRiskRepository;
 use App\Services\NotificationService;
 use App\Services\EmailQueueService;
 use App\Services\SellerReferralCommissionService;
+use App\Services\CreatorRecognitionService;
 use Throwable;
 class AdminController
 {
     private function gate()
     {
         H::requireRole('admin');
+        if(!DB::row('select id from users where id=? and role="admin" and status="active"',[(int)H::user()['id']]))H::abort(403);
 
     }
     private function applicationById($id)
@@ -282,16 +284,13 @@ class AdminController
     {
         $this->gate();
         if($_POST) {
+            H::verifyCsrf();
             $id = (int)($_POST['id'] ?? 0);
             $action = $_POST['action'] ?? 'change_rank';
-            if ($action === 'change_rank') {
-                $rank = $_POST['creator_rank'] ?? 'Bronze';
-                if (!in_array($rank, ['Bronze','Silver','Gold','Platinum','Legend'], true)) {
-                    H::flash('error','Invalid creator rank.');
-                } else {
-                    DB::exec('update designers set creator_rank=?, updated_at=now() where id=?',[$rank,$id]);
-                    H::flash('success','Seller rank updated.');
-                }
+            if (in_array($action,['set_rank_override','remove_rank_override'],true)) {
+                try {(new CreatorRecognitionService)->setRankOverride($id,$action==='set_rank_override'?($_POST['creator_rank']??''):null,(int)H::user()['id'],$_POST['reason']??'');H::flash('success','Creator rank recognition updated.');} catch(Throwable $error){H::flash('error',$error instanceof \DomainException?$error->getMessage():'Recognition was not changed.');}
+            } elseif (in_array($action,['grant','force_active','force_inactive','automatic','restore'],true)) {
+                try {(new CreatorRecognitionService)->founderAction($id,$action,(int)H::user()['id'],$_POST['reason']??'');H::flash('success','Founder recognition updated.');} catch(Throwable $error){H::flash('error',$error instanceof \DomainException?$error->getMessage():'Recognition was not changed.');}
             } elseif (in_array($action, ['disable', 'inactive', 'delete'], true)) {
                 $owner = DB::row('select user_id from designers where id=?', [$id]);
                 $status = ['disable' => 'disabled', 'inactive' => 'inactive', 'delete' => 'deleted'][$action];

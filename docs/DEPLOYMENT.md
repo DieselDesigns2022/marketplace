@@ -162,3 +162,16 @@ transfers without a source transaction. A non-zero status requires operator
 attention; failed or onboarding-incomplete earnings remain in the unpaid ledger.
 
 The monthly period is a closed UTC calendar month. Omitting `YYYY-MM` selects the previous closed UTC month. Processing claims expire after 15 minutes; an admin retry recovers stale processing with the same batch idempotency key. Failed/not-ready batches retain claimed unpaid ledger entries for controlled retry. Later adjustments after a paid batch are included in a new sequence for that period or offset a future positive batch; negative balances never produce Stripe transfers.
+
+### Phase 12 deployment
+1. Back up the production database and verify restoration procedures.
+2. Apply `database/migrations/2026_08_06_phase_12_creator_ranks_founder_badge.sql`; it is repeatable, but inspect every migration result.
+3. Run `php scripts/recalculate_creator_recognition.php --dry-run` and retain the proposed deterministic first-50 positions for review.
+4. With unchanged order/refund data, run `php scripts/recalculate_creator_recognition.php --apply` and compare its results to the reviewed plan.
+5. Verify seller/admin rank pages, one storefront, one product, history counts, and queued communications.
+6. Install daily UTC inactivity processing: `0 2 * * * cd /path/to/marketplace && /usr/bin/php scripts/recalculate_creator_recognition.php --daily >> storage/logs/creator-recognition-cron.log 2>&1`.
+7. Run the Phase 12 behavior suite and disposable MariaDB migration/concurrency suite; a database `SKIP` is not release verification.
+
+Recognition timestamps and the daily job use UTC. Verify the six guarded Phase 12 foreign keys after migration. Founder `restore` removes forced inactivity and immediately applies automatic eligibility; only `force_active` bypasses the 60-day rule.
+
+`--apply` is the silent initial historical write; `--daily` is the recurring UTC mode that communicates real transitions. Paid/refund trigger keys permit replay recovery without duplicate messages only while current semantic state matches and the event-linked rank/badge history remains latest; later automatic or administrative history permanently suppresses stale recovery.
