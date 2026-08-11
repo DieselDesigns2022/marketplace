@@ -325,3 +325,7 @@ Recognition timestamps are UTC. New Phase 12 audit relationships are guarded, re
 
 `creator_recognition_events` is the durable automatic-transition journal: source, optional unique 190-character trigger key, complete recognition-state before/after JSON, rank/Founder flags, and UTC creation time. Its ID forms `recognition-event:{id}` history and communication keys; count-, timestamp-, and Founder audit-field-only refreshes create no event. Existing-position grant and inapplicable restore remain administrative no-ops, while a real rank or Founder-active transition discovered by their authoritative refresh is recorded separately as an automatic semantic event. The table has a guarded `ON DELETE RESTRICT` designer foreign key and designer/date lookup index.
 Recognition-event JSON is allowlisted recognition state only; it never snapshots payout, Stripe, receipt, profile, social-link, or storefront fields. Phase 12 has six recognition foreign keys in total.
+
+### Phase 12.1 Digital Product License seed
+
+`2026_08_10_phase_12_1_digital_product_license.sql` repeatably upserts the active `digital-product` row in `license_types`. It adds no tables or columns and does not alter `product_license_types`, seller configurations, carts, or historical `order_items` snapshots. Sellers opt products into the new free-or-paid permission through the existing product-license rows.

@@ -4,7 +4,8 @@
   <p>Order #<?=$item['order_id']?> · <?=H::e($item['order_status'])?> · payment <?=H::e($item['payment_status'] ?? $item['order_status'])?> · <?=$item['order_created']?></p>
   <?php $paid = (($item['payment_status'] ?? $item['order_status']) === 'paid'); ?><p>Buyer: <?=H::e($paid ? $item['buyer_name'] : 'Hidden until payment clears')?> <?php if($paid):?>(<?=H::e($item['buyer_email'])?>)<?php endif;?></p>
   <p>Product: <?=H::e($item['product_title'] ?: ('Product #'.$item['product_id']))?></p>
-  <p>License: <?=H::e($item['license_name'] ?: $item['license_type'])?></p>
+  <p>License: <?=H::e($item['license_name'] ?: $item['license_type'])?><?php if(!empty($item['license_description'])):?><br><span class="muted"><?=nl2br(H::e($item['license_description']))?></span><?php endif;?></p>
+  <p>License add-on price: <?=H::money($item['license_price'] ?? 0)?></p>
   <?php if(!empty($item['coupon_code'])):?><p>Coupon <?=H::e($item['coupon_code'])?> item discount: <?=H::money($item['coupon_discount'] ?? 0)?>. Earnings use the discounted item total.</p><?php endif;?>
   <p class="muted">Sales tax, when required, is handled by Asset Moth through Stripe Tax and is excluded from seller payout.</p>
   <p>Fulfillment: <?=($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></p>

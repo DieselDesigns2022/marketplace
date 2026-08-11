@@ -310,6 +310,11 @@ You may not include the file in design drives, memberships, mega bundles, freebi
 You may not sell the file in a way that suggests you created the original artwork unless the listing specifically grants that right.
 
 This license only applies to the specific file or product purchased. It does not apply to the seller’s full shop, brand, future products, or other files.',100,1),
+('digital-product','Digital Product License','A buyer may use the purchased asset as part of a finished digital product they create and sell. The purchased asset must be modified or incorporated into a new completed design before it is sold as a digital product.
+
+The buyer may not resell the seller''s original purchased file as-is, redistribute it, share it, sublicense it, give it away, or upload or provide the original file as-is.
+
+A finished product may not give the end customer access to the seller''s original source file as a separate or extractable file. The buyer may not represent the seller''s original asset as their own standalone digital file.',105,1),
 ('extended-commercial','Extended Commercial','The Extended Commercial License allows the buyer to print and sell 1,000 or more physical products of a single design.
 
 This license allows high-volume production and sale of physical products using the purchased design.

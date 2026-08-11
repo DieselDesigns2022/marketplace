@@ -276,3 +276,7 @@ Creator ranks use one qualifying completed paid order per participating seller: 
 Founder restore removes forced inactivity and returns to current UTC automatic eligibility; an ineligible stale badge stays inactive. Only an explicit force-active admin action bypasses inactivity.
 
 Phase 12 operations use write-free `--dry-run` for review, `--apply` once for silent historical state, and `--daily` for recurring UTC transition communications.
+
+## Digital Product License (Phase 12.1)
+
+Sellers may enable the normalized `digital-product` license per product and set its add-on price to free or paid. It permits a buyer to sell a finished digital product only after incorporating or modifying the purchased asset into a new completed design; the seller's original/source file may not be resold, redistributed, shared, sublicensed, given away, or exposed as a separate or extractable file. Selection, authoritative pricing, cart persistence, checkout validation, and historical order details use the existing multi-license and order-snapshot system.

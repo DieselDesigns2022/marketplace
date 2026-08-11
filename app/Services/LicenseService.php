@@ -9,6 +9,7 @@ use Throwable;
 class LicenseService
 {
     public const PERSONAL_KEY = 'personal';
+    public const DIGITAL_PRODUCT_KEY = 'digital-product';
 
     private static function personalFallbackType(): array
     {
