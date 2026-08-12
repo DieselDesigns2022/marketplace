@@ -329,3 +329,8 @@ Recognition-event JSON is allowlisted recognition state only; it never snapshots
 ### Phase 12.1 Digital Product License seed
 
 `2026_08_10_phase_12_1_digital_product_license.sql` repeatably upserts the active `digital-product` row in `license_types`. It adds no tables or columns and does not alter `product_license_types`, seller configurations, carts, or historical `order_items` snapshots. Sellers opt products into the new free-or-paid permission through the existing product-license rows.
+
+## Phase 12.2 — Bulk Product Upload & Batch Listing
+`product_batches` stores `id`, required `designer_id`, required `name`, and creation/update timestamps. Its indexed `designer_id` references `designers.id` with `ON DELETE CASCADE`. `product_batch_items` stores `id`, required `batch_id`, required `product_id`, `sort_order`, nullable JSON `validation_errors`, nullable `submitted_at`, and `created_at`. Its batch/order index supports ordered reopening; `batch_id` and `product_id` reference their parent rows with `ON DELETE CASCADE`. A unique key on `product_id` means a normal product can belong to at most one batch.
+
+These tables contain metadata and membership only. Every member remains an independent row in `products`; product content, unique slug, tags, licenses and paid prices, preview images, protected files, moderation status, and IP-risk state remain in their existing canonical tables. Removing an eligible draft through the batch workflow removes that product and its membership; submitting or independently editing a product does not remove its membership.

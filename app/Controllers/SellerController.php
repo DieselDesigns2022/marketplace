@@ -11,6 +11,8 @@ use App\Services\IpRiskScanner;
 use App\Repositories\IpRiskRepository;
 use App\Services\NotificationService;
 use App\Services\SellerReceiptService;
+use App\Services\ProductBatchService;
+use App\Services\ProductSubmissionService;
 use Throwable;
 class SellerController
 {
@@ -898,6 +900,102 @@ class SellerController
         H::view('seller/products', [ 'status' => $status, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
 
     }
+
+    public function productBatches(): void
+    {
+        $d = $this->requireOnboardingComplete();
+        H::view('seller/product_batches', ['batches' => DB::rows('select b.*,count(i.id) product_count,sum(p.status="draft") draft_count,sum(p.status="pending_review") submitted_count from product_batches b left join product_batch_items i on i.batch_id=b.id left join products p on p.id=i.product_id where b.designer_id=? group by b.id order by b.updated_at desc', [$d['id']])]);
+    }
+
+    public function createProductBatch(): void
+    {
+        $d = $this->requireOnboardingComplete();
+        $name = trim($_POST['name'] ?? '') ?: 'Product batch ' . date('Y-m-d H:i');
+        $count = max(2, min(50, (int)($_POST['product_count'] ?? 2)));
+        DB::begin();
+        try {
+            DB::exec('insert into product_batches (designer_id,name) values (?,?)', [$d['id'], mb_substr($name, 0, 190)]);
+            $batchId = (int)DB::id();
+            for ($i=1; $i<=$count; $i++) $this->addBlankBatchProduct($batchId, (int)$d['id'], $i);
+            DB::commit();
+            H::redirect('/seller/product-batch/' . $batchId);
+        } catch (Throwable $e) {
+            DB::rollBack(); H::flash('error', 'The product batch could not be created.'); H::redirect('/seller/product-batches');
+        }
+    }
+
+    private function addBlankBatchProduct(int $batchId, int $designerId, int $sort): int
+    {
+        $title = 'Untitled product ' . $sort;
+        DB::exec('insert into products (designer_id,title,slug,description,price,ai_disclosure,status) values (?,?,?,?,?,? ,"draft")', [$designerId, $title, $this->uniqueProductSlug($title), '', '5.00', 'No AI Used']);
+        $id = (int)DB::id();
+        DB::exec('insert into product_batch_items (batch_id,product_id,sort_order) values (?,?,?)', [$batchId, $id, $sort]);
+        return $id;
+    }
+
+    private function storedBatchErrors(array $p): array
+    {
+        $v = ['title'=>$p['title'],'description'=>$p['description'],'price'=>$p['price'],'fulfillment_type'=>$p['fulfillment_type'] ?? 'downloadable','manual_delivery_instructions'=>$p['manual_delivery_instructions'] ?? '', 'ai_disclosure'=>$p['ai_disclosure'],'seo_title'=>$p['seo_title'] ?? '', 'seo_description'=>$p['seo_description'] ?? ''];
+        $errors = $this->validateProduct($v, (int)$p['id']);
+        if (empty($p['category_id'])) $errors[] = 'Category is required.';
+        if ((int)$p['image_count'] < 1) $errors[] = 'At least one preview image is required.';
+        if (($p['fulfillment_type'] ?? 'downloadable') === 'downloadable' && (int)$p['file_count'] < 1) $errors[] = 'At least one protected downloadable file is required.';
+        foreach (DB::rows('select price from product_license_types where product_id=? and is_enabled=1', [$p['id']]) as $license) if ((float)$license['price'] < 0) $errors[] = 'License prices cannot be negative.';
+        return array_values(array_unique($errors));
+    }
+
+    public function productBatch($id): void
+    {
+        $d = $this->requireOnboardingComplete(); $service = new ProductBatchService();
+        $batch = $service->batch((int)$id, (int)$d['id']) ?? H::abort(404);
+        $products = $service->products((int)$id, (int)$d['id']);
+        foreach ($products as &$p) {
+            $p['batch_errors'] = $this->storedBatchErrors($p);
+            $savedErrors = json_decode((string)($p['validation_errors'] ?? ''), true);
+            if (is_array($savedErrors)) $p['batch_errors'] = array_values(array_unique(array_merge($p['batch_errors'], $savedErrors)));
+        }
+        H::view('seller/product_batch', ['batch'=>$batch,'products'=>$products,'copyFields'=>ProductBatchService::COPY_FIELDS]);
+    }
+
+    public function mutateProductBatch($id): void
+    {
+        $d = $this->requireOnboardingComplete(); $service = new ProductBatchService();
+        $batch = $service->batch((int)$id, (int)$d['id']) ?? H::abort(404);
+        $action = $_POST['action'] ?? '';
+        if ($action === 'add') {
+            $this->addBlankBatchProduct((int)$id, (int)$d['id'], count($service->products((int)$id, (int)$d['id'])) + 1);
+            H::flash('success', 'A new independent draft product was added.');
+        } elseif ($action === 'copy') {
+            $products = $service->products((int)$id, (int)$d['id']);
+            if (!$products) H::abort(404);
+            $count = $service->copy((int)$id, (int)$d['id'], (int)$products[0]['id'], (array)($_POST['copy_fields'] ?? []));
+            H::flash('success', "Selected template fields were copied into $count draft products. Each copy can now be edited independently.");
+        } elseif ($action === 'remove') {
+            $productId = (int)($_POST['product_id'] ?? 0);
+            $p = DB::row('select p.* from products p join product_batch_items i on i.product_id=p.id where i.batch_id=? and p.id=? and p.designer_id=?', [(int)$id,$productId,$d['id']]) ?? H::abort(404);
+            if ($p['status'] !== 'draft' || $this->productHasCompletedOrders($productId)) H::abort(403);
+            DB::exec('delete from product_batch_items where batch_id=? and product_id=?', [(int)$id,$productId]);
+            $this->permanentlyDeleteProduct($productId); H::flash('success', 'Draft product removed from the batch.');
+        } elseif (in_array($action, ['submit_selected','submit_all'], true)) {
+            $selected = array_map('intval', (array)($_POST['products'] ?? [])); $submitted=0; $invalid=0; $published=0; $review=0;
+            foreach ($service->products((int)$id, (int)$d['id']) as $p) {
+                if ($p['status'] !== 'draft' || ($action === 'submit_selected' && !in_array((int)$p['id'], $selected, true))) continue;
+                $errors = $this->storedBatchErrors($p);
+                if ($errors) { DB::exec('update product_batch_items set validation_errors=? where batch_id=? and product_id=?', [json_encode($errors),(int)$id,$p['id']]); $invalid++; continue; }
+                try {
+                    DB::begin();
+                    $confirmRights = in_array((int)$p['id'], array_map('intval', (array)($_POST['ip_rights_confirmation'] ?? [])), true);
+                    $result = (new ProductSubmissionService())->submit((int)$p['id'], (int)$d['id'], (int)H::user()['id'], $confirmRights);
+                    if (!$result['ok']) { DB::rollBack(); DB::exec('update product_batch_items set validation_errors=? where batch_id=? and product_id=?', [json_encode([$result['error']]),(int)$id,$p['id']]); $invalid++; continue; }
+                    DB::exec('update product_batch_items set validation_errors=null,submitted_at=now() where batch_id=? and product_id=?', [(int)$id,$p['id']]); DB::commit();
+                    $submitted++; $published += (int)($result['status']==='approved'); $review += (int)($result['status']==='pending_review');
+                } catch (Throwable $e) { if (DB::pdo()->inTransaction()) DB::rollBack(); $invalid++; DB::exec('update product_batch_items set validation_errors=? where batch_id=? and product_id=?', [json_encode(['Product could not be submitted safely. Please try again.']),(int)$id,$p['id']]); }
+            }
+            H::flash($submitted ? 'success' : 'warning', "$submitted valid product(s) submitted: $published published and $review sent for IP review. $invalid product(s) remain drafts with errors.");
+        } else H::abort(400);
+        DB::exec('update product_batches set updated_at=now() where id=? and designer_id=?', [(int)$id,$d['id']]);
+        H::redirect('/seller/product-batch/' . (int)$id);
+    }
     public function editProduct($id = null)
     {
         $this->requireOnboardingComplete();
@@ -1236,22 +1334,11 @@ class SellerController
             H::redirect('/seller/product/'.$productId);
         }
 
-        $ipWorkflow = new ProductIpRiskWorkflow();
         try {
             DB::begin();
-            $ipRiskResult = $ipWorkflow->scanProduct($productId, (int)H::user()['id']);
-            if ($ipRiskResult['requires_confirmation']) {
-                if (empty($_POST['ip_rights_confirmation'])) {
-                    DB::rollBack();
-                    H::flash('error','Please confirm your legal right to sell this design before submitting a flagged product for review.');
-                    H::redirect('/seller/product/'.$productId);
-                }
-                $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
-            }
-
-            $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
-            $nextStatus = $requiresIpReview ? 'pending_review' : 'approved';
-            DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$nextStatus, $productId, $d['id']]);
+            $result = (new ProductSubmissionService())->submit($productId, (int)$d['id'], (int)H::user()['id'], !empty($_POST['ip_rights_confirmation']));
+            if (!$result['ok']) { DB::rollBack(); H::flash('error','Please confirm your legal right to sell this design before submitting a flagged product for review.'); H::redirect('/seller/product/'.$productId); }
+            $nextStatus = $result['status'];
             DB::commit();
         } catch (Throwable $e) {
             if (DB::pdo()->inTransaction()) {
