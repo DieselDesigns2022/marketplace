@@ -307,3 +307,8 @@ Intentionally postponed:
 
 - Third correction added silent apply versus communicating daily CLI modes, durable automatic event IDs, webhook recovery trigger keys, neutral admin-rank messaging, locked Founder-position replanning, and authoritative Founder admin refresh.
 - Final correction restricted automatic event snapshots to recognition fields, repaired missing Founder audit timestamps from the authoritative tenth sale, preserved separate rank events during Founder admin refresh, and completed second-daily-run idempotency coverage.
+
+## Phase 12.2 — Bulk Product Upload & Batch Listing
+- Added persistent seller-owned batches whose members are ordinary, independent product drafts with their own product records, slugs, images, protected files, status, and validation state.
+- Product 1 can selectively copy short/full descriptions, price, category, tags, AI disclosure, complete license rows and paid prices, POD/license compatibility fields, SEO defaults, fulfillment/manual-delivery settings, and the hand-drawn disclosure into the other drafts. Titles, slugs, preview images, and protected files are never copied, and copied products remain independently editable.
+- Added resumable batch reopening, draft add/remove, product-specific readiness errors, Submit Selected Valid Products, and Submit All Valid Products. Normal submission behavior is preserved: clean products become `approved`; newly flagged products require product-specific seller IP-rights confirmation and, once confirmed, become `pending_review` for IP review. Invalid products remain drafts without blocking valid products.

@@ -264,3 +264,9 @@ Seller-referral qualification permanently selects either referrer-only $5 store 
 - Existing `GET|POST /admin/designers` handles `set_rank_override`, `remove_rank_override`, `grant`, `force_active`, `force_inactive`, `restore`, and `automatic`. Every recognition POST uses the existing CSRF field, seller ID, and a 3–500 character reason; no public recognition directory or additional badge route exists.
 
 Founder `restore` and `automatic` both return the badge to the current UTC automatic calculation; `restore` emails only when an inactive badge actually becomes eligible and active. `force_active` is the sole persistent inactivity exception.
+
+### Phase 12.2 — Bulk Product Upload & Batch Listing
+- `GET /seller/product-batches` — list/reopen batches (approved, onboarded seller only).
+- `POST /seller/product-batches` — create a batch of independent drafts.
+- `GET /seller/product-batch/{id}` — batch summary and product-specific readiness.
+- `POST /seller/product-batch/{id}` — dispatch the `add`, `remove`, `copy`, `submit_selected`, or `submit_all` action for the authenticated seller's batch. Copy uses Product 1 and never copies titles, slugs, previews, or protected files. Submission leaves invalid products as drafts, approves clean products, and requires product-specific rights confirmation before newly flagged products enter `pending_review` IP review.

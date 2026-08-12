@@ -1,5 +1,5 @@
 <h1>Seller Dashboard → Products</h1>
-<p><a class="btn" href="/seller/product/new">Create Product</a></p>
+<p><a class="btn" href="/seller/product/new">Create Product</a> <a class="btn" href="/seller/product-batches">Bulk Upload / Create Multiple Products</a></p>
 <p class="muted">Archive hides a product from public browsing while preserving order history. Permanent delete is only available for draft/test products with no completed orders.</p>
 <nav class="tabs">
     <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label): ?>

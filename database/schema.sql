@@ -1039,3 +1039,17 @@ CREATE TABLE seller_referral_transfer_attempts (
 CREATE TABLE seller_referral_admin_audits (
  id BIGINT PRIMARY KEY AUTO_INCREMENT,admin_user_id BIGINT NOT NULL,batch_id BIGINT NOT NULL,action VARCHAR(80) NOT NULL,amount_cents BIGINT NOT NULL,result_status VARCHAR(40) NOT NULL,reason VARCHAR(500) NULL,stripe_transfer_id VARCHAR(255) NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,KEY seller_ref_admin_audit_batch_idx(batch_id,created_at),CONSTRAINT seller_ref_admin_audit_admin_fk FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT seller_ref_admin_audit_batch_fk FOREIGN KEY(batch_id) REFERENCES seller_referral_payout_batches(id) ON DELETE RESTRICT
 );
+
+-- Phase 12.2 batch metadata. Products remain independent product rows.
+CREATE TABLE product_batches (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, designer_id BIGINT NOT NULL, name VARCHAR(190) NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY product_batches_designer_idx(designer_id,updated_at), CONSTRAINT product_batches_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE CASCADE
+);
+CREATE TABLE product_batch_items (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, batch_id BIGINT NOT NULL, product_id BIGINT NOT NULL, sort_order INT NOT NULL DEFAULT 0,
+ validation_errors JSON NULL, submitted_at TIMESTAMP NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY product_batch_product_unique(product_id), KEY product_batch_order_idx(batch_id,sort_order,id),
+ CONSTRAINT product_batch_items_batch_fk FOREIGN KEY(batch_id) REFERENCES product_batches(id) ON DELETE CASCADE,
+ CONSTRAINT product_batch_items_product_fk FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+);
