@@ -24,7 +24,7 @@ class ProductBatchService
         return DB::rows('select p.*,bpi.sort_order,bpi.validation_errors,(select count(*) from product_images i where i.product_id=p.id) image_count,(select count(*) from product_files f where f.product_id=p.id) file_count from product_batch_items bpi join product_batches b on b.id=bpi.batch_id join products p on p.id=bpi.product_id and p.designer_id=b.designer_id where bpi.batch_id=? and b.designer_id=? order by bpi.sort_order,bpi.id', [$batchId, $designerId]);
     }
 
-    public function copy(int $batchId, int $designerId, int $sourceId, array $fields): int
+    public function copy(int $batchId, int $designerId, int $sourceId, array $fields, array $targetIds = []): int
     {
         $batch = $this->batch($batchId, $designerId);
         $source = DB::row('select p.* from products p join product_batch_items i on i.product_id=p.id where i.batch_id=? and p.id=? and p.designer_id=?', [$batchId, $sourceId, $designerId]);
@@ -33,9 +33,11 @@ class ProductBatchService
         $fields = array_values(array_intersect(self::COPY_FIELDS, $fields));
         $copyTags = in_array('tags', $requested, true);
         $copyLicenses = in_array('licenses', $requested, true);
+        $targetIds = array_values(array_unique(array_map('intval', $targetIds)));
         $count = 0;
         foreach ($this->products($batchId, $designerId) as $target) {
             if ((int)$target['id'] === $sourceId || $target['status'] !== 'draft') continue;
+            if ($targetIds && !in_array((int)$target['id'], $targetIds, true)) continue;
             if ($fields) {
                 $sets = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $params = array_map(fn($f) => $source[$f], $fields);

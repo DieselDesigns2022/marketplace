@@ -911,12 +911,11 @@ class SellerController
     {
         $d = $this->requireOnboardingComplete();
         $name = trim($_POST['name'] ?? '') ?: 'Product batch ' . date('Y-m-d H:i');
-        $count = max(2, min(50, (int)($_POST['product_count'] ?? 2)));
         DB::begin();
         try {
             DB::exec('insert into product_batches (designer_id,name) values (?,?)', [$d['id'], mb_substr($name, 0, 190)]);
             $batchId = (int)DB::id();
-            for ($i=1; $i<=$count; $i++) $this->addBlankBatchProduct($batchId, (int)$d['id'], $i);
+            $this->addBlankBatchProduct($batchId, (int)$d['id'], 1);
             DB::commit();
             H::redirect('/seller/product-batch/' . $batchId);
         } catch (Throwable $e) {
@@ -962,7 +961,62 @@ class SellerController
         $d = $this->requireOnboardingComplete(); $service = new ProductBatchService();
         $batch = $service->batch((int)$id, (int)$d['id']) ?? H::abort(404);
         $action = $_POST['action'] ?? '';
-        if ($action === 'add') {
+        if ($action === 'create_copies') {
+            $products = $service->products((int)$id, (int)$d['id']);
+            if (!$products) H::abort(404);
+
+            $sourceId = (int)$products[0]['id'];
+            $templateErrors = $this->storedBatchErrors($products[0]);
+
+            if ($templateErrors) {
+                DB::exec(
+                    'update product_batch_items set validation_errors=? where batch_id=? and product_id=?',
+                    [json_encode($templateErrors), (int)$id, $sourceId]
+                );
+                H::flash('error', 'Finish Product 1 before creating the rest of your products.');
+                H::redirect('/seller/product-batch/' . (int)$id);
+            }
+
+            $copyCount = max(1, min(49, (int)($_POST['copy_count'] ?? 1)));
+            $copyFields = array_values(array_filter((array)($_POST['copy_fields'] ?? [])));
+
+            if (!$copyFields) {
+                H::flash('error', 'Choose at least one type of information to copy from Product 1.');
+                H::redirect('/seller/product-batch/' . (int)$id);
+            }
+
+            $startingSort = count($products);
+            $newIds = [];
+
+            DB::begin();
+            try {
+                for ($i = 1; $i <= $copyCount; $i++) {
+                    $newIds[] = $this->addBlankBatchProduct(
+                        (int)$id,
+                        (int)$d['id'],
+                        $startingSort + $i
+                    );
+                }
+
+                $copied = $service->copy(
+                    (int)$id,
+                    (int)$d['id'],
+                    $sourceId,
+                    $copyFields,
+                    $newIds
+                );
+
+                DB::commit();
+
+                H::flash(
+                    'success',
+                    $copied . ' new product(s) were created from Product 1. Now add each product\'s own title, images and files.'
+                );
+            } catch (Throwable $e) {
+                if (DB::pdo()->inTransaction()) DB::rollBack();
+                H::flash('error', 'The new products could not be created safely. Please try again.');
+            }
+        } elseif ($action === 'add') {
             $this->addBlankBatchProduct((int)$id, (int)$d['id'], count($service->products((int)$id, (int)$d['id'])) + 1);
             H::flash('success', 'A new independent draft product was added.');
         } elseif ($action === 'copy') {
