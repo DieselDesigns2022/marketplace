@@ -1,49 +1,35 @@
-<h1>Bulk Upload Products</h1>
+<h1>Bulk Product Upload</h1>
 
 <div class="card">
-    <h2>Create several product listings faster</h2>
+    <h2>Create several products without starting over each time</h2>
 
     <p>
-        Start by creating <strong>one complete product</strong>.
-        Once Product 1 is finished, you can create as many additional products as you need
-        using Product 1 as the starting template.
+        Enter the information your products have in common once.
+        Then Asset Moth will walk you through each product one at a time
+        with that information already filled in.
     </p>
 
     <ol>
-        <li>Create your batch.</li>
-        <li>Complete Product 1.</li>
-        <li>Choose how many additional products you want.</li>
-        <li>The shared information from Product 1 is copied into those new products.</li>
-        <li>Add each product's own title, preview images and downloadable files.</li>
+        <li>Enter your shared product information.</li>
+        <li>Tell us how many products you're creating.</li>
+        <li>Review Product 1, make any individual changes, upload its images/files, then click Next.</li>
+        <li>Repeat for Product 2, Product 3, and so on.</li>
+        <li>Review the completed batch and submit the products that are ready.</li>
     </ol>
+
+    <a
+        class="btn"
+        href="/seller/product-bulk/template?reset=1"
+    >
+        Create Bulk Products
+    </a>
 </div>
 
-<form method="post" action="/seller/product-batches" class="form card">
-    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-
-    <h2>Start a New Batch</h2>
-
-    <label>
-        Batch name
-        <input
-            name="name"
-            maxlength="190"
-            placeholder="Example: Halloween PNG Collection"
-        >
-    </label>
-
-    <p class="muted">
-        This name is only for you. Customers will not see it.
-    </p>
-
-    <button>Start My Batch</button>
-</form>
-
-<h2>Saved Batches</h2>
+<h2>Saved Bulk Batches</h2>
 
 <?php if (!$batches): ?>
     <div class="card empty">
-        <strong>You don't have any saved batches yet.</strong>
+        You don't have any saved bulk batches yet.
     </div>
 <?php endif; ?>
 
@@ -53,12 +39,60 @@
 
         <p>
             <strong><?=(int)$batch['product_count']?></strong> products
-            · <?=(int)$batch['draft_count']?> still being worked on
+            · <?=(int)$batch['draft_count']?> drafts
             · <?=(int)$batch['submitted_count']?> pending review
         </p>
 
-        <a class="btn" href="/seller/product-batch/<?=$batch['id']?>">
-            Continue This Batch
+        <a
+            class="btn"
+            href="/seller/product-batch/<?=$batch['id']?>"
+        >
+            Continue Editing Bulk Draft
         </a>
+
+        <form
+            method="post"
+            action="/seller/product-batch/<?=$batch['id']?>"
+            class="inline"
+            onsubmit="return confirm('Delete this bulk batch? Draft products inside it will be permanently deleted. Submitted or published products will remain in your shop.');"
+        >
+            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+            <input type="hidden" name="action" value="delete_batch">
+
+            <button type="submit">
+                Delete Bulk Batch
+            </button>
+        </form>
+
+        <?php
+        $isEntirelyDraft =
+            (int)$batch['product_count'] > 0
+            && (int)$batch['draft_count'] === (int)$batch['product_count'];
+        ?>
+
+        <?php if ($isEntirelyDraft): ?>
+            <form
+                method="post"
+                action="/seller/product-batch/<?=$batch['id']?>"
+                class="inline"
+                onsubmit="return confirm('Permanently delete this entire bulk draft and all products inside it? This cannot be undone.');"
+            >
+                <input
+                    type="hidden"
+                    name="_csrf"
+                    value="<?=H::csrf()?>"
+                >
+
+                <input
+                    type="hidden"
+                    name="action"
+                    value="delete_batch"
+                >
+
+                <button type="submit">
+                    Delete Bulk Draft
+                </button>
+            </form>
+        <?php endif; ?>
     </article>
 <?php endforeach; ?>

@@ -402,8 +402,25 @@ When the disposable MariaDB fixture is enabled, the Phase 12 suite executes all 
 The PR #59 correction additionally verifies semantic-only rank/Founder events, latest semantic-history stale-trigger suppression across automatic and administrative rank/Founder cycles, post-commit communication recovery, and no-op Founder grant/restore authoritative repairs. The final correction verifies recognition-only event JSON, authoritative Founder tenth-order/earned-date repair without false history or communication, separate durable rank events during Founder refresh, and a second no-op daily run after inactivity.
 
 ## Phase 12.2 — Bulk Product Upload & Batch Listing
-`php tests/Phase122BulkProductBatchTest.php` performs source-contract checks only; it does not execute or claim behavioral workflow coverage.
 
-`PHASE122_ALLOW_FIXTURE=1 php tests/Phase122DatabaseIntegrationTest.php` creates and destroys a disposable MariaDB database and applies the real Phase 12.2 migration twice. Through `tests/helpers/Phase122BatchControllerProbe.php`, it constructs authenticated POST requests, runs CSRF verification, and invokes the actual `SellerController::mutateProductBatch()` path for copy, add, remove, Submit Selected Valid Products, Submit All Valid Products, cross-seller denial, and invalid-CSRF denial. Database assertions cover copied fields/tags/complete paid POD and Digital Product License rows, independent edits, membership persistence, duplicate-slug isolation, product-specific invalid errors, clean-product `approved` status, and flagged-product confirmation/`pending_review` behavior. A direct database edit is used only to arrange independent-edit, invalid, duplicate, and flagged fixtures; it is not labeled as exercising a controller action.
+Phase 12.2 final live testing covers the guided bulk-product workflow and directly affected existing seller product behavior.
 
-If MariaDB is unavailable or the explicit disposable-fixture opt-in is absent, the integration test exits 77. That result is **SKIP/unexecuted**, never PASS; this documentation makes no claim that the suite has already passed in a database-capable environment.
+Required live checks:
+- Begin from Create Bulk Products and enter shared product information.
+- Confirm the next step asks for the total number of products instead of immediately creating blank drafts.
+- Confirm Product 1 opens with the shared information prefilled.
+- Confirm every following product also opens with the shared information prefilled.
+- Confirm individual product edits remain independent.
+- Confirm seller license selections and applicable paid license prices carry into the workflow.
+- Confirm preview images and protected downloadable files are supplied per individual product.
+- Confirm the seller can move sequentially through the full requested product count.
+- Confirm saved bulk drafts can be reopened and edited.
+- Confirm bulk batches can be deleted from both the saved batch list and the individual batch page.
+- Confirm completed products remain normal independent products.
+- Regression-test normal seller product creation/editing, validation, IP-risk behavior, submission, moderation, and publishing where directly affected.
+- Confirm cross-seller access is denied and POST mutations remain CSRF protected.
+- Confirm affected desktop and mobile/tablet layouts remain usable.
+
+`php tests/Phase122BulkProductBatchTest.php` remains a source-contract test and must not be represented as full behavioral live coverage.
+
+`PHASE122_ALLOW_FIXTURE=1 php tests/Phase122DatabaseIntegrationTest.php` remains the disposable-database integration suite where supported. Exit 77 means SKIP/unexecuted, not PASS. Final approval additionally requires successful live testing of the current guided workflow.

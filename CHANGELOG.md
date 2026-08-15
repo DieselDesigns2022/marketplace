@@ -309,6 +309,9 @@ Intentionally postponed:
 - Final correction restricted automatic event snapshots to recognition fields, repaired missing Founder audit timestamps from the authoritative tenth sale, preserved separate rank events during Founder admin refresh, and completed second-daily-run idempotency coverage.
 
 ## Phase 12.2 — Bulk Product Upload & Batch Listing
-- Added persistent seller-owned batches whose members are ordinary, independent product drafts with their own product records, slugs, images, protected files, status, and validation state.
-- Product 1 can selectively copy short/full descriptions, price, category, tags, AI disclosure, complete license rows and paid prices, POD/license compatibility fields, SEO defaults, fulfillment/manual-delivery settings, and the hand-drawn disclosure into the other drafts. Titles, slugs, preview images, and protected files are never copied, and copied products remain independently editable.
-- Added resumable batch reopening, draft add/remove, product-specific readiness errors, Submit Selected Valid Products, and Submit All Valid Products. Normal submission behavior is preserved: clean products become `approved`; newly flagged products require product-specific seller IP-rights confirmation and, once confirmed, become `pending_review` for IP review. Invalid products remain drafts without blocking valid products.
+- Added a guided seller bulk-product workflow built around shared starting information instead of generating blank product drafts.
+- Sellers enter shared product information first, choose the total number of products, then move through Product 1, Product 2, and onward with each product prefilled from that shared information.
+- Each product can be changed independently before continuing, including titles, descriptions, pricing, tags, licenses, SEO, fulfillment, preview images, and protected files as applicable.
+- Seller license selections and applicable paid license prices carry into the guided workflow.
+- Saved bulk drafts can be reopened and edited. Bulk batches can also be deleted from both the saved bulk-product list and the individual batch page.
+- Completed products remain ordinary independent marketplace products and continue through the existing validation, IP-risk, submission, moderation, and publishing behavior.
