@@ -307,3 +307,11 @@ Intentionally postponed:
 
 - Third correction added silent apply versus communicating daily CLI modes, durable automatic event IDs, webhook recovery trigger keys, neutral admin-rank messaging, locked Founder-position replanning, and authoritative Founder admin refresh.
 - Final correction restricted automatic event snapshots to recognition fields, repaired missing Founder audit timestamps from the authoritative tenth sale, preserved separate rank events during Founder admin refresh, and completed second-daily-run idempotency coverage.
+
+## Phase 12.2 — Bulk Product Upload & Batch Listing
+- Added a guided seller bulk-product workflow built around shared starting information instead of generating blank product drafts.
+- Sellers enter shared product information first, choose the total number of products, then move through Product 1, Product 2, and onward with each product prefilled from that shared information.
+- Each product can be changed independently before continuing, including titles, descriptions, pricing, tags, licenses, SEO, fulfillment, preview images, and protected files as applicable.
+- Seller license selections and applicable paid license prices carry into the guided workflow.
+- Saved bulk drafts can be reopened and edited. Bulk batches can also be deleted from both the saved bulk-product list and the individual batch page.
+- Completed products remain ordinary independent marketplace products and continue through the existing validation, IP-risk, submission, moderation, and publishing behavior.

@@ -400,3 +400,27 @@ Run `php tests/Phase121DigitalProductLicenseTest.php` for deterministic normaliz
 
 When the disposable MariaDB fixture is enabled, the Phase 12 suite executes all three CLI modes, the paid-order finalizer hook, the actual Stripe refund-processing method plus its recovery path, durable 24→25→24→25→24 automatic-event cycles, stale planned-position revalidation, and authoritative Founder admin refreshes.
 The PR #59 correction additionally verifies semantic-only rank/Founder events, latest semantic-history stale-trigger suppression across automatic and administrative rank/Founder cycles, post-commit communication recovery, and no-op Founder grant/restore authoritative repairs. The final correction verifies recognition-only event JSON, authoritative Founder tenth-order/earned-date repair without false history or communication, separate durable rank events during Founder refresh, and a second no-op daily run after inactivity.
+
+## Phase 12.2 — Bulk Product Upload & Batch Listing
+
+Phase 12.2 final live testing covers the guided bulk-product workflow and directly affected existing seller product behavior.
+
+Required live checks:
+- Begin from Create Bulk Products and enter shared product information.
+- Confirm the next step asks for the total number of products instead of immediately creating blank drafts.
+- Confirm Product 1 opens with the shared information prefilled.
+- Confirm every following product also opens with the shared information prefilled.
+- Confirm individual product edits remain independent.
+- Confirm seller license selections and applicable paid license prices carry into the workflow.
+- Confirm preview images and protected downloadable files are supplied per individual product.
+- Confirm the seller can move sequentially through the full requested product count.
+- Confirm saved bulk drafts can be reopened and edited.
+- Confirm bulk batches can be deleted from both the saved batch list and the individual batch page.
+- Confirm completed products remain normal independent products.
+- Regression-test normal seller product creation/editing, validation, IP-risk behavior, submission, moderation, and publishing where directly affected.
+- Confirm cross-seller access is denied and POST mutations remain CSRF protected.
+- Confirm affected desktop and mobile/tablet layouts remain usable.
+
+`php tests/Phase122BulkProductBatchTest.php` remains a source-contract test and must not be represented as full behavioral live coverage.
+
+`PHASE122_ALLOW_FIXTURE=1 php tests/Phase122DatabaseIntegrationTest.php` remains the disposable-database integration suite where supported. Exit 77 means SKIP/unexecuted, not PASS. Final approval additionally requires successful live testing of the current guided workflow.

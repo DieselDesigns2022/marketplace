@@ -11,6 +11,8 @@ use App\Services\IpRiskScanner;
 use App\Repositories\IpRiskRepository;
 use App\Services\NotificationService;
 use App\Services\SellerReceiptService;
+use App\Services\ProductBatchService;
+use App\Services\ProductSubmissionService;
 use Throwable;
 class SellerController
 {
@@ -898,6 +900,600 @@ class SellerController
         H::view('seller/products', [ 'status' => $status, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
 
     }
+
+    private function bulkWizardLicenseMap(array $licenses): array
+    {
+        $map = [];
+        foreach ($licenses as $license) {
+            $key = trim((string)($license['license_key'] ?? ''));
+            if ($key !== '') {
+                $map[$key] = $license;
+            }
+        }
+        return $map;
+    }
+
+    private function bulkWizardDefaultValues(): array
+    {
+        return [
+            'title' => '',
+            'short_description' => '',
+            'description' => '',
+            'price' => '5.00',
+            'fulfillment_type' => 'downloadable',
+            'manual_delivery_instructions' => '',
+            'category_id' => null,
+            'tags' => '',
+            'commercial_license_enabled' => 0,
+            'commercial_license_price' => '0.00',
+            'pod_allowed' => 0,
+            'ai_disclosure' => 'No AI Used',
+            'is_hand_drawn' => 0,
+            'seo_title' => '',
+            'seo_description' => '',
+        ];
+    }
+
+    private function renderBulkWizardForm(
+        array $values,
+        array $licenses,
+        array $errors,
+        string $mode,
+        int $step = 0,
+        int $total = 0
+    ): void {
+        H::view('seller/bulk_product_form', [
+            'values' => $values,
+            'configuredLicenses' => $this->bulkWizardLicenseMap($licenses),
+            'licenseTypes' => LicenseService::platformTypes(),
+            'cats' => DB::rows('select * from categories order by name'),
+            'errors' => $errors,
+            'bulkMode' => $mode,
+            'step' => $step,
+            'total' => $total,
+        ]);
+    }
+
+    public function bulkProductTemplate(): void
+    {
+        $d = $this->requireOnboardingComplete();
+        H::requireSeller();
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['reset'])) {
+            unset($_SESSION['bulk_product_wizard']);
+        }
+
+        $wizard = $_SESSION['bulk_product_wizard'] ?? [];
+
+        if ($_POST) {
+            $values = $this->productValues([]);
+            $errors = $this->validateProduct($values);
+
+            if (empty($values['category_id'])) {
+                $errors[] = 'Category is required.';
+            }
+
+            [$licenses, $licenseErrors] = LicenseService::normalizePosted($values, $_POST);
+            $errors = array_merge($errors, $licenseErrors);
+
+            if ($errors) {
+                $this->renderBulkWizardForm(
+                    $values,
+                    $licenses ?: LicenseService::presetLicensesForProductForm((int)$d['id']),
+                    $errors,
+                    'template'
+                );
+                return;
+            }
+
+            $_SESSION['bulk_product_wizard'] = [
+                'template' => $values,
+                'licenses' => array_values($licenses),
+                'count' => 0,
+                'batch_id' => 0,
+                'product_ids' => [],
+            ];
+
+            H::redirect('/seller/product-bulk/count');
+        }
+
+        $values = $wizard['template'] ?? $this->bulkWizardDefaultValues();
+
+        $licenses = $wizard['licenses']
+            ?? LicenseService::presetLicensesForProductForm((int)$d['id']);
+
+        $this->renderBulkWizardForm(
+            $values,
+            $licenses,
+            [],
+            'template'
+        );
+    }
+
+    public function bulkProductCount(): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+
+        $wizard = $_SESSION['bulk_product_wizard'] ?? null;
+
+        if (!$wizard || empty($wizard['template'])) {
+            H::redirect('/seller/product-bulk/template?reset=1');
+        }
+
+        $errors = [];
+
+        if ($_POST) {
+            $raw = trim((string)($_POST['product_count'] ?? ''));
+
+            if (!ctype_digit($raw)) {
+                $errors[] = 'Enter how many products you are creating.';
+            } else {
+                $count = (int)$raw;
+
+                if ($count < 2 || $count > 50) {
+                    $errors[] = 'Bulk upload supports between 2 and 50 products at a time.';
+                }
+            }
+
+            if (!$errors) {
+                $wizard['count'] = $count;
+                $wizard['batch_id'] = 0;
+                $wizard['product_ids'] = [];
+                $wizard['batch_name'] =
+                    trim((string)($wizard['template']['title'] ?? 'Bulk Products'))
+                    . ' — Bulk Batch';
+
+                $_SESSION['bulk_product_wizard'] = $wizard;
+
+                H::redirect('/seller/product-bulk/item/1');
+            }
+        }
+
+        H::view('seller/bulk_product_count', [
+            'errors' => $errors,
+            'count' => (int)($wizard['count'] ?: 5),
+            'template' => $wizard['template'],
+        ]);
+    }
+
+    public function bulkProductItem($step): void
+    {
+        $d = $this->requireOnboardingComplete();
+        H::requireSeller();
+
+        $wizard = $_SESSION['bulk_product_wizard'] ?? null;
+
+        if (
+            !$wizard
+            || empty($wizard['template'])
+            || empty($wizard['count'])
+        ) {
+            H::redirect('/seller/product-bulk/template?reset=1');
+        }
+
+        $step = (int)$step;
+        $total = (int)$wizard['count'];
+
+        if ($step < 1 || $step > $total) {
+            H::abort(404);
+        }
+
+        if (!empty($wizard['product_ids'][$step])) {
+            if ($step < $total) {
+                H::redirect('/seller/product-bulk/item/' . ($step + 1));
+            }
+
+            $batchId = (int)($wizard['batch_id'] ?? 0);
+            unset($_SESSION['bulk_product_wizard']);
+
+            if ($batchId > 0) {
+                H::redirect('/seller/product-batch/' . $batchId);
+            }
+
+            H::redirect('/seller/product-batches');
+        }
+
+        $template = $wizard['template'];
+        $templateLicenses = $wizard['licenses'] ?? [];
+        $values = $template;
+        $errors = [];
+
+        if ($_POST) {
+            $values = $this->productValues($template);
+            $errors = $this->validateProduct($values);
+
+            if (empty($values['category_id'])) {
+                $errors[] = 'Category is required.';
+            }
+
+            [$postedLicenses, $licenseErrors] =
+                LicenseService::normalizePosted($values, $_POST);
+
+            $errors = array_merge($errors, $licenseErrors);
+
+            $this->uploadedPreviewFilesValid($errors);
+
+            $previewNames = array_values(array_filter(
+                (array)($_FILES['preview_images']['name'] ?? []),
+                static fn($name) => trim((string)$name) !== ''
+            ));
+
+            if (!$previewNames) {
+                $errors[] = 'Upload at least one preview image before continuing.';
+            }
+
+            if (($values['fulfillment_type'] ?? 'downloadable') === 'downloadable') {
+                $productFileNames = array_values(array_filter(
+                    (array)($_FILES['product_files']['name'] ?? []),
+                    static fn($name) => trim((string)$name) !== ''
+                ));
+
+                if (!$productFileNames) {
+                    $errors[] = 'Upload at least one downloadable product file before continuing.';
+                }
+            }
+
+            if ($errors) {
+                $this->renderBulkWizardForm(
+                    $values,
+                    $postedLicenses ?: $templateLicenses,
+                    $errors,
+                    'item',
+                    $step,
+                    $total
+                );
+                return;
+            }
+
+            $productId = 0;
+            $createdPreviewIds = [];
+            $createdFileIds = [];
+
+            try {
+                $values['slug'] = $this->uniqueProductSlug($values['title']);
+                $fileTypes = implode(',', $values['file_types']);
+
+                DB::exec(
+                    'insert into products (
+                        designer_id,
+                        category_id,
+                        title,
+                        slug,
+                        short_description,
+                        description,
+                        price,
+                        fulfillment_type,
+                        manual_delivery_instructions,
+                        tags_text,
+                        file_types,
+                        commercial_license_enabled,
+                        commercial_license_price,
+                        pod_allowed,
+                        digital_resale_prohibited,
+                        ai_disclosure,
+                        is_hand_drawn,
+                        seo_title,
+                        seo_description,
+                        status
+                    ) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                    [
+                        $d['id'],
+                        $values['category_id'],
+                        $values['title'],
+                        $values['slug'],
+                        $values['short_description'],
+                        $values['description'],
+                        $values['price'],
+                        $values['fulfillment_type'],
+                        $values['manual_delivery_instructions'],
+                        null,
+                        $fileTypes,
+                        $values['commercial_license_enabled'],
+                        $values['commercial_license_price'],
+                        $values['pod_allowed'],
+                        1,
+                        $values['ai_disclosure'],
+                        $values['is_hand_drawn'],
+                        $values['seo_title'],
+                        $values['seo_description'],
+                        'draft',
+                    ]
+                );
+
+                $productId = (int)DB::id();
+
+                $this->syncTags($productId, $values['tags']);
+
+                LicenseService::syncProductLicenses(
+                    $productId,
+                    $postedLicenses
+                );
+
+                $createdPreviewIds =
+                    $this->savePreviewImages($productId, $errors);
+
+                if ($errors) {
+                    $this->cleanupNewProductAfterFailedSave(
+                        $productId,
+                        (int)$d['id']
+                    );
+
+                    $this->renderBulkWizardForm(
+                        $values,
+                        $postedLicenses,
+                        $errors,
+                        'item',
+                        $step,
+                        $total
+                    );
+                    return;
+                }
+
+                $createdFileIds =
+                    $this->saveProductFiles($productId, $errors);
+
+                if ($errors) {
+                    $this->cleanupNewProductAfterFailedSave(
+                        $productId,
+                        (int)$d['id']
+                    );
+
+                    $this->renderBulkWizardForm(
+                        $values,
+                        $postedLicenses,
+                        $errors,
+                        'item',
+                        $step,
+                        $total
+                    );
+                    return;
+                }
+
+                $batchId = (int)($wizard['batch_id'] ?? 0);
+
+                if ($batchId <= 0) {
+                    DB::exec(
+                        'insert into product_batches (designer_id,name) values (?,?)',
+                        [
+                            $d['id'],
+                            mb_substr(
+                                (string)$wizard['batch_name'],
+                                0,
+                                190
+                            ),
+                        ]
+                    );
+
+                    $batchId = (int)DB::id();
+                }
+
+                DB::exec(
+                    'insert into product_batch_items (
+                        batch_id,
+                        product_id,
+                        sort_order
+                    ) values (?,?,?)',
+                    [
+                        $batchId,
+                        $productId,
+                        $step,
+                    ]
+                );
+
+                $wizard['batch_id'] = $batchId;
+                $wizard['product_ids'][$step] = $productId;
+
+                $_SESSION['bulk_product_wizard'] = $wizard;
+
+            } catch (Throwable $e) {
+                if ($productId > 0) {
+                    $this->cleanupNewProductAfterFailedSave(
+                        $productId,
+                        (int)$d['id']
+                    );
+                }
+
+                error_log(
+                    'Bulk wizard product save failed: '
+                    . get_class($e)
+                    . ': '
+                    . $e->getMessage()
+                );
+
+                $errors[] =
+                    'This product could not be saved safely. Please try again.';
+
+                $this->renderBulkWizardForm(
+                    $values,
+                    $postedLicenses ?: $templateLicenses,
+                    $errors,
+                    'item',
+                    $step,
+                    $total
+                );
+
+                return;
+            }
+
+            if ($step < $total) {
+                H::redirect(
+                    '/seller/product-bulk/item/' . ($step + 1)
+                );
+            }
+
+            $batchId = (int)$wizard['batch_id'];
+
+            unset($_SESSION['bulk_product_wizard']);
+
+            H::redirect('/seller/product-batch/' . $batchId);
+        }
+
+        $this->renderBulkWizardForm(
+            $values,
+            $templateLicenses,
+            [],
+            'item',
+            $step,
+            $total
+        );
+    }
+
+    public function productBatches(): void
+    {
+        $d = $this->requireOnboardingComplete();
+        H::view('seller/product_batches', ['batches' => DB::rows('select b.*,count(i.id) product_count,sum(p.status="draft") draft_count,sum(p.status="pending_review") submitted_count from product_batches b left join product_batch_items i on i.batch_id=b.id left join products p on p.id=i.product_id where b.designer_id=? group by b.id order by b.updated_at desc', [$d['id']])]);
+    }
+
+    public function createProductBatch(): void
+    {
+        $d = $this->requireOnboardingComplete();
+        $name = trim($_POST['name'] ?? '') ?: 'Product batch ' . date('Y-m-d H:i');
+        DB::begin();
+        try {
+            DB::exec('insert into product_batches (designer_id,name) values (?,?)', [$d['id'], mb_substr($name, 0, 190)]);
+            $batchId = (int)DB::id();
+            $this->addBlankBatchProduct($batchId, (int)$d['id'], 1);
+            DB::commit();
+            H::redirect('/seller/product-batch/' . $batchId);
+        } catch (Throwable $e) {
+            DB::rollBack(); H::flash('error', 'The product batch could not be created.'); H::redirect('/seller/product-batches');
+        }
+    }
+
+    private function addBlankBatchProduct(int $batchId, int $designerId, int $sort): int
+    {
+        $title = 'Untitled product ' . $sort;
+        DB::exec('insert into products (designer_id,title,slug,description,price,ai_disclosure,status) values (?,?,?,?,?,? ,"draft")', [$designerId, $title, $this->uniqueProductSlug($title), '', '5.00', 'No AI Used']);
+        $id = (int)DB::id();
+        DB::exec('insert into product_batch_items (batch_id,product_id,sort_order) values (?,?,?)', [$batchId, $id, $sort]);
+        return $id;
+    }
+
+    private function storedBatchErrors(array $p): array
+    {
+        $v = ['title'=>$p['title'],'description'=>$p['description'],'price'=>$p['price'],'fulfillment_type'=>$p['fulfillment_type'] ?? 'downloadable','manual_delivery_instructions'=>$p['manual_delivery_instructions'] ?? '', 'ai_disclosure'=>$p['ai_disclosure'],'seo_title'=>$p['seo_title'] ?? '', 'seo_description'=>$p['seo_description'] ?? ''];
+        $errors = $this->validateProduct($v, (int)$p['id']);
+        if (empty($p['category_id'])) $errors[] = 'Category is required.';
+        if ((int)$p['image_count'] < 1) $errors[] = 'At least one preview image is required.';
+        if (($p['fulfillment_type'] ?? 'downloadable') === 'downloadable' && (int)$p['file_count'] < 1) $errors[] = 'At least one protected downloadable file is required.';
+        foreach (DB::rows('select price from product_license_types where product_id=? and is_enabled=1', [$p['id']]) as $license) if ((float)$license['price'] < 0) $errors[] = 'License prices cannot be negative.';
+        return array_values(array_unique($errors));
+    }
+
+    public function productBatch($id): void
+    {
+        $d = $this->requireOnboardingComplete(); $service = new ProductBatchService();
+        $batch = $service->batch((int)$id, (int)$d['id']) ?? H::abort(404);
+        $products = $service->products((int)$id, (int)$d['id']);
+        foreach ($products as &$p) {
+            $p['batch_errors'] = $this->storedBatchErrors($p);
+            $savedErrors = json_decode((string)($p['validation_errors'] ?? ''), true);
+            if (is_array($savedErrors)) $p['batch_errors'] = array_values(array_unique(array_merge($p['batch_errors'], $savedErrors)));
+        }
+        H::view('seller/product_batch', ['batch'=>$batch,'products'=>$products,'copyFields'=>ProductBatchService::COPY_FIELDS]);
+    }
+
+    public function mutateProductBatch($id): void
+    {
+        $d = $this->requireOnboardingComplete(); $service = new ProductBatchService();
+        $batch = $service->batch((int)$id, (int)$d['id']) ?? H::abort(404);
+        $action = $_POST['action'] ?? '';
+
+        if ($action === 'delete_batch') {
+            $products = $service->products((int)$id, (int)$d['id']);
+
+            try {
+                DB::begin();
+
+                foreach ($products as $product) {
+                    $productId = (int)$product['id'];
+                    $status = (string)($product['status'] ?? '');
+
+                    DB::exec(
+                        'delete from product_batch_items where batch_id=? and product_id=?',
+                        [(int)$id, $productId]
+                    );
+
+                    /*
+                     * Draft products created only for this bulk batch are
+                     * permanently removed when safe.
+                     *
+                     * Submitted/published products remain normal products;
+                     * only their batch membership is removed.
+                     */
+                    if (
+                        $status === 'draft'
+                        && !$this->productHasCompletedOrders($productId)
+                    ) {
+                        $this->permanentlyDeleteProduct($productId);
+                    }
+                }
+
+                DB::exec(
+                    'delete from product_batches where id=? and designer_id=?',
+                    [(int)$id, (int)$d['id']]
+                );
+
+                DB::commit();
+
+                H::flash(
+                    'success',
+                    'Bulk batch deleted. Draft products from this batch were removed; submitted or published products were kept.'
+                );
+            } catch (Throwable $e) {
+                if (DB::pdo()->inTransaction()) {
+                    DB::rollBack();
+                }
+
+                error_log(
+                    'Bulk batch delete failed: '
+                    . get_class($e)
+                    . ': '
+                    . $e->getMessage()
+                );
+
+                H::flash(
+                    'error',
+                    'The bulk batch could not be deleted safely. Please try again.'
+                );
+            }
+
+            H::redirect('/seller/product-batches');
+        } elseif ($action === 'add') {
+            $this->addBlankBatchProduct((int)$id, (int)$d['id'], count($service->products((int)$id, (int)$d['id'])) + 1);
+            H::flash('success', 'A new independent draft product was added.');
+        } elseif ($action === 'copy') {
+            $products = $service->products((int)$id, (int)$d['id']);
+            if (!$products) H::abort(404);
+            $count = $service->copy((int)$id, (int)$d['id'], (int)$products[0]['id'], (array)($_POST['copy_fields'] ?? []));
+            H::flash('success', "Selected template fields were copied into $count draft products. Each copy can now be edited independently.");
+        } elseif ($action === 'remove') {
+            $productId = (int)($_POST['product_id'] ?? 0);
+            $p = DB::row('select p.* from products p join product_batch_items i on i.product_id=p.id where i.batch_id=? and p.id=? and p.designer_id=?', [(int)$id,$productId,$d['id']]) ?? H::abort(404);
+            if ($p['status'] !== 'draft' || $this->productHasCompletedOrders($productId)) H::abort(403);
+            DB::exec('delete from product_batch_items where batch_id=? and product_id=?', [(int)$id,$productId]);
+            $this->permanentlyDeleteProduct($productId); H::flash('success', 'Draft product removed from the batch.');
+        } elseif (in_array($action, ['submit_selected','submit_all'], true)) {
+            $selected = array_map('intval', (array)($_POST['products'] ?? [])); $submitted=0; $invalid=0; $published=0; $review=0;
+            foreach ($service->products((int)$id, (int)$d['id']) as $p) {
+                if ($p['status'] !== 'draft' || ($action === 'submit_selected' && !in_array((int)$p['id'], $selected, true))) continue;
+                $errors = $this->storedBatchErrors($p);
+                if ($errors) { DB::exec('update product_batch_items set validation_errors=? where batch_id=? and product_id=?', [json_encode($errors),(int)$id,$p['id']]); $invalid++; continue; }
+                try {
+                    DB::begin();
+                    $confirmRights = in_array((int)$p['id'], array_map('intval', (array)($_POST['ip_rights_confirmation'] ?? [])), true);
+                    $result = (new ProductSubmissionService())->submit((int)$p['id'], (int)$d['id'], (int)H::user()['id'], $confirmRights);
+                    if (!$result['ok']) { DB::rollBack(); DB::exec('update product_batch_items set validation_errors=? where batch_id=? and product_id=?', [json_encode([$result['error']]),(int)$id,$p['id']]); $invalid++; continue; }
+                    DB::exec('update product_batch_items set validation_errors=null,submitted_at=now() where batch_id=? and product_id=?', [(int)$id,$p['id']]); DB::commit();
+                    $submitted++; $published += (int)($result['status']==='approved'); $review += (int)($result['status']==='pending_review');
+                } catch (Throwable $e) { if (DB::pdo()->inTransaction()) DB::rollBack(); $invalid++; DB::exec('update product_batch_items set validation_errors=? where batch_id=? and product_id=?', [json_encode(['Product could not be submitted safely. Please try again.']),(int)$id,$p['id']]); }
+            }
+            H::flash($submitted ? 'success' : 'warning', "$submitted valid product(s) submitted: $published published and $review sent for IP review. $invalid product(s) remain drafts with errors.");
+        } else H::abort(400);
+        DB::exec('update product_batches set updated_at=now() where id=? and designer_id=?', [(int)$id,$d['id']]);
+        H::redirect('/seller/product-batch/' . (int)$id);
+    }
     public function editProduct($id = null)
     {
         $this->requireOnboardingComplete();
@@ -1236,22 +1832,11 @@ class SellerController
             H::redirect('/seller/product/'.$productId);
         }
 
-        $ipWorkflow = new ProductIpRiskWorkflow();
         try {
             DB::begin();
-            $ipRiskResult = $ipWorkflow->scanProduct($productId, (int)H::user()['id']);
-            if ($ipRiskResult['requires_confirmation']) {
-                if (empty($_POST['ip_rights_confirmation'])) {
-                    DB::rollBack();
-                    H::flash('error','Please confirm your legal right to sell this design before submitting a flagged product for review.');
-                    H::redirect('/seller/product/'.$productId);
-                }
-                $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
-            }
-
-            $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
-            $nextStatus = $requiresIpReview ? 'pending_review' : 'approved';
-            DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$nextStatus, $productId, $d['id']]);
+            $result = (new ProductSubmissionService())->submit($productId, (int)$d['id'], (int)H::user()['id'], !empty($_POST['ip_rights_confirmation']));
+            if (!$result['ok']) { DB::rollBack(); H::flash('error','Please confirm your legal right to sell this design before submitting a flagged product for review.'); H::redirect('/seller/product/'.$productId); }
+            $nextStatus = $result['status'];
             DB::commit();
         } catch (Throwable $e) {
             if (DB::pdo()->inTransaction()) {

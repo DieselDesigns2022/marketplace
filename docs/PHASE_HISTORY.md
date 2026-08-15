@@ -1074,3 +1074,11 @@ Phase 12 third correction separated backfill/daily operation and introduced dura
 ### Phase 12.1 — Digital Product License Expansion
 
 Phase 12.1 extended the Phase 8.5 data-driven license catalog with the normalized `digital-product` permission. Sellers can enable it per product and set a zero or paid add-on price; buyers can combine it with existing permissions. Existing server-authoritative cart/checkout validation and order-item snapshot fields preserve the purchased key, name, description, price, and full selected-license collection after later seller changes. Licensing Help explains that only a modified or incorporated completed digital design may be sold and that the original/source asset cannot be resold, redistributed, shared, given away, sublicensed, or exposed as an extractable file. Focused static and disposable-MariaDB tests cover availability, pricing, multiple permissions, invalid keys, disable-after-cart behavior, and historical snapshots.
+
+## Phase 12.2 — Bulk Product Upload & Batch Listing
+
+Phase 12.2 introduced a guided bulk-product creation workflow for approved sellers. The seller enters shared product information once, then chooses how many products are being created. The workflow opens Product 1 with that information already filled in, allows product-specific edits, and continues sequentially through each remaining product with the same starting information prefilled.
+
+Each completed product remains an independent normal product with its own title, slug, preview image, protected files, tags, licenses, status, validation state, and IP-risk state. Prefilling is only the starting point for the bulk workflow; changing one product does not create a continuing template relationship with the others.
+
+The workflow preserves the seller's configured license selections and applicable paid license prices. Saved bulk drafts can be reopened and edited. Bulk batches can also be deleted from the saved bulk-product list or individual batch page. Existing product submission, validation, IP-rights confirmation, moderation, and publishing behavior remains authoritative.

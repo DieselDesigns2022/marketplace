@@ -155,3 +155,13 @@ Automatic recognition transitions use an insert-only event ID rather than a fina
 ### Phase 12.1 license validation
 
 Digital Product License requests use `LicenseService::purchasableLicenses()` against the approved product's current enabled license rows. Client-posted prices are ignored: cart totals and checkout/order snapshots are rebuilt from server-side product license prices. Unknown or newly disabled keys invalidate the selection, while completed orders display immutable order-item snapshot fields. Existing seller product ownership, authentication, role, and CSRF boundaries are unchanged.
+
+## Phase 12.2 — Bulk Product Upload & Batch Listing
+
+All bulk-product routes require an approved seller with completed onboarding. Batch access remains constrained to the authenticated seller's designer ownership. Another seller cannot view, edit, continue, submit, or delete a batch they do not own. POST mutations remain protected by the application's CSRF verification.
+
+Shared starting information is used only to prefill products in the guided workflow. Each resulting product remains independently owned and validated through the existing product rules. Client-submitted ownership, status, pricing, license state, and IP-risk state are not trusted over authoritative server-side data.
+
+Bulk-batch deletion remains seller-scoped and must preserve existing permanent-product deletion protections. Draft products may be removed as part of deleting a batch when safe; submitted, approved, published, or historically retained products must not bypass existing order/history protections.
+
+Normal product validation and IP-risk rules remain authoritative. Bulk creation does not bypass required product data, protected-file/manual-delivery rules, license validation, IP-rights confirmation, moderation, or normal submission behavior.
