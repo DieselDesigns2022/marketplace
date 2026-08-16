@@ -83,10 +83,16 @@ final class WaitlistController
             $valid=(bool)DB::row("select $column from $table where $column=? and unsubscribe_nonce=?",[$identity['id'],$identity['nonce']]);
         }
         if($_SERVER['REQUEST_METHOD']==='POST'&&$valid){
+            H::verifyCsrf();
             if($identity['kind']==='w')DB::exec('update waitlist_entries set status=if(status="suppressed",status,"unsubscribed"),unsubscribed_at=if(status="suppressed",unsubscribed_at,coalesce(unsubscribed_at,now())) where id=? and unsubscribe_nonce=?',[$identity['id'],$identity['nonce']]);
-            else DB::exec('update email_preferences set marketing_opt_in=0,marketing_opted_out_at=coalesce(marketing_opted_out_at,now()) where user_id=? and unsubscribe_nonce=?',[$identity['id'],$identity['nonce']]);
+            else {
+                $column=['uw'=>'weekly_emails','um'=>'monthly_emails','uf'=>'favorite_shop_emails'][$identity['kind']]??null;
+                if($column)DB::exec("update email_preferences set preference_changed_at=if($column=1,now(),preference_changed_at),$column=0,marketing_opt_in=(weekly_emails or monthly_emails or favorite_shop_emails),marketing_opted_out_at=if((weekly_emails or monthly_emails or favorite_shop_emails)=0,coalesce(marketing_opted_out_at,now()),null) where user_id=? and unsubscribe_nonce=?",[$identity['id'],$identity['nonce']]);
+                else DB::exec('update email_preferences set preference_changed_at=if(weekly_emails=1 or monthly_emails=1 or favorite_shop_emails=1,now(),preference_changed_at),marketing_opt_in=0,weekly_emails=0,monthly_emails=0,favorite_shop_emails=0,marketing_opted_out_at=coalesce(marketing_opted_out_at,now()) where user_id=? and unsubscribe_nonce=?',[$identity['id'],$identity['nonce']]);
+            }
             $complete=true;
         }
-        H::view('public/email_unsubscribe',['token'=>$valid?$token:'','valid'=>$valid,'complete'=>$complete]);
+        $category=$identity?(['uw'=>'weekly emails','um'=>'monthly emails','uf'=>'favorite-shop emails','u'=>'optional marketing emails','w'=>'waitlist emails'][$identity['kind']]??'optional emails'):'';
+        H::view('public/email_unsubscribe',['token'=>$valid?$token:'','valid'=>$valid,'complete'=>$complete,'category'=>$category]);
     }
 }

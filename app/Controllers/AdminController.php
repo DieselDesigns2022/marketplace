@@ -136,7 +136,11 @@ class AdminController
             (select coalesce(round(sum(total),2),0) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_gross_sales,
             (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") asset_moth_commission,
             (select coalesce(round(sum(seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where o.stripe_checkout_session_id like "cs_live_%" and sp.payout_status not in ("transfer_failed","reversed")) seller_payouts,
-            (select count(*) from waitlist_entries) waitlist_total');
+            (select count(*) from waitlist_entries) waitlist_total,
+            (select count(*) from email_preferences where weekly_emails=1) weekly_email_subscribers,
+            (select count(*) from email_preferences where monthly_emails=1) monthly_email_subscribers,
+            (select count(*) from email_preferences where favorite_shop_emails=1) favorite_shop_email_subscribers,
+            (select count(*) from email_preferences where weekly_emails=1 or monthly_emails=1 or favorite_shop_emails=1) any_marketing_subscribers');
         $waitlist=DB::row('select count(*) total,sum(created_at>=date_sub(now(),interval 7 day)) recent,sum(interest_type in ("buyer","both")) buyer_interest,sum(interest_type in ("seller","both")) seller_interest,sum(confirmation_sent_at is not null) confirmed,sum(invited_at is not null) invited,sum(status="subscribed" and invited_at is null) awaiting_invitation from waitlist_entries');
         H::view('admin/home',['s'=>$stats,'waitlist'=>$waitlist,'recentActivity'=>DB::rows('select * from admin_logs order by created_at desc,id desc limit 8'),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc,id desc limit 8',[$adminId]),'unreadCount'=>(int)(DB::row('select count(*) c from notifications where user_id=? and read_at is null',[$adminId])['c']??0)]);
 

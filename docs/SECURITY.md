@@ -165,3 +165,8 @@ Shared starting information is used only to prefill products in the guided workf
 Bulk-batch deletion remains seller-scoped and must preserve existing permanent-product deletion protections. Draft products may be removed as part of deleting a batch when safe; submitted, approved, published, or historically retained products must not bypass existing order/history protections.
 
 Normal product validation and IP-risk rules remain authoritative. Bulk creation does not bypass required product data, protected-file/manual-delivery rules, license validation, IP-rights confirmation, moderation, or normal submission behavior.
+# Phase 12.3 marketing-email boundaries
+
+Digest producers query active users and saved category consent before queueing; the worker rechecks that same category immediately before delivery. Signed category unsubscribe tokens remain bound to the private per-user nonce and application HMAC secret, are idempotent, and cannot change transactional delivery. Followed-shop eligibility is computed internally from `follows`; no seller route, view, export, or campaign tool receives buyer addresses. Admin visibility is aggregate-only.
+
+Registered-user marketing worker checks include current user existence and active status. Favorite-shop delivery additionally intersects queued product/designer IDs with current follows and currently available products/shops, preventing an unfollowed shop from authorizing later delivery. POST unsubscribe confirmation is CSRF-verified in the controller in addition to the router's application-wide POST check.

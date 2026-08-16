@@ -175,3 +175,11 @@ The monthly period is a closed UTC calendar month. Omitting `YYYY-MM` selects th
 Recognition timestamps and the daily job use UTC. Verify the six guarded Phase 12 foreign keys after migration. Founder `restore` removes forced inactivity and immediately applies automatic eligibility; only `force_active` bypasses the 60-day rule.
 
 `--apply` is the silent initial historical write; `--daily` is the recurring UTC mode that communicates real transitions. Paid/refund trigger keys permit replay recovery without duplicate messages only while current semantic state matches and the event-linked rank/badge history remains latest; later automatic or administrative history permanently suppresses stale recovery.
+# Phase 12.3 scheduled email producers
+
+Before running either weekly or monthly producer, apply both Phase 12.3 migrations in this order:
+
+1. `database/migrations/2026_08_15_phase_12_3_email_preferences_digests.sql`
+2. `database/migrations/2026_08_16_phase_12_3_digest_content_claims.sql`
+
+Schedule `php scripts/queue_weekly_emails.php` once weekly and `php scripts/queue_monthly_emails.php` once monthly in UTC. Both producers add durable, deduplicated messages only; the existing `php scripts/process_email_queue.php` worker remains responsible for delivery and retries. The weekly producer queues favorite-shop messages before the general weekly marketplace digest. Durable per-user/product claims enforce favorite-shop → weekly → monthly precedence across overlapping periods rather than permanent lifetime suppression, and stable queue keys continue protecting exact cron reruns.
