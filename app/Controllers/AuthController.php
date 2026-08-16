@@ -5,6 +5,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\ReferralService;
 use App\Services\EmailPreferenceService;
+use App\Services\AccountSecurityService;
 
 class AuthController
 {
@@ -72,7 +73,8 @@ class AuthController
     {
         $error = null;
         if ($_POST) {
-            $u = DB::row('select * from users where email=? and status="active"', [$_POST['email']]);
+            $email = AccountSecurityService::normalizeEmail((string)($_POST['email'] ?? ''));
+            $u = DB::row('select * from users where email=? and status="active"', [$email]);
             if ($u && password_verify($_POST['password'], $u['password_hash'])) {
                 $_SESSION['user'] = ['id'=>$u['id'], 'name'=>$u['name'], 'email'=>$u['email'], 'role'=>$u['role']];
                 H::redirect($this->afterLoginRedirect());
@@ -121,19 +123,64 @@ class AuthController
     {
         H::requireLogin();
         $userId=(int)H::user()['id'];
+        $account=AccountSecurityService::userWithPassword($userId);
+        if(!$account){H::abort(403);}
         $preferences=EmailPreferenceService::ensure($userId);
         if ($_POST) {
             H::verifyCsrf();
-            $name=trim((string)($_POST['name']??''));
-            if($name===''||mb_strlen($name)>120){H::flash('error','Enter a name between 1 and 120 characters.');}
-            else{
-                DB::begin();
-                try{DB::exec('update users set name=?, updated_at=now() where id=?',[$name,$userId]);EmailPreferenceService::save($userId,['weekly'=>isset($_POST['weekly_emails']),'monthly'=>isset($_POST['monthly_emails']),'favorite_shop'=>isset($_POST['favorite_shop_emails'])]);DB::commit();$_SESSION['user']['name']=$name;H::flash('success','Account and email preferences saved.');H::redirect('/account#email-preferences');}
-                catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error','Account settings could not be saved. Please try again.');}
-            }
+            $action=(string)($_POST['action']??'');
+            if($action==='profile'){$this->updateProfile($userId);}
+            elseif($action==='email'){$this->updateEmail($account);}
+            elseif($action==='password'){$this->updatePassword($account);}
+            elseif($action==='preferences'){$this->updatePreferences($userId);}
+            else{H::flash('error','Invalid account settings request.');}
+            $account=AccountSecurityService::userWithPassword($userId);
             $preferences=EmailPreferenceService::ensure($userId);
         }
 
-        H::view('auth/account',compact('preferences'));
+        H::view('auth/account',compact('preferences','account'));
+    }
+
+    private function updateProfile(int $userId): void
+    {
+        $name=trim((string)($_POST['name']??''));
+        if($name===''||mb_strlen($name)>120){H::flash('error','Enter a name between 1 and 120 characters.');return;}
+        DB::exec('update users set name=?, updated_at=now() where id=?',[$name,$userId]);
+        $_SESSION['user']['name']=$name;
+        H::flash('success','Name updated.');
+        H::redirect('/account#profile');
+    }
+
+    private function updateEmail(array $account): void
+    {
+        $email=AccountSecurityService::normalizeEmail((string)($_POST['email']??''));
+        $password=(string)($_POST['current_password']??'');
+        if(!password_verify($password,(string)$account['password_hash'])){H::flash('error','Email address could not be changed. Check your current password and try again.');return;}
+        if(!AccountSecurityService::validEmail($email)){H::flash('error','Enter a valid email address.');return;}
+        $other=DB::row('select id from users where email=? and id<>? limit 1',[$email,(int)$account['id']]);
+        if($other){H::flash('error','That email address cannot be used.');return;}
+        try{DB::exec('update users set email=?, updated_at=now() where id=?',[$email,(int)$account['id']]);}
+        catch(\Throwable $e){H::flash('error','That email address cannot be used.');return;}
+        $_SESSION['user']['email']=$email;
+        H::flash('success','Email address updated.');
+        H::redirect('/account#email-address');
+    }
+
+    private function updatePassword(array $account): void
+    {
+        $current=(string)($_POST['current_password']??'');$new=(string)($_POST['new_password']??'');$confirm=(string)($_POST['confirm_password']??'');
+        if(!password_verify($current,(string)$account['password_hash'])){H::flash('error','Password could not be changed. Check your current password and try again.');return;}
+        if($new!==$confirm){H::flash('error','New password and confirmation must match.');return;}
+        if(!AccountSecurityService::validPassword($new)){H::flash('error','New password must be at least 8 characters.');return;}
+        DB::exec('update users set password_hash=?, updated_at=now() where id=?',[password_hash($new,PASSWORD_DEFAULT),(int)$account['id']]);
+        H::flash('success','Password updated.');
+        H::redirect('/account#change-password');
+    }
+
+    private function updatePreferences(int $userId): void
+    {
+        EmailPreferenceService::save($userId,['weekly'=>isset($_POST['weekly_emails']),'monthly'=>isset($_POST['monthly_emails']),'favorite_shop'=>isset($_POST['favorite_shop_emails'])]);
+        H::flash('success','Email preferences saved.');
+        H::redirect('/account#email-preferences');
     }
 }
