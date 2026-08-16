@@ -232,6 +232,23 @@ Keep `MAIL_TRANSPORT=log` locally. Apply `database/migrations/2026_07_20_phase_1
 
 Generate `EMAIL_UNSUBSCRIBE_SECRET` as an environment-only random value of at least 32 bytes before queueing waitlist or marketing mail. Do not rotate it without an unsubscribe-link migration plan. Campaign and launch-invite messages include HMAC-signed unsubscribe URLs. Complete unsubscribe tokens, recipient addresses, and signing secrets are not written to delivery logs.
 
+## Phase 12.3 email development setup
+
+After the Phase 10.5 email foundation, apply both Phase 12.3 migrations in this order:
+
+1. `database/migrations/2026_08_15_phase_12_3_email_preferences_digests.sql`
+2. `database/migrations/2026_08_16_phase_12_3_digest_content_claims.sql`
+
+Queue and process scheduled email work from the repository root:
+
+```bash
+php scripts/queue_weekly_emails.php
+php scripts/queue_monthly_emails.php
+php scripts/process_email_queue.php 50
+```
+
+The weekly producer queues favorite-shop work before the weekly marketplace digest. Both producers add durable queue messages only; the existing queue worker performs delivery and retries. `MAIL_TRANSPORT=log` remains the only implemented mail transport.
+
 
 
 ## Phase 10.6 development notes

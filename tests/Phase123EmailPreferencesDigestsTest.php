@@ -1,0 +1,18 @@
+<?php
+require dirname(__DIR__).'/app/bootstrap.php';
+use App\Services\EmailDigestService;
+use App\Services\EmailPreferenceService;
+use App\Services\UnsubscribeService;
+$_ENV['APP_URL']='https://assetmoth.example';
+$_ENV['EMAIL_UNSUBSCRIBE_SECRET']=str_repeat('phase-12.3-test-secret-',2);
+$passed=0;$failed=[];$test=function(string $name,callable $fn)use(&$passed,&$failed){try{$fn();$passed++;}catch(Throwable $e){$failed[]="$name: {$e->getMessage()}";}};
+$eq=function($actual,$expected){if($actual!==$expected)throw new RuntimeException('expected '.var_export($expected,true).', got '.var_export($actual,true));};
+$yes=function($value){if(!$value)throw new RuntimeException('assertion failed');};
+$test('independent preference mapping',function()use($eq,$yes){$eq(EmailPreferenceService::column('weekly'),'weekly_emails');$eq(EmailPreferenceService::column('monthly'),'monthly_emails');$eq(EmailPreferenceService::column('favorite_shop'),'favorite_shop_emails');$eq(EmailPreferenceService::column('unknown'),null);$row=['weekly_emails'=>1,'monthly_emails'=>0,'favorite_shop_emails'=>1];$yes(EmailPreferenceService::enabled($row,'weekly'));$yes(!EmailPreferenceService::enabled($row,'monthly'));$yes(EmailPreferenceService::enabled($row,'favorite_shop'));});
+$test('stable digest periods',function()use($eq){$eq(EmailDigestService::period('weekly','2026-08-15'),['2026-08-08','2026-08-15']);$eq(EmailDigestService::period('monthly','2026-08-15'),['2026-07-01','2026-08-01']);$threw=false;try{EmailDigestService::period('weekly','08/15/2026');}catch(InvalidArgumentException $e){$threw=true;}$eq($threw,true);});
+$test('category-scoped signed links',function()use($eq){$nonce=str_repeat('c',64);foreach(['uw','um','uf'] as $kind){$token=UnsubscribeService::issue($kind,9,$nonce);$eq(UnsubscribeService::verify($token),['kind'=>$kind,'id'=>9,'nonce'=>$nonce]);$eq(UnsubscribeService::verify($token.'x'),null);}});
+$test('migration preserves legacy consent rule',function()use($yes){$sql=file_get_contents(app_path('database/migrations/2026_08_15_phase_12_3_email_preferences_digests.sql'));$yes(str_contains($sql,'weekly_emails=IF(marketing_opt_in=1,1,0)'));$yes(str_contains($sql,'monthly_emails=IF(marketing_opt_in=1,1,0)'));$yes(str_contains($sql,'favorite_shop_emails=IF(marketing_opt_in=1,1,0)'));});
+$test('digest templates include preference controls and escape data',function()use($yes){$data=['name'=>'<Buyer>','frequency'=>'weekly','products'=>[['title'=>'<script>x</script>','slug'=>'safe','display_name'=>'Shop','price'=>'4.00']],'manage_preferences_url'=>'https://assetmoth.example/account#email-preferences','unsubscribe_url'=>'https://assetmoth.example/email/unsubscribe?token=signed'];ob_start();require app_path('app/Views/emails/marketplace_digest.php');$html=ob_get_clean();$yes(!str_contains($html,'<script>'));$yes(str_contains($html,'Manage Email Preferences'));$yes(str_contains($html,'Unsubscribe from weekly emails'));});
+$test('favorite content uses follows without seller email exposure',function()use($yes){$source=file_get_contents(app_path('app/Services/EmailDigestService.php'));$yes(str_contains($source,'join follows f on f.user_id=u.id'));$yes(str_contains($source,'where f.user_id=?'));$yes(!preg_match('/select[^;]+seller[^;]+email/is',$source));});
+$test('transactional queue remains category independent',function()use($yes){$source=file_get_contents(app_path('app/Services/EmailQueueService.php'));$yes(str_contains($source,"if(\$classification==='marketing')"));$yes(str_contains($source,"self::queue('transactional',\$o['email']"));});
+if($failed){fwrite(STDERR,implode("\n",$failed)."\n");exit(1);}fwrite(STDOUT,"Phase 12.3 behavioral checks passed ($passed tests).\n");

@@ -1082,3 +1082,6 @@ Phase 12.2 introduced a guided bulk-product creation workflow for approved selle
 Each completed product remains an independent normal product with its own title, slug, preview image, protected files, tags, licenses, status, validation state, and IP-risk state. Prefilling is only the starting point for the bulk workflow; changing one product does not create a continuing template relationship with the others.
 
 The workflow preserves the seller's configured license selections and applicable paid license prices. Saved bulk drafts can be reopened and edited. Bulk batches can also be deleted from the saved bulk-product list or individual batch page. Existing product submission, validation, IP-rights confirmation, moderation, and publishing behavior remains authoritative.
+# Phase 12.3 — Email Preferences, Digests & Favorite-Shop Emails
+
+Extended the Phase 10.5 durable email foundation with independent weekly, monthly, and favorite-shop consent, scheduled marketplace-backed producers, preference-scoped signed unsubscribe handling, and privacy-preserving aggregate admin visibility.

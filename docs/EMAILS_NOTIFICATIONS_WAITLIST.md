@@ -71,3 +71,25 @@ Refund downgrades, automatic Founder inactivity, rank-override removal, and forc
 Recognition notification titles are event-specific: `Creator rank earned`, `Creator rank updated`, `Founder recognition earned`, `Founder badge restored`, `Founder badge inactive`, or `Founder status updated`. Admin communication keys use the committed `admin_logs.id`, so a genuine later state cycle gets a new identity while an administrative no-op queues no administrative communication. If its authoritative Founder refresh discovers a real automatic rank or active-state transition, that separate automatic event follows the corresponding promotion/downgrade/reactivation/inactivity rule.
 
 Administrative rank changes are neutral `Creator rank updated` events: only an upward displayed-rank assignment queues `creator_rank` email; lowering, locking the same effective rank, and override removal are notification-only. Automatic paid/refund events use `recognition-event:{id}` identities and stable trigger keys so failed communication can be recovered on webhook replay only before any later semantic rank/badge history supersedes that event.
+# Phase 12.3 email preferences and scheduled digests
+
+Registered users have independent `weekly_emails`, `monthly_emails`, and `favorite_shop_emails` choices in `email_preferences`. Account saves update all three explicit checkbox values and `preference_changed_at`; required transactional messages never consult these fields. The Phase 12.3 migration copies an existing enabled `marketing_opt_in` value to all three choices and copies an opted-out value to none.
+
+`EmailDigestService` selects only active users and real products belonging to approved shops with an `approved` or `published` status. Favorite-shop selection additionally joins the current `follows` relationship. It groups a user's followed-shop products into one message for each weekly period, so sellers never receive subscriber addresses and overlapping followed shops do not create repeated messages.
+
+Run scheduled queue producers from the repository root (UTC period boundaries):
+
+```bash
+# Weekly; also queues eligible favorite-shop updates.
+php scripts/queue_weekly_emails.php
+# Monthly.
+php scripts/queue_monthly_emails.php
+```
+
+An optional `YYYY-MM-DD` period-end argument supports deterministic operational replay. Stable queue deduplication keys make repeats safe. Continue running `php scripts/process_email_queue.php`; producers never deliver directly.
+
+Each category message carries a signed, nonce-bound category token (`uw`, `um`, or `uf`) and a Manage Email Preferences link. Category unsubscribe turns off only that field. Legacy registered-user `u` links retain their general opt-out behavior. Tokens do not authorize transactional-email changes.
+
+Immediately before registered-user marketing delivery, the queue worker rechecks that the user still exists, remains active, and retains the queued message's specific preference. For favorite-shop messages it also revalidates authoritative product and designer IDs against current product/shop availability and the recipient's current `follows` rows. Ineligible queued content is removed, and a message with no eligible followed-shop content is cancelled. Transactional delivery does not use these marketing checks.
+
+Phase 12.3 digest content has deterministic per-recipient precedence: favorite-shop, then weekly, then monthly. `email_digest_content_claims` records the authoritative user/product IDs, covered period, category, and queued message. Overlapping lower-priority producers omit an existing claim; a higher-priority producer can reassign content while the lower-priority message is still pending. Once delivery is processing or sent, its claim wins because an earlier delivery cannot be undone. This prevents repeated products across overlapping preference categories without permanently suppressing them from genuinely later, non-overlapping digest periods. Existing message deduplication keys and database transactions protect producer and worker replay. The weekly command queues favorite-shop work first for operational clarity, but pending-message precedence also makes reverse invocation order safe.

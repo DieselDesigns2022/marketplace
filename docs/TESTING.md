@@ -424,3 +424,12 @@ Required live checks:
 `php tests/Phase122BulkProductBatchTest.php` remains a source-contract test and must not be represented as full behavioral live coverage.
 
 `PHASE122_ALLOW_FIXTURE=1 php tests/Phase122DatabaseIntegrationTest.php` remains the disposable-database integration suite where supported. Exit 77 means SKIP/unexecuted, not PASS. Final approval additionally requires successful live testing of the current guided workflow.
+# Phase 12.3
+
+Run `php tests/Phase123EmailPreferencesDigestsTest.php` for preference mapping, deterministic periods, scoped signed tokens, migration policy, template safety, follows eligibility/privacy, and transactional separation. With a disposable migrated MariaDB server, run `PHASE123_RUN_DATABASE_TESTS=1 PHASE123_ALLOW_FIXTURE=1 php tests/Phase123DatabaseIntegrationTest.php` for the service/database scenarios below.
+
+The destructive fixture is doubly opt-in: set both `PHASE123_RUN_DATABASE_TESTS=1` and `PHASE123_ALLOW_FIXTURE=1`. It creates and drops a randomly named isolated database and exercises the real Phase 12.3 migration, preference service, scoped unsubscribe controller, digest producers, queue deduplication, current follow/user-status suppression, safe log worker, and transactional separation. Without both flags it exits safely without changing a database.
+
+The fixture also exercises cross-preference product assignment with weekly plus favorite-shop, overlapping weekly plus monthly, all three preferences, repeated producers, a distinct second product, and a monthly-only recipient. Assertions inspect actual sent queue payloads after the safe log worker runs, rather than treating source text as delivery behavior.
+
+The enabled command `PHASE123_RUN_DATABASE_TESTS=1 PHASE123_ALLOW_FIXTURE=1 php tests/Phase123DatabaseIntegrationTest.php` exists but has not been successfully executed in the current Codex environment because disposable MariaDB was unavailable. A safe `SKIP` is not a passing integration result; the enabled disposable MariaDB suite must pass before release approval. Phase 12.3 also requires live testing before it is considered fully released, covering `/account` save/reload and independent preference combinations, scoped unsubscribe links, weekly and monthly producers, favorite-shop producer behavior, queue-worker processing and retries, follow/unfollow and current-user-status suppression, cross-preference product deduplication, aggregate admin counts, safe log delivery, and transactional-email regression.

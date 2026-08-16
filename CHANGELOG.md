@@ -315,3 +315,7 @@ Intentionally postponed:
 - Seller license selections and applicable paid license prices carry into the guided workflow.
 - Saved bulk drafts can be reopened and edited. Bulk batches can also be deleted from both the saved bulk-product list and the individual batch page.
 - Completed products remain ordinary independent marketplace products and continue through the existing validation, IP-risk, submission, moderation, and publishing behavior.
+# Phase 12.3 — Email Preferences, Digests & Favorite-Shop Emails
+
+- Added three independent registered-user marketing preferences with legacy-consent migration, account controls, scoped unsubscribe, and aggregate admin counts.
+- Added durable weekly, monthly, and followed-shop digest producers using real eligible marketplace products, current follows, delivery-time consent checks, and stable deduplication.

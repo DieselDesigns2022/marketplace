@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\ReferralService;
+use App\Services\EmailPreferenceService;
 
 class AuthController
 {
@@ -119,11 +120,20 @@ class AuthController
     public function account()
     {
         H::requireLogin();
+        $userId=(int)H::user()['id'];
+        $preferences=EmailPreferenceService::ensure($userId);
         if ($_POST) {
-            DB::exec('update users set name=?, updated_at=now() where id=?', [$_POST['name'], H::user()['id']]);
-            $_SESSION['user']['name'] = $_POST['name'];
+            H::verifyCsrf();
+            $name=trim((string)($_POST['name']??''));
+            if($name===''||mb_strlen($name)>120){H::flash('error','Enter a name between 1 and 120 characters.');}
+            else{
+                DB::begin();
+                try{DB::exec('update users set name=?, updated_at=now() where id=?',[$name,$userId]);EmailPreferenceService::save($userId,['weekly'=>isset($_POST['weekly_emails']),'monthly'=>isset($_POST['monthly_emails']),'favorite_shop'=>isset($_POST['favorite_shop_emails'])]);DB::commit();$_SESSION['user']['name']=$name;H::flash('success','Account and email preferences saved.');H::redirect('/account#email-preferences');}
+                catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error','Account settings could not be saved. Please try again.');}
+            }
+            $preferences=EmailPreferenceService::ensure($userId);
         }
 
-        H::view('auth/account');
+        H::view('auth/account',compact('preferences'));
     }
 }

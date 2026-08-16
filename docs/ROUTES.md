@@ -274,3 +274,7 @@ Founder `restore` and `automatic` both return the badge to the current UTC autom
 - `POST /seller/product-batch/{id}` — perform supported batch mutations, including product submission actions and bulk-batch deletion.
 
 All seller bulk routes remain ownership-scoped and retain the existing onboarding, CSRF, product validation, IP-risk, submission, moderation, and publishing protections.
+# Phase 12.3 email preference behavior
+
+- `GET|POST /account` displays and saves the authenticated user's name and three independent email preferences with CSRF protection.
+- `GET|POST /email/unsubscribe?token=...` verifies the existing HMAC/nonce identity and applies the category encoded by a Phase 12.3 link. Weekly, monthly, and favorite-shop links do not change one another or transactional delivery.
