@@ -247,7 +247,7 @@ php scripts/queue_monthly_emails.php
 php scripts/process_email_queue.php 50
 ```
 
-The weekly producer queues favorite-shop work before the weekly marketplace digest. Both producers add durable queue messages only; the existing queue worker performs delivery and retries. `MAIL_TRANSPORT=log` remains the only implemented mail transport.
+The weekly producer queues favorite-shop work before the weekly marketplace digest. Both producers add durable queue messages only; the existing queue worker performs delivery and retries. Keep `MAIL_TRANSPORT=log` for development; production can select `MAIL_TRANSPORT=resend` with the configured Resend API key and sender.
 
 
 

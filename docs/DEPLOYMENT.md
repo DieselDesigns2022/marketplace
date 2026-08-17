@@ -106,7 +106,7 @@ Rollback order is: `product_ip_risk_review_history`, `product_ip_rights_confirma
 
 ## Phase 10.5 deployment
 1. Back up, then apply `database/migrations/2026_07_20_phase_10_5_emails_notifications_waitlist.sql` after Phase 10.4.
-2. Set `MAIL_TRANSPORT=log`, `MAIL_QUEUE_BATCH_SIZE`, and a randomly generated `EMAIL_UNSUBSCRIBE_SECRET` of at least 32 bytes before waitlist or marketing delivery. `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME` are reserved for a future production provider and are not consumed by the current log transport. Verify that `APP_URL` is the final HTTPS application origin before queueing mail because unsubscribe URLs, email links, and absolute CTA-origin validation derive from it.
+2. Set `MAIL_TRANSPORT=log` for local logging or `MAIL_TRANSPORT=resend` for production delivery, along with `MAIL_QUEUE_BATCH_SIZE` and a randomly generated `EMAIL_UNSUBSCRIBE_SECRET` of at least 32 bytes before waitlist or marketing delivery. Resend delivery requires `RESEND_API_KEY` plus a verified `MAIL_FROM_ADDRESS`; `MAIL_FROM_NAME` controls the display name. Verify that `APP_URL` is the final HTTPS application origin before queueing mail because unsubscribe URLs, email links, and absolute CTA-origin validation derive from it.
 3. Grant the PHP/cron user write access to `storage/logs` without making it web-accessible.
 4. Schedule `php /path/to/marketplace/scripts/process_email_queue.php 50` every minute and alert on a nonzero exit.
 5. Before enabling a real transport, test provider authentication, sender verification, bounce/suppression handling, unsubscribe links, concurrency, and secret-redacted logging.
@@ -118,7 +118,7 @@ The protected log transport repairs an incomplete trailing fragment automaticall
 ### Phase 10.5 deployment safety
 The Phase 10.5 migration is **not idempotent**. Back up the database and inspect migration state before applying it; never run it twice blindly. Apply the migration before activating application code that queries the new tables. In particular, the shared authenticated layout queries `notifications`, so code-first deployment can break authenticated page rendering. Use maintenance mode or the project’s schema-first safe deployment order when an atomic release is unavailable.
 
-Configure `EMAIL_UNSUBSCRIBE_SECRET` before accepting waitlist signups, administrator test sends, or marketing queue work. Rotating this secret invalidates outstanding unsubscribe links unless a planned dual-key/migration strategy is used. `MAIL_TRANSPORT=log` is the only implemented transport; no production provider is included.
+Configure `EMAIL_UNSUBSCRIBE_SECRET` before accepting waitlist signups, administrator test sends, or marketing queue work. Rotating this secret invalidates outstanding unsubscribe links unless a planned dual-key/migration strategy is used. Keep `MAIL_TRANSPORT=log` for non-delivering environments; use `MAIL_TRANSPORT=resend` only after configuring the Resend key and verified sender.
 
 
 
