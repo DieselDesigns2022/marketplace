@@ -344,7 +344,7 @@ Verify active repeat signup, transactional signup/confirmation rollback, intenti
 
 Step 8 staging must also verify: a receipt insert followed by a failed download insert is healed on replay; an existing buyer notification with a missing seller notification is healed without duplicates; replay does not repeat coupon usage, earnings, payout ledgers, transfers, unlock, or transaction logging; manual-review orders receive no paid communication; complete communication sets remain unchanged; and identical/smaller/out-of-order refunds do not communicate while increased partial and partial-to-full transitions do. These database-backed cases are not passed by the lightweight suite or connectivity gate.
 
-Production-provider authentication, sender verification, bounce handling, and live delivery remain future work because only `MAIL_TRANSPORT=log` is implemented.
+Resend request construction, acceptance validation, configuration failure, and secret-safe errors are covered by `php tests/ResendEmailTransportTest.php`. Sender verification, bounce handling, and live delivery still require production-provider testing.
 
 The database-independent suite also covers backslash/browser-normalization URL attacks, same-host unapproved ports, URL userinfo, deterministic verified-payload fingerprints, normalized event types, allowlisted failure categories, controlled non-sensitive webhook-alert copy, and idempotent structured log append by message ID. Database persistence after physical delivery and verified webhook notification insertion remain part of the unexecuted staging matrix when no disposable MariaDB environment is configured.
 

@@ -103,6 +103,7 @@ final class EmailQueueService
     {
         $data=json_decode($m['template_data'],true,512,JSON_THROW_ON_ERROR); $template=preg_replace('/[^a-z0-9_]/','',$m['template']);
         $body=self::render($template,$data); $transport=$_ENV['MAIL_TRANSPORT']??'log';
+        if($transport==='resend'){ResendEmailTransport::send($m['recipient_email'],$m['subject'],$body);return;}
         if($transport!=='log') throw new \RuntimeException('Configured mail transport is unavailable');
         $dir=app_path('storage/logs'); if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))throw new \RuntimeException('Mail log directory is not writable');
         self::appendLogOnce($dir.'/mail.log',['timestamp'=>gmdate('c'),'message_id'=>(int)$m['id'],'template'=>$template,'recipient_hash'=>hash('sha256',strtolower($m['recipient_email'])),'subject'=>$m['subject'],'body_bytes'=>strlen($body)]);
