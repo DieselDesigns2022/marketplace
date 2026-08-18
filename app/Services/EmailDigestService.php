@@ -36,7 +36,7 @@ final class EmailDigestService
         $users=DB::rows('select distinct u.id,u.email,u.name from users u join email_preferences ep on ep.user_id=u.id join follows f on f.user_id=u.id join designers d on d.id=f.designer_id and d.status="approved" join products p on p.designer_id=d.id and p.status in ("approved","published") and p.created_at>=? and p.created_at<? where u.status="active" and ep.favorite_shop_emails=1',[$start,$end]);
         $count=0;
         foreach($users as $user){
-            $products=DB::rows('select distinct p.id,p.title,p.slug,p.price,d.id designer_id,d.display_name,d.store_slug from follows f join designers d on d.id=f.designer_id and d.status="approved" join products p on p.designer_id=d.id and p.status in ("approved","published") and p.created_at>=? and p.created_at<? where f.user_id=? order by p.created_at desc,p.id desc limit 24',[$start,$end,$user['id']]);
+            $products=DB::rows('select distinct p.id,p.title,p.slug,p.price,d.id designer_id,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from follows f join designers d on d.id=f.designer_id and d.status="approved" join products p on p.designer_id=d.id and p.status in ("approved","published") and p.created_at>=? and p.created_at<? where f.user_id=? order by p.created_at desc,p.id desc limit 24',[$start,$end,$user['id']]);
             if(!$products)continue;
             $data=['user_id'=>(int)$user['id'],'name'=>$user['name'],'period_start'=>$start,'period_end'=>$end,'marketing_preference'=>'favorite_shop','manage_preferences_url'=>self::manageUrl()];
             if(EmailDigestClaimService::queue('favorite_shop',$user,$products,$start,$end,'New from shops you follow on Asset Moth','favorite_shop_digest',$data,"favorite-shops:$start:{$user['id']}"))$count++;
@@ -46,7 +46,7 @@ final class EmailDigestService
 
     private static function products(string $start,string $end): array
     {
-        return DB::rows('select p.id,p.designer_id,p.title,p.slug,p.price,d.display_name,d.store_slug from products p join designers d on d.id=p.designer_id where p.status in ("approved","published") and d.status="approved" and p.created_at>=? and p.created_at<? order by p.created_at desc,p.id desc limit 24',[$start,$end]);
+        return DB::rows('select p.id,p.designer_id,p.title,p.slug,p.price,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id where p.status in ("approved","published") and d.status="approved" and p.created_at>=? and p.created_at<? order by p.created_at desc,p.id desc limit 24',[$start,$end]);
     }
     private static function manageUrl(): string{return \App\Core\Helpers::baseUrl().'/account#email-preferences';}
 }
