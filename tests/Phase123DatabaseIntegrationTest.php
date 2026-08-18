@@ -20,6 +20,18 @@ try{
 create table email_preferences(user_id bigint primary key,marketing_opt_in boolean not null default 0,marketing_opted_in_at timestamp null,marketing_opted_out_at timestamp null,unsubscribe_nonce char(64) not null,created_at timestamp default current_timestamp,updated_at timestamp default current_timestamp on update current_timestamp,unique key uq_email_preferences_nonce(unsubscribe_nonce));
 create table designers(id bigint primary key auto_increment,user_id bigint not null,display_name varchar(120),store_slug varchar(140),status enum('approved','disabled','inactive','deleted') default 'approved');
 create table products(id bigint primary key auto_increment,designer_id bigint not null,title varchar(190),slug varchar(210),price decimal(10,2),status enum('draft','approved','published','disabled') default 'draft',created_at timestamp default current_timestamp,updated_at timestamp default current_timestamp on update current_timestamp);
+create table product_images(
+id bigint primary key auto_increment,
+product_id bigint not null,
+image_path varchar(255),
+original_image_path varchar(255),
+watermark_status varchar(40),
+watermark_error varchar(255),
+alt_text varchar(255),
+sort_order int default 0,
+created_at timestamp default current_timestamp,
+updated_at timestamp default current_timestamp on update current_timestamp
+);
 create table follows(id bigint primary key auto_increment,user_id bigint not null,designer_id bigint not null,created_at timestamp default current_timestamp,unique key uq_follow(user_id,designer_id));
 create table email_messages(id bigint primary key auto_increment,classification enum('transactional','marketing') not null,recipient_email varchar(190),recipient_name varchar(120),subject varchar(190),template varchar(80),template_data json,campaign_id bigint null,campaign_recipient_id bigint null,waitlist_entry_id bigint null,deduplication_key varchar(190) unique,status enum('pending','processing','sent','failed','cancelled') default 'pending',attempt_count tinyint unsigned default 0,next_attempt_at timestamp null,last_error varchar(500),created_at timestamp default current_timestamp,claimed_at timestamp null,sent_at timestamp null,updated_at timestamp default current_timestamp on update current_timestamp);
 create table waitlist_entries(id bigint primary key auto_increment,status varchar(30),unsubscribed_at timestamp null,unsubscribe_nonce char(64),confirmation_sent_at timestamp null,invited_at timestamp null);
