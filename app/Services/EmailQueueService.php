@@ -31,7 +31,7 @@ final class EmailQueueService
         if(!empty($links['admin_test']))$data['admin_test_send']=true;
         if($classification==='marketing'){
             if(!empty($links['waitlist_entry_id'])){$w=DB::row('select id,unsubscribe_nonce from waitlist_entries where id=?',[$links['waitlist_entry_id']]);if(!$w)return false;$data['unsubscribe_url']=UnsubscribeService::url('w',(int)$w['id'],$w['unsubscribe_nonce']);}
-            elseif(!empty($data['user_id'])){$p=DB::row('select user_id,unsubscribe_nonce from email_preferences where user_id=?',[$data['user_id']]);if(!$p)return false;$data['unsubscribe_url']=UnsubscribeService::url('u',(int)$p['user_id'],$p['unsubscribe_nonce']);}
+            elseif(!empty($data['user_id'])){$p=DB::row('select * from email_preferences where user_id=?',[$data['user_id']]);if(!$p)return false;$category=(string)($data['marketing_preference']??'');if($category!==''&&!EmailPreferenceService::enabled($p,$category))return false;$kind=['weekly'=>'uw','monthly'=>'um','favorite_shop'=>'uf'][$category]??'u';$data['unsubscribe_url']=UnsubscribeService::url($kind,(int)$p['user_id'],$p['unsubscribe_nonce']);$data['manage_preferences_url']??=H::baseUrl().'/account#email-preferences';}
             else return false;
         }
         $json=json_encode($data,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
@@ -69,18 +69,41 @@ final class EmailQueueService
         }
         return $result;
     }
-    private static function stillConsented(array $m): bool
+    private static function stillConsented(array &$m): bool
     {
         if(!empty($m['waitlist_entry_id'])) return (bool)DB::row('select id from waitlist_entries where id=? and status in ("subscribed","invited") and unsubscribed_at is null',[$m['waitlist_entry_id']]);
         $d=json_decode($m['template_data'],true)?:[];
         if(($d['admin_test_send']??false)===true){$user=!empty($d['user_id'])?DB::row('select id,email,role,status from users where id=?',[$d['user_id']]):null;return $user?self::authorizedAdminTest($user,$m['recipient_email'],$d):false;}
-        if(!empty($d['user_id'])) return (bool)DB::row('select user_id from email_preferences where user_id=? and marketing_opt_in=1 and marketing_opted_out_at is null',[$d['user_id']]);
+        if(!empty($d['user_id'])) {
+            $user=DB::row('select id,status from users where id=?',[$d['user_id']]);
+            if(!$user||$user['status']!=='active')return false;
+            $preference=DB::row('select * from email_preferences where user_id=?',[$d['user_id']]);
+            $category=(string)($d['marketing_preference']??'');
+            $consented=$preference&&($category!==''?EmailPreferenceService::enabled($preference,$category):((int)$preference['marketing_opt_in']===1&&$preference['marketing_opted_out_at']===null));
+            if(!$consented)return false;
+            if($category==='favorite_shop'){
+                $products=is_array($d['products']??null)?$d['products']:[];
+                $ids=array_values(array_unique(array_filter(array_map(static fn($product)=>(int)($product['id']??0),$products))));
+                if(!$ids)return false;
+                $placeholders=implode(',',array_fill(0,count($ids),'?'));
+                $eligible=DB::rows("select p.id,p.designer_id from products p join designers ds on ds.id=p.designer_id and ds.status=\"approved\" join follows f on f.designer_id=ds.id and f.user_id=? where p.id in ($placeholders) and p.status in (\"approved\",\"published\")",array_merge([(int)$d['user_id']],$ids));
+                $allowed=[];foreach($eligible as $row)$allowed[(int)$row['id']]=(int)$row['designer_id'];
+                $d['products']=array_values(array_filter($products,static fn($product):bool=>isset($allowed[(int)($product['id']??0)])&&$allowed[(int)$product['id']]===(int)($product['designer_id']??0)));
+                if(!$d['products'])return false;
+                $m['template_data']=json_encode($d,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+                $kept=array_map(static fn($product)=>(int)$product['id'],$d['products']);$removed=array_values(array_diff($ids,$kept));
+                DB::exec('update email_messages set template_data=? where id=? and status="processing"',[$m['template_data'],$m['id']]);
+                if($removed){$claimPlaceholders=implode(',',array_fill(0,count($removed),'?'));DB::exec("delete from email_digest_content_claims where email_message_id=? and product_id in ($claimPlaceholders)",array_merge([(int)$m['id']],$removed));}
+            }
+            return true;
+        }
         return false;
     }
     private static function deliver(array $m): void
     {
         $data=json_decode($m['template_data'],true,512,JSON_THROW_ON_ERROR); $template=preg_replace('/[^a-z0-9_]/','',$m['template']);
         $body=self::render($template,$data); $transport=$_ENV['MAIL_TRANSPORT']??'log';
+        if($transport==='resend'){ResendEmailTransport::send($m['recipient_email'],$m['subject'],$body);return;}
         if($transport!=='log') throw new \RuntimeException('Configured mail transport is unavailable');
         $dir=app_path('storage/logs'); if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))throw new \RuntimeException('Mail log directory is not writable');
         self::appendLogOnce($dir.'/mail.log',['timestamp'=>gmdate('c'),'message_id'=>(int)$m['id'],'template'=>$template,'recipient_hash'=>hash('sha256',strtolower($m['recipient_email'])),'subject'=>$m['subject'],'body_bytes'=>strlen($body)]);

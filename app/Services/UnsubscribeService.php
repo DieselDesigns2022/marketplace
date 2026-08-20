@@ -7,7 +7,7 @@ final class UnsubscribeService
 {
     public static function issue(string $kind, int $id, string $nonce): string
     {
-        if (!in_array($kind, ['w', 'u'], true) || $id < 1 || !preg_match('/^[a-f0-9]{64}$/', $nonce)) {
+        if (!in_array($kind, ['w', 'u', 'uw', 'um', 'uf'], true) || $id < 1 || !preg_match('/^[a-f0-9]{64}$/', $nonce)) {
             throw new \InvalidArgumentException('Invalid unsubscribe identity.');
         }
         $payload = $kind . '.' . $id . '.' . $nonce;
@@ -20,7 +20,7 @@ final class UnsubscribeService
         $payload = self::decode($parts[1]);
         if ($payload === null || !hash_equals(hash_hmac('sha256', $payload, self::secret()), $parts[2])) return null;
         $values = explode('.', $payload);
-        if (count($values) !== 3 || !in_array($values[0], ['w','u'], true) || !ctype_digit($values[1]) || (int)$values[1] < 1 || !preg_match('/^[a-f0-9]{64}$/', $values[2])) return null;
+        if (count($values) !== 3 || !in_array($values[0], ['w','u','uw','um','uf'], true) || !ctype_digit($values[1]) || (int)$values[1] < 1 || !preg_match('/^[a-f0-9]{64}$/', $values[2])) return null;
         return ['kind'=>$values[0], 'id'=>(int)$values[1], 'nonce'=>$values[2]];
     }
 

@@ -7,7 +7,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current Phase: Phase 10.6 — Dashboard usability, currently in live-testing corrections.
+- Current implemented phase: Phase 12.3 — Email Preferences, Digests & Favorite-Shop Emails. Phase 12.3 is not yet fully released: its disposable MariaDB suite has not successfully executed in the current Codex environment, and live account, unsubscribe, scheduled-producer, and queue-worker verification remains required. Email delivery supports the safe local `log` transport and the production `resend` transport.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -21,7 +21,7 @@ Features from the original blueprint that are not implemented in the current cod
 
 ## Current Implementation Status
 
-These features represent the current implemented and tested functionality in the codebase.
+These features represent current implemented functionality in the codebase; phase-specific release verification status is noted where applicable.
 
 ### Implemented now
 
@@ -33,6 +33,7 @@ These features represent the current implemented and tested functionality in the
 - Phase 10.1 product cleanup tools for seller archive/hide, restore-as-draft, safe permanent delete, admin bulk cleanup, archived/deleted statuses, and completed-order delete protection.
 - Admin dashboards for users, applications, designers, products, categories, orders, referrals, homepage features, and ads.
 - Phase 4.5 codebase standardization for readability, plus restoration of public product previews and sell page regressions.
+- Phase 12.3 provides independent Weekly Emails, Monthly Emails, and Favorite/Followed-Shop Emails preferences managed at `/account`; signed category-specific unsubscribe links; weekly and monthly queue producers; and marketplace-generated favorite-shop updates. Durable per-user/product claims apply favorite-shop → weekly → monthly precedence for overlapping periods. Admin visibility is aggregate-only, sellers receive no subscriber email addresses, and transactional email remains independent. Producers use the existing durable queue; `MAIL_TRANSPORT=log` remains available locally and `MAIL_TRANSPORT=resend` enables production delivery.
 
 ### Planned / Future Phase
 
@@ -41,7 +42,7 @@ These features represent the current implemented and tested functionality in the
 - Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
 - Advanced SEO iteration after launch data is available.
-- Phase 10.5 implements the durable email queue, log transport, escaped templates, consent controls, promotional campaign foundation, waitlist workflows, and in-app notification center. Production-provider delivery, provider authentication, sender verification, bounce handling, and advanced production operations remain future work.
+- Phase 10.5 implements the durable email queue, log transport, escaped templates, consent controls, promotional campaign foundation, waitlist workflows, and in-app notification center. Resend production-provider authentication and request delivery are implemented; live production verification, sender verification, bounce/suppression handling, and advanced production email operations still require testing or future work as applicable.
 - More complete ad campaign management and analytics.
 
 

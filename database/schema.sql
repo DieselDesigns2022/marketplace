@@ -969,10 +969,13 @@ CREATE TABLE notifications (
  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE TABLE email_preferences (
- user_id BIGINT PRIMARY KEY, marketing_opt_in BOOLEAN NOT NULL DEFAULT 0, marketing_opted_in_at TIMESTAMP NULL,
- marketing_opted_out_at TIMESTAMP NULL, unsubscribe_nonce CHAR(64) NOT NULL,
+ user_id BIGINT PRIMARY KEY, marketing_opt_in BOOLEAN NOT NULL DEFAULT 0,
+ weekly_emails BOOLEAN NOT NULL DEFAULT 0, monthly_emails BOOLEAN NOT NULL DEFAULT 0,
+ favorite_shop_emails BOOLEAN NOT NULL DEFAULT 0, marketing_opted_in_at TIMESTAMP NULL,
+ marketing_opted_out_at TIMESTAMP NULL, preference_changed_at TIMESTAMP NULL, unsubscribe_nonce CHAR(64) NOT NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
- UNIQUE KEY uq_email_preferences_nonce (unsubscribe_nonce),
+ UNIQUE KEY uq_email_preferences_nonce (unsubscribe_nonce), INDEX idx_email_preferences_weekly (weekly_emails,user_id),
+ INDEX idx_email_preferences_monthly (monthly_emails,user_id), INDEX idx_email_preferences_favorite_shop (favorite_shop_emails,user_id),
  CONSTRAINT fk_email_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE TABLE waitlist_entries (
@@ -1017,6 +1020,17 @@ CREATE TABLE email_messages (
  CONSTRAINT fk_message_campaign FOREIGN KEY (campaign_id) REFERENCES email_campaigns(id) ON DELETE SET NULL,
  CONSTRAINT fk_message_recipient FOREIGN KEY (campaign_recipient_id) REFERENCES email_campaign_recipients(id) ON DELETE SET NULL,
  CONSTRAINT fk_message_waitlist FOREIGN KEY (waitlist_entry_id) REFERENCES waitlist_entries(id) ON DELETE SET NULL
+);
+CREATE TABLE email_digest_content_claims (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, user_id BIGINT NOT NULL, product_id BIGINT NOT NULL,
+ preference_category ENUM('favorite_shop','weekly','monthly') NOT NULL,
+ period_start DATE NOT NULL, period_end DATE NOT NULL, email_message_id BIGINT NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_digest_claim_message_product (email_message_id,product_id),
+ INDEX idx_digest_claim_overlap (user_id,product_id,period_start,period_end),
+ CONSTRAINT fk_digest_claim_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+ CONSTRAINT fk_digest_claim_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+ CONSTRAINT fk_digest_claim_message FOREIGN KEY (email_message_id) REFERENCES email_messages(id) ON DELETE CASCADE
 );
 
 

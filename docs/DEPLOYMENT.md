@@ -106,7 +106,7 @@ Rollback order is: `product_ip_risk_review_history`, `product_ip_rights_confirma
 
 ## Phase 10.5 deployment
 1. Back up, then apply `database/migrations/2026_07_20_phase_10_5_emails_notifications_waitlist.sql` after Phase 10.4.
-2. Set `MAIL_TRANSPORT=log`, `MAIL_QUEUE_BATCH_SIZE`, and a randomly generated `EMAIL_UNSUBSCRIBE_SECRET` of at least 32 bytes before waitlist or marketing delivery. `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME` are reserved for a future production provider and are not consumed by the current log transport. Verify that `APP_URL` is the final HTTPS application origin before queueing mail because unsubscribe URLs, email links, and absolute CTA-origin validation derive from it.
+2. Set `MAIL_TRANSPORT=log` for local logging or `MAIL_TRANSPORT=resend` for production delivery, along with `MAIL_QUEUE_BATCH_SIZE` and a randomly generated `EMAIL_UNSUBSCRIBE_SECRET` of at least 32 bytes before waitlist or marketing delivery. Resend delivery requires `RESEND_API_KEY` plus a verified `MAIL_FROM_ADDRESS`; `MAIL_FROM_NAME` controls the display name. Verify that `APP_URL` is the final HTTPS application origin before queueing mail because unsubscribe URLs, email links, and absolute CTA-origin validation derive from it.
 3. Grant the PHP/cron user write access to `storage/logs` without making it web-accessible.
 4. Schedule `php /path/to/marketplace/scripts/process_email_queue.php 50` every minute and alert on a nonzero exit.
 5. Before enabling a real transport, test provider authentication, sender verification, bounce/suppression handling, unsubscribe links, concurrency, and secret-redacted logging.
@@ -118,7 +118,7 @@ The protected log transport repairs an incomplete trailing fragment automaticall
 ### Phase 10.5 deployment safety
 The Phase 10.5 migration is **not idempotent**. Back up the database and inspect migration state before applying it; never run it twice blindly. Apply the migration before activating application code that queries the new tables. In particular, the shared authenticated layout queries `notifications`, so code-first deployment can break authenticated page rendering. Use maintenance mode or the project’s schema-first safe deployment order when an atomic release is unavailable.
 
-Configure `EMAIL_UNSUBSCRIBE_SECRET` before accepting waitlist signups, administrator test sends, or marketing queue work. Rotating this secret invalidates outstanding unsubscribe links unless a planned dual-key/migration strategy is used. `MAIL_TRANSPORT=log` is the only implemented transport; no production provider is included.
+Configure `EMAIL_UNSUBSCRIBE_SECRET` before accepting waitlist signups, administrator test sends, or marketing queue work. Rotating this secret invalidates outstanding unsubscribe links unless a planned dual-key/migration strategy is used. Keep `MAIL_TRANSPORT=log` for non-delivering environments; use `MAIL_TRANSPORT=resend` only after configuring the Resend key and verified sender.
 
 
 
@@ -175,3 +175,11 @@ The monthly period is a closed UTC calendar month. Omitting `YYYY-MM` selects th
 Recognition timestamps and the daily job use UTC. Verify the six guarded Phase 12 foreign keys after migration. Founder `restore` removes forced inactivity and immediately applies automatic eligibility; only `force_active` bypasses the 60-day rule.
 
 `--apply` is the silent initial historical write; `--daily` is the recurring UTC mode that communicates real transitions. Paid/refund trigger keys permit replay recovery without duplicate messages only while current semantic state matches and the event-linked rank/badge history remains latest; later automatic or administrative history permanently suppresses stale recovery.
+# Phase 12.3 scheduled email producers
+
+Before running either weekly or monthly producer, apply both Phase 12.3 migrations in this order:
+
+1. `database/migrations/2026_08_15_phase_12_3_email_preferences_digests.sql`
+2. `database/migrations/2026_08_16_phase_12_3_digest_content_claims.sql`
+
+Schedule `php scripts/queue_weekly_emails.php` once weekly and `php scripts/queue_monthly_emails.php` once monthly in UTC. Both producers add durable, deduplicated messages only; the existing `php scripts/process_email_queue.php` worker remains responsible for delivery and retries. The weekly producer queues favorite-shop messages before the general weekly marketplace digest. Durable per-user/product claims enforce favorite-shop → weekly → monthly precedence across overlapping periods rather than permanent lifetime suppression, and stable queue keys continue protecting exact cron reruns.
