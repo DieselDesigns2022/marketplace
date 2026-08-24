@@ -1,5 +1,5 @@
 <h1>Seller Dashboard → Products</h1>
-<p><a class="btn" href="/seller/product/new">Create Product</a> <a class="btn" href="/seller/product-batches">Bulk Upload / Create Multiple Products</a></p>
+<p><a class="btn" href="/seller/product/new">Create Product</a> <a class="btn" href="/seller/product-batches">Bulk Upload / Create Multiple Products</a> <a class="btn" href="/seller/products/import">Import Products</a></p>
 <p class="muted">Archive hides a product from public browsing while preserving order history. Permanent delete is only available for draft/test products with no completed orders.</p>
 <nav class="tabs">
     <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label): ?>
@@ -17,7 +17,7 @@
                <td><?=H::e($p['title'])?><?php if($p['rejection_reason']):?><br><small>Rejected: <?=H::e($p['rejection_reason'])?></small><?php endif;?><?php if((int)($p['completed_order_count'] ?? 0)>0):?><br><small class="muted">Cannot be permanently deleted because completed orders reference it.</small><?php endif;?></td>
                <td><span class="badge"><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></span></td>
                <td><?= (int)($p['completed_order_count'] ?? 0) ?></td>
-               <td><?=H::money($p['price'])?></td>
+               <td><?=$p['price']===null?'Needs review':H::money($p['price'])?></td>
                <td><?=H::e($p['category_name']??'Uncategorized')?></td>
                <td><?=H::e($p['updated_at'])?></td>
                <td>

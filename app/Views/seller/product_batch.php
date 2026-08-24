@@ -67,6 +67,7 @@ foreach ($products as $x) {
                     )?>
                 </strong>
             </p>
+            <p>Price: <strong><?=$p['price']===null?'Needs review':H::money($p['price'])?></strong></p>
 
             <?php if (!empty($p['batch_errors'])): ?>
                 <div class="notice error">

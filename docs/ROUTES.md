@@ -1,5 +1,14 @@
 # Routes
 
+## Phase 12.4 seller CSV import
+- `GET|POST /seller/products/import` — choose a source, upload a UTF-8 product CSV, and optionally review automatic mapping.
+- `POST /seller/products/import/map` — apply fallback column mapping.
+- `GET /seller/products/import/history` — seller-scoped history.
+- `GET /seller/products/import/payhip-template` — download the Payhip-oriented template.
+- `GET /seller/products/import/{id}/preview` — owned, paginated preview.
+- `POST /seller/products/import/{id}/confirm` — create selected drafts and a batch.
+- `GET /seller/products/import/{id}/summary` — owned results.
+
 Routes are registered in `public/index.php`.
 
 ## Public routes
