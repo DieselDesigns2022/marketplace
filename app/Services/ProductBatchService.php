@@ -21,7 +21,7 @@ class ProductBatchService
 
     public function products(int $batchId, int $designerId): array
     {
-        return DB::rows('select p.*,bpi.sort_order,bpi.validation_errors,(select count(*) from product_images i where i.product_id=p.id) image_count,(select count(*) from product_files f where f.product_id=p.id) file_count from product_batch_items bpi join product_batches b on b.id=bpi.batch_id join products p on p.id=bpi.product_id and p.designer_id=b.designer_id where bpi.batch_id=? and b.designer_id=? order by bpi.sort_order,bpi.id', [$batchId, $designerId]);
+        return DB::rows('select p.*,bpi.sort_order,bpi.validation_errors,bpi.submission_errors,(select count(*) from product_images i where i.product_id=p.id) image_count,(select count(*) from product_files f where f.product_id=p.id) file_count from product_batch_items bpi join product_batches b on b.id=bpi.batch_id join products p on p.id=bpi.product_id and p.designer_id=b.designer_id where bpi.batch_id=? and b.designer_id=? order by bpi.sort_order,bpi.id', [$batchId, $designerId]);
     }
 
     public function copy(int $batchId, int $designerId, int $sourceId, array $fields, array $targetIds = []): int

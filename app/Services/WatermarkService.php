@@ -34,6 +34,27 @@ class WatermarkService
             return null;
         }
 
+        return self::storeValidatedPreview($tmp, $ext, $folder, $errors, true);
+    }
+
+    /** Store a validated server-side image through the normal preview pipeline. */
+    public static function applyLocalPreview(string $path, string $folder, array &$errors): ?array
+    {
+        if (!is_file($path) || filesize($path) > 25 * 1024 * 1024) {
+            $errors[] = 'Remote image exceeded the 25MB preview-image limit.';
+            return null;
+        }
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path) ?: '';
+        $ext = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'][$mime] ?? '';
+        if ($ext === '' || !self::isSupportedImage($path, $ext)) {
+            $errors[] = 'Remote file was not a supported JPG, PNG, or WEBP image.';
+            return null;
+        }
+        return self::storeValidatedPreview($path, $ext, $folder, $errors, false);
+    }
+
+    private static function storeValidatedPreview(string $tmp, string $ext, string $folder, array &$errors, bool $uploaded): ?array
+    {
         $name = bin2hex(random_bytes(12)) . '.' . $ext;
         $privateDir = app_path('storage/app/private/product_previews');
         $publicDir = public_path('uploads/' . trim($folder, '/'));
@@ -41,7 +62,8 @@ class WatermarkService
         if (!is_dir($publicDir)) mkdir($publicDir, 0755, true);
 
         $originalAbs = $privateDir . '/' . $name;
-        if (!move_uploaded_file($tmp, $originalAbs)) {
+        $stored = $uploaded ? move_uploaded_file($tmp, $originalAbs) : copy($tmp, $originalAbs);
+        if (!$stored) {
             $errors[] = 'Preview image could not be saved.';
             return null;
         }

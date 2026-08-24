@@ -5,6 +5,7 @@
         <?=H::e($error)?>
     </div>
 <?php endforeach;?>
+<?php if(!empty($importReviewErrors)):?><div class="notice warning"><strong>This imported draft still requires explicit review:</strong><ul><?php foreach($importReviewErrors as $error):?><li><?=H::e($error)?></li><?php endforeach;?></ul><p>Review the form below and save it to confirm these Asset Moth settings.</p></div><?php endif;?>
 <form method="post" enctype="multipart/form-data" class="form card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <h2>Basic Information</h2>
@@ -43,6 +44,8 @@
     </select></label>
     <label>Manual delivery instructions<textarea name="manual_delivery_instructions"><?=H::e($_POST['manual_delivery_instructions']??$p['manual_delivery_instructions']??'')?></textarea></label>
     <p class="help-text">Google Drive/manual delivery products do not require a protected downloadable file. Sellers manually grant access using the buyer email collected during checkout.</p>
+    <?php if(in_array('fulfillment',$importReviewKeys??[],true)):?><label><input type="checkbox" name="confirm_import_fulfillment" value="1"> I reviewed and confirm this Asset Moth fulfillment choice.</label><?php endif;?>
+    <?php if(in_array('source_type',$importReviewKeys??[],true)):?><div class="notice warning">Imported source type: <strong><?=H::e($importReviewContext['source_type']??'Unknown')?></strong>. Asset Moth did not retrieve any source download file.</div><label><input type="checkbox" name="confirm_import_source_type" value="1"> I reviewed this source type and configured an eligible Asset Moth product.</label><?php endif;?>
     <h2>Product Files</h2>
     <?php foreach($files as $file):?>
         <div class="inline">
@@ -54,7 +57,8 @@
     <label>Protected downloadable files<input type="file" name="product_files[]" multiple>
     </label>
     <h2>Pricing and Licenses</h2>
-    <label>Base Price<input type="number" step="0.01" name="price" value="<?=H::e($_POST['price']??$p['price']??'5.00')?>">
+    <?php $priceValue=array_key_exists('price',$_POST)?$_POST['price']:($p?(($p['price']??null)===null?'':$p['price']):'5.00'); ?>
+    <label>Base Price<input type="number" step="0.01" min="0" name="price" value="<?=H::e($priceValue)?>">
     </label>
     <p class="help-text">Personal use is included with the base product price. Enable any additional paid license permissions and set the add-on price for each one.</p>
     <?php
@@ -85,6 +89,7 @@
             </tr>
         <?php endforeach;?>
     </table>
+    <?php if(in_array('licenses',$importReviewKeys??[],true)):?><label><input type="checkbox" name="confirm_import_licenses" value="1"> I reviewed and confirm these Asset Moth license settings.</label><?php endif;?>
     <p>Digital Resale: always prohibited.</p>
     <h2>Product Details</h2>
     <label>Category<select name="category_id" data-category-guidance-source>
@@ -101,7 +106,8 @@
     <p class="notice warning" data-category-guidance="customs-personalized" hidden>Customs / Personalized products must use the existing downloadable or Google Drive / manual-delivery choice.</p>
     <label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>">
     </label>
-<label>AI Disclosure<select name="ai_disclosure" required>
+<label>AI Disclosure<select name="ai_disclosure"<?=in_array('ai',$importReviewKeys??[],true)?'':' required'?>>
+<option value="">Choose AI disclosure</option>
 <?php foreach(['No AI Used','AI Assisted','AI Generated'] as $ai):?>
     <option <?=($_POST['ai_disclosure']??$p['ai_disclosure']??'')===$ai?'selected':''?>>
     <?=$ai?>
