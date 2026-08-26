@@ -1950,6 +1950,74 @@ class SellerController
         H::redirect('/seller/products?status=draft');
     }
 
+    public function bulkDeleteProducts(): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+
+        $d = $this->d();
+
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', (array)($_POST['product_ids'] ?? [])),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if (!$ids) {
+            H::flash('error', 'Select at least one product to permanently delete.');
+            H::redirect('/seller/products');
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        foreach ($ids as $productId) {
+            $p = DB::row(
+                'select id,status from products where id=? and designer_id=?',
+                [$productId, $d['id']]
+            );
+
+            if (
+                !$p
+                || $this->productHasCompletedOrders($productId)
+                || !in_array(
+                    $p['status'],
+                    ['draft','rejected','archived','disabled','deleted'],
+                    true
+                )
+            ) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                $this->permanentlyDeleteProduct($productId);
+                $deleted++;
+            } catch (Throwable $e) {
+                $skipped++;
+            }
+        }
+
+        if ($deleted > 0 && $skipped > 0) {
+            H::flash(
+                'warning',
+                $deleted . ' selected product(s) permanently deleted. ' .
+                $skipped . ' product(s) were skipped because they were not eligible for permanent deletion.'
+            );
+        } elseif ($deleted > 0) {
+            H::flash(
+                'success',
+                $deleted . ' selected product(s) permanently deleted.'
+            );
+        } else {
+            H::flash(
+                'error',
+                'None of the selected products were eligible for permanent deletion.'
+            );
+        }
+
+        H::redirect('/seller/products');
+    }
+
     public function deleteProduct($id)
     {
         $this->requireOnboardingComplete();

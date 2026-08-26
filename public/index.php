@@ -53,6 +53,7 @@ use App\Controllers\AdminCreditController;
  $router->match(['GET','POST'], '/seller/store', [SellerController::class, 'storeSettings']);
  $router->match(['GET','POST'], '/seller/receipt-settings', [SellerController::class, 'receiptSettings']);
  $router->get('/seller/products', [SellerController::class, 'products']);
+ $router->post('/seller/products/bulk-delete', [SellerController::class, 'bulkDeleteProducts']);
  $router->match(['GET','POST'], '/seller/products/import', [SellerController::class, 'importProducts']);
  $router->post('/seller/products/import/map', [SellerController::class, 'mapProductImport']);
  $router->get('/seller/products/import/history', [SellerController::class, 'productImportHistory']);
