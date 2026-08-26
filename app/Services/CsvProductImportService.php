@@ -11,8 +11,8 @@ use RuntimeException;
 class CsvProductImportService
 {
     public const SOURCES=['shopify'=>'Shopify','etsy'=>'Etsy','payhip'=>'Payhip','square'=>'Square','squarespace'=>'Squarespace','wix'=>'Wix','weebly'=>'Weebly','woocommerce'=>'WordPress / WooCommerce'];
-    public const MAX_BYTES=10_485_760;
-    public const MAX_ROWS=20_000;
+    public const MAX_BYTES=52_428_800;
+    public const MAX_ROWS=50_000;
     public const MAP_FIELDS=['source_id','source_url','sku','title','short_description','description','price','sale_price','currency','tags','categories','product_type','seo_title','seo_description','images'];
     private const ALIASES=[
         'shopify'=>['source_id'=>['handle'],'source_url'=>['url handle'],'title'=>['title'],'description'=>['body html','body (html)','description'],'price'=>['variant price','price'],'sku'=>['variant sku','sku'],'tags'=>['tags'],'categories'=>['product category'],'product_type'=>['type'],'seo_title'=>['seo title'],'seo_description'=>['seo description'],'images'=>['image src','image url']],
@@ -50,7 +50,7 @@ class CsvProductImportService
     {
         $this->cleanupStaleFiles();
         if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK||!is_uploaded_file((string)($file['tmp_name']??'')))throw new RuntimeException('Choose a CSV file to upload.');
-        $size=(int)($file['size']??0); if($size<1||$size>self::MAX_BYTES)throw new RuntimeException('The CSV must be non-empty and 10 MB or smaller.');
+        $size=(int)($file['size']??0); if($size<1||$size>self::MAX_BYTES)throw new RuntimeException('The CSV must be non-empty and 50 MB or smaller.');
         if(strtolower(pathinfo((string)($file['name']??''),PATHINFO_EXTENSION))!=='csv')throw new RuntimeException('Only .csv files are accepted.');
         $bytes=file_get_contents($file['tmp_name']);
         if($bytes===false||str_contains($bytes,"\0")||!mb_check_encoding($bytes,'UTF-8'))throw new RuntimeException('The CSV must be valid UTF-8 text.');
@@ -68,7 +68,7 @@ class CsvProductImportService
         $this->rejectWrongExport($source,$headers); $mapping=$this->mapping($source,$headers,$manual);
         if(empty($mapping['title'])||(empty($mapping['source_id'])&&empty($mapping['sku'])&&empty($mapping['source_url']))){fclose($fh);return ['needs_mapping'=>true,'headers'=>$raw,'mapping'=>$mapping,'records'=>[]];}
         $rows=[];$line=1;
-        while(($row=fgetcsv($fh))!==false){$line++;if($line>self::MAX_ROWS+1){fclose($fh);throw new RuntimeException('This CSV exceeds the 20,000-row safety limit. Split it into smaller product CSVs.');}if($row===[null]||!array_filter($row,fn($v)=>trim((string)$v)!==''))continue;if(count($row)!==count($headers)){fclose($fh);throw new RuntimeException("Row $line has a different number of columns and cannot be read safely.");}$rows[]=array_merge(array_combine($headers,array_map([$this,'cell'],$row)),['_line'=>$line]);}
+        while(($row=fgetcsv($fh))!==false){$line++;if($line>self::MAX_ROWS+1){fclose($fh);throw new RuntimeException('This CSV exceeds the 50,000-row safety limit. Split it into smaller product CSVs.');}if($row===[null]||!array_filter($row,fn($v)=>trim((string)$v)!==''))continue;if(count($row)!==count($headers)){fclose($fh);throw new RuntimeException("Row $line has a different number of columns and cannot be read safely.");}$rows[]=array_merge(array_combine($headers,array_map([$this,'cell'],$row)),['_line'=>$line]);}
         fclose($fh);if(!$rows)throw new RuntimeException('No product rows were found in this CSV.');
         return ['needs_mapping'=>false,'headers'=>$raw,'mapping'=>$mapping,'records'=>$this->normalize($source,$rows,$mapping)];
     }

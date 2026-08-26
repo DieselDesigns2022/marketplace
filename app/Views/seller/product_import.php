@@ -5,7 +5,7 @@
  <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
  <label for="source_platform">CSV source</label>
  <select id="source_platform" name="source_platform" required><option value="">Choose a platform</option><?php foreach($sources as $key=>$label): ?><option value="<?=H::e($key)?>"><?=H::e($label)?></option><?php endforeach; ?></select>
- <label for="csv_file">Product CSV file (10 MB maximum)</label><input id="csv_file" type="file" name="csv_file" accept=".csv,text/csv" required>
+ <label for="csv_file">Product CSV file (50 MB maximum)</label><input id="csv_file" type="file" name="csv_file" accept=".csv,text/csv" required>
  <label><input type="checkbox" name="review_mapping" value="1"> Review or override column mapping before preview</label>
  <button>Upload and preview</button>
 </form>
