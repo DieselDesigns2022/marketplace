@@ -60,6 +60,8 @@ use App\Controllers\AdminCreditController;
  $router->get('/seller/products/import/payhip-template', [SellerController::class, 'payhipImportTemplate']);
  $router->get('/seller/products/import/{id}/preview', [SellerController::class, 'productImportPreview']);
  $router->post('/seller/products/import/{id}/confirm', [SellerController::class, 'confirmProductImport']);
+ $router->get('/seller/products/import/{id}/progress', [SellerController::class, 'productImportProgress']);
+ $router->post('/seller/products/import/{id}/process', [SellerController::class, 'processProductImportBatch']);
  $router->get('/seller/products/import/{id}/summary', [SellerController::class, 'productImportSummary']);
  $router->match(['GET','POST'], '/seller/product-bulk/template', [SellerController::class, 'bulkProductTemplate']);
  $router->match(['GET','POST'], '/seller/product-bulk/count', [SellerController::class, 'bulkProductCount']);

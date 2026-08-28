@@ -1,12 +1,13 @@
 <h1>Import Products from CSV</h1>
 <p>Upload product-listing metadata only. Imports are always editable drafts and are never submitted or published automatically.</p>
 <?php foreach($errors as $error): ?><div class="alert error"><?=H::e($error)?></div><?php endforeach; ?>
-<form method="post" enctype="multipart/form-data" class="card">
+<form method="post" enctype="multipart/form-data" class="card" data-csv-upload data-import-action data-loading-text="Reading your CSV…">
  <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
  <label for="source_platform">CSV source</label>
  <select id="source_platform" name="source_platform" required><option value="">Choose a platform</option><?php foreach($sources as $key=>$label): ?><option value="<?=H::e($key)?>"><?=H::e($label)?></option><?php endforeach; ?></select>
  <label for="csv_file">Product CSV file (50 MB maximum)</label><input id="csv_file" type="file" name="csv_file" accept=".csv,text/csv" required>
  <label><input type="checkbox" name="review_mapping" value="1"> Review or override column mapping before preview</label>
+ <progress data-upload-progress value="0" max="1" hidden aria-label="CSV upload progress"></progress><p class="muted" data-upload-message aria-live="polite"></p>
  <button>Upload and preview</button>
 </form>
 <p><a href="/seller/products/import/payhip-template">Download the Asset Moth Payhip CSV template</a> · <a href="/seller/products/import/history">View import history</a></p>
