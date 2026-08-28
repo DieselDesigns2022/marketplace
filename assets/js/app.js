@@ -103,3 +103,33 @@ document.querySelectorAll("main table").forEach((table) => {
   table.parentNode.insertBefore(wrapper, table);
   wrapper.appendChild(table);
 });
+
+// CSV imports expose network and server work instead of leaving long requests looking frozen.
+document.querySelectorAll('form[data-import-action]').forEach((form) => {
+  form.addEventListener('submit', () => {
+    const button = form.querySelector('button[type="submit"], button:not([type])');
+    if (button) { button.disabled = true; button.textContent = form.dataset.loadingText || 'Working…'; }
+  });
+});
+
+const csvUploadForm = document.querySelector('form[data-csv-upload]');
+if (csvUploadForm) csvUploadForm.addEventListener('submit', (event) => {
+  if (!window.FormData || !window.XMLHttpRequest) return;
+  event.preventDefault();
+  const progress = csvUploadForm.querySelector('[data-upload-progress]');
+  const message = csvUploadForm.querySelector('[data-upload-message]');
+  const button = csvUploadForm.querySelector('button');
+  progress.hidden = false; button.disabled = true; button.textContent = 'Uploading…';
+  const xhr = new XMLHttpRequest(); xhr.open('POST', csvUploadForm.action || window.location.href);
+  xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) { progress.max=e.total;progress.value=e.loaded;message.textContent=`Uploading… ${Math.round(e.loaded/e.total*100)}%`; } });
+  xhr.upload.addEventListener('load', () => { progress.value=progress.max;message.textContent='Reading your CSV…';button.textContent='Reading your CSV…'; });
+  xhr.addEventListener('load', () => { const finalUrl=new URL(xhr.responseURL || window.location.href,window.location.href);if(finalUrl.pathname!==window.location.pathname || finalUrl.search!==window.location.search){window.location.assign(finalUrl.href);return;}document.open();document.write(xhr.responseText);document.close(); });
+  xhr.addEventListener('error', () => { message.textContent='Upload failed. Please try again.';button.disabled=false;button.textContent='Upload and preview'; });
+  xhr.send(new FormData(csvUploadForm));
+});
+
+const importProgress = document.querySelector('[data-import-progress]');
+if (importProgress) {
+  const bar=importProgress.querySelector('progress'), count=importProgress.querySelector('[data-import-count]'), message=importProgress.querySelector('[data-import-message]');
+  const run=async()=>{try{const body=new URLSearchParams({_csrf:importProgress.dataset.csrf});const response=await fetch(importProgress.dataset.processUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body});if(!response.ok)throw new Error();const data=await response.json();bar.max=Math.max(1,data.selected);bar.value=data.processed;count.textContent=`${Number(data.processed).toLocaleString()} of ${Number(data.selected).toLocaleString()} products`;message.textContent=data.activity || 'Creating draft products…';if(data.done){message.textContent='Import finished. Opening your summary…';window.location.assign(data.redirect);return;}setTimeout(run,Math.max(100,Number(data.retry_ms)||1000));}catch(error){message.textContent='The import was interrupted. Retrying safely…';setTimeout(run,2000);}};run();
+}

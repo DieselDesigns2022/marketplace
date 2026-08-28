@@ -20,7 +20,7 @@ CREATE TABLE product_import_items (
  id BIGINT PRIMARY KEY AUTO_INCREMENT, import_run_id BIGINT NOT NULL, product_id BIGINT NULL,
  duplicate_product_id BIGINT NULL, source_key VARCHAR(190) NOT NULL, source_fingerprint CHAR(64) NOT NULL, source_sku VARCHAR(190) NULL,
  source_title VARCHAR(190) NOT NULL, normalized_data JSON NOT NULL,
- result_status ENUM('ready','invalid','duplicate','imported','failed','skipped') NOT NULL,
+ result_status ENUM('ready','queued','processing','invalid','duplicate','imported','failed','skipped') NOT NULL,
  warnings JSON NULL, error_message VARCHAR(1000) NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  UNIQUE KEY product_import_item_run_key_unique(import_run_id,source_fingerprint),
  KEY product_import_items_result_idx(import_run_id,result_status,id), KEY product_import_items_product_idx(product_id),
@@ -45,4 +45,13 @@ CREATE TABLE product_import_requirements (
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cleared_at TIMESTAMP NULL,
  UNIQUE KEY product_import_requirement_unique(product_id,requirement_key), KEY product_import_requirement_open_idx(product_id,cleared_at),
  CONSTRAINT product_import_requirement_product_fk FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE product_import_images (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, import_item_id BIGINT NOT NULL, product_image_id BIGINT NULL,
+ source_url TEXT NOT NULL, sort_order INT UNSIGNED NOT NULL, status ENUM('queued','processing','imported','failed') NOT NULL DEFAULT 'queued',
+ claim_token CHAR(40) NULL, claimed_at TIMESTAMP NULL, warning VARCHAR(1000) NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY product_import_image_item_sort_unique(import_item_id,sort_order), KEY product_import_images_claim_idx(status,claimed_at,id),
+ CONSTRAINT product_import_image_item_fk FOREIGN KEY(import_item_id) REFERENCES product_import_items(id) ON DELETE CASCADE,
+ CONSTRAINT product_import_image_product_fk FOREIGN KEY(product_image_id) REFERENCES product_images(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

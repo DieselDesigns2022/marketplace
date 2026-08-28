@@ -52,6 +52,12 @@ mysql -u <user> -p <database> < database/migrations/<migration-file>.sql
 
 Phase 10.1 deployments must apply `database/migrations/2026_07_07_phase_10_1_product_cleanup.sql` before relying on archived/deleted product statuses or admin/seller cleanup tools.
 
+### Phase 12.4 CSV import deployment
+
+Deployments that already applied `database/migrations/2026_08_21_phase_12_4_csv_product_import.sql` must next apply `database/migrations/2026_08_26_phase_12_4_batched_csv_import.sql` to add the queued/processing states and durable bounded image jobs.
+
+`storage/app/private/csv_imports` must exist outside the public web root and remain non-public and writable by PHP-FPM. Production uses `www-data:www-data` with mode `0750`, or an equivalent runtime owner and permission policy. The application accepts CSV files up to **50 MB** and rejects imports exceeding **50,000 rows**.
+
 ## Upload folder permissions
 
 Upload folders must be writable by the PHP/Nginx runtime user but must not be committed to Git. Public preview uploads may be web-accessible. Protected product files must not be directly web-accessible. Phase 10.6 banner normalization additionally requires an application-writable `public/uploads/store_banners/` directory with script execution prohibited.
