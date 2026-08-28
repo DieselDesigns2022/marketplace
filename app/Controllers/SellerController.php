@@ -990,54 +990,115 @@ class SellerController
     public function confirmProductImport($id): void
     {
         $d=$this->requireOnboardingComplete(); $run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']])??H::abort(404);
-        if($run['status']!=='preview') H::redirect('/seller/products/import/'.$id.'/summary');
-        $claim=DB::pdo()->prepare('update product_import_runs set status="processing" where id=? and designer_id=? and status="preview"');
-        $claim->execute([(int)$id,(int)$d['id']]);
-        if($claim->rowCount()!==1)H::redirect('/seller/products/import/'.$id.'/summary');
-        $selectAll=isset($_POST['select_all']); $ids=array_values(array_unique(array_map('intval',(array)($_POST['item_ids']??[]))));
-        $items=$selectAll?DB::rows('select * from product_import_items where import_run_id=? and result_status="ready"',[(int)$id]):($ids?DB::rows('select * from product_import_items where import_run_id=? and result_status="ready" and id in ('.implode(',',array_fill(0,count($ids),'?')).')',array_merge([(int)$id],$ids)):[]);
-        $batchId=0;$imported=0;$failed=0;$sort=0;$service=new CsvProductImportService();$remoteImages=new RemoteProductImageService();$review=new ProductImportReviewService();
-        try{
-        if($items){DB::exec('insert into product_batches (designer_id,name) values (?,?)',[$d['id'],CsvProductImportService::SOURCES[$run['source_platform']].' CSV import — '.date('Y-m-d H:i')]);$batchId=(int)DB::id();}
-        foreach($items as $item){
-            $record=json_decode($item['normalized_data'],true);$productId=0;
-            try{
-                DB::begin();$category=$service->categoryId((array)$record['categories']);
-                DB::exec('insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,0,0,0,1,NULL,?,? ,"draft")',[$d['id'],$category,$record['title'],$service->uniqueSlug($record['title']),$record['short_description'],$record['description'],$record['price'],'downloadable',$record['seo_title'],$record['seo_description']]);
-                $productId=(int)DB::id();$this->syncTags($productId,implode(',',(array)$record['tags']));
-                DB::exec('insert into product_import_sources (designer_id,source_platform,source_key,source_fingerprint,product_id,import_item_id) values (?,?,?,?,?,?)',[$d['id'],$run['source_platform'],$record['source_id'],$record['source_fingerprint'],$productId,$item['id']]);
-                $requirements=['ai','licenses','fulfillment'];if(!empty($record['price_requires_review']))$requirements[]='price';if(!empty($record['source_type_requires_review']))$requirements[]='source_type';$review->add($productId,$requirements);
-                DB::exec('insert into product_batch_items (batch_id,product_id,sort_order,validation_errors) values (?,?,?,null)',[$batchId,$productId,++$sort]);
-                DB::exec('update product_import_items set result_status="imported",product_id=? where id=? and import_run_id=?',[$productId,$item['id'],$id]);DB::commit();$imported++;
-            }catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();DB::exec('update product_import_items set result_status="failed",error_message=? where id=? and import_run_id=?',['This product could not be created safely.',$item['id'],$id]);$failed++;continue;}
-            $imageSort=0;$imageResult=$remoteImages->processUrls((array)$record['images'],function(array $download,int $imageIndex)use(&$imageSort,$productId,$record){
-                $watermarkErrors=[];$saved=WatermarkService::applyLocalPreview($download['path'],'product_previews',$watermarkErrors);
-                if(!$saved)throw new \RuntimeException($watermarkErrors[0]??'Image could not be watermarked or saved.');
-                try{DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)',[$productId,$saved['image_path'],$saved['original_image_path'],$saved['watermark_status'],$saved['watermark_error'],mb_substr($record['title'],0,240),$imageSort++]);}catch(Throwable $e){$this->deletePreviewPaths($saved['image_path'],$saved['original_image_path']);throw new \RuntimeException('Image could not be attached safely.');}
-            });
-            DB::exec('update product_import_items set warnings=? where id=? and import_run_id=?',[$service->json(array_merge((array)$record['warnings'],$imageResult['warnings'])),$item['id'],$id]);
+        if($run['status']!=='preview') H::redirect('/seller/products/import/'.$id.'/progress');
+        $selectAll=isset($_POST['select_all']); $ids=array_values(array_unique(array_filter(array_map('intval',(array)($_POST['item_ids']??[])))));
+        DB::begin();
+        try {
+            $claim=DB::pdo()->prepare('update product_import_runs set status="processing" where id=? and designer_id=? and status="preview"');$claim->execute([(int)$id,(int)$d['id']]);
+            if($claim->rowCount()!==1){DB::rollBack();H::redirect('/seller/products/import/'.$id.'/progress');}
+            if($selectAll) DB::exec('update product_import_items set result_status="queued" where import_run_id=? and result_status="ready"',[$id]);
+            elseif($ids) DB::exec('update product_import_items set result_status="queued" where import_run_id=? and result_status="ready" and id in ('.implode(',',array_fill(0,count($ids),'?')).')',array_merge([(int)$id],$ids));
+            DB::exec('update product_import_items set result_status="skipped" where import_run_id=? and result_status="ready"',[$id]);
+            $selected=(int)(DB::row('select count(*) c from product_import_items where import_run_id=? and result_status="queued"',[$id])['c']??0);
+            $batchId=null;if($selected){DB::exec('insert into product_batches (designer_id,name) values (?,?)',[$d['id'],CsvProductImportService::SOURCES[$run['source_platform']].' CSV import — '.date('Y-m-d H:i')]);$batchId=(int)DB::id();}
+            DB::exec('update product_import_runs set selected_count=?,batch_id=? where id=? and designer_id=?',[$selected,$batchId,$id,$d['id']]);DB::commit();
+        } catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
+        if(!$selected)$this->finishProductImport((int)$id,(int)$d['id'],$run);
+        H::redirect('/seller/products/import/'.$id.'/progress');
+    }
+
+    public function productImportProgress($id): void
+    {
+        $d=$this->requireOnboardingComplete();$run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']])??H::abort(404);
+        $this->normalizeLegacyProductImport($run,(int)$d['id']);$run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']]);
+        if(in_array($run['status'],['completed','partial','failed'],true))H::redirect('/seller/products/import/'.$id.'/summary');
+        $counts=$this->productImportCounts((int)$id);$processed=($counts['imported']??0)+($counts['failed']??0);H::view('seller/product_import_progress',['run'=>$run,'processed'=>$processed]);
+    }
+
+    public function processProductImportBatch($id): void
+    {
+        $d=$this->requireOnboardingComplete();$run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']])??H::abort(404);
+        $this->normalizeLegacyProductImport($run,(int)$d['id']);$run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']]);
+        header('Content-Type: application/json');
+        if($run['status']!=='processing'){echo json_encode(['done'=>true,'redirect'=>'/seller/products/import/'.$id.'/summary']);return;}
+        /* Legacy runs never recorded a selection. Ready rows are intentionally not inferred as selected. */
+        DB::exec('update product_import_items set result_status="skipped",error_message=? where import_run_id=? and result_status="ready"',['This legacy import had no saved selection and was not resumed automatically.',$id]);
+        $this->reconcileInterruptedImportItems((int)$id);
+        $current=DB::row('select id from product_import_items where import_run_id=? and result_status="processing" order by id limit 1',[$id]);
+        $worked=$current?$this->processNextImportedImage((int)$id,(int)$current['id']):$this->createNextImportedDraft($run,(int)$d['id']);
+        $remaining=(int)(DB::row('select count(*) c from product_import_items where import_run_id=? and result_status in ("queued","processing")',[$id])['c']??0);
+        if(!$remaining){$run=DB::row('select * from product_import_runs where id=? and designer_id=?',[$id,$d['id']]);$this->finishProductImport((int)$id,(int)$d['id'],$run);$done=true;}else $done=false;
+        $counts=$this->productImportCounts((int)$id);$processed=($counts['imported']??0)+($counts['failed']??0);
+        $activity=$this->productImportActivity((int)$id);echo json_encode(['done'=>$done,'processed'=>$processed,'selected'=>(int)$run['selected_count'],'imported'=>$counts['imported']??0,'failed'=>$counts['failed']??0,'activity'=>$activity,'retry_ms'=>$worked?150:1500,'redirect'=>'/seller/products/import/'.$id.'/summary']);
+    }
+
+    private function normalizeLegacyProductImport(array $run,int $designerId): void
+    {
+        if($run['status']!=='processing'||(int)$run['selected_count']!==0)return;
+        DB::begin();try{$locked=DB::row('select id from product_import_runs where id=? and designer_id=? and status="processing" and selected_count=0 for update',[$run['id'],$designerId]);if(!$locked){DB::rollBack();return;}DB::exec('update product_import_items set result_status="skipped",error_message=? where import_run_id=? and result_status="ready"',['This legacy item was not selected before processing stopped.',$run['id']]);$counts=$this->productImportCounts((int)$run['id']);$attempted=($counts['imported']??0)+($counts['failed']??0);DB::exec('update product_import_runs set selected_count=?,imported_count=?,failed_count=?,skipped_count=? where id=? and designer_id=?',[$attempted,$counts['imported']??0,$counts['failed']??0,$counts['skipped']??0,$run['id'],$designerId]);DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
+    }
+
+    private function reconcileInterruptedImportItems(int $runId): void
+    {
+        foreach(DB::rows('select i.id,i.product_id,i.normalized_data,s.product_id committed_product from product_import_items i left join product_import_sources s on s.import_item_id=i.id where i.import_run_id=? and i.result_status="processing" and not exists(select 1 from product_import_images x where x.import_item_id=i.id)',[$runId]) as $item){
+            if($item['committed_product'])DB::exec('update product_import_items set result_status="imported",product_id=?,error_message=null where id=? and import_run_id=? and result_status="processing"',[$item['committed_product'],$item['id'],$runId]);
+            elseif(!$item['product_id'])DB::exec('update product_import_items set result_status="queued" where id=? and import_run_id=? and result_status="processing"',[$item['id'],$runId]);
         }
-        }catch(Throwable $e){
-            if(DB::pdo()->inTransaction())DB::rollBack();
-            foreach($items as $selectedItem)DB::exec('update product_import_items set result_status="failed",error_message=? where id=? and import_run_id=? and result_status="ready"',['This product could not be completed after the import started.',$selectedItem['id'],$id]);
-        }
-        DB::exec('update product_import_items set result_status="skipped" where import_run_id=? and result_status="ready"',[$id]);
-        $counts=[];foreach(DB::rows('select result_status,count(*) c from product_import_items where import_run_id=? group by result_status',[$id])as $row)$counts[$row['result_status']]=(int)$row['c'];
-        $imported=$counts['imported']??0;$failed=$counts['failed']??0;
-        if($batchId&&!$imported){DB::exec('delete from product_batches where id=? and designer_id=?',[$batchId,$d['id']]);$batchId=0;}
-        DB::exec('update product_import_runs set selected_count=?,imported_count=?,duplicate_count=?,invalid_count=?,skipped_count=?,failed_count=?,batch_id=?,status=?,completed_at=now(),stored_path=NULL where id=? and designer_id=?',[count($items),$imported,$counts['duplicate']??0,$counts['invalid']??0,$counts['skipped']??0,$failed,$batchId?:null,$failed?($imported?'partial':'failed'):'completed',$id,$d['id']]);
-        $service->removeTemporaryFile($run['stored_path']??null);H::redirect('/seller/products/import/'.$id.'/summary');
+        $terminal=DB::rows('select i.id,i.normalized_data,s.product_id committed_product from product_import_items i join product_import_sources s on s.import_item_id=i.id where i.import_run_id=? and i.result_status="processing" and exists(select 1 from product_import_images x where x.import_item_id=i.id) and not exists(select 1 from product_import_images x where x.import_item_id=i.id and x.status in ("queued","processing"))',[$runId]);$service=new CsvProductImportService();
+        foreach($terminal as $item){$record=json_decode($item['normalized_data'],true)?:[];$warnings=array_column(DB::rows('select warning from product_import_images where import_item_id=? and status="failed" and warning is not null order by sort_order,id',[$item['id']]),'warning');DB::exec('update product_import_items set result_status="imported",product_id=?,warnings=?,error_message=null where id=? and import_run_id=? and result_status="processing"',[$item['committed_product'],$service->json(array_merge((array)($record['warnings']??[]),$warnings)),$item['id'],$runId]);}
+    }
+
+    /** Claim and create one draft in the same transaction. A disconnect rolls the claim back to queued. */
+    private function createNextImportedDraft(array $run,int $designerId): bool
+    {
+        $service=new CsvProductImportService();$review=new ProductImportReviewService();
+        try{DB::begin();DB::row('select id from product_import_runs where id=? for update',[$run['id']]);if(DB::row('select id from product_import_items where import_run_id=? and result_status="processing" limit 1',[$run['id']])){DB::rollBack();return false;}$item=DB::row('select * from product_import_items where import_run_id=? and result_status="queued" order by id limit 1 for update',[$run['id']]);if(!$item){DB::rollBack();return false;}
+            DB::exec('update product_import_items set result_status="processing" where id=? and import_run_id=? and result_status="queued"',[$item['id'],$run['id']]);$record=json_decode($item['normalized_data'],true);$category=$service->categoryId((array)$record['categories']);
+            DB::exec('insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,0,0,0,1,NULL,?,? ,"draft")',[$designerId,$category,$record['title'],$service->uniqueSlug($record['title']),$record['short_description'],$record['description'],$record['price'],'downloadable',$record['seo_title'],$record['seo_description']]);
+            $productId=(int)DB::id();$this->syncTags($productId,implode(',',(array)$record['tags']));DB::exec('insert into product_import_sources (designer_id,source_platform,source_key,source_fingerprint,product_id,import_item_id) values (?,?,?,?,?,?)',[$designerId,$run['source_platform'],$record['source_id'],$record['source_fingerprint'],$productId,$item['id']]);
+            $requirements=['ai','licenses','fulfillment'];if(!empty($record['price_requires_review']))$requirements[]='price';if(!empty($record['source_type_requires_review']))$requirements[]='source_type';$review->add($productId,$requirements);
+            DB::exec('insert into product_batch_items (batch_id,product_id,sort_order,validation_errors) values (?,?,(select count(*)+1 from product_import_items where import_run_id=? and product_id is not null),null)',[$run['batch_id'],$productId,$run['id']]);
+            foreach(array_values((array)$record['images']) as $sort=>$url)DB::exec('insert into product_import_images (import_item_id,source_url,sort_order,status) values (?,?,?,"queued")',[$item['id'],$url,$sort]);
+            DB::exec('update product_import_items set product_id=?,result_status=? where id=? and import_run_id=? and result_status="processing"',[$productId,empty($record['images'])?'imported':'processing',$item['id'],$run['id']]);DB::commit();return true;
+        }catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();$driverCode=$e instanceof \PDOException?(int)($e->errorInfo[1]??0):0;if($e instanceof \PDOException&&($e->getCode()==='40001'||in_array($driverCode,[1205,1213],true)))return true;if(isset($item))DB::exec('update product_import_items set result_status="failed",error_message=? where id=? and import_run_id=? and result_status="queued"',['This product could not be created safely.',$item['id'],$run['id']]);return true;}
+    }
+
+    /** Lease and process at most one remote image. Other requests cannot share an active lease. */
+    private function processNextImportedImage(int $runId,int $itemId): bool
+    {
+        $token=bin2hex(random_bytes(20));DB::begin();
+        try{$job=DB::row('select x.*,i.product_id,i.normalized_data from product_import_images x join product_import_items i on i.id=x.import_item_id where i.import_run_id=? and i.id=? and x.status in ("queued","processing") order by x.id limit 1 for update',[$runId,$itemId]);if(!$job||($job['status']==='processing'&&strtotime((string)$job['claimed_at'])>time()-300)){DB::rollBack();return false;}DB::exec('update product_import_images set status="processing",claim_token=?,claimed_at=now() where id=?',[$token,$job['id']]);DB::commit();}
+        catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
+        $record=json_decode($job['normalized_data'],true);$imageResult=(new RemoteProductImageService())->processUrls([$job['source_url']],function(array $download)use($job,$token,$record){$errors=[];$saved=WatermarkService::applyLocalPreview($download['path'],'product_previews',$errors);if(!$saved)throw new \RuntimeException($errors[0]??'Image could not be watermarked or saved.');try{DB::begin();DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)',[$job['product_id'],$saved['image_path'],$saved['original_image_path'],$saved['watermark_status'],$saved['watermark_error'],mb_substr($record['title'],0,240),$job['sort_order']]);$claim=DB::pdo()->prepare('update product_import_images set status="imported",product_image_id=?,claim_token=null where id=? and claim_token=? and status="processing"');$claim->execute([DB::id(),$job['id'],$token]);if($claim->rowCount()!==1)throw new \RuntimeException('Image claim expired safely.');DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();$this->deletePreviewPaths($saved['image_path'],$saved['original_image_path']);throw new \RuntimeException('Image could not be attached safely.');}});
+        if(!$imageResult['succeeded'])DB::exec('update product_import_images set status="failed",warning=?,claim_token=null where id=? and claim_token=? and status="processing"',[$imageResult['warnings'][0]??'Image could not be imported.',$job['id'],$token]);
+        $open=(int)(DB::row('select count(*) c from product_import_images where import_item_id=? and status in ("queued","processing")',[$job['import_item_id']])['c']??0);if(!$open){$warnings=array_column(DB::rows('select warning from product_import_images where import_item_id=? and warning is not null order by sort_order',[$job['import_item_id']]),'warning');DB::exec('update product_import_items set result_status="imported",warnings=? where id=? and result_status="processing"',[(new CsvProductImportService())->json(array_merge((array)$record['warnings'],$warnings)),$job['import_item_id']]);}return true;
+    }
+
+    private function productImportActivity(int $runId): string
+    {
+        $item=DB::row('select id,source_title from product_import_items where import_run_id=? and result_status="processing" order by id limit 1',[$runId]);if(!$item)return 'Preparing the next product…';
+        $images=DB::row('select count(*) total,sum(status in ("imported","failed")) finished from product_import_images where import_item_id=?',[$item['id']]);$total=(int)($images['total']??0);$finished=(int)($images['finished']??0);
+        return $total?$item['source_title'].' — image '.min($total,$finished+1).' of '.$total:$item['source_title'].' — finishing draft…';
+    }
+
+    private function productImportCounts(int $id): array{$counts=[];foreach(DB::rows('select result_status,count(*) c from product_import_items where import_run_id=? group by result_status',[$id])as $row)$counts[$row['result_status']]=(int)$row['c'];return $counts;}
+    private function finishProductImport(int $id,int $designerId,array $run): void
+    {
+        $counts=$this->productImportCounts($id);$imported=$counts['imported']??0;$failed=$counts['failed']??0;$batchId=$run['batch_id']??null;
+        if($batchId&&!$imported){DB::exec('delete from product_batches where id=? and designer_id=?',[$batchId,$designerId]);$batchId=null;}
+        DB::exec('update product_import_runs set imported_count=?,duplicate_count=?,invalid_count=?,skipped_count=?,failed_count=?,batch_id=?,status=?,completed_at=now(),stored_path=NULL where id=? and designer_id=?',[$imported,$counts['duplicate']??0,$counts['invalid']??0,$counts['skipped']??0,$failed,$batchId,$failed?($imported?'partial':'failed'):'completed',$id,$designerId]);
+        (new CsvProductImportService())->removeTemporaryFile($run['stored_path']??null);
     }
 
     public function productImportSummary($id): void
     {
-        $d=$this->requireOnboardingComplete(); $run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']])??H::abort(404);
+        $d=$this->requireOnboardingComplete(); $run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']])??H::abort(404);$this->normalizeLegacyProductImport($run,(int)$d['id']);$run=DB::row('select * from product_import_runs where id=? and designer_id=?',[(int)$id,$d['id']]);
         H::view('seller/product_import_summary',['run'=>$run,'items'=>DB::rows('select * from product_import_items where import_run_id=? order by id',[(int)$id])]);
     }
 
     public function productImportHistory(): void
     {
-        $d=$this->requireOnboardingComplete(); H::view('seller/product_import_history',['runs'=>DB::rows('select * from product_import_runs where designer_id=? order by created_at desc limit 100',[$d['id']])]);
+        $d=$this->requireOnboardingComplete();$runs=DB::rows('select * from product_import_runs where designer_id=? order by created_at desc limit 100',[$d['id']]);foreach($runs as $run)$this->normalizeLegacyProductImport($run,(int)$d['id']);H::view('seller/product_import_history',['runs'=>DB::rows('select * from product_import_runs where designer_id=? order by created_at desc limit 100',[$d['id']])]);
     }
 
     public function payhipImportTemplate(): void
