@@ -9,21 +9,42 @@
 <?php if(!$products): ?>
 <div class="card empty"><h2>No products found.</h2><p>Create a product draft and submit it for review when it is ready.</p><a class="btn" href="/seller/product/new">Create Product</a></div>
 <?php else: ?>
-    <form id="bulk-delete-form" method="post" action="/seller/products/bulk-delete" onsubmit="const n=document.querySelectorAll('.bulk-delete-pick:checked').length;if(!n){alert('Select at least one product to delete.');return false;}return confirm('Permanently delete '+n+' selected product'+(n===1?'':'s')+'? This cannot be undone.');">
+    <form id="bulk-product-form" method="post" action="/seller/products/bulk-delete">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
         <p>
-            <button type="button" onclick="document.querySelectorAll('.bulk-delete-pick').forEach(x=>x.checked=true)">Select All Deletable</button>
-            <button type="button" onclick="document.querySelectorAll('.bulk-delete-pick').forEach(x=>x.checked=false)">Deselect All</button>
-            <button type="submit">Delete Selected Products</button>
+            <button
+                type="button"
+                onclick="document.querySelectorAll('.bulk-product-pick').forEach(x=>x.checked=true)"
+            >Select All</button>
+
+            <button
+                type="button"
+                onclick="document.querySelectorAll('.bulk-product-pick').forEach(x=>x.checked=false)"
+            >Deselect All</button>
+
+            <button
+                type="submit"
+                formaction="/seller/products/bulk-archive"
+                onclick="const n=document.querySelectorAll('.bulk-product-pick:checked').length;if(!n){alert('Select at least one product to archive.');return false;}return confirm('Archive '+n+' selected product'+(n===1?'':'s')+' and hide them from public listings?');"
+            >Archive Selected</button>
+
+            <button
+                type="submit"
+                formaction="/seller/products/bulk-delete"
+                onclick="const n=document.querySelectorAll('.bulk-product-pick:checked').length;if(!n){alert('Select at least one product to delete.');return false;}return confirm('Permanently delete all eligible products from the '+n+' selected product'+(n===1?'':'s')+'? Products that are not eligible for permanent deletion will be skipped.');"
+            >Permanent Delete Selected</button>
         </p>
-        <p class="muted">Only products currently eligible for Permanent Delete can be selected.</p>
+
+        <p class="muted">
+            Select any products for bulk actions. Archive hides selected products from public listings. Permanent delete only removes eligible draft/test products with no completed orders.
+        </p>
     </form>
 
     <div class="responsive-table"><table>
         <tr><th>Select</th><th>Thumbnail</th><th>Product Name</th><th>Status</th><th>Orders</th><th>Price</th><th>Category</th><th>Updated Date</th><th>Actions</th></tr>
         <?php foreach($products as $p): $safeDelete = ((int)($p['completed_order_count'] ?? 0) === 0) && in_array($p['status'], ['draft','rejected','archived','disabled','deleted'], true); ?>
            <tr>
-               <td><?php if($safeDelete):?><input class="bulk-delete-pick" type="checkbox" name="product_ids[]" value="<?=(int)$p['id']?>" form="bulk-delete-form" aria-label="Select <?=H::e($p['title'])?> for permanent delete"><?php else:?><span class="muted">—</span><?php endif;?></td>
+               <td><input class="bulk-product-pick" type="checkbox" name="product_ids[]" value="<?=(int)$p['id']?>" form="bulk-product-form" aria-label="Select <?=H::e($p['title'])?>"></td>
                <td><?php if($p['thumbnail']):?><img class="thumb" src="<?=H::e($p['thumbnail'])?>" alt="<?=H::e($p['title'])?> thumbnail"><?php else:?><span class="thumb">No image</span><?php endif;?></td>
                <td><?=H::e($p['title'])?><?php if($p['rejection_reason']):?><br><small>Rejected: <?=H::e($p['rejection_reason'])?></small><?php endif;?><?php if((int)($p['completed_order_count'] ?? 0)>0):?><br><small class="muted">Cannot be permanently deleted because completed orders reference it.</small><?php endif;?></td>
                <td><span class="badge"><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></span></td>

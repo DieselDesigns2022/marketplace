@@ -49,9 +49,41 @@ class ProductBatchService
                 DB::exec('insert ignore into product_tags (product_id,tag_id) select ?,tag_id from product_tags where product_id=?', [$target['id'], $sourceId]);
             }
             if ($copyLicenses) {
-                DB::exec('delete from product_license_types where product_id=?', [$target['id']]);
-                DB::exec('insert into product_license_types (product_id,license_type_id,is_enabled,is_default,price,custom_name,description,sort_order) select ?,license_type_id,is_enabled,is_default,price,custom_name,description,sort_order from product_license_types where product_id=?', [$target['id'], $sourceId]);
-                DB::exec('update products set commercial_license_enabled=?,commercial_license_price=?,pod_allowed=? where id=? and designer_id=?', [$source['commercial_license_enabled'], $source['commercial_license_price'], $source['pod_allowed'], $target['id'], $designerId]);
+                DB::exec(
+                    'delete from product_license_types where product_id=?',
+                    [$target['id']]
+                );
+
+                DB::exec(
+                    'insert into product_license_types
+                     (product_id,license_type_id,is_enabled,is_default,price,custom_name,description,sort_order)
+                     select ?,license_type_id,is_enabled,is_default,price,custom_name,description,sort_order
+                     from product_license_types
+                     where product_id=?',
+                    [$target['id'], $sourceId]
+                );
+
+                DB::exec(
+                    'update products
+                     set commercial_license_enabled=?,
+                         commercial_license_price=?,
+                         pod_allowed=?,
+                         updated_at=now()
+                     where id=? and designer_id=?',
+                    [
+                        $source['commercial_license_enabled'],
+                        $source['commercial_license_price'],
+                        $source['pod_allowed'],
+                        $target['id'],
+                        $designerId
+                    ]
+                );
+
+                (new ProductImportReviewService())
+                    ->clearAfterExplicitSave(
+                        (int)$target['id'],
+                        ['licenses']
+                    );
             }
             $count++;
         }

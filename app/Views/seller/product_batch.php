@@ -162,6 +162,73 @@ $isEntirelyDraft =
     <?php endif; ?>
 
 
+<?php if ($drafts && count($products) > 1): ?>
+<div class="card">
+    <h2>Apply License Settings in Bulk</h2>
+
+    <p>
+        Configure the Asset Moth licenses on one product first and save it.
+        Then choose that product below to apply the same enabled licenses
+        and add-on prices to every other draft product in this batch.
+    </p>
+
+    <form
+        method="post"
+        onsubmit="return confirm('Apply these license settings to every other draft product in this batch?');"
+    >
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::csrf()?>"
+        >
+
+        <input
+            type="hidden"
+            name="action"
+            value="copy"
+        >
+
+        <input
+            type="hidden"
+            name="copy_fields[]"
+            value="licenses"
+        >
+
+        <label>
+            Copy license settings from
+
+            <select name="source_product_id" required>
+                <option value="">Choose a product</option>
+
+                <?php foreach ($products as $licenseSource): ?>
+                    <option value="<?=(int)$licenseSource['id']?>">
+                        <?=H::e($licenseSource['title'])?>
+                        — <?=H::e(
+                            ucwords(
+                                str_replace(
+                                    '_',
+                                    ' ',
+                                    $licenseSource['status']
+                                )
+                            )
+                        )?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+
+        <p class="help-text">
+            Only other products that are still drafts will be changed.
+            Submitted or published products remain unchanged.
+        </p>
+
+        <button type="submit">
+            Apply License Settings to All Other Drafts
+        </button>
+    </form>
+</div>
+<?php endif; ?>
+
 <div class="card">
     <h2>Delete This Bulk Batch</h2>
 

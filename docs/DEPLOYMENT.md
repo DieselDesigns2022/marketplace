@@ -58,6 +58,8 @@ Deployments that already applied `database/migrations/2026_08_21_phase_12_4_csv_
 
 `storage/app/private/csv_imports` must exist outside the public web root and remain non-public and writable by PHP-FPM. Production uses `www-data:www-data` with mode `0750`, or an equivalent runtime owner and permission policy. The application accepts CSV files up to **50 MB** and rejects imports exceeding **50,000 rows**.
 
+Imported remote product previews are stored under `public/uploads/product_previews` as a single watermarked storefront image. The longest dimension is capped at 1200px and WebP is used when the PHP GD encoder is available. Imported remote previews do not retain a duplicate private original. Normal seller-uploaded preview images continue to use the existing private-original plus public-watermarked-preview storage model.
+
 ## Upload folder permissions
 
 Upload folders must be writable by the PHP/Nginx runtime user but must not be committed to Git. Public preview uploads may be web-accessible. Protected product files must not be directly web-accessible. Phase 10.6 banner normalization additionally requires an application-writable `public/uploads/store_banners/` directory with script execution prohibited.

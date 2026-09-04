@@ -1069,7 +1069,7 @@ class SellerController
         $token=bin2hex(random_bytes(20));DB::begin();
         try{$job=DB::row('select x.*,i.product_id,i.normalized_data from product_import_images x join product_import_items i on i.id=x.import_item_id where i.import_run_id=? and i.id=? and x.status in ("queued","processing") order by x.id limit 1 for update',[$runId,$itemId]);if(!$job||($job['status']==='processing'&&strtotime((string)$job['claimed_at'])>time()-300)){DB::rollBack();return false;}DB::exec('update product_import_images set status="processing",claim_token=?,claimed_at=now() where id=?',[$token,$job['id']]);DB::commit();}
         catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
-        $record=json_decode($job['normalized_data'],true);$imageResult=(new RemoteProductImageService())->processUrls([$job['source_url']],function(array $download)use($job,$token,$record){$errors=[];$saved=WatermarkService::applyLocalPreview($download['path'],'product_previews',$errors);if(!$saved)throw new \RuntimeException($errors[0]??'Image could not be watermarked or saved.');try{DB::begin();DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)',[$job['product_id'],$saved['image_path'],$saved['original_image_path'],$saved['watermark_status'],$saved['watermark_error'],mb_substr($record['title'],0,240),$job['sort_order']]);$claim=DB::pdo()->prepare('update product_import_images set status="imported",product_image_id=?,claim_token=null where id=? and claim_token=? and status="processing"');$claim->execute([DB::id(),$job['id'],$token]);if($claim->rowCount()!==1)throw new \RuntimeException('Image claim expired safely.');DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();$this->deletePreviewPaths($saved['image_path'],$saved['original_image_path']);throw new \RuntimeException('Image could not be attached safely.');}});
+        $record=json_decode($job['normalized_data'],true);$imageResult=(new RemoteProductImageService())->processUrls([$job['source_url']],function(array $download)use($job,$token,$record){$errors=[];$saved=WatermarkService::applyImportedRemotePreview($download['path'],'product_previews',$errors);if(!$saved)throw new \RuntimeException($errors[0]??'Image could not be watermarked or saved.');try{DB::begin();DB::exec('insert into product_images (product_id,image_path,original_image_path,watermark_status,watermark_error,alt_text,sort_order) values (?,?,?,?,?,?,?)',[$job['product_id'],$saved['image_path'],$saved['original_image_path'],$saved['watermark_status'],$saved['watermark_error'],mb_substr($record['title'],0,240),$job['sort_order']]);$claim=DB::pdo()->prepare('update product_import_images set status="imported",product_image_id=?,claim_token=null where id=? and claim_token=? and status="processing"');$claim->execute([DB::id(),$job['id'],$token]);if($claim->rowCount()!==1)throw new \RuntimeException('Image claim expired safely.');DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();$this->deletePreviewPaths($saved['image_path'],$saved['original_image_path']);throw new \RuntimeException('Image could not be attached safely.');}});
         if(!$imageResult['succeeded'])DB::exec('update product_import_images set status="failed",warning=?,claim_token=null where id=? and claim_token=? and status="processing"',[$imageResult['warnings'][0]??'Image could not be imported.',$job['id'],$token]);
         $open=(int)(DB::row('select count(*) c from product_import_images where import_item_id=? and status in ("queued","processing")',[$job['import_item_id']])['c']??0);if(!$open){$warnings=array_column(DB::rows('select warning from product_import_images where import_item_id=? and warning is not null order by sort_order',[$job['import_item_id']]),'warning');DB::exec('update product_import_items set result_status="imported",warnings=? where id=? and result_status="processing"',[(new CsvProductImportService())->json(array_merge((array)$record['warnings'],$warnings)),$job['import_item_id']]);}return true;
     }
@@ -1673,8 +1673,64 @@ class SellerController
         } elseif ($action === 'copy') {
             $products = $service->products((int)$id, (int)$d['id']);
             if (!$products) H::abort(404);
-            $count = $service->copy((int)$id, (int)$d['id'], (int)$products[0]['id'], (array)($_POST['copy_fields'] ?? []));
-            H::flash('success', "Selected template fields were copied into $count draft products. Each copy can now be edited independently.");
+
+            $sourceId = (int)($_POST['source_product_id'] ?? ($products[0]['id'] ?? 0));
+            $copyFields = (array)($_POST['copy_fields'] ?? []);
+            $targetIds = array_map(
+                'intval',
+                (array)($_POST['target_product_ids'] ?? [])
+            );
+
+            $source = null;
+            foreach ($products as $candidate) {
+                if ((int)$candidate['id'] === $sourceId) {
+                    $source = $candidate;
+                    break;
+                }
+            }
+
+            if (!$source) {
+                H::abort(404);
+            }
+
+            if (
+                in_array('licenses', $copyFields, true)
+                && in_array(
+                    'licenses',
+                    (new ProductImportReviewService())->openKeys($sourceId),
+                    true
+                )
+            ) {
+                H::flash(
+                    'error',
+                    'Open the source product, review its Asset Moth licenses, and save it first.'
+                );
+                H::redirect('/seller/product-batch/' . (int)$id);
+            }
+
+            $count = $service->copy(
+                (int)$id,
+                (int)$d['id'],
+                $sourceId,
+                $copyFields,
+                $targetIds
+            );
+
+            if (in_array('licenses', $copyFields, true)) {
+                H::flash(
+                    'success',
+                    'License settings were applied to ' .
+                    $count .
+                    ' other draft product(s).'
+                );
+            } else {
+                H::flash(
+                    'success',
+                    'Selected template fields were copied into ' .
+                    $count .
+                    ' draft product(s). Each product can still be edited independently.'
+                );
+            }
         } elseif ($action === 'remove') {
             $productId = (int)($_POST['product_id'] ?? 0);
             $p = DB::row('select p.* from products p join product_batch_items i on i.product_id=p.id where i.batch_id=? and p.id=? and p.designer_id=?', [(int)$id,$productId,$d['id']]) ?? H::abort(404);
@@ -2009,6 +2065,69 @@ class SellerController
         DB::exec('update products set status="draft",updated_at=now() where id=? and designer_id=? and status in ("archived","deleted")', [$productId, $d['id']]);
         H::flash('success', 'Product restored as a draft. Submit it for review before publishing again.');
         H::redirect('/seller/products?status=draft');
+    }
+
+    public function bulkArchiveProducts(): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+
+        $d = $this->d();
+
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', (array)($_POST['product_ids'] ?? [])),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if (!$ids) {
+            H::flash('error', 'Select at least one product to archive.');
+            H::redirect('/seller/products');
+        }
+
+        $archived = 0;
+        $skipped = 0;
+
+        foreach ($ids as $productId) {
+            $p = DB::row(
+                'select id,status from products where id=? and designer_id=?',
+                [$productId, $d['id']]
+            );
+
+            if (
+                !$p
+                || in_array($p['status'], ['archived','deleted'], true)
+            ) {
+                $skipped++;
+                continue;
+            }
+
+            DB::exec(
+                'update products set status="archived",updated_at=now() where id=? and designer_id=?',
+                [$productId, $d['id']]
+            );
+
+            $archived++;
+        }
+
+        if ($archived > 0 && $skipped > 0) {
+            H::flash(
+                'warning',
+                $archived . ' selected product(s) archived. ' .
+                $skipped . ' product(s) were already archived or unavailable.'
+            );
+        } elseif ($archived > 0) {
+            H::flash(
+                'success',
+                $archived . ' selected product(s) archived and hidden from public listings.'
+            );
+        } else {
+            H::flash(
+                'error',
+                'None of the selected products could be archived.'
+            );
+        }
+
+        H::redirect('/seller/products?status=archived');
     }
 
     public function bulkDeleteProducts(): void

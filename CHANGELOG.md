@@ -3,9 +3,12 @@
 ## Phase 12.4 — Multi-platform CSV product import
 - Added a shared CSV-only preview, mapping, draft creation, import-history, duplicate-protection, and Phase 12.2 batch-review workflow for Shopify, Etsy, Payhip, Square, Squarespace, Wix, Weebly, and WordPress/WooCommerce product exports.
 - Payhip uses an Asset Moth template or seller-directed column mapping; no native Payhip catalogue export, API connection, credentials, or synchronization is claimed.
-- CSV-supplied HTTPS product images now pass SSRF-safe DNS/redirect checks and byte-level image validation before using the normal private-original, public-watermarked preview storage and product image records.
+- CSV-supplied HTTPS product images now pass SSRF-safe DNS/redirect checks and byte-level image validation before being attached as watermarked product preview records.
 - Corrected atomic preview persistence, independent batch/product failures, durable imported-draft review gates, unresolved-price handling, fingerprinted duplicates, accurate final result states, UTF-8 validation, source-curated metadata, and protected temporary-file cleanup.
 - Live testing established the CSV application limits at 50 MB and 50,000 rows and added real upload progress followed by server-parsing feedback.
+- Imported remote previews are now stored as a single public watermarked storefront image, capped at 1200px on the longest side and encoded as WebP when available; manually uploaded previews continue to retain private originals.
+- Seller product management now supports bulk archive, and imported Phase 12.2 batches can copy explicitly reviewed Asset Moth license settings from one source product to all other draft products while clearing the receiving drafts' license-review requirement.
+- Final external Phase 12.4 tester review completed with no remaining tester-reported blocker.
 - Added completed-product import progress with current product/image activity, exact durable selection, and resumable bounded draft/image work with transactional claims, active leases, safe retry delays, and per-image warnings.
 - Added ownership-scoped, CSRF-protected seller bulk product deletion from the products list.
 

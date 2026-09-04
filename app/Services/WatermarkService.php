@@ -53,6 +53,81 @@ class WatermarkService
         return self::storeValidatedPreview($path, $ext, $folder, $errors, false);
     }
 
+    /**
+     * Imported remote previews only need the final public watermarked image.
+     * They are resized for storefront use and do not retain a private source copy.
+     */
+    public static function applyImportedRemotePreview(
+        string $path,
+        string $folder,
+        array &$errors,
+        int $maxDimension = 1200
+    ): ?array {
+        if (!is_file($path) || filesize($path) > 25 * 1024 * 1024) {
+            $errors[] = 'Remote image exceeded the 25MB preview-image limit.';
+            return null;
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path) ?: '';
+        $sourceTypes = [
+            'image/jpeg' => IMAGETYPE_JPEG,
+            'image/png' => IMAGETYPE_PNG,
+            'image/webp' => IMAGETYPE_WEBP,
+        ];
+        $sourceExts = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        ];
+
+        if (!isset($sourceTypes[$mime]) || !self::isSupportedImage($path, $sourceExts[$mime])) {
+            $errors[] = 'Remote file was not a supported JPG, PNG, or WEBP image.';
+            return null;
+        }
+
+        if (!extension_loaded('gd')) {
+            $errors[] = 'Preview watermarking is unavailable because PHP GD is not installed.';
+            return null;
+        }
+
+        $publicDir = public_path('uploads/' . trim($folder, '/'));
+        if (!is_dir($publicDir) && !mkdir($publicDir, 0755, true)) {
+            $errors[] = 'Public preview directory is unavailable.';
+            return null;
+        }
+
+        $sourceType = $sourceTypes[$mime];
+        $outputType = function_exists('imagewebp') ? IMAGETYPE_WEBP : $sourceType;
+        $outputExt = match ($outputType) {
+            IMAGETYPE_WEBP => 'webp',
+            IMAGETYPE_PNG => 'png',
+            default => 'jpg',
+        };
+
+        $name = bin2hex(random_bytes(12)) . '-wm.' . $outputExt;
+        $publicAbs = $publicDir . '/' . $name;
+
+        $result = self::watermarkFile(
+            $path,
+            $publicAbs,
+            max(1, $maxDimension),
+            $outputType
+        );
+
+        if (!$result['ok']) {
+            @unlink($publicAbs);
+            $errors[] = $result['message'];
+            return null;
+        }
+
+        return [
+            'image_path' => '/uploads/' . trim($folder, '/') . '/' . $name,
+            'original_image_path' => null,
+            'watermark_status' => self::STATUS_WATERMARKED,
+            'watermark_error' => null,
+        ];
+    }
+
     private static function storeValidatedPreview(string $tmp, string $ext, string $folder, array &$errors, bool $uploaded): ?array
     {
         $name = bin2hex(random_bytes(12)) . '.' . $ext;
@@ -137,7 +212,12 @@ class WatermarkService
         return ($allowed[$ext] ?? '') === $mime;
     }
 
-    private static function watermarkFile(string $sourceAbs, string $destinationAbs): array
+    private static function watermarkFile(
+        string $sourceAbs,
+        string $destinationAbs,
+        ?int $maxDimension = null,
+        ?int $outputType = null
+    ): array
     {
         if (!extension_loaded('gd')) return ['ok' => false, 'message' => 'PHP GD extension is not available.'];
         $info = @getimagesize($sourceAbs);
@@ -148,13 +228,56 @@ class WatermarkService
             imagealphablending($base, true);
             imagesavealpha($base, true);
             $bw = imagesx($base); $bh = imagesy($base);
+
+            if ($maxDimension !== null && max($bw, $bh) > $maxDimension) {
+                $scale = $maxDimension / max($bw, $bh);
+                $newW = max(1, (int)round($bw * $scale));
+                $newH = max(1, (int)round($bh * $scale));
+                $resized = imagecreatetruecolor($newW, $newH);
+                if (!$resized) {
+                    imagedestroy($base);
+                    return ['ok' => false, 'message' => 'Preview image could not be resized.'];
+                }
+
+                if (in_array((int)$info[2], [IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+                    imagealphablending($resized, false);
+                    imagesavealpha($resized, true);
+                    $transparent = imagecolorallocatealpha($resized, 0, 0, 0, 127);
+                    imagefilledrectangle($resized, 0, 0, $newW - 1, $newH - 1, $transparent);
+                }
+
+                if (!imagecopyresampled(
+                    $resized,
+                    $base,
+                    0,
+                    0,
+                    0,
+                    0,
+                    $newW,
+                    $newH,
+                    $bw,
+                    $bh
+                )) {
+                    imagedestroy($resized);
+                    imagedestroy($base);
+                    return ['ok' => false, 'message' => 'Preview image could not be resized.'];
+                }
+
+                imagedestroy($base);
+                $base = $resized;
+                imagealphablending($base, true);
+                imagesavealpha($base, true);
+                $bw = $newW;
+                $bh = $newH;
+            }
+
             $mark = self::watermarkImage(max(1, (int)round($bw * 0.238)), max(1, (int)round($bh * 0.159)));
             $mark = self::applyOpacity($mark, 50);
             $mw = imagesx($mark); $mh = imagesy($mark);
             $pad = max(12, (int)round(min($bw, $bh) * 0.035));
             imagecopy($base, $mark, $pad, max(0, $bh - $mh - $pad), 0, 0, $mw, $mh);
             if (!is_dir(dirname($destinationAbs))) mkdir(dirname($destinationAbs), 0755, true);
-            $saved = self::saveImage($base, $destinationAbs, (int)$info[2]);
+            $saved = self::saveImage($base, $destinationAbs, $outputType ?? (int)$info[2]);
             imagedestroy($base); imagedestroy($mark);
             return $saved ? ['ok' => true, 'message' => 'Watermark created.'] : ['ok' => false, 'message' => 'Watermarked preview could not be written.'];
         } catch (Throwable $e) {

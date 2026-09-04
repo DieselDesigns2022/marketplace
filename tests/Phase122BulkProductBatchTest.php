@@ -11,6 +11,7 @@ $service=file_get_contents("$root/app/Services/ProductBatchService.php");
 $submission=file_get_contents("$root/app/Services/ProductSubmissionService.php");
 $controller=file_get_contents("$root/app/Controllers/SellerController.php");
 $batchView=file_get_contents("$root/app/Views/seller/product_batch.php");
+$productsView=file_get_contents("$root/app/Views/seller/products.php");
 $batchesView=file_get_contents("$root/app/Views/seller/product_batches.php");
 $bulkForm=file_get_contents("$root/app/Views/seller/bulk_product_form.php");
 $bulkCount=file_get_contents("$root/app/Views/seller/bulk_product_count.php");
@@ -71,6 +72,30 @@ $check(
     && str_contains($batchView,'value="delete_batch"')
     && str_contains($batchesView,'value="delete_batch"'),
     'SOURCE: bulk batch deletion is wired from list and individual batch views'
+);
+
+
+$check(
+    str_contains($routes,'/seller/products/bulk-archive')
+    && str_contains($controller,'bulkArchiveProducts')
+    && str_contains($productsView,'Archive Selected')
+    && str_contains($productsView,'bulk-product-pick'),
+    'SOURCE: seller products expose selectable bulk archive controls'
+);
+
+$check(
+    str_contains($batchView,'Apply License Settings in Bulk')
+    && str_contains($batchView,'name="source_product_id"')
+    && str_contains($batchView,'value="licenses"')
+    && str_contains($controller,'source_product_id')
+    && str_contains($controller,'openKeys($sourceId)')
+    && str_contains($service,'clearAfterExplicitSave'),
+    'SOURCE: bulk license copy requires reviewed source and clears target import license gate'
+);
+
+$check(
+    str_contains($controller,"\$products[0]['id'] ?? 0"),
+    'SOURCE: generic batch copy remains backward-compatible when no explicit source product is posted'
 );
 
 echo "NOTE: Behavioral workflow assertions run only in Phase122DatabaseIntegrationTest.php and live testing.\n";

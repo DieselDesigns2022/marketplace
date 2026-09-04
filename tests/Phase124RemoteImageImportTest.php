@@ -17,9 +17,93 @@ foreach(['timeout'=>'timed out','large'=>'25MB'] as $name=>$message){try{$servic
 $redirectPrivate=new RemoteProductImageService(fn($h)=>$h==='private.example'?['10.0.0.2']:['93.184.216.34'],$transport);try{$redirectPrivate->fetch('https://example.com/redirect-'.urlencode('https://private.example/jpg'));$ok=false;}catch(RuntimeException $e){$ok=str_contains($e->getMessage(),'blocked');}$check($ok,'redirect destination is DNS validated and private redirect rejected');
 try{$service->fetch('https://example.com/redirect-'.urlencode('http://example.com/jpg'));$ok=false;}catch(RuntimeException $e){$ok=str_contains($e->getMessage(),'not HTTPS');}$check($ok,'HTTPS to HTTP redirect downgrade rejected');
 try{$service->fetch('https://example.com/loop');$ok=false;}catch(RuntimeException $e){$ok=str_contains($e->getMessage(),'redirect limit');}$check($ok,'redirect limit enforced');
-$got=$service->fetch('https://example.com/png');$errors=[];$saved=WatermarkService::applyLocalPreview($got['path'],'product_previews',$errors);unlink($got['path']);$private=$saved?app_path('storage/app/private/'.$saved['original_image_path']):'';$public=$saved?public_path(ltrim($saved['image_path'],'/')):'';$check($saved&&is_file($private),'remote image uses normal private-original storage');$check($saved&&is_file($public)&&str_starts_with($saved['image_path'],'/uploads/product_previews/'),'remote image uses normal public preview storage');if($saved){@unlink($private);@unlink($public);}
+$got=$service->fetch('https://example.com/png');
+$errors=[];
+$manual=WatermarkService::applyLocalPreview($got['path'],'product_previews',$errors);
+unlink($got['path']);
+$manualPrivate=$manual&&$manual['original_image_path']?app_path('storage/app/private/'.$manual['original_image_path']):'';
+$manualPublic=$manual?public_path(ltrim($manual['image_path'],'/')):'';
+$check($manual&&is_file($manualPrivate),'manual local preview retains private original');
+$check($manual&&is_file($manualPublic),'manual local preview retains public watermarked preview');
+if($manual){@unlink($manualPrivate);@unlink($manualPublic);}
+
+$largePath="$dir/large-source.png";
+$large=imagecreatetruecolor(1600,900);
+$largeColor=imagecolorallocate($large,40,80,120);
+imagefill($large,0,0,$largeColor);
+imagepng($large,$largePath);
+imagedestroy($large);
+
+$importErrors=[];
+$imported=WatermarkService::applyImportedRemotePreview($largePath,'product_previews',$importErrors);
+$importedPublic=$imported?public_path(ltrim($imported['image_path'],'/')):'';
+$importedInfo=$importedPublic&&is_file($importedPublic)?getimagesize($importedPublic):false;
+
+$check(
+    $imported
+    && $imported['original_image_path']===null
+    && is_file($importedPublic),
+    'imported remote preview is public-only with no private original'
+);
+$check(
+    $imported
+    && $imported['watermark_status']===WatermarkService::STATUS_WATERMARKED,
+    'imported remote preview is watermarked'
+);
+$check(
+    $importedInfo
+    && max((int)$importedInfo[0],(int)$importedInfo[1])<=1200,
+    'imported remote preview longest dimension is capped at 1200px'
+);
+
+if(function_exists('imagewebp')){
+    $check(
+        $imported
+        && strtolower(pathinfo($imported['image_path'],PATHINFO_EXTENSION))==='webp',
+        'imported remote preview uses WEBP when encoder is available'
+    );
+}else{
+    echo "SKIP: GD WEBP encoder is unavailable for imported-preview encoding.\n";
+}
+
+@unlink($largePath);
+if($importedPublic)@unlink($importedPublic);
 $order=[];$tempPaths=[];$mixed=$service->processUrls(['https://example.com/png','https://example.com/html','https://example.com/jpg'],function($download,$index)use(&$order,&$tempPaths){$order[]=$index;$tempPaths[]=$download['path'];});$check($mixed['succeeded']===2&&$order===[0,2]&&count($mixed['warnings'])===1&&str_starts_with($mixed['warnings'][0],'Image 2:'),'multiple images preserve order and mixed failure remains partial');$check(!array_filter($tempPaths,'is_file'),'successful and partial processing removes temporary downloads');
 $all=$service->processUrls(['http://example.com/jpg','https://example.com/svg'],fn()=>null);$check($all['succeeded']===0&&count($all['warnings'])===2,'all image failures return warnings without throwing product-fatal error');
-$created=[];$attach=$service->processUrls(['https://example.com/png'],function($download)use(&$created){$errors=[];$saved=WatermarkService::applyLocalPreview($download['path'],'product_previews',$errors);$created=$saved;foreach([$saved['image_path']??null,$saved['original_image_path']??null] as $path){if(!$path)continue;$absolute=str_starts_with($path,'/uploads/')?public_path(ltrim($path,'/')):app_path('storage/app/private/'.$path);@unlink($absolute);}throw new RuntimeException('Image could not be attached safely.');});$check($attach['succeeded']===0&&str_contains($attach['warnings'][0],'attached safely'),'attachment failure is partial and callback can remove created preview files');
-$watermark=file_get_contents("$root/app/Services/WatermarkService.php");$check(str_contains($watermark,'applyUploadedPreview')&&str_contains($watermark,'storeValidatedPreview'),'manual and remote previews share one storage/watermark pipeline');
+$created=[];
+$attach=$service->processUrls(
+    ['https://example.com/png'],
+    function($download)use(&$created){
+        $errors=[];
+        $saved=WatermarkService::applyImportedRemotePreview(
+            $download['path'],
+            'product_previews',
+            $errors
+        );
+        $created=$saved;
+        if($saved&&!empty($saved['image_path'])){
+            @unlink(public_path(ltrim($saved['image_path'],'/')));
+        }
+        throw new RuntimeException('Image could not be attached safely.');
+    }
+);
+$check(
+    $attach['succeeded']===0
+    && str_contains($attach['warnings'][0],'attached safely'),
+    'attachment failure is partial and imported public preview can be cleaned'
+);
+$watermark=file_get_contents("$root/app/Services/WatermarkService.php");
+$controller=file_get_contents("$root/app/Controllers/SellerController.php");
+
+$check(
+    str_contains($watermark,'applyUploadedPreview')
+    && str_contains($watermark,'applyImportedRemotePreview')
+    && str_contains($watermark,"'original_image_path' => null"),
+    'manual and imported remote preview storage paths are intentionally distinct'
+);
+
+$check(
+    str_contains($controller,'applyImportedRemotePreview'),
+    'CSV import controller uses imported remote preview pipeline'
+);
 foreach(glob("$dir/*") as $f)@unlink($f);@rmdir($dir);exit($fail?1:0);
