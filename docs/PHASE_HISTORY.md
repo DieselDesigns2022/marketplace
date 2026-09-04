@@ -1,5 +1,8 @@
 # Phase History
 
+## Phase 12.4 — CSV product import
+Seller-supplied product CSV files from Shopify, Etsy, Payhip, Square, Squarespace, Wix, Weebly, and core WordPress/WooCommerce can be normalized and previewed before selected listings become independent drafts in a Phase 12.2 batch. Sellers may review automatic mappings or override supported columns. Payhip uses the downloadable Asset Moth template/manual mapping because it has no standard native product-catalogue CSV export. Wix native exports omit digital source files, and no source platform download file is retrieved. Imported drafts require explicit review of AI, licensing, and fulfillment; price review is additionally required when the source price is unresolved, conflicting, or in a different currency, and source-type acknowledgement is required when the source type may be incompatible. Category, preview-image, protected-file or delivery, and legal checks remain normal current-product validation requirements rather than import-review confirmations. This phase adds no connections or synchronization. Live-test hardening added public-only max-1200px imported remote previews with WebP output when available, seller bulk product archive controls, and batch-wide copying of explicitly reviewed Asset Moth license settings to other draft products. Final external tester review reported no remaining Phase 12.4 blocker.
+
 This document is the detailed project development history. It records the implementation timeline, deployment milestones, testing performed, regressions discovered, infrastructure work, database work, security work, and workflow lessons from completed marketplace phases.
 
 `CHANGELOG.md` remains the concise high-level release summary. This file is the detailed phase log.
@@ -1085,3 +1088,6 @@ The workflow preserves the seller's configured license selections and applicable
 # Phase 12.3 — Email Preferences, Digests & Favorite-Shop Emails
 
 Extended the Phase 10.5 durable email foundation with independent weekly, monthly, and favorite-shop consent, scheduled marketplace-backed producers, preference-scoped signed unsubscribe handling, and privacy-preserving aggregate admin visibility.
+
+### Phase 12.4 correction pass 2
+The CSV-only import review was tightened so unresolved prices remain blank, each imported setting requires its own explicit confirmation, remote images are fetched after the core draft transaction commits, confirmation is atomically claimed, and source sale prices remain reference metadata. No account connection, synchronization, or source download-file retrieval was added.

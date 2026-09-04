@@ -1,12 +1,24 @@
 # Changelog
 
+## Phase 12.4 — Multi-platform CSV product import
+- Added a shared CSV-only preview, mapping, draft creation, import-history, duplicate-protection, and Phase 12.2 batch-review workflow for Shopify, Etsy, Payhip, Square, Squarespace, Wix, Weebly, and WordPress/WooCommerce product exports.
+- Payhip uses an Asset Moth template or seller-directed column mapping; no native Payhip catalogue export, API connection, credentials, or synchronization is claimed.
+- CSV-supplied HTTPS product images now pass SSRF-safe DNS/redirect checks and byte-level image validation before being attached as watermarked product preview records.
+- Corrected atomic preview persistence, independent batch/product failures, durable imported-draft review gates, unresolved-price handling, fingerprinted duplicates, accurate final result states, UTF-8 validation, source-curated metadata, and protected temporary-file cleanup.
+- Live testing established the CSV application limits at 50 MB and 50,000 rows and added real upload progress followed by server-parsing feedback.
+- Imported remote previews are now stored as a single public watermarked storefront image, capped at 1200px on the longest side and encoded as WebP when available; manually uploaded previews continue to retain private originals.
+- Seller product management now supports bulk archive, and imported Phase 12.2 batches can copy explicitly reviewed Asset Moth license settings from one source product to all other draft products while clearing the receiving drafts' license-review requirement.
+- Final external Phase 12.4 tester review completed with no remaining tester-reported blocker.
+- Added completed-product import progress with current product/image activity, exact durable selection, and resumable bounded draft/image work with transactional claims, active leases, safe retry delays, and per-image warnings.
+- Added ownership-scoped, CSRF-protected seller bulk product deletion from the products list.
+
 ### Phase 12.1 digital product license expansion
 - Added the seller-enabled `digital-product` permission as a free or paid per-product add-on using the existing LicenseService selection, cart, checkout validation, pricing, and order snapshot paths.
 - Added complete source-file protections to license details and Licensing Help, seller visibility of saved license descriptions/prices, a repeatable MariaDB seed migration, canonical schema data, and focused static/database tests.
 
 ## Current status
 
-The project currently includes the original MVP plus implemented phases through Phase 10.6. Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations; Phase 10 connects that foundation to Stripe Checkout and webhook-driven payment state.
+The project history documents repository work from the original MVP through the current Phase 12.4 CSV-import work. Changelog entries describe implementation in the repository and do not by themselves claim deployment or completed live testing; Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations, while Phase 10 connected that foundation to Stripe Checkout and webhook-driven payment state.
 
 ## Original MVP — completed 2026-06-22
 
@@ -319,3 +331,6 @@ Intentionally postponed:
 
 - Added three independent registered-user marketing preferences with legacy-consent migration, account controls, scoped unsubscribe, and aggregate admin counts.
 - Added durable weekly, monthly, and followed-shop digest producers using real eligible marketplace products, current follows, delivery-time consent checks, and stable deduplication.
+
+### Phase 12.4 correction pass 2
+- Preserved unresolved imported prices as NULL until explicit seller entry, made imported review gates selectively confirmable, made permitted duplicated imported drafts retain their open gates while blocking duplication until an unresolved `source_type` gate is acknowledged, separated batch submission errors from derived validation, moved remote image fetching outside core product transactions, retained source sale-price metadata, and atomically claimed import confirmations to prevent repeat processing.

@@ -1,0 +1,5 @@
+<h1>Map CSV columns</h1><p>We could not safely recognize every required column. Choose what each Asset Moth import field means; each source column can be used once.</p>
+<?php foreach($errors as $error): ?><div class="alert error"><?=H::e($error)?></div><?php endforeach; ?>
+<form method="post" action="/seller/products/import/map" class="card" data-import-action data-loading-text="Building preview…"><input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+<?php foreach(\App\Services\CsvProductImportService::MAP_FIELDS as $field): ?><label><?=H::e(ucwords(str_replace('_',' ',$field)))?><?=$field==='title'?' (required)':''?><select name="mapping[<?=H::e($field)?>]"><option value="">Do not import</option><?php foreach($headers as $header): $normalized=trim(preg_replace('/\s+/',' ',strtolower(str_replace(['-','_'],' ',trim($header))))); ?><option value="<?=H::e($normalized)?>" <?=($mapping[$field]??'')===$normalized?'selected':''?>><?=H::e($header)?></option><?php endforeach; ?></select></label><?php endforeach; ?>
+<button>Apply mapping and preview</button></form>

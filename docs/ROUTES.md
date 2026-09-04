@@ -1,5 +1,16 @@
 # Routes
 
+## Phase 12.4 seller CSV import
+- `GET|POST /seller/products/import` — choose a source, upload a UTF-8 product CSV, and optionally review automatic mapping.
+- `POST /seller/products/import/map` — apply fallback column mapping.
+- `GET /seller/products/import/history` — seller-scoped history.
+- `GET /seller/products/import/payhip-template` — download the Payhip-oriented template.
+- `GET /seller/products/import/{id}/preview` — owned, paginated preview.
+- `POST /seller/products/import/{id}/confirm` — durably save the exact selection and start its draft batch.
+- `GET /seller/products/import/{id}/progress` — show seller-scoped live counts.
+- `POST /seller/products/import/{id}/process` — process one bounded, idempotent, CSRF-protected import work unit: either one draft creation or one remote image job.
+- `GET /seller/products/import/{id}/summary` — owned results.
+
 Routes are registered in `public/index.php`.
 
 ## Public routes
@@ -52,6 +63,7 @@ Routes are registered in `public/index.php`.
 | GET | `/seller` | `SellerController::home` | Seller/admin protected |
 | GET/POST | `/seller/store` | `SellerController::storeSettings` | Seller/admin protected |
 | GET | `/seller/products` | `SellerController::products` | Seller/admin protected |
+| POST | `/seller/products/bulk-delete` | `SellerController::bulkDeleteProducts` | Seller/admin protected, ownership-scoped, CSRF |
 | GET/POST | `/seller/product/new` | `SellerController::editProduct` | Seller/admin protected |
 | GET/POST | `/seller/product/{id}` | `SellerController::editProduct` | Seller/admin protected |
 | POST | `/seller/product/{id}/submit` | `SellerController::submitProduct` | Seller/admin protected |

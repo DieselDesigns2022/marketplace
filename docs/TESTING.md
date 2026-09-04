@@ -1,5 +1,11 @@
 # Testing
 
+## Phase 12.4
+
+Final external tester review completed with four submitted tester responses across computer, tablet, and phone use. No remaining Phase 12.4 blocker was reported after the live licensing usability correction.
+
+Run `php tests/Phase124CsvProductImportTest.php` for all eight adapters, UTF-8/CSV structure, mapping, curated variants, privacy, price/type review, identity fingerprints, tags/categories, and image parsing. Run `php tests/Phase124RemoteImageImportTest.php` for deterministic HTTPS destination, redirect, timeout, size, byte validation, cleanup, manual private-original preservation, imported public-only max-1200px/WebP behavior, partial failure, order, and watermark behavior; it makes no public internet requests. Run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase124DatabaseIntegrationTest.php` only against an explicitly disposable MariaDB server: the test creates a temporary fixture database, builds its prerequisite tables, applies both Phase 12.4 migrations, then checks exact selection, legacy zero-selection stuck-run reconciliation and initial progress, repeated confirmation, interrupted-claim resume, overlapping process workers, idempotent retries, active image leases, terminal-image parent recovery, in-order bounded image work and warnings, failures/partial success, ownership, counts, completion, fingerprints, and review requirements, and then drops the fixture database. Relevant regressions are `php tests/Phase122BulkProductBatchTest.php` and `php tests/Phase106DashboardUsabilityTest.php`. Phase 12.4 live-fix closeout also verifies seller bulk archive wiring, explicit batch license-source selection, backward-compatible generic batch copying, and target license-review clearing.
+
 ## Public visitor testing
 
 - Open homepage.
