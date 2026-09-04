@@ -174,6 +174,7 @@ class AdminController
         $id=(int)$user['id'];
         if ($id===(int)H::user()['id']) return 'You cannot permanently delete your own account.';
         if (($user['role']??'')==='admin') return 'Admin accounts cannot be permanently deleted.';
+        if (DB::row('select id from message_conversations where buyer_user_id=? or seller_user_id=? limit 1',[$id,$id])||DB::row('select id from conversation_messages where sender_user_id=? limit 1',[$id])||DB::row('select id from message_reports where reporter_user_id=? or moderator_user_id=? limit 1',[$id,$id])) return 'This account has private messaging history that must be retained.';
         if (DB::row('select id from orders where user_id=? limit 1',[$id])) return 'This account has an order that must be retained.';
         if (DB::row('select id from coupon_usages where user_id=? limit 1',[$id])) return 'This account has coupon usage history that must be retained.';
         if (DB::row('select id from seller_earnings where buyer_id=? limit 1',[$id])) return 'This account has buyer earnings history that must be retained.';

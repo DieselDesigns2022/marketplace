@@ -1091,3 +1091,9 @@ Extended the Phase 10.5 durable email foundation with independent weekly, monthl
 
 ### Phase 12.4 correction pass 2
 The CSV-only import review was tightened so unresolved prices remain blank, each imported setting requires its own explicit confirmation, remote images are fetched after the core draft transaction commits, confirmation is atomically claimed, and source sale prices remain reference metadata. No account connection, synchronization, or source download-file retrieval was added.
+
+## Phase 12.5 — Internal messaging
+Added durable private buyer/seller conversations with product, storefront, and paid or partially-refunded order-item context, participant read/archive/block controls, abuse reporting, protected image attachments, moderation, in-app notifications, and transactional email alerts. Context presentation remains type-aware and durable: products, storefronts, and purchased products/order items are identified without treating every conversation as product context.
+
+### Phase 12.5 corrections
+Hardened exact image-container validation and decoding, durable context snapshots, empty-compose filtering, side-correct notifications/read synchronization, explicit report/conversation identities, report reopening cleanup, eligible-order UI parity, and messaging-aware account-retention checks.

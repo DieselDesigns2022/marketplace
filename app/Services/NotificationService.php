@@ -44,6 +44,8 @@ final class NotificationService
         if(!in_array($title,$allowed,true))return false;
         return self::create($userId,'rank_badge','designer',$title,$message,$eventKey,'/seller/rank');
     }
+    public static function internalMessage(int $userId,string $recipientSide,int $messageId,string $sender,string $url): bool
+    { $audience=$recipientSide==='seller'?'designer':'buyer';return self::create($userId,'internal_message',$audience,'New message',mb_substr(strip_tags($sender),0,120).' sent you a private Asset Moth message.',"internal-message:$messageId:recipient:$userId",$url); }
     public static function rankBadge(int $userId,string $eventKey,string $message): bool { return self::recognition($userId,$eventKey,'Creator rank earned',$message); }
     /** Foundation only: call when a future compliant seller-tax transition exists. */
     public static function sellerTaxEnabled(string $eventKey,string $message,?string $url=null): void { self::admins('seller_tax_enabled','Seller tax status enabled',$message,$eventKey,$url); }

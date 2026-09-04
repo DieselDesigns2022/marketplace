@@ -103,7 +103,7 @@ if ($json && json_decode($json) !== null):
     </nav>
 </header>
 <main class="wrap">
-<?php if ($u && ($path==='/dashboard'||str_starts_with($path,'/dashboard/')||$path==='/seller'||str_starts_with($path,'/seller/')||$path==='/admin'||str_starts_with($path,'/admin/')||$path==='/notifications'||$path==='/account')) require app_path('app/Views/partials/dashboard_nav.php'); ?>
+<?php if ($u && ($path==='/dashboard'||str_starts_with($path,'/dashboard/')||$path==='/seller'||str_starts_with($path,'/seller/')||$path==='/admin'||str_starts_with($path,'/admin/')||$path==='/notifications'||$path==='/account'||str_starts_with($path,'/buyer/messages'))) require app_path('app/Views/partials/dashboard_nav.php'); ?>
 <?php foreach (H::flashes() as $flash): ?>
 <?php $accountSaveToast = $path === '/account' && ($flash['type'] ?? '') === 'success'; ?>
 <div class="notice <?=H::e($flash['type'])?>"<?=$accountSaveToast?' role="status" aria-live="polite" style="position:fixed;top:82px;right:20px;z-index:50;width:min(380px,calc(100vw - 24px));margin:0;box-shadow:0 16px 40px #2319422e;"':''?>><?=H::e($flash['message'])?></div>

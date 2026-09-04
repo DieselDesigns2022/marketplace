@@ -290,3 +290,13 @@ All seller bulk routes remain ownership-scoped and retain the existing onboardin
 
 - `GET|POST /account` displays and saves the authenticated user's name and three independent email preferences with CSRF protection.
 - `GET|POST /email/unsubscribe?token=...` verifies the existing HMAC/nonce identity and applies the category encoded by a Phase 12.3 link. Weekly, monthly, and favorite-shop links do not change one another or transactional delivery.
+
+## Phase 12.5 messaging
+All routes require authentication and POST routes require CSRF. `GET /buyer/messages` and `GET /seller/messages` provide participant-specific active inboxes; `GET /buyer/messages?archived=1` and `GET /seller/messages?archived=1` provide the corresponding participant's archived inbox. `GET|POST /{side}/messages/{id}` reads or replies. Archive, block, and report use `POST /{side}/messages/{id}/{archive|block|report}`, and `GET /messages/attachments/{id}` reauthorizes conversation participation.
+
+Start routes are `POST /messages/start/product/{id}`, `POST /messages/start/store/{id}`, `POST /messages/start/buyer-order-item/{id}`, and `POST /messages/start/seller-order-item/{id}`. Product and storefront starts reject messaging one's own store. Buyer order-item starts require authoritative buyer ownership and an order payment state of `paid` or `partially_refunded`; seller order-item starts require authoritative seller ownership and the same payment-state allowlist.
+
+Reported-conversation administration uses the exact routes `GET /admin/message-reports`, `GET /admin/message-reports/{id}`, `POST /admin/message-reports/{id}/moderate`, and `GET /admin/message-reports/{reportId}/attachments/{id}`. These routes require an authenticated administrator, and attachment access is scoped to the conversation referenced by the supplied report ID.
+
+### Report identity and empty compose behavior
+Admin detail URLs always identify a `message_reports.id`; the controller separately uses its aliased `conversation_id` to load history. Report-scoped attachment URLs and moderation posts retain the report ID. Start routes may prepare an empty compose thread, but it is absent from inbox routes until its first message commits.
