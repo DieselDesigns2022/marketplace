@@ -45,6 +45,7 @@ use App\Controllers\MessagingController;
  $router->post('/messages/start/seller-order-item/{id}', [MessagingController::class, 'startSellerOrder']);
  $router->get('/messages/attachments/{id}', [MessagingController::class, 'attachment']);
  $router->post('/notifications/read-all', [NotificationController::class, 'readAll']);
+ $router->post('/notifications/{id}/open', [NotificationController::class, 'open']);
  $router->post('/notifications/{id}/read', [NotificationController::class, 'read']);
  $router->get('/dashboard', [BuyerController::class, 'home']);
  $router->get('/dashboard/purchases', [BuyerController::class, 'purchases']);
