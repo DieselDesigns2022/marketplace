@@ -18,6 +18,15 @@ final class NotificationService
         return mb_substr($url, 0, 500);
     }
 
+    public static function openForUser(int $notificationId, int $userId): ?string
+    {
+        if ($notificationId < 1 || $userId < 1) return null;
+        $notification = DB::row('select action_url from notifications where id=? and user_id=?', [$notificationId, $userId]);
+        if (!$notification) return null;
+        DB::exec('update notifications set read_at=coalesce(read_at,now()) where id=? and user_id=?', [$notificationId, $userId]);
+        return self::safeActionUrl($notification['action_url'] ?? null) ?? '/notifications';
+    }
+
     public static function create(int $userId, string $type, string $audience, string $title, string $message, string $eventKey, ?string $actionUrl = null): bool
     {
         if ($userId < 1 || !preg_match('/^[a-z0-9_.:-]{1,190}$/i', $eventKey)) return false;

@@ -191,3 +191,20 @@ Before running either weekly or monthly producer, apply both Phase 12.3 migratio
 2. `database/migrations/2026_08_16_phase_12_3_digest_content_claims.sql`
 
 Schedule `php scripts/queue_weekly_emails.php` once weekly and `php scripts/queue_monthly_emails.php` once monthly in UTC. Both producers add durable, deduplicated messages only; the existing `php scripts/process_email_queue.php` worker remains responsible for delivery and retries. The weekly producer queues favorite-shop messages before the general weekly marketplace digest. Durable per-user/product claims enforce favorite-shop → weekly → monthly precedence across overlapping periods rather than permanent lifetime suppression, and stable queue keys continue protecting exact cron reruns.
+
+## Phase 12.5 protected message attachments
+
+Apply the Phase 12.5 database migrations in this order:
+
+1. `database/migrations/2026_09_04_phase_12_5_internal_messaging.sql`
+2. `database/migrations/2026_09_08_phase_12_5_live_fixes.sql`
+
+Apply the live-fix migration before deploying code that expects `message_reports.notification_cycle`. It uses a direct `ALTER TABLE ... ADD COLUMN`: inspect the migration and current schema first, apply it once to an existing Phase 12.5 database, and do not blindly rerun it after the column exists. Verify that `message_reports.notification_cycle` exists afterward.
+
+Before internal-message attachment testing or use, create `storage/protected_uploads/messages` outside the public web root. The directory is runtime storage and must not be committed to Git. PHP-FPM must be able to write to it; production currently uses owner/group `www-data:www-data` with mode `0750` (or an equivalent secure policy granting only the runtime identity the required access).
+
+Deployment verification must include a write test executed as the PHP-FPM runtime user, for example:
+
+```bash
+sudo -u www-data sh -c 'test -d storage/protected_uploads/messages && touch storage/protected_uploads/messages/.write-test && rm storage/protected_uploads/messages/.write-test'
+```

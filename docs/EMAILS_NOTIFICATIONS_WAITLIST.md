@@ -101,3 +101,9 @@ Alerts use the durable type-aware conversation snapshot for products, storefront
 
 ### Messaging read synchronization
 The notification audience comes from the recipient's role in that conversation (`buyer` or seller/`designer`), not from whether the recipient happens to own a store. Opening a thread advances its participant read marker and marks only that recipient's `internal_message` notification keys for received messages in that conversation read; unrelated notifications remain unchanged.
+
+### Phase 12.5 live notification corrections
+
+Notification-history **View** controls submit a CSRF-protected open request. The server authorizes the signed-in user against the notification, marks only that owned notification read, revalidates its action URL, and redirects only to the safe local path; missing or invalid actions return to `/notifications`. Manual single/all read controls and read history remain available.
+
+After a participant's first conversation-report transaction commits, the application attempts an in-app notification for every active administrator with an exact `/admin/message-reports/{reportId}` link. Controlled copy contains the reason and safe store identity, but no report details, message or attachment content, or participant email. A deterministic per-report/per-cycle key deduplicates repeated attempts while the report is open/reviewing; a later participant reopen after resolution/dismissal advances the cycle for a fresh alert attempt. Communication-hook failure is logged and does not roll back the committed report. No report email is sent.

@@ -1097,3 +1097,7 @@ Added durable private buyer/seller conversations with product, storefront, and p
 
 ### Phase 12.5 corrections
 Hardened exact image-container validation and decoding, durable context snapshots, empty-compose filtering, side-correct notifications/read synchronization, explicit report/conversation identities, report reopening cleanup, eligible-order UI parity, and messaging-aware account-retention checks.
+
+### Phase 12.5 live-testing fixes
+
+Notification View now authorizes the signed-in user against the notification, marks only that owned notification read, revalidates its action URL, and redirects only to the safe local path or `/notifications` when the action is invalid or missing. After a conversation-report transaction commits, the application attempts a privacy-safe in-app alert for active administrators; deterministic per-report/per-cycle keys deduplicate attempts, and communication-hook failure is logged without rolling back the report. A participant reopening a resolved or dismissed report advances the cycle for a fresh alert attempt. Messaging labels pair a seller's store name with the owner's user name, while buyer identities remain side-appropriate. Deployment documentation now requires the live-fix migration and pre-provisioned, non-public, runtime-writable protected message attachment storage.

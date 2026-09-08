@@ -15,7 +15,7 @@ final class MessagingService
     { return $this->side($conversation,$userId)!==null; }
     public function conversation(int $id,int $userId): array
     {
-        $c=DB::row('select c.*,d.display_name shop_name,u.name buyer_name from message_conversations c join designers d on d.id=c.designer_id join users u on u.id=c.buyer_user_id where c.id=?',[$id])??H::abort(404);
+        $c=DB::row('select c.*,d.display_name shop_name,u.name buyer_name,su.name seller_owner_name from message_conversations c join designers d on d.id=c.designer_id join users u on u.id=c.buyer_user_id join users su on su.id=c.seller_user_id where c.id=?',[$id])??H::abort(404);
         if(!$this->canAccessConversation($c,$userId))H::abort(404);
         return $c;
     }
@@ -61,10 +61,10 @@ final class MessagingService
     {
         if(!in_array($side,['buyer','seller'],true))H::abort(404);
         $idColumn=$side.'_user_id';$archive=$side.'_archived_at';$read=$side.'_last_read_message_id';
-        return DB::rows("select c.*,d.display_name shop_name,u.name buyer_name,(select count(*) from conversation_messages m where m.conversation_id=c.id and m.sender_user_id<>? and m.id>coalesce(c.$read,0)) unread_count,(select body from conversation_messages m where m.conversation_id=c.id order by m.id desc limit 1) latest_body,(select m.id from conversation_messages m where m.conversation_id=c.id order by m.id desc limit 1) latest_message_id,(select count(*) from message_attachments a join conversation_messages m on m.id=a.message_id where m.conversation_id=c.id and m.id=(select max(m2.id) from conversation_messages m2 where m2.conversation_id=c.id)) latest_attachment_count from message_conversations c join designers d on d.id=c.designer_id join users u on u.id=c.buyer_user_id where c.$idColumn=? and c.last_message_at is not null and c.$archive is ".($archived?'not null':'null').' order by coalesce(c.last_message_at,c.created_at) desc',[$userId,$userId]);
+        return DB::rows("select c.*,d.display_name shop_name,u.name buyer_name,su.name seller_owner_name,(select count(*) from conversation_messages m where m.conversation_id=c.id and m.sender_user_id<>? and m.id>coalesce(c.$read,0)) unread_count,(select body from conversation_messages m where m.conversation_id=c.id order by m.id desc limit 1) latest_body,(select m.id from conversation_messages m where m.conversation_id=c.id order by m.id desc limit 1) latest_message_id,(select count(*) from message_attachments a join conversation_messages m on m.id=a.message_id where m.conversation_id=c.id and m.id=(select max(m2.id) from conversation_messages m2 where m2.conversation_id=c.id)) latest_attachment_count from message_conversations c join designers d on d.id=c.designer_id join users u on u.id=c.buyer_user_id join users su on su.id=c.seller_user_id where c.$idColumn=? and c.last_message_at is not null and c.$archive is ".($archived?'not null':'null').' order by coalesce(c.last_message_at,c.created_at) desc',[$userId,$userId]);
     }
     public function messages(array $c): array
-    { return DB::rows('select m.*,u.name sender_name from conversation_messages m join users u on u.id=m.sender_user_id where m.conversation_id=? order by m.id',[$c['id']]); }
+    { return DB::rows('select m.*,case when m.sender_user_id=c.seller_user_id then concat(d.display_name," (",u.name,")") else u.name end sender_name from conversation_messages m join users u on u.id=m.sender_user_id join message_conversations c on c.id=m.conversation_id join designers d on d.id=c.designer_id where m.conversation_id=? order by m.id',[$c['id']]); }
     public function markRead(array $c,int $userId): void
     {
         $side=$this->side($c,$userId);if(!$side)H::abort(404);
@@ -84,9 +84,9 @@ final class MessagingService
         try { foreach($uploads as $upload){$name=bin2hex(random_bytes(24)).'.'.$upload['ext'];$path=$dir.'/'.$name;if(!move_uploaded_file($upload['tmp_name'],$path))throw new \RuntimeException('Attachment storage failed.');chmod($path,0640);$upload['stored_name']=$name;$stored[]=$upload;}
             DB::begin();DB::exec('insert into conversation_messages(conversation_id,sender_user_id,body) values(?,?,?)',[$c['id'],$sender,$body===''?null:$body]);$messageId=(int)DB::id();foreach($stored as $f)DB::exec('insert into message_attachments(message_id,original_name,stored_name,mime_type,byte_size,width,height) values(?,?,?,?,?,?,?)',[$messageId,$f['original_name'],$f['stored_name'],$f['mime'],$f['size'],$f['width'],$f['height']]);DB::exec("update message_conversations set last_message_at=now(),buyer_archived_at=null,seller_archived_at=null,{$side}_last_read_message_id=? where id=?",[$messageId,$c['id']]);DB::commit();
         } catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $f)@unlink($dir.'/'.$f['stored_name']);throw $e;}
-        $recipientSide=$side==='buyer'?'seller':'buyer';
-        try{NotificationService::internalMessage($recipient,$recipientSide,$messageId,$side==='buyer'?(string)$c['buyer_name']:(string)$c['shop_name'],'/'.$recipientSide.'/messages/'.$c['id']);}catch(\Throwable $e){NotificationService::reportFailure('internal-message notification',$e);}
-        try{$u=DB::row('select email,name from users where id=? and status="active"',[$recipient]);if($u)EmailQueueService::queue('transactional',$u['email'],'You have a new Asset Moth message','internal_message',['name'=>$u['name'],'sender'=>$side==='buyer'?(string)$c['buyer_name']:(string)$c['shop_name'],'shop'=>$c['shop_name'],'context'=>$c['context_label']??null,'order_id'=>$c['order_id']??null,'conversation_url'=>H::baseUrl().'/'.($side==='buyer'?'seller':'buyer').'/messages/'.$c['id']],"internal-message:$messageId:recipient:$recipient");}catch(\Throwable $e){NotificationService::reportFailure('internal-message email',$e);}
+        $recipientSide=$side==='buyer'?'seller':'buyer';$sellerIdentity=(string)$c['shop_name'].' ('.(string)$c['seller_owner_name'].')';
+        try{NotificationService::internalMessage($recipient,$recipientSide,$messageId,$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'/'.$recipientSide.'/messages/'.$c['id']);}catch(\Throwable $e){NotificationService::reportFailure('internal-message notification',$e);}
+        try{$u=DB::row('select email,name from users where id=? and status="active"',[$recipient]);if($u)EmailQueueService::queue('transactional',$u['email'],'You have a new Asset Moth message','internal_message',['name'=>$u['name'],'sender'=>$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'shop'=>$c['shop_name'],'context'=>$c['context_label']??null,'order_id'=>$c['order_id']??null,'conversation_url'=>H::baseUrl().'/'.($side==='buyer'?'seller':'buyer').'/messages/'.$c['id']],"internal-message:$messageId:recipient:$recipient");}catch(\Throwable $e){NotificationService::reportFailure('internal-message email',$e);}
         return $messageId;
     }
     private function validateUploads(array $files): array
@@ -99,7 +99,19 @@ final class MessagingService
     }
     public function archive(array $c,int $userId,bool $archive): void{$side=$this->side($c,$userId);DB::exec("update message_conversations set {$side}_archived_at=".($archive?'now()':'null').' where id=?',[$c['id']]);}
     public function block(array $c,int $userId,bool $block): void{$other=$this->side($c,$userId)==='buyer'?(int)$c['seller_user_id']:(int)$c['buyer_user_id'];if($block)DB::exec('insert into message_blocks(blocker_user_id,blocked_user_id) select ?,? where not exists(select id from message_blocks where blocker_user_id=? and blocked_user_id=? and removed_at is null)',[$userId,$other,$userId,$other]);else DB::exec('update message_blocks set removed_at=now() where blocker_user_id=? and blocked_user_id=? and removed_at is null',[$userId,$other]);}
-    public function report(array $c,int $userId,string $reason,string $details): void{if(!in_array($reason,['abuse','spam','inappropriate','other'],true))throw new \InvalidArgumentException('Choose a report reason.');DB::exec('insert into message_reports(conversation_id,reporter_user_id,reason,details) values(?,?,?,?) on duplicate key update reason=values(reason),details=values(details),status="open",moderator_user_id=null,moderator_notes=null,reviewed_at=null',[$c['id'],$userId,$reason,mb_substr(trim($details),0,1000)]);}
+    public function report(array $c,int $userId,string $reason,string $details): void
+    {
+        if(!in_array($reason,['abuse','spam','inappropriate','other'],true))throw new \InvalidArgumentException('Choose a report reason.');
+        $notify=false;$reportId=0;$cycle=0;
+        DB::begin();
+        try{
+            $existing=DB::row('select id,status,notification_cycle from message_reports where conversation_id=? and reporter_user_id=? for update',[$c['id'],$userId]);
+            if(!$existing){DB::exec('insert into message_reports(conversation_id,reporter_user_id,reason,details,notification_cycle) values(?,?,?,?,1)',[$c['id'],$userId,$reason,mb_substr(trim($details),0,1000)]);$reportId=(int)DB::id();$cycle=1;$notify=true;}
+            else{$reportId=(int)$existing['id'];$reopen=in_array($existing['status'],['resolved','dismissed'],true);$cycle=(int)$existing['notification_cycle']+($reopen?1:0);if($reopen)DB::exec('update message_reports set reason=?,details=?,status="open",moderator_user_id=null,moderator_notes=null,reviewed_at=null,notification_cycle=? where id=?',[$reason,mb_substr(trim($details),0,1000),$cycle,$reportId]);else DB::exec('update message_reports set reason=?,details=? where id=?',[$reason,mb_substr(trim($details),0,1000),$reportId]);$notify=true;}
+            DB::commit();
+        }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
+        if($notify){$shop=mb_substr(strip_tags((string)($c['shop_name']??'the related shop')),0,120);$label=['abuse'=>'Abuse','spam'=>'Spam','inappropriate'=>'Inappropriate content','other'=>'Other'][$reason];try{NotificationService::admins('message_report','Messaging conversation reported','A messaging conversation for '.$shop.' was reported. Reason: '.$label.'.',"message-report:$reportId:cycle:$cycle",'/admin/message-reports/'.$reportId);}catch(\Throwable $e){NotificationService::reportFailure('message-report notification',$e);}}
+    }
     public function attachments(array $messages): array{$ids=array_column($messages,'id');if(!$ids)return[];$rows=DB::rows('select * from message_attachments where message_id in ('.implode(',',array_fill(0,count($ids),'?')).') order by id',$ids);$out=[];foreach($rows as $r)$out[$r['message_id']][]=$r;return$out;}
     public function attachmentForUser(int $attachmentId,int $userId): ?array
     { $a=DB::row('select a.*,m.conversation_id from message_attachments a join conversation_messages m on m.id=a.message_id where a.id=?',[$attachmentId]);if(!$a)return null;$c=DB::row('select buyer_user_id,seller_user_id from message_conversations where id=?',[$a['conversation_id']]);return $c&&$this->canAccessConversation($c,$userId)?$a:null; }

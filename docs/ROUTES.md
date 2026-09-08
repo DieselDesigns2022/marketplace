@@ -229,6 +229,7 @@ There are no public term-list endpoints and no state-changing GET routes.
 | GET | `/notifications` | Authenticated |
 | POST | `/notifications/read-all` | Authenticated owner, CSRF |
 | POST | `/notifications/{id}/read` | Authenticated owner, CSRF |
+| POST | `/notifications/{id}/open` | Authenticated owner, CSRF; marks that notification read and redirects to its validated local action |
 | GET | `/admin/waitlist` | Admin read access |
 | POST | `/admin/waitlist` | Admin, CSRF-protected status mutation |
 | GET | `/admin/waitlist/export` | Admin |
