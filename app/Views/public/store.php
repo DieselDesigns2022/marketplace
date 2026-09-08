@@ -99,6 +99,7 @@
         </p>
     <?php endif; ?>
 </section>
+<?php if(H::user() && !$isOwner):?><form method="post" action="/messages/start/store/<?=$d['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn secondary">Message seller</button></form><?php endif;?>
 <section id="featured-products">
     <h2>Featured products</h2>
     <?php if(empty($products)): ?>

@@ -18,6 +18,15 @@ final class NotificationService
         return mb_substr($url, 0, 500);
     }
 
+    public static function openForUser(int $notificationId, int $userId): ?string
+    {
+        if ($notificationId < 1 || $userId < 1) return null;
+        $notification = DB::row('select action_url from notifications where id=? and user_id=?', [$notificationId, $userId]);
+        if (!$notification) return null;
+        DB::exec('update notifications set read_at=coalesce(read_at,now()) where id=? and user_id=?', [$notificationId, $userId]);
+        return self::safeActionUrl($notification['action_url'] ?? null) ?? '/notifications';
+    }
+
     public static function create(int $userId, string $type, string $audience, string $title, string $message, string $eventKey, ?string $actionUrl = null): bool
     {
         if ($userId < 1 || !preg_match('/^[a-z0-9_.:-]{1,190}$/i', $eventKey)) return false;
@@ -44,6 +53,8 @@ final class NotificationService
         if(!in_array($title,$allowed,true))return false;
         return self::create($userId,'rank_badge','designer',$title,$message,$eventKey,'/seller/rank');
     }
+    public static function internalMessage(int $userId,string $recipientSide,int $messageId,string $sender,string $url): bool
+    { $audience=$recipientSide==='seller'?'designer':'buyer';return self::create($userId,'internal_message',$audience,'New message',mb_substr(strip_tags($sender),0,120).' sent you a private Asset Moth message.',"internal-message:$messageId:recipient:$userId",$url); }
     public static function rankBadge(int $userId,string $eventKey,string $message): bool { return self::recognition($userId,$eventKey,'Creator rank earned',$message); }
     /** Foundation only: call when a future compliant seller-tax transition exists. */
     public static function sellerTaxEnabled(string $eventKey,string $message,?string $url=null): void { self::admins('seller_tax_enabled','Seller tax status enabled',$message,$eventKey,$url); }

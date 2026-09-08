@@ -11,7 +11,7 @@
         <th>Product</th>
         <th>Purchased permissions</th>
         <th>Price</th>
-        <th>Fulfillment</th><th>Download / Delivery</th>
+        <th>Fulfillment</th><th>Download / Delivery</th><th>Seller message</th>
     </tr>
     <?php foreach($group['items'] as $i):?>
         <tr>
@@ -38,6 +38,7 @@
              <?php if(($order['payment_status'] ?? $order['status']) === 'paid'):?><span class="muted">Google Drive email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?></span><?php else:?><span class="muted">Google Drive delivery details unlock after payment clears.</span><?php endif;?>
            <?php endif;?>
            </td>
+        <td><?php if(in_array(($order['payment_status']??$order['status']),['paid','partially_refunded'],true)):?><form method="post" action="/messages/start/buyer-order-item/<?=$i['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Message seller</button></form><?php else:?><span class="muted">Available after eligible payment</span><?php endif;?></td>
         </tr>
     <?php endforeach;?>
 </table></div></section><?php endforeach;?>

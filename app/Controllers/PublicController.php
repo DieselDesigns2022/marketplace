@@ -240,7 +240,7 @@ class PublicController
 
     public function product($slug): void
     {
-        $p = DB::row('select p.*,d.display_name,d.store_slug,d.creator_rank,d.founder_position,d.founder_active,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.slug=? and p.status="approved" and d.status="approved"', [$slug]) ?? H::abort(404);
+        $p = DB::row('select p.*,d.user_id seller_user_id,d.display_name,d.store_slug,d.creator_rank,d.founder_position,d.founder_active,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.slug=? and p.status="approved" and d.status="approved"', [$slug]) ?? H::abort(404);
         $images = DB::rows('select * from product_images where product_id=? order by sort_order,id', [$p['id']]);
         $preview = $images[0]['image_path'] ?? '';
         $title = $p['seo_title'] ?: $p['title'];

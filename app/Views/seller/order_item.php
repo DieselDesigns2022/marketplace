@@ -1,5 +1,6 @@
 <h1>Seller Order Item #<?=$item['id']?></h1>
 <p><a href="/seller/sales">Back to sales</a></p>
+<?php if(in_array(($item['payment_status']??$item['order_status']),['paid','partially_refunded'],true)):?><form method="post" action="/messages/start/seller-order-item/<?=$item['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn">Message buyer</button></form><?php endif;?>
 <div class="card">
   <p>Order #<?=$item['order_id']?> · <?=H::e($item['order_status'])?> · payment <?=H::e($item['payment_status'] ?? $item['order_status'])?> · <?=$item['order_created']?></p>
   <?php $paid = (($item['payment_status'] ?? $item['order_status']) === 'paid'); ?><p>Buyer: <?=H::e($paid ? $item['buyer_name'] : 'Hidden until payment clears')?> <?php if($paid):?>(<?=H::e($item['buyer_email'])?>)<?php endif;?></p>

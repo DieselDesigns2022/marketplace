@@ -89,6 +89,8 @@
         <button>Add to Wishlist</button>
     </form>
 
+<?php if(H::user() && (int)H::user()['id'] !== (int)$p['seller_user_id']):?><form method="post" action="/messages/start/product/<?=$p['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn secondary">Message seller</button></form><?php endif;?>
+
 <section class="card share-card">
     <h2>Share this product</h2>
     <div class="share-actions icon-actions" aria-label="Product sharing options">
