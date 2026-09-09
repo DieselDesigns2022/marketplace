@@ -141,7 +141,7 @@ class AdminController
             (select count(*) from email_preferences where monthly_emails=1) monthly_email_subscribers,
             (select count(*) from email_preferences where favorite_shop_emails=1) favorite_shop_email_subscribers,
             (select count(*) from email_preferences where weekly_emails=1 or monthly_emails=1 or favorite_shop_emails=1) any_marketing_subscribers');
-        $waitlist=DB::row('select count(*) total,sum(created_at>=date_sub(now(),interval 7 day)) recent,sum(interest_type in ("buyer","both")) buyer_interest,sum(interest_type in ("seller","both")) seller_interest,sum(confirmation_sent_at is not null) confirmed,sum(invited_at is not null) invited,sum(status="subscribed" and invited_at is null) awaiting_invitation from waitlist_entries');
+        $waitlist=DB::row('select count(*) total,sum(created_at>=date_sub(now(),interval 7 day)) recent,sum(find_in_set("buyer",interest_type)>0) buyer_interest,sum(find_in_set("seller",interest_type)>0) seller_interest,sum(confirmation_sent_at is not null) confirmed,sum(invited_at is not null) invited,sum(status="subscribed" and invited_at is null) awaiting_invitation from waitlist_entries');
         H::view('admin/home',['s'=>$stats,'waitlist'=>$waitlist,'recentActivity'=>DB::rows('select * from admin_logs order by created_at desc,id desc limit 8'),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc,id desc limit 8',[$adminId]),'unreadCount'=>(int)(DB::row('select count(*) c from notifications where user_id=? and read_at is null',[$adminId])['c']??0)]);
 
     }

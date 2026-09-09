@@ -980,7 +980,7 @@ CREATE TABLE email_preferences (
 );
 CREATE TABLE waitlist_entries (
  id BIGINT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(120) NOT NULL, email VARCHAR(190) NOT NULL,
- interest_type ENUM('seller','buyer','both','tester') NOT NULL, business_name VARCHAR(190) NULL,
+ interest_type SET('seller','buyer','tester') NOT NULL, business_name VARCHAR(190) NULL,
  source ENUM('direct','homepage','seller','social','referral','campaign') NOT NULL DEFAULT 'direct',
  status ENUM('subscribed','invited','unsubscribed','suppressed') NOT NULL DEFAULT 'subscribed', consent_at TIMESTAMP NOT NULL,
  unsubscribed_at TIMESTAMP NULL, unsubscribe_nonce CHAR(64) NOT NULL, confirmation_sent_at TIMESTAMP NULL,
