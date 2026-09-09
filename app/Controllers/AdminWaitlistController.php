@@ -8,11 +8,12 @@ use App\Services\NotificationService;
 
 final class AdminWaitlistController
 {
-    private const ALLOWED=['interest_type'=>['seller','buyer','both','tester'],'source'=>['direct','homepage','seller','social','referral','campaign'],'status'=>['subscribed','invited','unsubscribed','suppressed']];
+    private const ALLOWED=['interest_type'=>['seller','buyer','tester'],'source'=>['direct','homepage','seller','social','referral','campaign'],'status'=>['subscribed','invited','unsubscribed','suppressed']];
     private const TRANSITIONS=['subscribed'=>['subscribed','unsubscribed','suppressed'],'invited'=>['invited','unsubscribed','suppressed'],'unsubscribed'=>['unsubscribed','suppressed'],'suppressed'=>['suppressed']];
     private function admin():void{H::requireRole('admin');}
     public static function allowedStatusTransition(string $from,string $to):bool{return in_array($to,self::TRANSITIONS[$from]??[],true);}
     public static function statusOptions(string $status):array{return self::TRANSITIONS[$status]??[];}
+    public static function interestLabel(string $value):string{return WaitlistController::interestLabel($value);}
     public static function invitationDecision(array $input,array $filters):array
     {
         $mode=(string)($input['mode']??'');$id=filter_var($input['id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
@@ -25,7 +26,7 @@ final class AdminWaitlistController
         return ['valid'=>true,'mode'=>$mode];
     }
     private function state(array $input):array{$out=['q'=>trim((string)($input['q']??'')),'interest_type'=>'','source'=>'','status'=>''];foreach(self::ALLOWED as $k=>$allowed)if(in_array($input[$k]??'',$allowed,true))$out[$k]=$input[$k];return $out;}
-    private function where(array $f,bool $eligible=false):array{$w=[];$p=[];if($f['q']!==''){$w[]='(name like ? or email like ? or business_name like ?)';$p=array_merge($p,array_fill(0,3,'%'.$f['q'].'%'));}foreach(self::ALLOWED as $k=>$a)if($f[$k]!==''){$w[]="$k=?";$p[]=$f[$k];}if($eligible){$w[]='status in ("subscribed","invited")';$w[]='unsubscribed_at is null';$w[]='invited_at is null';}return [$w?implode(' and ',$w):'1=1',$p];}
+    private function where(array $f,bool $eligible=false):array{$w=[];$p=[];if($f['q']!==''){$w[]='(name like ? or email like ? or business_name like ?)';$p=array_merge($p,array_fill(0,3,'%'.$f['q'].'%'));}if($f['interest_type']!==''){$w[]='find_in_set(?,interest_type)>0';$p[]=$f['interest_type'];}foreach(['source','status'] as $k)if($f[$k]!==''){$w[]="$k=?";$p[]=$f[$k];}if($eligible){$w[]='status in ("subscribed","invited")';$w[]='unsubscribed_at is null';$w[]='invited_at is null';}return [$w?implode(' and ',$w):'1=1',$p];}
     private static function query(array $f):string{return http_build_query(array_filter($f,fn($v)=>$v!==''));}
     public function index():void
     {
@@ -77,7 +78,7 @@ final class AdminWaitlistController
         $this->back($filters);
     }
 
-    public function export():void{$this->admin();$f=$this->state($_GET);[$w,$p]=$this->where($f);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="asset-moth-waitlist.csv"');$out=fopen('php://output','w');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Name','Email','Interest','Business','Source','Status','Confirmation sent','Invited','Created']);foreach(DB::rows('select name,email,interest_type,business_name,source,status,confirmation_sent_at,invited_at,created_at from waitlist_entries where '.$w.' order by created_at desc',$p) as $r)fputcsv($out,array_map([self::class,'csvCell'],array_values($r)));fclose($out);}
+    public function export():void{$this->admin();$f=$this->state($_GET);[$w,$p]=$this->where($f);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="asset-moth-waitlist.csv"');$out=fopen('php://output','w');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Name','Email','Interest','Business','Source','Status','Confirmation sent','Invited','Created']);foreach(DB::rows('select name,email,interest_type,business_name,source,status,confirmation_sent_at,invited_at,created_at from waitlist_entries where '.$w.' order by created_at desc',$p) as $r){$r['interest_type']=self::interestLabel($r['interest_type']);fputcsv($out,array_map([self::class,'csvCell'],array_values($r)));}fclose($out);}
     public static function csvCell($v):string{$v=(string)$v;return preg_match('/^\s*[=+\-@]/u',$v)?"'".$v:$v;}
     public function invite():void
     {
