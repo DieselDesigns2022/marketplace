@@ -3,8 +3,8 @@
   <p>Your Stripe payment was not completed, so no downloads or manual delivery details have been unlocked.</p>
   <p>Current payment status: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong></p>
 </div>
-<form method="post" action="/checkout/retry/<?=$order['id']?>">
+<?php if(($customOrder['status']??null)==='cancelled'):?><p>This custom request was cancelled. Submit a new request if you still want this service.</p><p><a class="btn alt" href="/custom-designs">Browse custom designs</a></p><?php else:?><form method="post" action="/checkout/retry/<?=$order['id']?>">
   <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
   <button class="btn">Retry payment</button>
   <a class="btn alt" href="/cart">Return to cart</a>
-</form>
+</form><?php endif?>

@@ -11,6 +11,7 @@ use App\Services\CreditService;
 use App\Services\OrderFinalizationService;
 use Throwable;
 
+use App\Services\CheckoutOrderService;
 class CartController
 {
     private function owned(int $productId): bool
@@ -277,7 +278,7 @@ class CartController
                         ),
                     ];
                 }
-                $taxCalculation = StripeService::calculateTax(
+                $taxCalculation = (new CheckoutOrderService)->calculateTax(
                     $taxableItems,
                     $billingAddress,
                     'tax-checkout:' . (int)H::user()['id'] . ':' . hash('sha256', json_encode([$taxableItems, $billingAddress]))
@@ -296,8 +297,7 @@ class CartController
                 if ($total <= 0 && $creditCents <= 0) { DB::rollBack();H::flash('error','Coupon-only free checkout is not available.');H::redirect('/cart'); }
                 $commissionRate = StripeService::commissionRate();
                 $platformCommissionTotal = 0.0;
-                DB::exec('insert into orders (user_id,status,payment_processor,payment_mode,payment_provider,payment_status,subtotal,tax_amount,tax_provider,tax_status,tax_liability_owner,tax_snapshot,tax_calculation_id,tax_transaction_status,billing_address_snapshot,credits_applied,coupon_discount,coupon_id,coupon_code,coupon_snapshot,total,fulfillment_status,phase9_foundation_order,stripe_currency,stripe_amount_total,stripe_paid_amount,platform_commission_total) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[H::user()['id'],'pending','stripe','checkout','stripe','pending',$subtotal,$tax,'stripe_tax','calculated','platform',$taxCalculation['snapshot'],$taxCalculation['id'],'pending',json_encode($billingAddress,JSON_THROW_ON_ERROR),$credits,$couponDiscount,$coupon['id'] ?? null,$coupon['code'] ?? null,$coupon ? json_encode($coupon) : null,$total,'pending',1,StripeService::currency(),CreditService::parseCents($total),$total,0]);
-                $order=DB::id();
+                $order=(new CheckoutOrderService)->createOrder(['user_id'=>H::user()['id'],'subtotal'=>$subtotal,'tax_amount'=>$tax,'tax_snapshot'=>$taxCalculation['snapshot'],'tax_calculation_id'=>$taxCalculation['id'],'billing_snapshot'=>json_encode($billingAddress,JSON_THROW_ON_ERROR),'credits'=>$credits,'coupon_discount'=>$couponDiscount,'coupon_id'=>$coupon['id']??null,'coupon_code'=>$coupon['code']??null,'coupon_snapshot'=>$coupon?json_encode($coupon):null,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>$total,'commission_total'=>0]);
                 if ($creditCents > 0) {
                     $credits = (new CreditService)->reserve((int)H::user()['id'], $credits, (int)$order, 'order:' . $order . ':credit:reserve');
                     $creditCents = CreditService::parseCents($credits);
@@ -319,7 +319,7 @@ class CartController
                     $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
                     DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version,seller_receipt_note_snapshot,seller_receipt_image_path_snapshot) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null,$receiptSnapshot['note'],$receiptSnapshot['image_path']]);
                     DB::exec('update order_items set coupon_id=?,coupon_code=?,coupon_discount=? where id=?', [$coupon['id'] ?? null,$coupon['code'] ?? null,$lineDiscount,DB::id()]);
-                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['designer_id'],H::user()['id'],$discountedLine,$comm,$discountedLine-$comm,'pending_payment']);
+                    (new CheckoutOrderService)->addSellerEarning((int)$order,(int)$p['id'],(int)$p['designer_id'],(int)H::user()['id'],CreditService::formatCents(CreditService::parseCents((string)$discountedLine)),$commissionRate);
 
                }
                 DB::exec('update orders set platform_commission_total=? where id=?', [$platformCommissionTotal,$order]);
@@ -334,7 +334,7 @@ class CartController
                     $finalizer->communicate((int)$order);
                     H::redirect('/dashboard/order/' . (int)$order);
                 }
-                $session = StripeService::createCheckoutSession($createdOrder, $createdItems);
+                $session = (new CheckoutOrderService)->checkout($createdOrder, $createdItems);
                 DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?', [$session['id'] ?? null, $order]);
                 DB::exec('delete from cart_items where user_id=?',[H::user()['id']]);
                 unset($_SESSION['coupon_code']);

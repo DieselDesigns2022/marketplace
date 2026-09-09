@@ -11,6 +11,7 @@ use App\Services\OperationalErrorSanitizer;
 use App\Services\OrderFinalizationService;
 use App\Services\CreditService;
 use App\Services\SellerReferralCommissionService;
+use App\Services\CustomDesignService;
 use Throwable;
 
 class StripeController
@@ -51,17 +52,18 @@ class StripeController
         H::requireLogin();
         $order = $this->buyerOrder((int)($_GET['order_id'] ?? 0));
         if (!in_array($order['payment_status'] ?? $order['status'], ['paid','refunded','partially_refunded'], true)) {
-            DB::exec('update orders set payment_status="canceled",status="cancelled",canceled_at=coalesce(canceled_at,now()) where id=? and user_id=?', [$order['id'], H::user()['id']]);
+            DB::begin();try{DB::exec('update orders set payment_status="canceled",status="cancelled",canceled_at=coalesce(canceled_at,now()) where id=? and user_id=?', [$order['id'], H::user()['id']]);(new CustomDesignService)->systemTransitionByOrder((int)$order['id'],'cancelled','stripe_cancel');DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
             (new OrderFinalizationService)->release((int)$order['id'],'buyer-cancel:'.$order['id'].':credit-release');
             $order = $this->buyerOrder((int)$order['id']);
         }
-        H::view('buyer/payment_cancel', ['order' => $order]);
+        H::view('buyer/payment_cancel', ['order'=>$order,'customOrder'=>DB::row('select * from custom_orders where order_id=?',[$order['id']])]);
     }
 
     public function retry($id): void
     {
         H::requireLogin();
         $order = $this->buyerOrder((int)$id);
+        $customStatus=DB::row('select status from custom_orders where order_id=?',[$order['id']])['status']??null;if(!CustomDesignService::retryEligible($customStatus)){H::flash('warning','This custom request was cancelled. Submit a new request if you still want this service.');H::redirect('/dashboard/order/'.(int)$order['id']);}
         $paymentStatus = $order['payment_status'] ?? $order['status'];
         if ($paymentStatus === 'manual_review') {
             H::flash('warning', 'This payment needs admin review before another payment attempt can be made.');
@@ -342,7 +344,7 @@ class StripeController
     private function markFailed(array $order, string $eventId, array $object, string $message): void
     { $safeMessage=OperationalErrorSanitizer::sanitize($message,1000);DB::exec('update orders set status="failed",payment_status="failed",failed_at=coalesce(failed_at,now()),payment_error=? where id=? and payment_status<>"paid"', [$safeMessage,$order['id']]); (new OrderFinalizationService)->release((int)$order['id'],'stripe:'.$eventId.':credit-release'); StripeService::logTransaction((int)$order['id'],$eventId,'payment_failed','failed',($object['amount_total'] ?? $object['amount'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null,'intent'=>$object['payment_intent'] ?? $object['id'] ?? null],$safeMessage); try{NotificationService::admins('payment_failed','Payment needs attention','A payment failed for order #'.(int)$order['id'].'.',"stripe:$eventId:failed",'/admin/order/'.(int)$order['id']);}catch(Throwable $e){NotificationService::reportFailure('payment_failed',$e);} }
     private function markCanceled(array $order, string $eventId, array $object, string $status): void
-    { DB::exec('update orders set status="cancelled",payment_status=?,canceled_at=coalesce(canceled_at,now()) where id=? and payment_status<>"paid"', [$status,$order['id']]); (new OrderFinalizationService)->release((int)$order['id'],'stripe:'.$eventId.':credit-release'); StripeService::logTransaction((int)$order['id'],$eventId,'checkout_'.$status,$status,($object['amount_total'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null], 'Checkout session '.$status.'.'); }
+    { DB::begin();try{DB::exec('update orders set status="cancelled",payment_status=?,canceled_at=coalesce(canceled_at,now()) where id=? and payment_status<>"paid"', [$status,$order['id']]);(new CustomDesignService)->systemTransitionByOrder((int)$order['id'],'cancelled','stripe_expired');DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;} (new OrderFinalizationService)->release((int)$order['id'],'stripe:'.$eventId.':credit-release'); StripeService::logTransaction((int)$order['id'],$eventId,'checkout_'.$status,$status,($object['amount_total'] ?? 0)/100,strtolower($object['currency'] ?? StripeService::currency()),['session'=>$object['id'] ?? null], 'Checkout session '.$status.'.'); }
 
     private function processChargeRefund(array $charge, string $eventId, string $type): void
     {
@@ -355,10 +357,10 @@ class StripeController
             return;
         }
         $prior=$this->highestRefundCents((int)$order['id']);$decision=self::refundDecision((string)($order['payment_status']??''),$prior,$refunded,$total);$status=$decision['status'];$partial=$status==='partially_refunded';
-        if($decision['meaningful']){
+        if($decision['meaningful']){DB::begin();try{
             DB::exec('update orders set payment_status=?,status=?,stripe_charge_id=coalesce(?,stripe_charge_id),refunded_at=case when ?="refunded" then coalesce(refunded_at,now()) else refunded_at end,partially_refunded_at=case when ?="partially_refunded" then coalesce(partially_refunded_at,now()) else partially_refunded_at end where id=?', [$status,$partial?'paid':'refunded',$charge['id'] ?? null,$status,$status,$order['id']]);
-            if(!$partial)DB::exec('update order_items set manual_delivery_status=case when fulfillment_type="google_drive" then "cancelled_refunded" else manual_delivery_status end where order_id=?',[$order['id']]);
-        }
+            if(!$partial){DB::exec('update order_items set manual_delivery_status=case when fulfillment_type="google_drive" then "cancelled_refunded" else manual_delivery_status end where order_id=?',[$order['id']]);(new CustomDesignService)->systemTransitionByOrder((int)$order['id'],'refunded','stripe_refund');}DB::commit();}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
+        }elseif($status==='refunded'){(new CustomDesignService)->systemTransitionByOrder((int)$order['id'],'refunded','stripe_refund');}
         StripeService::logTransaction((int)$order['id'],$eventId,$refunded<$total?'partial_refund':'refund',$refunded<$total?'partially_refunded':'refunded',$refunded/100,strtolower($charge['currency'] ?? StripeService::currency()),['charge'=>$charge['id'] ?? null,'intent'=>$charge['payment_intent'] ?? null],$decision['meaningful']?'Refund status received from Stripe.':'Refund observation recorded without a state transition.');
         $this->reconcileRefundPayouts((int)$order['id']);
         if($decision['meaningful']||$decision['communication_recovery'])$this->recalculateRecognitionForRefund((int)$order['id'],$status,$refunded);

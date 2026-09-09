@@ -1,0 +1,1 @@
+<section><h1>Custom orders</h1><?php foreach($orders as $o):?><article><a href="/seller/custom-orders/<?=$o['id']?>"><?=H::e($o['title'])?> for <?=H::e($o['buyer_name'])?></a> · <?=H::e(str_replace('_',' ',$o['status']))?> · payment <?=H::e($o['payment_status'])?></article><?php endforeach?><?php if(!$orders):?><p>No paid custom orders yet.</p><?php endif?></section>

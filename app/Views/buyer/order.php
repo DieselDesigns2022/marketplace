@@ -16,10 +16,7 @@
     <?php foreach($group['items'] as $i):?>
         <tr>
            <td>
-           <?php if(!empty($i['preview_image'])):?><a href="/product/<?=H::e($i['slug'])?>"><img src="<?=H::assetUrl($i['preview_image'])?>" alt="<?=H::e($i['title'])?>" style="width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin-bottom:8px;"></a><?php endif;?>
-           <a href="/product/<?=H::e($i['slug'])?>">
-           <?=H::e($i['title'])?>
-           </a>
+           <?php if(!empty($i['product_id'])):?><?php if(!empty($i['preview_image'])):?><a href="/product/<?=H::e($i['slug'])?>"><img src="<?=H::assetUrl($i['preview_image'])?>" alt="<?=H::e($i['title'])?>" style="width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin-bottom:8px;"></a><?php endif;?><a href="/product/<?=H::e($i['slug'])?>"><?=H::e($i['title'])?></a><?php else:?><strong><?=H::e($i['title'])?></strong><br><a href="/buyer/custom-orders/<?=(int)$customOrder['id']?>">View custom-design workflow</a><?php endif;?>
            </td>
            <td>
            <?=H::e($i['license_name'] ?: $i['license_type'])?><?php if(!empty($i['license_description'])):?><br><span class="muted"><?=H::e($i['license_description'])?></span><?php endif;?>
@@ -27,9 +24,10 @@
            <td>
            <?=H::money($i['total_price'])?>
            </td>
-           <td><?=($i['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></td>
+           <td><?=($i['fulfillment_type']==='custom_design')?'Custom design':(($i['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product')?></td>
            <td>
-           <?php if(($i['fulfillment_type'] ?? 'downloadable')==='downloadable'):?>
+           <?php if(($i['fulfillment_type'] ?? 'downloadable')==='custom_design'):?><span class="muted">Final delivery appears below after completion.</span>
+           <?php elseif(($i['fulfillment_type'] ?? 'downloadable')==='downloadable'):?>
              <?php $paymentStatus = $order['payment_status'] ?? ''; $downloadExpired = !empty($i['download_expires_at']) && strtotime($i['download_expires_at']) < time(); $downloadEligible = $i['file_id'] && !empty($i['file_available']) && $paymentStatus === 'paid' && !$downloadExpired; ?>
              <?php if($paymentStatus==='refunded'):?><span class="muted">Refunded — download unavailable.</span><?php elseif($downloadEligible):?><a class="btn" href="/download/<?=$i['file_id']?>">Download</a><?php elseif($downloadExpired):?><span class="muted">Download access has expired.</span><?php elseif($paymentStatus==='paid'):?><span class="muted">File unavailable.</span><?php else:?><span class="muted">Download access unlocks after Stripe webhook payment confirmation.</span><?php endif;?>
              <br><span class="muted">Downloads: <?=number_format((int)($i['download_count'] ?? 0))?></span>
@@ -38,16 +36,18 @@
              <?php if(($order['payment_status'] ?? $order['status']) === 'paid'):?><span class="muted">Google Drive email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?></span><?php else:?><span class="muted">Google Drive delivery details unlock after payment clears.</span><?php endif;?>
            <?php endif;?>
            </td>
-        <td><?php if(in_array(($order['payment_status']??$order['status']),['paid','partially_refunded'],true)):?><form method="post" action="/messages/start/buyer-order-item/<?=$i['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Message seller</button></form><?php else:?><span class="muted">Available after eligible payment</span><?php endif;?></td>
+        <td><?php if(in_array(($order['payment_status']??$order['status']),['paid','partially_refunded'],true)):?><form method="post" action="<?=($i['fulfillment_type']??'')==='custom_design'?'/messages/start/custom-order/'.(int)$customOrder['id']:'/messages/start/buyer-order-item/'.(int)$i['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Message seller</button></form><?php else:?><span class="muted">Available after eligible payment</span><?php endif;?></td>
         </tr>
     <?php endforeach;?>
 </table></div></section><?php endforeach;?>
 <?php $orderPaymentStatus = $order['payment_status'] ?? $order['status']; ?>
 <?php if($orderPaymentStatus === 'manual_review'):?>
   <p class="notice warning">This payment needs admin review before another payment attempt can be made.</p>
-<?php elseif(!in_array($orderPaymentStatus, ['paid','refunded','partially_refunded'], true)):?>
+<?php elseif(!in_array($orderPaymentStatus, ['paid','refunded','partially_refunded'], true)&&($customOrder['status']??null)!=='cancelled'):?>
   <form method="post" action="/checkout/retry/<?=$order['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn">Retry payment</button></form>
 <?php endif;?>
+<?php if(($customOrder['status']??null)==='cancelled'):?><p class="notice warning">This custom request was cancelled and cannot be retried. Submit a new request if you still want the service.</p><?php endif?>
 <p>
 <a href="/dashboard/purchases">Back to purchases</a>
 </p>
+<?php if($customOrder&&$orderPaymentStatus==='refunded'):?><section class="card"><h2>Custom-design delivery</h2><p>Refunded — final downloads are unavailable.</p></section><?php elseif(!empty($customFinals)):?><section class="card"><h2>Completed custom-design files</h2><?php foreach($customFinals as $file):?><p><a href="/custom-order-files/<?=$file['id']?>"><?=H::e($file['original_name'])?></a></p><?php endforeach?></section><?php endif?>
