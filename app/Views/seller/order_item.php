@@ -1,6 +1,6 @@
-<h1>Seller Order Item #<?=$item['id']?></h1>
+<h1>Seller Order Item #<?=$item['id']?></h1><?php if(($item['fulfillment_type']??'')==='custom_design'&&$item['custom_order_id']):?><p><a class="btn" href="/seller/custom-orders/<?=$item['custom_order_id']?>">Open custom-order workflow</a></p><?php endif?>
 <p><a href="/seller/sales">Back to sales</a></p>
-<?php if(in_array(($item['payment_status']??$item['order_status']),['paid','partially_refunded'],true)):?><form method="post" action="/messages/start/seller-order-item/<?=$item['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn">Message buyer</button></form><?php endif;?>
+<?php if(in_array(($item['payment_status']??$item['order_status']),['paid','partially_refunded'],true)):?><form method="post" action="<?=($item['fulfillment_type']??'')==='custom_design'&&$item['custom_order_id']?'/messages/start/custom-order/'.(int)$item['custom_order_id']:'/messages/start/seller-order-item/'.(int)$item['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn">Message buyer</button></form><?php endif;?>
 <div class="card">
   <p>Order #<?=$item['order_id']?> · <?=H::e($item['order_status'])?> · payment <?=H::e($item['payment_status'] ?? $item['order_status'])?> · <?=$item['order_created']?></p>
   <?php $paid = (($item['payment_status'] ?? $item['order_status']) === 'paid'); ?><p>Buyer: <?=H::e($paid ? $item['buyer_name'] : 'Hidden until payment clears')?> <?php if($paid):?>(<?=H::e($item['buyer_email'])?>)<?php endif;?></p>
@@ -9,7 +9,7 @@
   <p>License add-on price: <?=H::money($item['license_price'] ?? 0)?></p>
   <?php if(!empty($item['coupon_code'])):?><p>Coupon <?=H::e($item['coupon_code'])?> item discount: <?=H::money($item['coupon_discount'] ?? 0)?>. Earnings use the discounted item total.</p><?php endif;?>
   <p class="muted">Sales tax, when required, is handled by Asset Moth through Stripe Tax and is excluded from seller payout.</p>
-  <p>Fulfillment: <?=($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product'?></p>
+  <p>Fulfillment: <?=($item['fulfillment_type']==='custom_design')?'Custom Design':(($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product')?></p>
   <?php if($item['fulfillment_type']==='google_drive'):?>
     <?php if($paid):?>
       <p>Buyer Google Drive email: <strong><?=H::e($item['buyer_google_drive_email'] ?: 'Needed')?></strong></p>

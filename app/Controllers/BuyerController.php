@@ -20,24 +20,28 @@ class BuyerController
         $uid=(int)H::user()['id'];
         $summary=DB::row('select (select count(*) from orders where user_id=?) purchase_count,(select count(*) from wishlists where user_id=?) wishlist_count,(select count(*) from notifications where user_id=? and read_at is null) unread_count',[$uid,$uid,$uid]);
         $eligibleFiles=DB::rows('select pf.storage_path from order_items oi join orders o on o.id=oi.order_id join product_files pf on pf.product_id=oi.product_id where o.user_id=? and o.payment_status="paid" and oi.fulfillment_type="downloadable" and (oi.download_expires_at is null or oi.download_expires_at>=now())',[$uid]);
-        $summary['available_downloads']=count(array_filter($eligibleFiles,fn(array $file):bool=>$this->protectedFileAvailable($file['storage_path']??null)));
+        $customFiles=DB::rows('select f.storage_path from custom_order_files f join custom_orders co on co.id=f.custom_order_id join orders o on o.id=co.order_id where co.buyer_user_id=? and co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded")',[$uid]);
+        $customBase=realpath(app_path('storage/protected_uploads/custom_designs'));$customAvailable=array_filter($customFiles,static function(array $file)use($customBase):bool{$real=realpath(app_path('storage/protected_uploads/'.ltrim($file['storage_path']??'','/')));return(bool)($customBase&&$real&&str_starts_with($real,$customBase.DIRECTORY_SEPARATOR)&&is_file($real)&&is_readable($real));});
+        $summary['available_downloads']=count(array_filter($eligibleFiles,fn(array $file):bool=>$this->protectedFileAvailable($file['storage_path']??null)))+count($customAvailable);
         H::view('buyer/home',['summary'=>$summary,'orders'=>DB::rows('select * from orders where user_id=? order by created_at desc limit 5',[$uid]),'wishlist'=>DB::rows('select p.title,p.slug,(select image_path from product_images where product_id=p.id order by sort_order,id limit 1) preview_image from wishlists w join products p on p.id=w.product_id where w.user_id=? order by w.created_at desc limit 4',[$uid]),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc limit 5',[$uid])]);
 
     }
     public function purchases()
     {
         H::requireLogin();
-        H::view('buyer/purchases',['orders'=>DB::rows('select o.*, group_concat(concat(coalesce(oi.product_title,p.title)," (",oi.license_name,")") separator ", ") product_titles from orders o join order_items oi on oi.order_id=o.id join products p on p.id=oi.product_id where o.user_id=? group by o.id order by o.created_at desc',[H::user()['id']])]);
+        H::view('buyer/purchases',['orders'=>DB::rows('select o.*, group_concat(concat(coalesce(oi.product_title,p.title,"Purchased item")," (",oi.license_name,")") separator ", ") product_titles from orders o join order_items oi on oi.order_id=o.id left join products p on p.id=oi.product_id where o.user_id=? group by o.id order by o.created_at desc',[H::user()['id']])]);
 
     }
     public function order($id)
     {
         H::requireLogin();
         $order=DB::row('select * from orders where id=? and user_id=?',[(int)$id,H::user()['id']])??H::abort(404);
-        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id,(select storage_path from product_files pf where pf.product_id=p.id order by id limit 1) file_storage_path from order_items oi join products p on p.id=oi.product_id left join designers d on d.id=oi.designer_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title,"Purchased item") title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id,(select storage_path from product_files pf where pf.product_id=p.id order by id limit 1) file_storage_path from order_items oi left join products p on p.id=oi.product_id left join designers d on d.id=oi.designer_id where oi.order_id=?',[$order['id']]);
         foreach($items as &$item) $item['file_available']=$this->protectedFileAvailable($item['file_storage_path']??null);
         unset($item);
-        H::view('buyer/order',['order'=>$order,'items'=>$items,'sellerGroups'=>SellerReceiptService::groupItemsBySeller($items)]);
+        $customOrder=DB::row('select * from custom_orders where order_id=? and buyer_user_id=?',[$order['id'],H::user()['id']]);
+        $customFinals=$customOrder&&$customOrder['status']==='completed'&&in_array($order['payment_status'],['paid','partially_refunded'],true)?DB::rows('select * from custom_order_files where custom_order_id=? and file_kind="final" order by id',[$customOrder['id']]):[];
+        H::view('buyer/order',['order'=>$order,'items'=>$items,'sellerGroups'=>SellerReceiptService::groupItemsBySeller($items),'customOrder'=>$customOrder,'customFinals'=>$customFinals]);
 
     }
     public function downloads()
@@ -47,7 +51,8 @@ class BuyerController
         $items=DB::rows('select oi.*,o.payment_status,o.status order_status,o.created_at purchase_date,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,pf.id file_id,pf.original_name file_name,pf.storage_path from order_items oi join orders o on o.id=oi.order_id join products p on p.id=oi.product_id left join product_files pf on pf.product_id=oi.product_id left join designers d on d.id=oi.designer_id where o.user_id=? order by o.created_at desc,oi.id desc,pf.id',[$uid]);
         foreach($items as &$item) $item['file_available']=$this->protectedFileAvailable($item['storage_path']??null);
         unset($item);
-        H::view('buyer/downloads',['items'=>$items]);
+        $customFinals=DB::rows('select f.*,co.id custom_order_id,co.service_snapshot,o.created_at purchase_date,d.display_name seller_name from custom_order_files f join custom_orders co on co.id=f.custom_order_id join orders o on o.id=co.order_id join designers d on d.id=co.designer_id where co.buyer_user_id=? and co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded") order by f.created_at desc',[$uid]);
+        H::view('buyer/downloads',['items'=>$items,'customFinals'=>$customFinals]);
 
     }
     public function download($file)

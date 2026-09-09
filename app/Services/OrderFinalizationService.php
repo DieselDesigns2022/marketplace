@@ -80,9 +80,9 @@ final class OrderFinalizationService
 
     private function prepareFinancialLedgers(int $orderId, string $currency, bool $platformFunded): void
     {
-        $items = DB::rows('select order_id,product_id,designer_id,sum(total_price) total_price,sum(total_price*commission_rate) commission_amount from order_items where order_id=? group by order_id,product_id,designer_id', [$orderId]);
+        $items = DB::rows('select order_id,product_id,custom_service_id,designer_id,sum(total_price) total_price,sum(total_price*commission_rate) commission_amount from order_items where order_id=? group by order_id,product_id,custom_service_id,designer_id', [$orderId]);
         foreach ($items as $item) {
-            DB::exec('insert into platform_commissions (order_id,product_id,designer_id,gross_sale,commission_amount) select ?,?,?,?,? where not exists (select 1 from platform_commissions where order_id=? and product_id=? and designer_id=?)', [$orderId, $item['product_id'], $item['designer_id'], $item['total_price'], round((float)$item['commission_amount'], 2), $orderId, $item['product_id'], $item['designer_id']]);
+            DB::exec('insert into platform_commissions (order_id,product_id,custom_service_id,designer_id,gross_sale,commission_amount) select ?,?,?,?,?,? where not exists (select 1 from platform_commissions where order_id=? and product_id<=>? and custom_service_id<=>? and designer_id=?)', [$orderId,$item['product_id'],$item['custom_service_id'],$item['designer_id'],$item['total_price'],round((float)$item['commission_amount'],2),$orderId,$item['product_id'],$item['custom_service_id'],$item['designer_id']]);
         }
         foreach (DB::rows('select oi.designer_id,sum(oi.total_price) gross,sum(oi.total_price*oi.commission_rate) commission,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled from order_items oi join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled', [$orderId]) as $row) {
             $gross = round((float)$row['gross'], 2);
@@ -128,7 +128,9 @@ final class OrderFinalizationService
         $order = DB::row('select * from orders where id=?', [$orderId]);
         EmailQueueService::paidOrder($orderId);
         NotificationService::create((int)$order['user_id'], 'purchase_receipt', 'buyer', 'Purchase complete', 'Your order #' . $orderId . ' is complete.', 'order:' . $orderId . ':buyer:paid', '/dashboard/order/' . $orderId);
-        NotificationService::create((int)$order['user_id'], 'download_ready', 'buyer', 'Downloads ready', 'Your files for order #' . $orderId . ' are ready.', 'order:' . $orderId . ':buyer:download-ready', '/dashboard/order/' . $orderId);
+        $custom=DB::row('select co.id,d.user_id seller_user_id from custom_orders co join designers d on d.id=co.designer_id where co.order_id=?',[$orderId]);
+        if($custom) NotificationService::create((int)$custom['seller_user_id'],'custom_order_new','designer','New custom order','A paid custom-design request is ready, including the required buyer information.','custom-order:'.$custom['id'].':seller:new','/seller/custom-orders/'.$custom['id']);
+        else NotificationService::create((int)$order['user_id'], 'download_ready', 'buyer', 'Downloads ready', 'Your files for order #' . $orderId . ' are ready.', 'order:' . $orderId . ':buyer:download-ready', '/dashboard/order/' . $orderId);
         $coupon = !empty($order['coupon_id']) ? DB::row('select id,scope,seller_id,code from coupons where id=?', [$order['coupon_id']]) : null;
         foreach (DB::rows('select d.user_id,oi.designer_id,u.email,u.name,sum(coalesce(oi.coupon_discount,0)) coupon_discount from order_items oi join designers d on d.id=oi.designer_id join users u on u.id=d.user_id where oi.order_id=? group by d.user_id,oi.designer_id,u.email,u.name', [$orderId]) as $seller) {
             $key = 'order:' . $orderId . ':seller:' . $seller['designer_id'];

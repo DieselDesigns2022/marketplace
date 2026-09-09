@@ -208,3 +208,14 @@ Deployment verification must include a write test executed as the PHP-FPM runtim
 ```bash
 sudo -u www-data sh -c 'test -d storage/protected_uploads/messages && touch storage/protected_uploads/messages/.write-test && rm storage/protected_uploads/messages/.write-test'
 ```
+
+## Phase 12.6 custom designs
+
+Apply `database/migrations/2026_09_08_phase_12_6_custom_designs.sql` once after both Phase 12.5 migrations and before deploying Phase 12.6 code. It is not safely rerunnable because it directly creates tables and adds columns and constraints. Afterward verify `order_items.custom_service_id`, `platform_commissions.custom_service_id`, `message_conversations.custom_order_id`, `custom_order_status_history.system_event_key`, and the composite unique key on `(custom_order_id,system_event_key)`.
+
+Provision `storage/protected_uploads/custom_designs` outside the public web root with the same runtime-only ownership and `0750` policy as message attachments. Public examples use `public/uploads/custom_designs/examples`; protected references, proofs, and finals must not be served directly. Following the existing runtime-user convention, verify both locations are writable without retaining test files:
+
+```bash
+sudo -u www-data sh -c 'test -d storage/protected_uploads/custom_designs && touch storage/protected_uploads/custom_designs/.write-test && rm storage/protected_uploads/custom_designs/.write-test'
+sudo -u www-data sh -c 'test -d public/uploads/custom_designs/examples && touch public/uploads/custom_designs/examples/.write-test && rm public/uploads/custom_designs/examples/.write-test'
+```

@@ -2269,7 +2269,7 @@ class SellerController
     {
         $this->requireOnboardingComplete();
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
+        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
 
     }
 
@@ -2283,7 +2283,7 @@ class SellerController
             H::flash('success','Manual delivery item marked delivered.');
             H::redirect('/seller/order-item/'.(int)$id);
         }
-        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
+        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
         H::view('seller/order_item',['item'=>$item]);
     }
     public function referrals()

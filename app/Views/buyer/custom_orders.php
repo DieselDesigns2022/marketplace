@@ -1,0 +1,1 @@
+<section><h1>My custom designs</h1><?php foreach($orders as $o):?><article><a href="/buyer/custom-orders/<?=$o['id']?>"><?=H::e($o['title'])?></a> by <?=H::e($o['display_name'])?> · <?=H::e(str_replace('_',' ',$o['status']))?> · payment <?=H::e($o['payment_status'])?></article><?php endforeach?><?php if(!$orders):?><p>No custom-design requests yet.</p><?php endif?></section>

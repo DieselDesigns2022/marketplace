@@ -7,6 +7,7 @@ use Throwable;
 
 final class EmailQueueService
 {
+    public static function shouldQueueDownloadReady(bool $isCustomOrder):bool{return !$isCustomOrder;}
     public static function validEnvelope(string $email,string $subject): bool
     { return filter_var(strtolower(trim($email)),FILTER_VALIDATE_EMAIL)!==false && !preg_match('/[\r\n]/',$subject.$email); }
     public static function retryDelay(int $attempt): ?int { return [1=>5,2=>30][$attempt]??null; }
@@ -47,8 +48,10 @@ final class EmailQueueService
         foreach ($items as &$item) $item['title']=self::receiptTitle($item['product_title']??null,$item['legacy_live_title']??null);
         unset($item);
         self::queue('transactional',$o['email'],'Your Asset Moth receipt','purchase_receipt',['name'=>$o['name'],'order'=>$o,'items'=>$items,'seller_groups'=>SellerReceiptService::groupItemsBySeller($items)],"order:$orderId:receipt");
-        self::queue('transactional',$o['email'],'Your downloads are ready','download_ready',['name'=>$o['name'],'order_id'=>$orderId],"order:$orderId:downloads");
+        if(self::shouldQueueDownloadReady((bool)DB::row('select id from custom_orders where order_id=?',[$orderId])))self::queue('transactional',$o['email'],'Your downloads are ready','download_ready',['name'=>$o['name'],'order_id'=>$orderId],"order:$orderId:downloads");
     }
+    public static function customFinalAvailable(int $customOrderId,int $historyId):void
+    { $row=DB::row('select co.order_id,u.email,u.name from custom_orders co join orders o on o.id=co.order_id join users u on u.id=co.buyer_user_id where co.id=? and co.status="completed" and o.payment_status in ("paid","partially_refunded")',[$customOrderId]);if($row)self::queue('transactional',$row['email'],'Your custom design is ready','custom_final_available',['name'=>$row['name'],'order_id'=>$row['order_id']],"custom-order-history:$historyId:final-email"); }
     public static function refund(int $orderId,string $status,int $cumulativeRefundCents,string $transitionKey): void { $o=DB::row('select o.*,u.email,u.name from orders o join users u on u.id=o.user_id where o.id=?',[$orderId]); if($o)self::queue('transactional',$o['email'],'Refund status update','refund_status',['name'=>$o['name'],'order'=>$o,'refund_status'=>$status,'cumulative_refund_amount'=>$cumulativeRefundCents/100],$transitionKey.':email'); }
     public static function foundationSellerEmail(string $email,string $type,array $data,string $eventKey): bool { return self::queue('transactional',$email,self::sellerSubject($type),'seller_notification',$data,$eventKey); }
 
