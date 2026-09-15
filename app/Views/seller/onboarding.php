@@ -32,13 +32,13 @@
         </p>
     </div>
 
-    <h3 id="faq-selling-costs" style="color:#4c1d95;">What does it cost to sell on Asset Moth?</h3>
-    <p style="color:#334155;">There is no startup fee, no monthly fee, and no listing fee. Asset Moth only earns when you make a sale.</p>
-    <p style="color:#334155;">Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens. Stripe/payment processing fees also apply, and Asset Moth’s <?=H::e((string)$commissionPercent)?>% commission is separate from Stripe/payment processing fees.</p>
+    <h3 id="faq-selling-costs" style="color:#4c1d95;">What does it cost to sell on Creative Moth?</h3>
+    <p style="color:#334155;">There is no startup fee, no monthly fee, and no listing fee. Creative Moth only earns when you make a sale.</p>
+    <p style="color:#334155;">Creative Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens. Stripe/payment processing fees also apply, and Creative Moth’s <?=H::e((string)$commissionPercent)?>% commission is separate from Stripe/payment processing fees.</p>
 
     <h3 id="faq-seller-payouts" style="color:#4c1d95;">How do seller payouts work?</h3>
     <p style="color:#334155;">Buyer checkout can work before seller onboarding is complete, but seller payouts remain pending until Stripe Connect onboarding is complete and Stripe marks the account payout-ready. Seller payouts are handled through Stripe Connect after onboarding.</p>
 
     <h3 id="faq-refunds-cancellations" style="color:#4c1d95;">Refunds and digital purchase cancellations</h3>
-    <p style="color:#334155;">Refunds are Stripe-processed and admin-exception only because Asset Moth is a digital product marketplace. Buyers cannot self-cancel completed digital purchases, and sellers cannot issue instant refunds themselves.</p>
+    <p style="color:#334155;">Refunds are Stripe-processed and admin-exception only because Creative Moth is a digital product marketplace. Buyers cannot self-cancel completed digital purchases, and sellers cannot issue instant refunds themselves.</p>
 </details>

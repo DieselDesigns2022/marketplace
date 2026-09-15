@@ -13,7 +13,7 @@ final class EmailQueueService
     public static function retryDelay(int $attempt): ?int { return [1=>5,2=>30][$attempt]??null; }
     public static function sellerSubject(string $type): string
     {
-        return ['new_sale'=>'You made a sale on Asset Moth','coupon_used'=>'A coupon was used on your Asset Moth sale','product_approved'=>'Your Asset Moth product was approved','product_rejected'=>'Your Asset Moth product needs changes','product_flagged'=>'Your Asset Moth product was flagged for review','creator_rank'=>'Your Asset Moth creator rank changed','founder_badge'=>'Your Asset Moth Founder recognition'][$type]??'Asset Moth seller update';
+        return ['new_sale'=>'You made a sale on Creative Moth','coupon_used'=>'A coupon was used on your Creative Moth sale','product_approved'=>'Your Creative Moth product was approved','product_rejected'=>'Your Creative Moth product needs changes','product_flagged'=>'Your Creative Moth product was flagged for review','creator_rank'=>'Your Creative Moth creator rank changed','founder_badge'=>'Your Creative Moth Founder recognition'][$type]??'Creative Moth seller update';
     }
     public static function receiptTitle(?string $snapshot, ?string $legacyLiveTitle): string
     {
@@ -47,7 +47,7 @@ final class EmailQueueService
         $items=DB::rows('select oi.id,oi.product_id,oi.product_title, p.title legacy_live_title,oi.license_type,oi.license_name,oi.license_snapshot,oi.unit_price,oi.license_price,oi.total_price,oi.coupon_discount,oi.designer_id,oi.seller_name,oi.seller_receipt_note_snapshot,oi.seller_receipt_image_path_snapshot from order_items oi left join products p on p.id=oi.product_id where oi.order_id=? order by oi.id',[$orderId]);
         foreach ($items as &$item) $item['title']=self::receiptTitle($item['product_title']??null,$item['legacy_live_title']??null);
         unset($item);
-        self::queue('transactional',$o['email'],'Your Asset Moth receipt','purchase_receipt',['name'=>$o['name'],'order'=>$o,'items'=>$items,'seller_groups'=>SellerReceiptService::groupItemsBySeller($items)],"order:$orderId:receipt");
+        self::queue('transactional',$o['email'],'Your Creative Moth receipt','purchase_receipt',['name'=>$o['name'],'order'=>$o,'items'=>$items,'seller_groups'=>SellerReceiptService::groupItemsBySeller($items)],"order:$orderId:receipt");
         if(self::shouldQueueDownloadReady((bool)DB::row('select id from custom_orders where order_id=?',[$orderId])))self::queue('transactional',$o['email'],'Your downloads are ready','download_ready',['name'=>$o['name'],'order_id'=>$orderId],"order:$orderId:downloads");
     }
     public static function customFinalAvailable(int $customOrderId,int $historyId):void

@@ -167,7 +167,7 @@ $isEntirelyDraft =
     <h2>Apply License Settings in Bulk</h2>
 
     <p>
-        Configure the Asset Moth licenses on one product first and save it.
+        Configure the Creative Moth licenses on one product first and save it.
         Then choose that product below to apply the same enabled licenses
         and add-on prices to every other draft product in this batch.
     </p>

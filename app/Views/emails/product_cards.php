@@ -12,7 +12,7 @@ foreach ($products as $product) {
 
     if (!isset($designers[$designerId])) {
         $designers[$designerId] = [
-            'display_name' => $product['display_name'] ?? 'Asset Moth Designer',
+            'display_name' => $product['display_name'] ?? 'Creative Moth Designer',
             'store_slug'   => $product['store_slug'] ?? '',
             'products'     => [],
         ];
@@ -119,7 +119,7 @@ foreach ($designers as $designer):
                                             font-weight:700;
                                             line-height:1.4;
                                         ">
-                                            ASSET MOTH<br>
+                                            CREATIVE MOTH<br>
                                             <span style="font-weight:400;color:#6b6478;">
                                                 Preview coming soon
                                             </span>

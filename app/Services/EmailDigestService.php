@@ -25,7 +25,7 @@ final class EmailDigestService
         $count=0;
         foreach($users as $user){
             $data=['user_id'=>(int)$user['id'],'name'=>$user['name'],'frequency'=>$frequency,'period_start'=>$start,'period_end'=>$end,'marketing_preference'=>$frequency,'manage_preferences_url'=>self::manageUrl()];
-            if(EmailDigestClaimService::queue($frequency,$user,$products,$start,$end,ucfirst($frequency).' Asset Moth marketplace digest','marketplace_digest',$data,"digest:$frequency:$start:{$user['id']}"))$count++;
+            if(EmailDigestClaimService::queue($frequency,$user,$products,$start,$end,ucfirst($frequency).' Creative Moth marketplace digest','marketplace_digest',$data,"digest:$frequency:$start:{$user['id']}"))$count++;
         }
         return $count;
     }
@@ -40,7 +40,7 @@ final class EmailDigestService
             $products=self::balanceByDesigner($products);
             if(!$products)continue;
             $data=['user_id'=>(int)$user['id'],'name'=>$user['name'],'period_start'=>$start,'period_end'=>$end,'marketing_preference'=>'favorite_shop','manage_preferences_url'=>self::manageUrl()];
-            if(EmailDigestClaimService::queue('favorite_shop',$user,$products,$start,$end,'New from shops you follow on Asset Moth','favorite_shop_digest',$data,"favorite-shops:$start:{$user['id']}"))$count++;
+            if(EmailDigestClaimService::queue('favorite_shop',$user,$products,$start,$end,'New from shops you follow on Creative Moth','favorite_shop_digest',$data,"favorite-shops:$start:{$user['id']}"))$count++;
         }
         return $count;
     }

@@ -6,7 +6,7 @@
 | Role-aware secondary navigation | Partially complete | Added in Phase 10.6 — server-side role sets, dynamic detail-route matching, current-page state, and notification shortcuts. |
 | Buyer cards and recent content | Partially complete | Added in Phase 10.6 — purchase, eligible-file, wishlist, unread counts plus recent orders, wishlist, and notifications. |
 | Buyer download history | Moved for clearer placement | Separate existing page — every protected product file has buyer-owned order context and accurate paid/refunded/expired/manual/missing states. |
-| Buyer receipts | Already complete | Complete but cleaned up — seller snapshot groups remain separate from Asset Moth payment, refund, tax, coupon, license, total, and fulfillment data. |
+| Buyer receipts | Already complete | Complete but cleaned up — seller snapshot groups remain separate from Creative Moth payment, refund, tax, coupon, license, total, and fulfillment data. |
 | Seller readiness and warnings | Partially complete | Complete but cleaned up — corrective links and unresolved warnings; incomplete sellers remain on the usable onboarding gate. |
 | Seller Stripe and tax status | Partially complete | Added in Phase 10.6 — friendly account states and platform Stripe Tax/no-action explanation. |
 | Seller products, earnings, payouts, orders | Partially complete | Added in Phase 10.6 — scoped status totals, tax-exclusive cumulative refund allocation, net gross/earnings, replay-safe pending payout reconciliation, transferred payouts, and recent paid seller items. |

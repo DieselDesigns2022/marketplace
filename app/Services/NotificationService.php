@@ -9,7 +9,7 @@ final class NotificationService
     {
         $safe = OperationalErrorSanitizer::sanitize($error->getMessage(), 240);
         $context = OperationalErrorSanitizer::context($context);
-        error_log('Asset Moth communication hook '.$context.' failed: '.$safe);
+        error_log('Creative Moth communication hook '.$context.' failed: '.$safe);
     }
     public static function safeActionUrl(?string $url): ?string
     {
@@ -39,7 +39,7 @@ final class NotificationService
     public static function creditReferralUpdate(int $userId,string $eventKey,string $message): bool { return self::create($userId,'credit_referral','buyer','Credit or referral update',$message,$eventKey,'/dashboard/referrals'); }
     public static function buyerReferralReward(int $userId,string $key):bool{return self::creditReferralUpdate($userId,$key,'Buyer referral reward earned: $1.50 store credit.');}
     public static function sellerReferralCredit(int $userId,string $key):bool{return self::creditReferralUpdate($userId,$key,'Seller referral reward earned: $5.00 store credit. The referred seller does not receive a matching credit.');}
-    public static function sellerReferralLifetimeQualified(int $userId,string $key):bool{return self::create($userId,'seller_referral_qualified','designer','Lifetime referral commission started','Your seller referral qualified for Asset Moth-funded 1% lifetime commission.',$key,'/seller/referrals');}
+    public static function sellerReferralLifetimeQualified(int $userId,string $key):bool{return self::create($userId,'seller_referral_qualified','designer','Lifetime referral commission started','Your seller referral qualified for Creative Moth-funded 1% lifetime commission.',$key,'/seller/referrals');}
     public static function sellerReferralPayoutSuccess(int $userId,string $key,string $amount):bool{return self::create($userId,'seller_referral_payout','designer','Referral commission transferred','$'.$amount.' in referral commission was transferred to your connected payout account.',$key,'/seller/referrals');}
     public static function sellerReferralPayoutProblem(int $userId,string $key,string $status):bool{return self::create($userId,'seller_referral_payout_problem','designer','Referral commission needs attention',$status==='not_ready'?'Your connected payout account is not ready. Earned commission remains unpaid and will be retried.':'A referral commission transfer could not be completed. Earned commission remains unpaid.',$key,'/seller/referrals');}
     public static function sellerReferralEnded(int $userId,string $key,string $reason):bool{return self::create($userId,'seller_referral_ended','designer','Referral commission permanently ended','Lifetime commission ended because the referred store was '.str_replace('store_','',$reason).'. Previously earned commission remains payable.',$key,'/seller/referrals');}
@@ -54,7 +54,7 @@ final class NotificationService
         return self::create($userId,'rank_badge','designer',$title,$message,$eventKey,'/seller/rank');
     }
     public static function internalMessage(int $userId,string $recipientSide,int $messageId,string $sender,string $url): bool
-    { $audience=$recipientSide==='seller'?'designer':'buyer';return self::create($userId,'internal_message',$audience,'New message',mb_substr(strip_tags($sender),0,120).' sent you a private Asset Moth message.',"internal-message:$messageId:recipient:$userId",$url); }
+    { $audience=$recipientSide==='seller'?'designer':'buyer';return self::create($userId,'internal_message',$audience,'New message',mb_substr(strip_tags($sender),0,120).' sent you a private Creative Moth message.',"internal-message:$messageId:recipient:$userId",$url); }
     public static function rankBadge(int $userId,string $eventKey,string $message): bool { return self::recognition($userId,$eventKey,'Creator rank earned',$message); }
     /** Foundation only: call when a future compliant seller-tax transition exists. */
     public static function sellerTaxEnabled(string $eventKey,string $message,?string $url=null): void { self::admins('seller_tax_enabled','Seller tax status enabled',$message,$eventKey,$url); }

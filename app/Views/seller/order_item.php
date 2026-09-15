@@ -8,7 +8,7 @@
   <p>License: <?=H::e($item['license_name'] ?: $item['license_type'])?><?php if(!empty($item['license_description'])):?><br><span class="muted"><?=nl2br(H::e($item['license_description']))?></span><?php endif;?></p>
   <p>License add-on price: <?=H::money($item['license_price'] ?? 0)?></p>
   <?php if(!empty($item['coupon_code'])):?><p>Coupon <?=H::e($item['coupon_code'])?> item discount: <?=H::money($item['coupon_discount'] ?? 0)?>. Earnings use the discounted item total.</p><?php endif;?>
-  <p class="muted">Sales tax, when required, is handled by Asset Moth through Stripe Tax and is excluded from seller payout.</p>
+  <p class="muted">Sales tax, when required, is handled by Creative Moth through Stripe Tax and is excluded from seller payout.</p>
   <p>Fulfillment: <?=($item['fulfillment_type']==='custom_design')?'Custom Design':(($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product')?></p>
   <?php if($item['fulfillment_type']==='google_drive'):?>
     <?php if($paid):?>

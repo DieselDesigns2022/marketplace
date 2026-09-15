@@ -1,5 +1,5 @@
 <?php use App\Core\Helpers as H; ?>
-<header class="dashboard-heading"><div><h1>Download history</h1><p class="muted">Files are served only through Asset Moth's protected download route.</p></div><a class="btn alt" href="/browse">Browse products</a></header>
+<header class="dashboard-heading"><div><h1>Download history</h1><p class="muted">Files are served only through Creative Moth's protected download route.</p></div><a class="btn alt" href="/browse">Browse products</a></header>
 <?php if(!$items&&!$customFinals):?><section class="card empty-state"><h2>No downloads yet</h2><p>Your eligible purchases will appear here after Stripe confirms payment.</p><a class="btn" href="/browse">Browse marketplace</a></section><?php endif;?>
 <div class="responsive-table"><table><thead><tr><th>Product</th><th>Seller</th><th>Purchased</th><th>Order</th><th>Status</th></tr></thead><tbody>
 <?php foreach($items as $i): $paid=($i['payment_status']??'')==='paid';$expired=!empty($i['download_expires_at'])&&strtotime($i['download_expires_at'])<time();$downloadable=($i['fulfillment_type']??'downloadable')==='downloadable';$available=$paid&&!$expired&&$downloadable&&!empty($i['file_id'])&&!empty($i['file_available']); ?>

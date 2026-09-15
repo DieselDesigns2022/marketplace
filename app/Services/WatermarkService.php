@@ -154,7 +154,7 @@ class WatermarkService
                 $errors[] = 'Preview image was saved privately, but the public preview could not be created.';
                 return null;
             }
-            error_log('Asset Moth watermark fallback: ' . $result['message']);
+            error_log('Creative Moth watermark fallback: ' . $result['message']);
             return [
                 'image_path' => '/uploads/' . trim($folder, '/') . '/' . $name,
                 'original_image_path' => 'product_previews/' . $name,
@@ -356,7 +356,7 @@ class WatermarkService
         $transparent = imagecolorallocatealpha($img, 255, 255, 255, 127);
         imagefill($img, 0, 0, $transparent);
         $white = imagecolorallocatealpha($img, 255, 255, 255, 0);
-        imagestring($img, 5, 12, max(8, (int)($h / 2) - 8), 'AM Asset Moth', $white);
+        imagestring($img, 5, 12, max(8, (int)($h / 2) - 8), 'AM Creative Moth', $white);
         return $img;
     }
 }

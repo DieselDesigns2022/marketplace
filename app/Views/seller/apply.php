@@ -1,6 +1,6 @@
 <h1>Apply to Sell</h1>
 <section class="card application-intro">
-    <h2>Become a designer on Asset Moth</h2>
+    <h2>Become a designer on Creative Moth</h2>
     <p><strong>Step 1 is creating an account. Step 2 is completing this seller application.</strong> Your account is not submitted for seller approval until this form is complete and submitted.</p>
     <ul>
         <li>Designers can create a public storefront after approval.</li>

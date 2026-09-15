@@ -10,6 +10,6 @@
  <progress data-upload-progress value="0" max="1" hidden aria-label="CSV upload progress"></progress><p class="muted" data-upload-message aria-live="polite"></p>
  <button>Upload and preview</button>
 </form>
-<p><a href="/seller/products/import/payhip-template">Download the Asset Moth Payhip CSV template</a> · <a href="/seller/products/import/history">View import history</a></p>
+<p><a href="/seller/products/import/payhip-template">Download the Creative Moth Payhip CSV template</a> · <a href="/seller/products/import/history">View import history</a></p>
 <p class="muted">Payhip does not provide a standard native product-catalog export. Use our template or map equivalent columns from a product-related CSV.</p>
-<p class="muted">Wix native store CSV exports do not include digital source products or their downloadable files. Asset Moth can only import listing data present in the CSV and never retrieves source-platform download files.</p>
+<p class="muted">Wix native store CSV exports do not include digital source products or their downloadable files. Creative Moth can only import listing data present in the CSV and never retrieves source-platform download files.</p>

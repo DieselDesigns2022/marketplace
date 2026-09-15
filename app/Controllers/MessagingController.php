@@ -11,8 +11,148 @@ final class MessagingController
     private function uid():int{H::requireLogin();return(int)H::user()['id'];}
     private function validSide(string $side):string{if(!in_array($side,['buyer','seller'],true))H::abort(404);if($side==='seller')H::requireSeller();return$side;}
     public function inbox($side):void{$uid=$this->uid();$side=$this->validSide($side);$archived=($_GET['archived']??'')==='1';$rows=$this->service->inbox($uid,$side,$archived);$all=$this->service->inbox($uid,$side,false);H::view('messages/index',['side'=>$side,'conversations'=>$rows,'archived'=>$archived,'totalUnread'=>array_sum(array_column($all,'unread_count'))]);}
-    public function thread($side,$id):void{$uid=$this->uid();$side=$this->validSide($side);$c=$this->service->conversation((int)$id,$uid);if($this->service->side($c,$uid)!==$side)H::abort(404);if($_SERVER['REQUEST_METHOD']==='POST'){H::verifyCsrf();try{$this->service->send($c,$uid,$_POST['body']??'',$_FILES['attachments']??[]);H::flash('success','Message sent.');}catch(\InvalidArgumentException $e){H::flash('warning',$e->getMessage());}H::redirect("/$side/messages/".(int)$id);}$this->service->markRead($c,$uid);$messages=$this->service->messages($c);$other=$side==='buyer'?(int)$c['seller_user_id']:(int)$c['buyer_user_id'];H::view('messages/thread',['side'=>$side,'conversation'=>$c,'messages'=>$messages,'attachments'=>$this->service->attachments($messages),'blocked'=>$this->service->blocked($uid,$other),'myBlock'=>(bool)DB::row('select id from message_blocks where blocker_user_id=? and blocked_user_id=? and removed_at is null',[$uid,$other])]);}
+    public function thread($side,$id):void
+    {
+        $uid=$this->uid();
+        $side=$this->validSide($side);
+
+        $c=$this->service->conversation((int)$id,$uid);
+
+        if($this->service->side($c,$uid)!==$side){
+            H::abort(404);
+        }
+
+        if($_SERVER['REQUEST_METHOD']==='POST'){
+            H::verifyCsrf();
+
+            try{
+                $this->service->send(
+                    $c,
+                    $uid,
+                    $_POST['body']??'',
+                    $_FILES['attachments']??[]
+                );
+
+                H::flash('success','Message sent.');
+
+            }catch(\InvalidArgumentException $e){
+                H::flash('warning',$e->getMessage());
+            }
+
+            H::redirect(
+                "/$side/messages/".(int)$id
+            );
+        }
+
+        $this->service->markRead($c,$uid);
+
+        $messages=$this->service->messages($c);
+
+        $other=$side==='buyer'
+            ?(int)$c['seller_user_id']
+            :(int)$c['buyer_user_id'];
+
+        $contextLinks=[];
+
+        /*
+         * Purchased custom order
+         */
+        if(!empty($c['custom_order_id'])){
+
+            $contextLinks[]=[
+                'label'=>'Back to custom order',
+                'url'=>'/'.$side.
+                    '/custom-orders/'.
+                    (int)$c['custom_order_id']
+            ];
+
+        /*
+         * Purchased regular product order
+         */
+        }elseif(
+            !empty($c['order_id']) &&
+            !empty($c['order_item_id'])
+        ){
+
+            $contextLinks[]=[
+                'label'=>'Back to order',
+                'url'=>$side==='buyer'
+                    ?'/dashboard/order/'.(int)$c['order_id']
+                    :'/seller/order-item/'.(int)$c['order_item_id']
+            ];
+        }
+
+        /*
+         * Product inquiry or purchased product
+         */
+        if(!empty($c['product_id'])){
+
+            $product=DB::row(
+                'select slug
+                 from products
+                 where id=?',
+                [(int)$c['product_id']]
+            );
+
+            if($product){
+
+                $contextLinks[]=[
+                    'label'=>'Back to product',
+                    'url'=>'/product/'.$product['slug']
+                ];
+            }
+        }
+
+        /*
+         * Pre-purchase Custom Design inquiry
+         */
+        if(
+            preg_match(
+                '/^custom-service:(\d+)$/',
+                (string)($c['context_key']??''),
+                $match
+            )
+        ){
+
+            $service=DB::row(
+                'select slug
+                 from custom_design_services
+                 where id=?',
+                [(int)$match[1]]
+            );
+
+            if($service){
+
+                $contextLinks[]=[
+                    'label'=>'Back to Custom Design',
+                    'url'=>'/custom-design/'.$service['slug']
+                ];
+            }
+        }
+
+        H::view(
+            'messages/thread',
+            [
+                'side'=>$side,
+                'conversation'=>$c,
+                'messages'=>$messages,
+                'attachments'=>$this->service->attachments($messages),
+                'blocked'=>$this->service->blocked($uid,$other),
+                'myBlock'=>(bool)DB::row(
+                    'select id
+                     from message_blocks
+                     where blocker_user_id=?
+                       and blocked_user_id=?
+                       and removed_at is null',
+                    [$uid,$other]
+                ),
+                'contextLinks'=>$contextLinks
+            ]
+        );
+    }
+
     public function startProduct($id):void{H::verifyCsrf();$cid=$this->service->startProduct((int)$id,$this->uid());H::redirect('/buyer/messages/'.$cid);}
+    public function startCustomService($id):void{H::verifyCsrf();$cid=$this->service->startCustomService((int)$id,$this->uid());H::redirect('/buyer/messages/'.$cid);}
     public function startStore($id):void{H::verifyCsrf();$cid=$this->service->startStore((int)$id,$this->uid());H::redirect('/buyer/messages/'.$cid);}
     public function startBuyerOrder($id):void{H::verifyCsrf();$cid=$this->service->startBuyerOrderItem((int)$id,$this->uid());H::redirect('/buyer/messages/'.$cid);}
     public function startSellerOrder($id):void{H::verifyCsrf();H::requireSeller();$cid=$this->service->startSellerOrderItem((int)$id,$this->uid());H::redirect('/seller/messages/'.$cid);}

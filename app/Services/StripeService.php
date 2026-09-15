@@ -33,7 +33,7 @@ class StripeService
         }
         $country = strtoupper(trim((string)($address['country'] ?? '')));
         if ($country !== 'US') {
-            throw new \InvalidArgumentException('Asset Moth checkout is currently limited to US billing addresses.');
+            throw new \InvalidArgumentException('Creative Moth checkout is currently limited to US billing addresses.');
         }
         foreach (['line1', 'city', 'state', 'postal_code'] as $field) {
             if (trim((string)($address[$field] ?? '')) === '') {
@@ -91,10 +91,30 @@ class StripeService
     {
         $expected = self::normalizeBillingAddress($authoritative);
         $actual = self::normalizeBillingAddress($returned);
-        foreach (['line1', 'city', 'state', 'postal_code', 'country'] as $field) {
-            if ($actual[$field] !== '' && $actual[$field] !== $expected[$field]) return false;
+
+        if ($expected['country'] !== 'US' || $actual['country'] !== 'US') {
+            return false;
         }
-        return $actual['country'] === '' || $actual['country'] === 'US';
+
+        if (
+            $expected['state'] === '' ||
+            $actual['state'] === '' ||
+            $expected['state'] !== $actual['state']
+        ) {
+            return false;
+        }
+
+        $expectedZip = preg_replace('/\\D+/', '', $expected['postal_code']);
+        $actualZip = preg_replace('/\\D+/', '', $actual['postal_code']);
+
+        if (
+            strlen($expectedZip) < 5 ||
+            strlen($actualZip) < 5
+        ) {
+            return false;
+        }
+
+        return substr($expectedZip, 0, 5) === substr($actualZip, 0, 5);
     }
 
     public static function createTaxTransaction(string $calculationId, int $orderId): array
@@ -113,7 +133,7 @@ class StripeService
     {
         if (!self::configured()) throw new \RuntimeException('Stripe is not configured. Set STRIPE_SECRET_KEY before creating live checkout sessions.');
         $currency = self::currency();
-        if ($currency !== 'usd') throw new \RuntimeException('Asset Moth checkout is US-only at launch and requires USD Stripe Checkout.');
+        if ($currency !== 'usd') throw new \RuntimeException('Creative Moth checkout is US-only at launch and requires USD Stripe Checkout.');
         $remainingCents = CreditService::parseCents((string)$order['total'], false);
         if ($remainingCents <= 0) throw new \RuntimeException('Stripe Checkout requires a positive remaining total.');
         $lineItems = [[
@@ -121,7 +141,7 @@ class StripeService
             'price_data' => [
                 'currency' => $currency,
                 'unit_amount' => $remainingCents,
-                'product_data' => ['name' => 'Asset Moth order #' . (int)$order['id']],
+                'product_data' => ['name' => 'Creative Moth order #' . (int)$order['id']],
             ],
         ]];
         $base = self::appUrl();
@@ -146,7 +166,7 @@ class StripeService
             'type' => 'express',
             'email' => $user['email'] ?? null,
             'capabilities' => ['transfers' => ['requested' => 'true']],
-            'business_profile' => ['name' => $designer['display_name'] ?? 'Asset Moth seller'],
+            'business_profile' => ['name' => $designer['display_name'] ?? 'Creative Moth seller'],
             'metadata' => ['designer_id' => (string)$designer['id'], 'user_id' => (string)$user['id'], 'platform' => 'asset_moth'],
         ], 'asset_moth_connect_designer_' . (int)$designer['id']);
     }

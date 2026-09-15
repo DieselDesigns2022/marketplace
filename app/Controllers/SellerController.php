@@ -332,7 +332,7 @@ class SellerController
                 StripeService::syncConnectedAccountStatus((int)$d['id'], StripeService::retrieveConnectedAccount($d['stripe_connect_account_id']));
                 $this->refreshPendingPayouts((int)$d['id']);
                 H::flash('success', 'Stripe payout setup status was refreshed.');
-            } catch (Throwable $e) { H::flash('warning', 'Stripe returned you to Asset Moth, but status refresh failed: ' . $e->getMessage()); }
+            } catch (Throwable $e) { H::flash('warning', 'Stripe returned you to Creative Moth, but status refresh failed: ' . $e->getMessage()); }
         }
         H::redirect('/seller/stripe');
     }
@@ -418,7 +418,7 @@ class SellerController
            }
 
         }
-        H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, 'meta' => ['title' => 'Apply to Sell | Asset Moth', 'description' => 'Apply for a reviewed designer storefront on Asset Moth.', 'canonical' => H::canonical('/apply'), 'robots' => 'noindex,follow'] ]);
+        H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, 'meta' => ['title' => 'Apply to Sell | Creative Moth', 'description' => 'Apply for a reviewed designer storefront on Creative Moth.', 'canonical' => H::canonical('/apply'), 'robots' => 'noindex,follow'] ]);
 
     }
     private function refundSummary(int $designerId): array
@@ -1103,7 +1103,7 @@ class SellerController
 
     public function payhipImportTemplate(): void
     {
-        $this->requireOnboardingComplete(); header('Content-Type: text/csv; charset=UTF-8'); header('Content-Disposition: attachment; filename="asset-moth-payhip-products.csv"'); echo "\xEF\xBB\xBFproduct_key,product_url,title,description,price,tags,sku,product_type,image_url\r\n"; exit;
+        $this->requireOnboardingComplete(); header('Content-Type: text/csv; charset=UTF-8'); header('Content-Disposition: attachment; filename="creative-moth-payhip-products.csv"'); echo "\xEF\xBB\xBFproduct_key,product_url,title,description,price,tags,sku,product_type,image_url\r\n"; exit;
     }
 
     private function bulkWizardLicenseMap(array $licenses): array
@@ -1703,7 +1703,7 @@ class SellerController
             ) {
                 H::flash(
                     'error',
-                    'Open the source product, review its Asset Moth licenses, and save it first.'
+                    'Open the source product, review its Creative Moth licenses, and save it first.'
                 );
                 H::redirect('/seller/product-batch/' . (int)$id);
             }

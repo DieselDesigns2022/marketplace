@@ -121,7 +121,7 @@ Phase 6 closeout validation included PHP syntax checks for modified controllers/
 
 ## Phase 7 launch polish checks
 
-Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks for modified PHP files, source/route checks for `/`, `/browse`, `/sell`, `/about`, `/privacy`, `/terms`, `/contact`, `/buyer-faq`, `/seller-faq`, and `/licensing-help`, and confirmation that the header logo slot either loads `public/assets/img/asset-moth-logo.png` or falls back to visible `Asset Moth` text. Browser smoke tests should verify homepage, browse/category, sample product, sample storefront, seller dashboard, buyer dashboard, and admin review pages where environment data is available.
+Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks for modified PHP files, source/route checks for `/`, `/browse`, `/sell`, `/about`, `/privacy`, `/terms`, `/contact`, `/buyer-faq`, `/seller-faq`, and `/licensing-help`, and confirmation that the header logo slot either loads `public/assets/img/creative-moth-logo.png` or falls back to visible `Creative Moth` text. Browser smoke tests should verify homepage, browse/category, sample product, sample storefront, seller dashboard, buyer dashboard, and admin review pages where environment data is available.
 
 ## Phase 8 manual testing checklist
 
@@ -180,7 +180,7 @@ Verify downloadable and Google Drive products can be added to the cart, mixed ca
 Phase 10 does not implement emails/notifications, buyer self-cancellation of completed digital purchases, or seller refund-request approval UI.
 
 ### Phase 10 Stripe seller onboarding test coverage
-Check that approved sellers can open `/seller/onboarding`, start `/seller/stripe`, create/continue Stripe Express onboarding with test keys, and return to Asset Moth with status fields synced. Verify buyer Checkout can complete before seller onboarding; seller payout records should remain `pending_stripe_onboarding` until the seller is payout-ready, then become `pending_transfer`/`transferred` or `transfer_failed` without reversing buyer access. Confirm seller-facing pages state no startup fee, no monthly fee, no listing fee, 18% Asset Moth commission, separate Stripe/payment processing fees, Stripe Connect payout requirement, admin-exception refunds, no buyer self-cancellation of completed digital purchases, and no seller instant refunds.
+Check that approved sellers can open `/seller/onboarding`, start `/seller/stripe`, create/continue Stripe Express onboarding with test keys, and return to Creative Moth with status fields synced. Verify buyer Checkout can complete before seller onboarding; seller payout records should remain `pending_stripe_onboarding` until the seller is payout-ready, then become `pending_transfer`/`transferred` or `transfer_failed` without reversing buyer access. Confirm seller-facing pages state no startup fee, no monthly fee, no listing fee, 18% Creative Moth commission, separate Stripe/payment processing fees, Stripe Connect payout requirement, admin-exception refunds, no buyer self-cancellation of completed digital purchases, and no seller instant refunds.
 
 #### Phase 10 correction tests
 After an approved seller completes Stripe onboarding or an `account.updated` webhook marks the seller payout-ready, verify old `pending_stripe_onboarding` paid-order payouts become attempted transfers with idempotency key `asset_moth_payout_order_{orderId}_designer_{designerId}`. Confirm unpaid, manual-review, and refunded orders are skipped; successful transfers become `transferred`, failures become `transfer_failed`, and buyer paid access remains unchanged. Test webhook signatures with `STRIPE_WEBHOOK_SECRET` and, when configured for a separate Connect destination, `STRIPE_CONNECT_WEBHOOK_SECRET`.
@@ -208,15 +208,15 @@ Recommended manual checks:
 - Admin designer management defaults to approved sellers and can filter disabled/all sellers so preserved test sellers do not clutter the live tester view.
 
 ## Admin commission report checks
-- Admin can open `/admin/payment-logs` and see gross sales, Asset Moth commission, seller payout totals, transfer status, payment transactions, and webhook logs.
-- A $5.00 paid order at 18% commission should show $0.90 Asset Moth commission and $4.10 seller payout.
+- Admin can open `/admin/payment-logs` and see gross sales, Creative Moth commission, seller payout totals, transfer status, payment transactions, and webhook logs.
+- A $5.00 paid order at 18% commission should show $0.90 Creative Moth commission and $4.10 seller payout.
 - Failed seller transfers should show the transfer error without changing the commission snapshot.
 - Admin commission report should count live Stripe payments only by default, excluding old `cs_test_` test-mode orders from live money totals.
 - Admin payment log tables should stay inside their content area without causing full-page sideways scrolling.
 
 ## Admin dashboard money stat checks
 - Admin dashboard live money stats should count live Stripe paid orders only.
-- Test-mode `cs_test_` orders, pending orders, canceled orders, and deleted test-seller cleanup records should not inflate live Gross Sales or Asset Moth Commission dashboard stats.
+- Test-mode `cs_test_` orders, pending orders, canceled orders, and deleted test-seller cleanup records should not inflate live Gross Sales or Creative Moth Commission dashboard stats.
 - Failed payouts from deleted test sellers can be marked `test_voided` so they do not appear as active seller payout failures.
 
 ## Phase 10.2 Coupon Testing Checklist
@@ -237,7 +237,7 @@ Recommended manual checks:
 The Phase 10.3B automatic-Tax checklist is superseded for current checkout. Validate that Phase 11 creates a standalone Tax Calculation from the normalized US billing address before credit reservation; stores the calculation ID/snapshot while leaving `tax_collected_at` null; rejects non-US or materially mismatched completed billing data into manual review; and creates one idempotent Tax Transaction during atomic finalization before marking tax complete/collected. Stripe Checkout automatic tax is disabled because its single remaining-total line item already includes the authoritative tax after credits. No shipping address/rates are collected. Tax remains excluded from seller earnings, payouts, and commission, while coupons reduce item totals before tax/commission snapshots.
 - `$0.00` coupon checkout remains blocked.
 - Admin order detail and payment logs show tax separately; payment-log detail shows order-level tax once per order while the summary remains authoritative.
-- Seller pages state tax is handled by Asset Moth/Stripe Tax and excluded from payout.
+- Seller pages state tax is handled by Creative Moth/Stripe Tax and excluded from payout.
 - Downloads/manual delivery unlock only after a valid webhook-confirmed paid order.
 
 
@@ -295,7 +295,7 @@ PHP
 
 Seller checks: save unflagged drafts and review submissions; save flagged drafts without confirmation; confirm flagged review submission without checkbox is blocked; confirm flagged review submission with checkbox records the exact text for the latest scan; edit products to add/remove matches and verify stale confirmations are not reused; verify published products are not automatically unpublished solely due to matches.
 
-Seller UI copy checks: verify the exact warning text is “This product may contain trademarked, copyrighted, or protected terms. Please confirm you own the rights, have permission, or that your use is legally allowed before publishing.” Verify the exact checkbox text is “I confirm I have the legal right to sell this design and any included wording, artwork, or references.” Verify the disclaimer communicates that automated matching may be incorrect, cannot identify every legal issue, Asset Moth does not provide legal advice, and the seller remains responsible for confirming rights. Confirm the checkbox is unchecked on every render, including first warning display, validation-error redisplay, reloading an already flagged product, and returning after a missing-confirmation submission. Do not treat the browser checkbox value alone as proof; the saved confirmation must bind to the final authoritative scan.
+Seller UI copy checks: verify the exact warning text is “This product may contain trademarked, copyrighted, or protected terms. Please confirm you own the rights, have permission, or that your use is legally allowed before publishing.” Verify the exact checkbox text is “I confirm I have the legal right to sell this design and any included wording, artwork, or references.” Verify the disclaimer communicates that automated matching may be incorrect, cannot identify every legal issue, Creative Moth does not provide legal advice, and the seller remains responsible for confirming rights. Confirm the checkbox is unchecked on every render, including first warning display, validation-error redisplay, reloading an already flagged product, and returning after a missing-confirmation submission. Do not treat the browser checkbox value alone as proof; the saved confirmation must bind to the final authoritative scan.
 
 Admin checks: verify list badge/count/status, detail active/inactive detections, first/last detection dates, confirmations, history, pending/approve/published-flagged/reject/archive actions, required rejection reason, invalid transition errors, and no history on failed transitions. Test state changes between page load and submitted IP action: the repository must re-read and lock product/state inside the transaction; stale scan IDs, stale product status, stale IP status, and submitted counts must not be trusted. Confirm `published_flagged` fails if the product became archived before the action commits, reject with an empty reason leaves no partial changes, simulated failure after a product update rolls back product, IP state, history, and admin log, and repository search shows only one authoritative IP review state-changing method. Verify ordinary single approval for a flagged pending product is blocked, crafted POST approval is blocked server-side, bulk approval skips flagged pending products with a dedicated IP-review-required count, and simulated database failures during reject/archive/published-flagged leave no partial product/IP state. Term tests must cover create/edit/enable/disable, canonical-vs-canonical duplicates, canonical-vs-alias duplicates, alias-vs-canonical duplicates, alias-vs-other-alias duplicates, invalid category, unsafe short terms, non-admin denial, and preserved history after disable. Regression tests must cover seller and admin permanent product deletion cleanup, pricing, licenses, uploads, AI disclosure, and existing product moderation.
 

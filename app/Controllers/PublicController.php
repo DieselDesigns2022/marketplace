@@ -9,11 +9,11 @@ use App\Services\LicenseService;
 class PublicController
 {
     private array $staticPages = [
-        'about' => ['About Asset Moth', 'Asset Moth is a digital design marketplace built for buyers shopping creative files and independent designers selling downloadable products.', 'AboutPage'],
-        'contact' => ['Contact Asset Moth', 'Find general support, buyer support, seller support, account help, order guidance, download help, and marketplace contact information for Asset Moth.', 'ContactPage'],
-        'terms' => ['Terms & Conditions', 'Read the rules for using Asset Moth, including accounts, digital purchases, downloads, licensing, seller responsibilities, refunds, and marketplace content.', 'WebPage'],
-        'privacy' => ['Privacy Policy', 'Learn how Asset Moth collects, uses, protects, and stores marketplace account, buyer, seller, order, upload, and download information.', 'PrivacyPolicy'],
-        'licensing-help' => ['Digital Product Licensing Help', 'Understand Asset Moth personal, basic, commercial, digital product, POD, wholesale, fabric, VA, reseller, and extended commercial license permissions.', 'WebPage'],
+        'about' => ['About Creative Moth', 'Creative Moth is a digital design marketplace built for buyers shopping creative files and independent designers selling downloadable products.', 'AboutPage'],
+        'contact' => ['Contact Creative Moth', 'Find general support, buyer support, seller support, account help, order guidance, download help, and marketplace contact information for Creative Moth.', 'ContactPage'],
+        'terms' => ['Terms & Conditions', 'Read the rules for using Creative Moth, including accounts, digital purchases, downloads, licensing, seller responsibilities, refunds, and marketplace content.', 'WebPage'],
+        'privacy' => ['Privacy Policy', 'Learn how Creative Moth collects, uses, protects, and stores marketplace account, buyer, seller, order, upload, and download information.', 'PrivacyPolicy'],
+        'licensing-help' => ['Digital Product Licensing Help', 'Understand Creative Moth personal, basic, commercial, digital product, POD, wholesale, fabric, VA, reseller, and extended commercial license permissions.', 'WebPage'],
         'buyer-faq' => ['Buyer FAQ', 'Answers for buyers about finding products, accounts, purchases, downloads, licenses, POD use, refunds, and support.', 'FAQPage'],
         'seller-faq' => ['Seller FAQ', 'Answers for sellers about applying, storefronts, product review, SEO fields, licensing, AI disclosure, uploads, and support.', 'FAQPage'],
     ];
@@ -92,8 +92,8 @@ class PublicController
              order by hf.sort_order,hf.id
              limit 6'
         );
-        $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Asset Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
-        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'meta'=>$this->pageMeta('Asset Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
+        $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Creative Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
+        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'meta'=>$this->pageMeta('Creative Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
     }
 
     private function searchTerms(string $query): array
@@ -133,43 +133,374 @@ class PublicController
     private function browseQuery(array $filters, array $terms, string $sort, int $page): array
     {
         [$where, $whereParams] = $this->browseCountWhere($filters, $terms);
+
         $score = [];
         $scoreParams = [];
+
         if ($filters['q'] !== '') {
             $like = '%'.$filters['q'].'%';
-            $score[] = 'case when p.title = ? then 120 else 0 end'; $scoreParams[] = $filters['q'];
-            $score[] = 'case when p.title like ? then 80 else 0 end'; $scoreParams[] = $like;
-            $score[] = 'case when p.tags_text like ? or exists (select 1 from product_tags pts join tags ts on ts.id=pts.tag_id where pts.product_id=p.id and ts.name like ?) then 55 else 0 end'; $scoreParams[] = $like; $scoreParams[] = $like;
-            $score[] = 'case when c.name like ? then 45 else 0 end'; $scoreParams[] = $like;
-            $score[] = 'case when d.display_name like ? or d.store_slug like ? then 45 else 0 end'; $scoreParams[] = $like; $scoreParams[] = $like;
-            $score[] = 'case when p.short_description like ? or p.description like ? then 18 else 0 end'; $scoreParams[] = $like; $scoreParams[] = $like;
+
+            $score[] = 'case when p.title = ? then 120 else 0 end';
+            $scoreParams[] = $filters['q'];
+
+            $score[] = 'case when p.title like ? then 80 else 0 end';
+            $scoreParams[] = $like;
+
+            $score[] = 'case when p.tags_text like ? or exists (
+                select 1
+                from product_tags pts
+                join tags ts on ts.id=pts.tag_id
+                where pts.product_id=p.id and ts.name like ?
+            ) then 55 else 0 end';
+            $scoreParams[] = $like;
+            $scoreParams[] = $like;
+
+            $score[] = 'case when c.name like ? then 45 else 0 end';
+            $scoreParams[] = $like;
+
+            $score[] = 'case when d.display_name like ? or d.store_slug like ? then 45 else 0 end';
+            $scoreParams[] = $like;
+            $scoreParams[] = $like;
+
+            $score[] = 'case when p.short_description like ? or p.description like ? then 18 else 0 end';
+            $scoreParams[] = $like;
+            $scoreParams[] = $like;
         }
+
         foreach ($terms as $term) {
             $like = '%'.$term.'%';
-            $score[] = 'case when p.title like ? then 25 else 0 end'; $scoreParams[] = $like;
-            $score[] = 'case when p.tags_text like ? or exists (select 1 from product_tags ptx join tags tx on tx.id=ptx.tag_id where ptx.product_id=p.id and tx.name like ?) then 20 else 0 end'; $scoreParams[] = $like; $scoreParams[] = $like;
-            $score[] = 'case when c.name like ? or d.display_name like ? then 15 else 0 end'; $scoreParams[] = $like; $scoreParams[] = $like;
-            $score[] = 'case when p.short_description like ? or p.description like ? then 6 else 0 end'; $scoreParams[] = $like; $scoreParams[] = $like;
+
+            $score[] = 'case when p.title like ? then 25 else 0 end';
+            $scoreParams[] = $like;
+
+            $score[] = 'case when p.tags_text like ? or exists (
+                select 1
+                from product_tags ptx
+                join tags tx on tx.id=ptx.tag_id
+                where ptx.product_id=p.id and tx.name like ?
+            ) then 20 else 0 end';
+            $scoreParams[] = $like;
+            $scoreParams[] = $like;
+
+            $score[] = 'case when c.name like ? or d.display_name like ? then 15 else 0 end';
+            $scoreParams[] = $like;
+            $scoreParams[] = $like;
+
+            $score[] = 'case when p.short_description like ? or p.description like ? then 6 else 0 end';
+            $scoreParams[] = $like;
+            $scoreParams[] = $like;
         }
-        $relevance = $score ? implode(' + ', $score) : '0';
-        $from = ' from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where '.implode(' and ', $where);
-        $total = (int)(DB::row('select count(*) c'.$from, $whereParams)['c'] ?? 0);
-        $pages = max(1, (int)ceil($total / self::BROWSE_PAGE_SIZE));
+
+        $productRelevance = $score ? implode(' + ', $score) : '0';
+
+        $productFrom =
+            ' from products p
+              join designers d on d.id=p.designer_id
+              left join categories c on c.id=p.category_id
+              where '.implode(' and ', $where);
+
+        $productCount = (int)(
+            DB::row(
+                'select count(*) c'.$productFrom,
+                $whereParams
+            )['c'] ?? 0
+        );
+
+        $productSql =
+            "select
+                'product' listing_type,
+                p.id,
+                p.title,
+                p.slug,
+                p.price,
+                p.created_at,
+                p.updated_at,
+                p.is_featured,
+                p.ai_disclosure,
+                p.is_hand_drawn,
+                p.pod_allowed,
+                p.commercial_license_enabled,
+                p.file_types,
+                d.display_name,
+                d.store_slug,
+                c.name category_name,
+                c.slug category_slug,
+                null turnaround_days,
+                null included_revisions,
+                (".$productRelevance.") relevance,
+                (
+                    select image_path
+                    from product_images pi
+                    where pi.product_id=p.id
+                    order by pi.sort_order,pi.id
+                    limit 1
+                ) preview_image"
+            .$productFrom;
+
+        /*
+         * Custom designs remain separate internally because they use
+         * the custom-order workflow, but publicly they behave like
+         * marketplace listings in Customs / Personalized.
+         */
+        $customEnabled = true;
+
+        $selectedCategory = trim((string)($filters['category'] ?? ''));
+        if (
+            $selectedCategory !== '' &&
+            $selectedCategory !== 'customs-personalized'
+        ) {
+            $customEnabled = false;
+        }
+
+        /*
+         * These filters belong specifically to downloadable product
+         * metadata and therefore do not apply to custom services.
+         */
+        foreach (['ai', 'pod', 'featured', 'file_type', 'commercial'] as $key) {
+            if (trim((string)($filters[$key] ?? '')) !== '') {
+                $customEnabled = false;
+            }
+        }
+
+        $customWhere = [
+            's.is_active=1',
+            'd.status="approved"'
+        ];
+
+        $customWhereParams = [];
+        $customScore = [];
+        $customScoreParams = [];
+
+        if ($customEnabled && $filters['q'] !== '') {
+            $like = '%'.$filters['q'].'%';
+
+            $customWhere[] =
+                '(s.title like ?
+                  or s.description like ?
+                  or s.buyer_instructions like ?
+                  or d.display_name like ?
+                  or d.store_slug like ?)';
+
+            array_push(
+                $customWhereParams,
+                $like,
+                $like,
+                $like,
+                $like,
+                $like
+            );
+
+            $customScore[] = 'case when s.title = ? then 120 else 0 end';
+            $customScoreParams[] = $filters['q'];
+
+            $customScore[] = 'case when s.title like ? then 80 else 0 end';
+            $customScoreParams[] = $like;
+
+            $customScore[] =
+                'case when d.display_name like ? or d.store_slug like ? then 45 else 0 end';
+            $customScoreParams[] = $like;
+            $customScoreParams[] = $like;
+
+            $customScore[] =
+                'case when s.description like ? or s.buyer_instructions like ? then 18 else 0 end';
+            $customScoreParams[] = $like;
+            $customScoreParams[] = $like;
+        }
+
+        if ($customEnabled) {
+            foreach ($terms as $term) {
+                $like = '%'.$term.'%';
+
+                $customWhere[] =
+                    '(s.title like ?
+                      or s.description like ?
+                      or s.buyer_instructions like ?
+                      or d.display_name like ?)';
+
+                array_push(
+                    $customWhereParams,
+                    $like,
+                    $like,
+                    $like,
+                    $like
+                );
+
+                $customScore[] = 'case when s.title like ? then 25 else 0 end';
+                $customScoreParams[] = $like;
+
+                $customScore[] =
+                    'case when d.display_name like ? then 15 else 0 end';
+                $customScoreParams[] = $like;
+
+                $customScore[] =
+                    'case when s.description like ? or s.buyer_instructions like ? then 6 else 0 end';
+                $customScoreParams[] = $like;
+                $customScoreParams[] = $like;
+            }
+
+            if (($filters['creator'] ?? '') !== '') {
+                $customWhere[] = 'd.store_slug=?';
+                $customWhereParams[] = $filters['creator'];
+            }
+
+            if (
+                ($filters['min_price'] ?? '') !== '' &&
+                is_numeric($filters['min_price'])
+            ) {
+                $customWhere[] = 's.price>=?';
+                $customWhereParams[] = max(
+                    0,
+                    (float)$filters['min_price']
+                );
+            }
+
+            if (
+                ($filters['max_price'] ?? '') !== '' &&
+                is_numeric($filters['max_price'])
+            ) {
+                $customWhere[] = 's.price<=?';
+                $customWhereParams[] = max(
+                    0,
+                    (float)$filters['max_price']
+                );
+            }
+
+            if (
+                ($filters['min_price'] ?? '') !== '' &&
+                ($filters['max_price'] ?? '') !== '' &&
+                is_numeric($filters['min_price']) &&
+                is_numeric($filters['max_price']) &&
+                (float)$filters['min_price'] > (float)$filters['max_price']
+            ) {
+                $customEnabled = false;
+            }
+
+            if (($filters['new'] ?? '') === '1') {
+                $customWhere[] =
+                    's.created_at >= date_sub(now(), interval 30 day)';
+            }
+        }
+
+        $customCount = 0;
+        $customSql = '';
+        $customRelevance = $customScore
+            ? implode(' + ', $customScore)
+            : '0';
+
+        if ($customEnabled) {
+            $customFrom =
+                ' from custom_design_services s
+                  join designers d on d.id=s.designer_id
+                  where '.implode(' and ', $customWhere);
+
+            $customCount = (int)(
+                DB::row(
+                    'select count(*) c'.$customFrom,
+                    $customWhereParams
+                )['c'] ?? 0
+            );
+
+            $customSql =
+                "select
+                    'custom' listing_type,
+                    s.id,
+                    s.title collate utf8mb4_unicode_ci title,
+                    s.slug collate utf8mb4_unicode_ci slug,
+                    s.price,
+                    s.created_at,
+                    s.updated_at,
+                    0 is_featured,
+                    null ai_disclosure,
+                    0 is_hand_drawn,
+                    0 pod_allowed,
+                    0 commercial_license_enabled,
+                    null file_types,
+                    d.display_name,
+                    d.store_slug,
+                    'Customs / Personalized' category_name,
+                    'customs-personalized' category_slug,
+                    s.turnaround_days,
+                    s.included_revisions,
+                    (".$customRelevance.") relevance,
+                    (
+                        select image_path collate utf8mb4_unicode_ci
+                        from custom_service_images csi
+                        where csi.custom_service_id=s.id
+                        order by csi.sort_order,csi.id
+                        limit 1
+                    ) preview_image"
+                .$customFrom;
+        }
+
+        $total = $productCount + $customCount;
+        $pages = max(
+            1,
+            (int)ceil($total / self::BROWSE_PAGE_SIZE)
+        );
+
         $page = min(max(1, $page), $pages);
         $offset = ($page - 1) * self::BROWSE_PAGE_SIZE;
+
         $orders = [
-            'relevance' => 'relevance desc,p.is_featured desc,p.created_at desc,p.id desc',
-            'newest' => 'p.created_at desc,p.id desc',
-            'oldest' => 'p.created_at asc,p.id asc',
-            'price_asc' => 'p.price asc,p.created_at desc,p.id desc',
-            'price_desc' => 'p.price desc,p.created_at desc,p.id desc',
-            'title_asc' => 'p.title asc,p.created_at desc,p.id desc',
-            'title_desc' => 'p.title desc,p.created_at desc,p.id desc',
-            'featured' => 'p.is_featured desc,p.created_at desc,p.id desc',
+            'relevance' =>
+                'relevance desc,is_featured desc,created_at desc,id desc',
+            'newest' =>
+                'created_at desc,id desc',
+            'oldest' =>
+                'created_at asc,id asc',
+            'price_asc' =>
+                'price asc,created_at desc,id desc',
+            'price_desc' =>
+                'price desc,created_at desc,id desc',
+            'title_asc' =>
+                'title asc,created_at desc,id desc',
+            'title_desc' =>
+                'title desc,created_at desc,id desc',
+            'featured' =>
+                'is_featured desc,created_at desc,id desc',
         ];
+
         $order = $orders[$sort] ?? $orders['newest'];
-        $sql = 'select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,('.$relevance.') relevance,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image'.$from.' order by '.$order.' limit '.self::BROWSE_PAGE_SIZE.' offset '.$offset;
-        return ['products'=>DB::rows($sql, array_merge($scoreParams, $whereParams)), 'total'=>$total, 'page'=>$page, 'pages'=>$pages, 'pageSize'=>self::BROWSE_PAGE_SIZE];
+
+        if ($customEnabled) {
+            $sql =
+                'select * from ('.
+                $productSql.
+                ' union all '.
+                $customSql.
+                ') marketplace_listings
+                order by '.$order.'
+                limit '.self::BROWSE_PAGE_SIZE.'
+                offset '.$offset;
+
+            $params = array_merge(
+                $scoreParams,
+                $whereParams,
+                $customScoreParams,
+                $customWhereParams
+            );
+        } else {
+            $sql =
+                'select * from ('.
+                $productSql.
+                ') marketplace_listings
+                order by '.$order.'
+                limit '.self::BROWSE_PAGE_SIZE.'
+                offset '.$offset;
+
+            $params = array_merge(
+                $scoreParams,
+                $whereParams
+            );
+        }
+
+        return [
+            'products' => DB::rows($sql, $params),
+            'total' => $total,
+            'page' => $page,
+            'pages' => $pages,
+            'pageSize' => self::BROWSE_PAGE_SIZE
+        ];
     }
 
     private function browseCountWhere(array $filters, array $terms): array
@@ -210,7 +541,7 @@ class PublicController
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
         $filtered = array_filter($state['filters'], fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>'Browse digital designs','url'=>H::canonical('/browse')];
-        H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>null, 'meta'=>$this->pageMeta('Browse Digital Designs', 'Browse digital designs, templates, graphics, fonts, and creative files from independent designers on Asset Moth.', '/browse', $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
+        H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>null, 'meta'=>$this->pageMeta('Browse Digital Designs', 'Browse digital designs, templates, graphics, fonts, and creative files from independent designers on Creative Moth.', '/browse', $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
     }
 
     public function category($slug): void
@@ -222,7 +553,7 @@ class PublicController
         $cats = $this->visibleCategories();
         $creators = DB::rows('select id,display_name,store_slug from designers where status="approved" order by display_name limit 100');
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
-        $description = $cat['description'] ?: 'Shop approved digital design products in the '.$cat['name'].' category on Asset Moth.';
+        $description = $cat['description'] ?: 'Shop approved digital design products in the '.$cat['name'].' category on Creative Moth.';
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>$cat['name'],'description'=>$description,'url'=>H::canonical('/category/'.$cat['slug'])];
         $filtered = array_filter(array_diff_key($state['filters'], ['category'=>true]), fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
         H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>$cat, 'meta'=>$this->pageMeta($cat['name'].' Digital Designs', mb_substr(strip_tags($description), 0, 160), '/category/'.$cat['slug'], $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
@@ -234,8 +565,8 @@ class PublicController
             $_SESSION['after_login_redirect'] = '/apply';
             $_SESSION['seller_intent'] = true;
         }
-        $schema = ['@context'=>'https://schema.org','@type'=>'WebPage','name'=>'Sell on Asset Moth','url'=>H::canonical('/sell')];
-        H::view('public/sell', ['meta'=>$this->pageMeta('Sell Digital Designs', 'Apply to sell digital designs through a reviewed storefront on Asset Moth.', '/sell', $schema)]);
+        $schema = ['@context'=>'https://schema.org','@type'=>'WebPage','name'=>'Sell on Creative Moth','url'=>H::canonical('/sell')];
+        H::view('public/sell', ['meta'=>$this->pageMeta('Sell Digital Designs', 'Apply to sell digital designs through a reviewed storefront on Creative Moth.', '/sell', $schema)]);
     }
 
     public function product($slug): void
@@ -254,24 +585,25 @@ class PublicController
         if ($preview) $schema['image'] = H::assetUrl($preview);
         if ($p['price'] !== null) $schema['offers'] = ['@type'=>'Offer','price'=>(string)$p['price'],'priceCurrency'=>'USD','url'=>$productUrl];
         $owned = H::user() ? (bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where o.user_id=? and oi.product_id=? and o.payment_status="paid" limit 1', [H::user()['id'], $p['id']]) : false;
-        H::view('public/product', ['p'=>$p,'owned'=>$owned,'licenses'=>$licenses,'defaultLicense'=>$defaultLicense,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>$images,'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" and d.status="approved" and p.id<>? order by p.updated_at desc,p.id desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(case when p.category_id <=> ? then 20 else 0 end + (select count(*)*10 from product_tags pt where pt.product_id=p.id and pt.tag_id in (select tag_id from product_tags where product_id=?))) related_score from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status="approved" and d.status="approved" and p.id<>? and (p.category_id <=> ? or exists (select 1 from product_tags pt2 where pt2.product_id=p.id and pt2.tag_id in (select tag_id from product_tags where product_id=?))) order by related_score desc,p.updated_at desc,p.id desc limit 4',[$p['category_id'],$p['id'],$p['id'],$p['category_id'],$p['id']]),'shareUrl'=>$productUrl,'shareText'=>$p['title'].' on Asset Moth','meta'=>$this->pageMeta($title, $description, '/product/'.$p['slug'], $schema, ['og_type'=>'product','og_image'=>$preview,'twitter_image'=>$preview,'twitter_card'=>'summary_large_image'])]);
+        H::view('public/product', ['p'=>$p,'owned'=>$owned,'licenses'=>$licenses,'defaultLicense'=>$defaultLicense,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>$images,'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" and d.status="approved" and p.id<>? order by p.updated_at desc,p.id desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(case when p.category_id <=> ? then 20 else 0 end + (select count(*)*10 from product_tags pt where pt.product_id=p.id and pt.tag_id in (select tag_id from product_tags where product_id=?))) related_score from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status="approved" and d.status="approved" and p.id<>? and (p.category_id <=> ? or exists (select 1 from product_tags pt2 where pt2.product_id=p.id and pt2.tag_id in (select tag_id from product_tags where product_id=?))) order by related_score desc,p.updated_at desc,p.id desc limit 4',[$p['category_id'],$p['id'],$p['id'],$p['category_id'],$p['id']]),'shareUrl'=>$productUrl,'shareText'=>$p['title'].' on Creative Moth','meta'=>$this->pageMeta($title, $description, '/product/'.$p['slug'], $schema, ['og_type'=>'product','og_image'=>$preview,'twitter_image'=>$preview,'twitter_card'=>'summary_large_image'])]);
     }
 
     public function store($slug): void
     {
         $d = DB::row('select * from designers where store_slug=? and status="approved"', [$slug]) ?? H::abort(404);
         $products = DB::rows('select p.*,d.display_name,d.store_slug,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" order by p.created_at desc', [$d['id']]);
+        $customServices = DB::rows('select s.*,(select image_path from custom_service_images csi where csi.custom_service_id=s.id order by csi.sort_order,csi.id limit 1) preview_image from custom_design_services s where s.designer_id=? and s.is_active=1 order by s.created_at desc,s.id desc', [$d['id']]);
         $followerCount = DB::row('select count(*) c from follows where designer_id=?', [$d['id']])['c'] ?? 0;
         DB::exec('update designers set follower_count=? where id=?', [$followerCount, $d['id']]);
         $isFollowing = H::user() ? (bool)DB::row('select id from follows where user_id=? and designer_id=?', [H::user()['id'], $d['id']]) : false;
         $isOwner = H::user() ? (int)$d['user_id'] === (int)H::user()['id'] : false;
         $title = $d['seo_title'] ?: ($d['display_name'].' Digital Design Store');
-        $description = $d['seo_description'] ?: ('Shop approved digital design files from '.$d['display_name'].' on Asset Moth.');
+        $description = $d['seo_description'] ?: ('Shop approved digital design files from '.$d['display_name'].' on Creative Moth.');
         $image = $d['banner_path'] ?: $d['avatar_path'];
         $schema = ['@context'=>'https://schema.org','@type'=>'ProfilePage','name'=>$d['display_name'],'description'=>$description,'url'=>H::canonical('/store/'.$d['store_slug'])];
         if ($image) $schema['image'] = H::assetUrl($image);
         $socialLinks = $this->designerSocialLinks($d);
-        H::view('public/store', ['d'=>$d,'socialLinks'=>$socialLinks,'products'=>$products,'followers'=>$followerCount,'isFollowing'=>$isFollowing,'isOwner'=>$isOwner,'productCount'=>count($products),'salesCount'=>$d['sales_count']??array_sum(array_column($products,'sales_count')),'meta'=>$this->pageMeta($title, $description, '/store/'.$d['store_slug'], $schema, ['og_image'=>$image,'twitter_image'=>$image])]);
+        H::view('public/store', ['d'=>$d,'socialLinks'=>$socialLinks,'products'=>$products,'customServices'=>$customServices,'followers'=>$followerCount,'isFollowing'=>$isFollowing,'isOwner'=>$isOwner,'productCount'=>count($products),'salesCount'=>$d['sales_count']??array_sum(array_column($products,'sales_count')),'meta'=>$this->pageMeta($title, $description, '/store/'.$d['store_slug'], $schema, ['og_image'=>$image,'twitter_image'=>$image])]);
     }
 
 
@@ -298,9 +630,10 @@ class PublicController
     public function sitemap(): never
     {
         header('Content-Type: application/xml; charset=utf-8');
-        $urls = ['/', '/browse', '/sell', '/about', '/contact', '/terms', '/privacy', '/licensing-help', '/buyer-faq', '/seller-faq'];
+        $urls = ['/', '/browse', '/custom-designs', '/sell', '/about', '/contact', '/terms', '/privacy', '/licensing-help', '/buyer-faq', '/seller-faq'];
         foreach ($this->visibleCategories() as $c) $urls[] = '/category/'.$c['slug'];
         foreach (DB::rows('select slug from products where status="approved" order by updated_at desc') as $p) $urls[] = '/product/'.$p['slug'];
+        foreach (DB::rows('select s.slug from custom_design_services s join designers d on d.id=s.designer_id where s.is_active=1 and d.status="approved" order by s.updated_at desc') as $s) $urls[] = '/custom-design/'.$s['slug'];
         foreach (DB::rows('select store_slug from designers where status="approved" order by updated_at desc') as $d) $urls[] = '/store/'.$d['store_slug'];
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         foreach (array_unique($urls) as $url) echo '  <url><loc>'.H::e(H::canonical($url))."</loc></url>\n";

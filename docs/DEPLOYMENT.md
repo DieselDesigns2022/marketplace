@@ -81,7 +81,7 @@ sudo tail -n 100 /var/log/nginx/marketplace.error.log
 
 ## Phase 6 SEO deployment notes
 
-Before requesting indexing, set `APP_URL=https://marketplace.dieseldesigns.co` in the current build/test deployment or rely on the current fallback. After deployment, verify `https://marketplace.dieseldesigns.co/robots.txt`, `https://marketplace.dieseldesigns.co/sitemap.xml`, public canonicals, and noindex behavior for private workflow pages. Treat `https://assetmoth.com` as the future domain migration target after purchase and DNS/application migration. Submit the sitemap in Google Search Console only after production content, support process, and owner legal/privacy review are complete.
+Before requesting indexing, set `APP_URL=https://marketplace.dieseldesigns.co` in the current build/test deployment or rely on the current fallback. After deployment, verify `https://marketplace.dieseldesigns.co/robots.txt`, `https://marketplace.dieseldesigns.co/sitemap.xml`, public canonicals, and noindex behavior for private workflow pages. Treat `https://creativemoth.com` as the future domain migration target after purchase and DNS/application migration. Submit the sitemap in Google Search Console only after production content, support process, and owner legal/privacy review are complete.
 
 ## Phase 6 completed deployment state
 
@@ -104,7 +104,7 @@ Seller product preview images support JPG, PNG, and WEBP uploads up to 25MB each
 - `post_max_size = 30M` or higher
 - Nginx `client_max_body_size 30M` or an equivalent reverse proxy limit
 
-If these server limits are lower than the application limit, sellers may see a server-level upload failure before Asset Moth can show the normal validation message.
+If these server limits are lower than the application limit, sellers may see a server-level upload failure before Creative Moth can show the normal validation message.
 
 ### Phase 10.4 deployment notes
 

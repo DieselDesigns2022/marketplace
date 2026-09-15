@@ -6,7 +6,7 @@
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?> · Date: <?=$order['created_at']?>
 </p>
 <?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>.</p><?php endif;?>
-<?php foreach($sellerGroups as $group): $receiptImage=\App\Services\SellerReceiptService::safePublicPath($group['receipt_image_path']??null);?><section class="card seller-receipt-group"><h2>Items from <?=H::e($group['seller_name'])?></h2><?php if($receiptImage):?><img class="receipt-image" src="<?=H::e(H::assetUrl($receiptImage))?>" alt="Receipt image from <?=H::e($group['seller_name'])?>"><?php endif;?><?php if($group['receipt_note']):?><p><strong>Message from the seller (not Asset Moth)</strong><br><?=nl2br(H::e($group['receipt_note']))?></p><?php endif;?><div class="responsive-table"><table>
+<?php foreach($sellerGroups as $group): $receiptImage=\App\Services\SellerReceiptService::safePublicPath($group['receipt_image_path']??null);?><section class="card seller-receipt-group"><h2>Items from <?=H::e($group['seller_name'])?></h2><?php if($receiptImage):?><img class="receipt-image" src="<?=H::e(H::assetUrl($receiptImage))?>" alt="Receipt image from <?=H::e($group['seller_name'])?>"><?php endif;?><?php if($group['receipt_note']):?><p><strong>Message from the seller (not Creative Moth)</strong><br><?=nl2br(H::e($group['receipt_note']))?></p><?php endif;?><div class="responsive-table"><table>
     <tr>
         <th>Product</th>
         <th>Purchased permissions</th>

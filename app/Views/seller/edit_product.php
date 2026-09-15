@@ -5,7 +5,7 @@
         <?=H::e($error)?>
     </div>
 <?php endforeach;?>
-<?php if(!empty($importReviewErrors)):?><div class="notice warning"><strong>This imported draft still requires explicit review:</strong><ul><?php foreach($importReviewErrors as $error):?><li><?=H::e($error)?></li><?php endforeach;?></ul><p>Review the form below and save it to confirm these Asset Moth settings.</p></div><?php endif;?>
+<?php if(!empty($importReviewErrors)):?><div class="notice warning"><strong>This imported draft still requires explicit review:</strong><ul><?php foreach($importReviewErrors as $error):?><li><?=H::e($error)?></li><?php endforeach;?></ul><p>Review the form below and save it to confirm these Creative Moth settings.</p></div><?php endif;?>
 <form method="post" enctype="multipart/form-data" class="form card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <h2>Basic Information</h2>
@@ -44,8 +44,8 @@
     </select></label>
     <label>Manual delivery instructions<textarea name="manual_delivery_instructions"><?=H::e($_POST['manual_delivery_instructions']??$p['manual_delivery_instructions']??'')?></textarea></label>
     <p class="help-text">Google Drive/manual delivery products do not require a protected downloadable file. Sellers manually grant access using the buyer email collected during checkout.</p>
-    <?php if(in_array('fulfillment',$importReviewKeys??[],true)):?><label><input type="checkbox" name="confirm_import_fulfillment" value="1"> I reviewed and confirm this Asset Moth fulfillment choice.</label><?php endif;?>
-    <?php if(in_array('source_type',$importReviewKeys??[],true)):?><div class="notice warning">Imported source type: <strong><?=H::e($importReviewContext['source_type']??'Unknown')?></strong>. Asset Moth did not retrieve any source download file.</div><label><input type="checkbox" name="confirm_import_source_type" value="1"> I reviewed this source type and configured an eligible Asset Moth product.</label><?php endif;?>
+    <?php if(in_array('fulfillment',$importReviewKeys??[],true)):?><label><input type="checkbox" name="confirm_import_fulfillment" value="1"> I reviewed and confirm this Creative Moth fulfillment choice.</label><?php endif;?>
+    <?php if(in_array('source_type',$importReviewKeys??[],true)):?><div class="notice warning">Imported source type: <strong><?=H::e($importReviewContext['source_type']??'Unknown')?></strong>. Creative Moth did not retrieve any source download file.</div><label><input type="checkbox" name="confirm_import_source_type" value="1"> I reviewed this source type and configured an eligible Creative Moth product.</label><?php endif;?>
     <h2>Product Files</h2>
     <?php foreach($files as $file):?>
         <div class="inline">
@@ -89,7 +89,7 @@
             </tr>
         <?php endforeach;?>
     </table>
-    <?php if(in_array('licenses',$importReviewKeys??[],true)):?><label><input type="checkbox" name="confirm_import_licenses" value="1"> I reviewed and confirm these Asset Moth license settings.</label><?php endif;?>
+    <?php if(in_array('licenses',$importReviewKeys??[],true)):?><label><input type="checkbox" name="confirm_import_licenses" value="1"> I reviewed and confirm these Creative Moth license settings.</label><?php endif;?>
     <p>Digital Resale: always prohibited.</p>
     <h2>Product Details</h2>
     <label>Category<select name="category_id" data-category-guidance-source>
@@ -148,7 +148,7 @@ $handDrawnChecked = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
         <li><?=H::e($match['matched_term'])?><?php if(!empty($match['matched_alias'])): ?> (matched alias: <?=H::e($match['matched_alias'])?>)<?php endif; ?> — <?=H::e($labels[$match['source_field']] ?? $match['source_field'])?></li>
     <?php endforeach; ?>
     </ul>
-    <p>Automated matching may be incorrect and cannot identify every legal issue. Asset Moth does not provide legal advice. You are responsible for confirming that you have the right to sell your product.</p>
+    <p>Automated matching may be incorrect and cannot identify every legal issue. Creative Moth does not provide legal advice. You are responsible for confirming that you have the right to sell your product.</p>
     <?php if(!empty($ipRisk['requires_confirmation'])): ?>
         <p class="help-text">Confirmation is required before publishing or submitting this flagged product for review. Draft saves are allowed without confirmation.</p>
         <label class="ip-rights-confirmation"><input type="checkbox" name="ip_rights_confirmation" value="1"> <span>I confirm I have the legal right to sell this design and any included wording, artwork, or references.</span></label>

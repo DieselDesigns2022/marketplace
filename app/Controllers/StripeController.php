@@ -132,7 +132,7 @@ class StripeController
     public static function webhookAlertCopy(string $type,string $category,string $untrustedText=''):string{return 'Verified Stripe event '.self::webhookEventType($type).' encountered '.self::webhookFailureCategory($category).'. Inspect protected admin payment logs and server logs.';}
     public static function webhookIssueMessage(string $message):string{return OperationalErrorSanitizer::sanitize($message,240);}
     private function notifyWebhookIssue(string $eventKey,string $type,string $category):void{try{NotificationService::admins('webhook_issue','Stripe webhook processing issue',self::webhookAlertCopy($type,$category),$eventKey,'/admin/payment-logs');}catch(Throwable $alertError){$this->reportWebhookFailure('stripe_webhook_issue_alert',$alertError);}}
-    private function reportWebhookFailure(string $context,Throwable $error):void{try{NotificationService::reportFailure($context,$error);}catch(Throwable $reportError){error_log('Asset Moth webhook operational reporting failed for '.OperationalErrorSanitizer::context($context).'.');}}
+    private function reportWebhookFailure(string $context,Throwable $error):void{try{NotificationService::reportFailure($context,$error);}catch(Throwable $reportError){error_log('Creative Moth webhook operational reporting failed for '.OperationalErrorSanitizer::context($context).'.');}}
 
     private function buyerOrder(int $id): array { return DB::row('select * from orders where id=? and user_id=?', [$id, H::user()['id']]) ?? H::abort(404); }
 
@@ -380,7 +380,7 @@ class StripeController
         foreach(DB::rows('select distinct designer_id from order_items where order_id=?',[$orderId]) as $seller){$designerId=(int)$seller['designer_id'];$key='recognition:refund:order:'.$orderId.':seller:'.$designerId.':'.$status.':'.$cumulativeCents;$this->communicationAttempt('creator_recognition_refund',fn()=>(new \App\Services\CreatorRecognitionService)->recalculate($designerId,false,true,'refund',null,$key));}
     }
 
-    private function communicationAttempt(string $context,callable $operation):void{try{$operation();}catch(Throwable $e){try{NotificationService::reportFailure($context,$e);}catch(Throwable $ignored){error_log('Asset Moth communication failure reporting failed for '.OperationalErrorSanitizer::context($context).'.');}}}
+    private function communicationAttempt(string $context,callable $operation):void{try{$operation();}catch(Throwable $e){try{NotificationService::reportFailure($context,$e);}catch(Throwable $ignored){error_log('Creative Moth communication failure reporting failed for '.OperationalErrorSanitizer::context($context).'.');}}}
 
     private function attemptPendingTransfers(int $orderId, string $currency): void
     {

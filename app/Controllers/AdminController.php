@@ -134,7 +134,7 @@ class AdminController
             (select count(*) from stripe_events where (processing_status="failed" or processing_error is not null) and admin_resolved_at is null) webhook_issues,
             (select count(*) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_paid_orders,
             (select coalesce(round(sum(total),2),0) from orders where payment_status in ("paid","partially_refunded") and stripe_checkout_session_id like "cs_live_%") live_gross_sales,
-            (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") asset_moth_commission,
+            (select coalesce(round(sum(platform_commission_amount),2),0) from order_items oi join orders o on o.id=oi.order_id where o.payment_status in ("paid","partially_refunded") and o.stripe_checkout_session_id like "cs_live_%") creative_moth_commission,
             (select coalesce(round(sum(seller_payout_amount),2),0) from seller_payouts sp join orders o on o.id=sp.order_id where o.stripe_checkout_session_id like "cs_live_%" and sp.payout_status not in ("transfer_failed","reversed")) seller_payouts,
             (select count(*) from waitlist_entries) waitlist_total,
             (select count(*) from email_preferences where weekly_emails=1) weekly_email_subscribers,

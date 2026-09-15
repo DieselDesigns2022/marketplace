@@ -1,5 +1,5 @@
 <h1>Stripe payouts</h1>
-<p class="muted">Connect Stripe so Asset Moth can transfer your seller portion after paid marketplace orders.</p>
+<p class="muted">Connect Stripe so Creative Moth can transfer your seller portion after paid marketplace orders.</p>
 <section class="card page-section">
     <h2>Current Stripe Connect status</h2>
     <p>Connection: <strong><?=$readiness['payout'] ? 'Connected' : (empty($d['stripe_connect_account_id']) ? 'Not connected' : 'Onboarding started')?></strong></p>
@@ -16,6 +16,6 @@
 <section class="card page-section">
     <h2>Fees and payout notes</h2>
     <p>Sellers must complete Stripe onboarding before payouts/transfers can be sent. Stripe/payment processing fees apply.</p>
-    <p>Asset Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission on each sale. Asset Moth has no startup fee, no monthly fee, and no listing fee.</p>
-    <p>Sales tax, when required, is handled by Asset Moth through Stripe Tax and is excluded from seller payouts.</p>
+    <p>Creative Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission on each sale. Creative Moth has no startup fee, no monthly fee, and no listing fee.</p>
+    <p>Sales tax, when required, is handled by Creative Moth through Stripe Tax and is excluded from seller payouts.</p>
 </section>

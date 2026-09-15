@@ -272,11 +272,11 @@ Credit is required.
 
 The product listing must clearly credit the original business or designer. Credit must be easy to see, easy to read, and clearly placed in the product listing.
 
-Credit must include a hyperlink to the original designer’s Asset Moth store.
+Credit must include a hyperlink to the original designer’s Creative Moth store.
 
-Example credit format: “Original design by [Designer/Business Name] on Asset Moth.”
+Example credit format: “Original design by [Designer/Business Name] on Creative Moth.”
 
-The credit must be clickable and must link to the original designer’s Asset Moth shop.
+The credit must be clickable and must link to the original designer’s Creative Moth shop.
 
 This license does not give you ownership of the file.
 

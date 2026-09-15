@@ -35,13 +35,13 @@
 
 <section class="card">
     <h2>Marketplace money summary</h2>
-    <p class="muted">Commission shown here counts live Stripe paid orders only and shows the Asset Moth marketplace commission snapshot before Stripe processing fees. Stripe fees may reduce the final amount paid out to the platform bank account.</p>
+    <p class="muted">Commission shown here counts live Stripe paid orders only and shows the Creative Moth marketplace commission snapshot before Stripe processing fees. Stripe fees may reduce the final amount paid out to the platform bank account.</p>
     <div style="overflow-x:auto; max-width:100%;"><div class="money-scroll"><table>
         <tr>
             <th>Paid Orders</th>
             <th>Gross Sales<br><span class="muted money-small">excludes tax</span></th>
             <th>Order Tax Collected</th>
-            <th>Asset Moth Commission</th>
+            <th>Creative Moth Commission</th>
             <th>Seller Payouts Owed</th>
             <th>Stripe Fees Recorded</th>
             <th>Seller Transfers Sent</th>
@@ -67,7 +67,7 @@
 
     <?php if($issue === '' || $issue === 'platform_credit_holds'):?>
         <h3>Platform-funded credit payout holds</h3>
-        <p class="muted">These paid internal-credit orders have no buyer source charge. Settlement transfers the stored obligation from the Asset Moth platform balance.</p>
+        <p class="muted">These paid internal-credit orders have no buyer source charge. Settlement transfers the stored obligation from the Creative Moth platform balance.</p>
         <?php if(!$platformCreditHolds):?><p class="muted">No platform-credit payout holds.</p><?php else:?><div class="money-scroll"><table><thead><tr><th>Order</th><th>Seller</th><th>Amount</th><th>Stripe readiness</th><th>Last safe error</th><th>Settlement</th></tr></thead><tbody>
         <?php foreach($platformCreditHolds as $hold):?><tr><td><a href="/admin/order/<?=(int)$hold['order_id']?>">#<?=(int)$hold['order_id']?></a></td><td><?=H::e($hold['seller_name'])?></td><td><?=H::money($hold['seller_payout_amount'])?> <?=H::e(strtoupper($hold['currency']))?></td><td><?=!empty($hold['stripe_connect_account_id'])&&!empty($hold['stripe_payouts_enabled'])&&!empty($hold['stripe_details_submitted'])?'Payout enabled':'Seller setup required'?></td><td class="money-wrap"><?=H::e($hold['stripe_transfer_error']??'')?></td><td><form method="post" action="/admin/platform-credit-payouts/<?=(int)$hold['id']?>/settle"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button <?=empty($hold['stripe_connect_account_id'])||empty($hold['stripe_payouts_enabled'])||empty($hold['stripe_details_submitted'])?'disabled':''?>>Transfer from platform balance</button></form></td></tr><?php endforeach;?>
         </tbody></table></div><?php endif;?>
@@ -90,7 +90,7 @@
 
 <section class="card">
     <h2>Commission detail</h2>
-    <p class="muted">Use this table to verify each paid order's gross sale, order-level tax collected, Asset Moth commission, seller payout amount, and Stripe transfer status. Summary Tax Collected is authoritative; order tax is shown once per order below and is excluded from commission and seller payout calculations.</p>
+    <p class="muted">Use this table to verify each paid order's gross sale, order-level tax collected, Creative Moth commission, seller payout amount, and Stripe transfer status. Summary Tax Collected is authoritative; order tax is shown once per order below and is excluded from commission and seller payout calculations.</p>
     <table>
         <tr>
             <th>Order</th>
@@ -100,7 +100,7 @@
             <th>Item Total<br><span class="muted money-small">excludes tax</span></th>
             <th>Order Tax Collected</th>
             <th>Rate</th>
-            <th>Asset Moth Commission</th>
+            <th>Creative Moth Commission</th>
             <th>Seller Payout</th>
             <th>Payout Status</th>
             <th>Stripe Transfer / Error</th>

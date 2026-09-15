@@ -25,6 +25,13 @@ final class MessagingService
         if(!$this->canStartProduct($p,$buyerId))H::abort(403);
         return $this->create($buyerId,(int)$p['seller_user_id'],(int)$p['designer_id'],(int)$p['id'],null,null,'Product: '.(string)$p['title'],'product:'.$p['id']);
     }
+    public function startCustomService(int $serviceId,int $buyerId): int
+    {
+        $s=DB::row('select s.id,s.title,s.designer_id,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.is_active=1 and d.status="approved"',[$serviceId])??H::abort(404);
+        if($buyerId<=0||$buyerId===(int)$s['seller_user_id'])H::abort(403);
+        return $this->create($buyerId,(int)$s['seller_user_id'],(int)$s['designer_id'],null,null,null,'Custom Design: '.(string)$s['title'],'custom-service:'.$s['id']);
+    }
+
     public function startStore(int $designerId,int $buyerId): int
     {
         $d=DB::row('select id,user_id,display_name from designers where id=? and status="approved"',[$designerId])??H::abort(404);
@@ -97,7 +104,7 @@ final class MessagingService
         } catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $f)@unlink($dir.'/'.$f['stored_name']);throw $e;}
         $recipientSide=$side==='buyer'?'seller':'buyer';$sellerIdentity=(string)$c['shop_name'].' ('.(string)$c['seller_owner_name'].')';
         try{NotificationService::internalMessage($recipient,$recipientSide,$messageId,$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'/'.$recipientSide.'/messages/'.$c['id']);}catch(\Throwable $e){NotificationService::reportFailure('internal-message notification',$e);}
-        try{$u=DB::row('select email,name from users where id=? and status="active"',[$recipient]);if($u)EmailQueueService::queue('transactional',$u['email'],'You have a new Asset Moth message','internal_message',['name'=>$u['name'],'sender'=>$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'shop'=>$c['shop_name'],'context'=>$c['context_label']??null,'order_id'=>$c['order_id']??null,'conversation_url'=>H::baseUrl().'/'.($side==='buyer'?'seller':'buyer').'/messages/'.$c['id']],"internal-message:$messageId:recipient:$recipient");}catch(\Throwable $e){NotificationService::reportFailure('internal-message email',$e);}
+        try{$u=DB::row('select email,name from users where id=? and status="active"',[$recipient]);if($u)EmailQueueService::queue('transactional',$u['email'],'You have a new Creative Moth message','internal_message',['name'=>$u['name'],'sender'=>$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'shop'=>$c['shop_name'],'context'=>$c['context_label']??null,'order_id'=>$c['order_id']??null,'conversation_url'=>H::baseUrl().'/'.($side==='buyer'?'seller':'buyer').'/messages/'.$c['id']],"internal-message:$messageId:recipient:$recipient");}catch(\Throwable $e){NotificationService::reportFailure('internal-message email',$e);}
         return $messageId;
     }
     private function validateUploads(array $files): array

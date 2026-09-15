@@ -5,7 +5,7 @@
 
     <p>
         Your shared product information has been saved.
-        Next, Asset Moth will walk you through each individual product.
+        Next, Creative Moth will walk you through each individual product.
     </p>
 </div>
 

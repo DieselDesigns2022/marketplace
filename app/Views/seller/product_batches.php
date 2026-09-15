@@ -5,7 +5,7 @@
 
     <p>
         Enter the information your products have in common once.
-        Then Asset Moth will walk you through each product one at a time
+        Then Creative Moth will walk you through each product one at a time
         with that information already filled in.
     </p>
 

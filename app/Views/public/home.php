@@ -1,12 +1,12 @@
 <section class="hero">
     <p class="eyebrow">Digital designs for creative projects</p>
     <h1>Shop downloadable designs from independent creators.</h1>
-    <p>Asset Moth is a digital design marketplace for SVGs, print-ready PNG files, seamless patterns, templates, fonts, brushes, mockups, printables, and other creative files from reviewed designer storefronts.</p>
+    <p>Creative Moth is a digital design marketplace for SVGs, print-ready PNG files, seamless patterns, templates, fonts, brushes, mockups, printables, and other creative files from reviewed designer storefronts.</p>
     <form action="/browse">
         <input name="q" placeholder="Search SVGs, PNGs, templates, fonts..." aria-label="Search digital designs">
         <button>Search</button>
     </form>
-    <p><a class="btn" href="/browse">Browse Digital Designs</a> <a class="btn alt" href="/sell">Sell on Asset Moth</a></p>
+    <p><a class="btn" href="/browse">Browse Digital Designs</a> <a class="btn alt" href="/sell">Sell on Creative Moth</a></p>
 </section>
 <section class="page-section">
     <h2>Explore marketplace categories</h2>
