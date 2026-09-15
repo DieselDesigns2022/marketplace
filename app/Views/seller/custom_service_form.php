@@ -418,6 +418,29 @@ $selectedQuestionCount = max(
                 </p>
             </div>
 
+            <?php
+            $extraProtectionChecked =
+                ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+                    ? isset($_POST['extra_protection_watermark'])
+                    : !empty($service['extra_protection_watermark']);
+            ?>
+
+            <label class="checkbox-option">
+                <input
+                    type="checkbox"
+                    name="extra_protection_watermark"
+                    value="1"
+                    <?=$extraProtectionChecked ? 'checked' : ''?>
+                >
+                <strong>Extra preview protection</strong>
+            </label>
+
+            <p class="help-text">
+                Adds the transparent full-image protection layer at 15%.
+                The standard centered Creative Moth watermark remains on top.
+                Final buyer files are never altered.
+            </p>
+
             <?php if($images): ?>
                 <div class="existing-custom-images">
                     <?php foreach($images as $image): ?>

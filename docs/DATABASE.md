@@ -365,3 +365,20 @@ The user workflow is seller `new -> in_progress`, seller `revision_requested -> 
 The always-required brief fields are `design_request`, `required_text`, and `design_direction`; color preferences, dimensions, requested file format, intended use, and additional notes are optional. `brief_snapshot` retains these fields plus each seller question, its required flag, and submitted answer. The order separately snapshots service title, description, seller instructions, agreed price, turnaround days, and included revisions. Service examples are public listing images; buyer references are private custom-order files.
 
 Stripe Tax is calculated from the authoritative service price before credit. Buyer-selected marketplace credit is reserved against subtotal plus tax through Phase 11. A positive remainder goes to Stripe Checkout; full credit coverage uses the existing internal finalizer and produces the existing `platform_credit_hold` seller obligation. Cancellation/failure uses the existing release lifecycle. Product/cart coupons are neither evaluated nor snapshotted for custom checkout.
+
+## Pre-Phase 12.7 preview-protection fields
+
+Migration:
+`database/migrations/2026_09_15_pre_12_7_extra_preview_protection.sql`
+
+Added boolean-style fields defaulting to `0`:
+
+- `products.extra_protection_watermark`
+- `custom_design_services.extra_protection_watermark`
+
+The value records whether the seller selected the optional 15% full-preview
+protection layer. A value of `0` still receives the standard Creative Moth
+watermark.
+
+Existing `product_images.watermark_status` and `watermark_error` continue to
+record regular product preview regeneration results.

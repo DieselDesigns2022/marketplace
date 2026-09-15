@@ -339,3 +339,18 @@ Intentionally postponed:
 - Consolidated custom and cart checkout behind shared tax/payment/order persistence, hid unpaid briefs from sellers, enforced locked workflow transitions and auditable system cancellation/refund history, hardened upload rollback handling, corrected relationship-based messaging, and surfaced final deliveries in normal buyer orders/downloads.
 - Corrected custom-order route arity, revoked fully refunded buyer downloads, fully contained communication-reporting failures, suppressed premature download-ready email, restored custom-only purchase rows, and applied the existing marketplace-credit lifecycle to custom checkout.
 - Final corrections deny retry for terminally cancelled requests; independently attempt a dedicated custom-final email and notification; confine delivery to the custom protected subtree; allow business file formats through safe extension/provenance/count/size controls rather than a format allowlist; integrate buyer Downloads/count and seller Sales/custom-conversation routing; and make terminal payment/custom state atomic and replay-repairable through `system_event_key` with NULL-safe `custom_service_id` commission recovery.
+
+### Pre-Phase 12.7 — Preview protection and storefront cleanup
+
+- Replaced the legacy Asset Moth preview watermark with the Creative Moth branding source.
+- Standard preview watermark placement is now centered, approximately 30% of preview width / 20% of preview height, at 40% opacity.
+- Backfilled regular product previews, Custom Design examples, Custom Design proofs, and legacy imported previews so existing marketplace previews use Creative Moth branding.
+- Added optional per-listing extra preview protection for regular products, bulk-created products, and Custom Designs. The extra full-preview layer renders at 15% opacity beneath the standard centered Creative Moth watermark and defaults off.
+- Custom Design example uploads now retain clean private originals and publish only watermarked public copies.
+- Custom Design proof images are watermarked before buyer access; final delivery files remain untouched.
+- Imported product previews continue to use secure remote-source retrieval and do not permanently retain duplicate clean originals.
+- Added browser deterrence for public marketplace preview images by disabling normal right-click context menus, dragging, image selection, and touch callouts.
+- Fixed Custom Design storefront cards so their previews use the same constrained product-card presentation as standard listings.
+- Hardened storefront product grids against card overflow/cutoff on responsive layouts.
+- Corrected Custom Design runtime directory ownership/permissions so seller preview and proof uploads can be written safely by PHP-FPM.
+- Added migration `2026_09_15_pre_12_7_extra_preview_protection.sql`.

@@ -155,7 +155,7 @@ Recommended Phase 7 verification includes `git diff --check`, PHP syntax checks 
 - Confirm seller storefront social fields reject invalid or dangerous URLs, valid links display publicly, and public links include safe external-link attributes.
 
 - Phase 8.75 live testing historically confirmed 15MB seller preview/avatar/banner uploads, active web PHP upload limits of `upload_max_filesize=100M`, `post_max_size=120M`, and `max_file_uploads=50`, and verified `public/.user.ini` is blocked from public access with HTTP 403. The historical 15MB avatar/banner result is superseded by the current 25MB seller avatar and store-banner application limit.
-- Live testing confirmed transparent PNG watermarks render without black rectangles, use bottom-left placement at 50% opacity, regenerate correctly from retained private originals, and legacy preview images were backfilled to watermarked public previews with `watermark_status = watermarked` and no errors.
+- Live testing confirmed transparent PNG watermarks render without black rectangles, use centered placement at 40% opacity, regenerate correctly from retained private originals, and legacy preview images were backfilled to Creative Moth watermarked public previews. Optional extra protection renders a full-preview layer at 15% opacity beneath the standard watermark.
 - Live testing confirmed product share controls render as clickable icon buttons under the wishlist action, copy/share actions work, storefront social links normalize seller-entered domain-only URLs to HTTPS, and license trust notes display below the product description.
 
 ## Phase 9 manual test scenarios
@@ -453,3 +453,26 @@ Run `php tests/Phase125InternalMessagingTest.php` for static security/UI contrac
 - Phase 12.6 test: `php tests/Phase126CustomDesignWorkflowTest.php`. Its transition, eligibility, route-reflection, email-decision, and failure-containment assertions execute PHP behavior; assertions explicitly prefixed `SOURCE CONTRACT` inspect wiring that needs a database/request harness and are not integration passes.
 - Phase 12.6 disposable system-transition/history checks: `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase126DatabaseIntegrationTest.php` (creates and drops an isolated database; otherwise reports `SKIP/UNEXECUTED`).
 Phase 12.6 output distinguishes `EXECUTABLE` pure PHP assertions from `SOURCE CONTRACT` wiring inspection. The lightweight suite does **not** behaviorally integrate atomic standard/custom rollback, Stripe-controller full-refund replay repair, partial-refund workflow preservation, persisted custom commission amounts/idempotency, historical seller database visibility, buyer purchase/download queries, email queue persistence, upload rollback, protected-file HTTP responses, admin dispute visibility, or seller Sales database integration. The opt-in disposable suite covers standalone cancellation/refund system transitions and actorless/system history only; it does not prove the full Phase 12.6 surface. A missing opt-in or database is `SKIP/UNEXECUTED`, never a pass. Live Stripe, multipart/storage, mail transport, and HTTP authorization checks remain staging work.
+
+## Pre-Phase 12.7 preview-protection regression
+
+Live regression coverage completed before Phase 12.7:
+
+- regular product preview standard watermark
+- regular product extra protection ON and OFF
+- Custom Design preview standard watermark
+- Custom Design extra protection ON and OFF
+- persisted checkbox state after save
+- Custom Design seller upload after PHP-FPM permission repair
+- standard-only Custom Design proof watermarking
+- buyer final files remain unmodified
+- legacy imported-preview Creative Moth backfill
+- browser right-click and drag deterrence on product and Custom Design previews
+- Custom Design storefront card sizing
+- responsive storefront product grids without clipped/inaccessible cards
+
+Bulk-created products use the same product preview-saving pipeline and persist
+the per-product extra-protection selection. Imported products default extra
+protection off but receive the standard Creative Moth watermark and may later
+be regenerated with extra protection after seller selection. Product
+duplication does not copy preview files.

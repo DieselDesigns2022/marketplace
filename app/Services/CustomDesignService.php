@@ -470,6 +470,13 @@ final class CustomDesignService
         $stored=[];
         $remove=[];
 
+        $extraProtection=
+            !empty($input['extra_protection_watermark'])
+                ?1
+                :0;
+
+        $protectionChanged=false;
+
         DB::begin();
 
         try{
@@ -479,7 +486,7 @@ final class CustomDesignService
             if($id){
 
                 $existing=DB::row(
-                    'select id,slug
+                    'select id,slug,extra_protection_watermark
                      from custom_design_services
                      where id=? and designer_id=?
                      for update',
@@ -487,6 +494,10 @@ final class CustomDesignService
                 )??H::abort(404);
 
                 $slug=(string)$existing['slug'];
+
+                $protectionChanged=
+                    (int)($existing['extra_protection_watermark']??0)
+                    !==$extraProtection;
 
                 /*
                  * A completely untitled new draft gets a temporary slug.
@@ -523,6 +534,7 @@ final class CustomDesignService
                          included_revisions=?,
                          buyer_instructions=?,
                          brief_fields=?,
+                         extra_protection_watermark=?,
                          is_active=?
                      where id=?',
                     [
@@ -539,6 +551,7 @@ final class CustomDesignService
                             )
                         ),
                         $briefFieldsJson,
+                        $extraProtection,
                         $isActive,
                         $id
                     ]
@@ -571,9 +584,10 @@ final class CustomDesignService
                          included_revisions,
                          buyer_instructions,
                          brief_fields,
+                         extra_protection_watermark,
                          is_active
                      )
-                     values(?,?,?,?,?,?,?,?,?,?)',
+                     values(?,?,?,?,?,?,?,?,?,?,?)',
                     [
                         $seller['id'],
                         $slug,
@@ -589,6 +603,7 @@ final class CustomDesignService
                             )
                         ),
                         $briefFieldsJson,
+                        $extraProtection,
                         $isActive
                     ]
                 );
@@ -703,16 +718,25 @@ final class CustomDesignService
 
             foreach($uploads as $upload){
 
-                $path=$this->store(
+                $watermarkErrors=[];
+
+                $saved=WatermarkService::storeCustomDesignPreview(
                     $upload,
-                    'examples',
-                    false
+                    $watermarkErrors,
+                    (bool)$extraProtection
                 );
 
-                $stored[]=
-                    public_path(
-                        ltrim($path,'/')
+                if(!$saved){
+                    throw new \RuntimeException(
+                        $watermarkErrors[0]
+                        ??'Custom Design preview could not be watermarked.'
                     );
+                }
+
+                $path=$saved['image_path'];
+
+                $stored[]=$saved['public_abs'];
+                $stored[]=$saved['original_abs'];
 
                 DB::exec(
                     'insert into custom_service_images
@@ -731,6 +755,45 @@ final class CustomDesignService
             }
 
             DB::commit();
+
+            if($protectionChanged){
+                $protectionFailures=0;
+
+                foreach(
+                    DB::rows(
+                        'select image_path
+                         from custom_service_images
+                         where custom_service_id=?
+                         order by id',
+                        [$id]
+                    )
+                    as $preview
+                ){
+                    $result=
+                        WatermarkService::regenerateCustomDesignPreview(
+                            (string)$preview['image_path'],
+                            (bool)$extraProtection
+                        );
+
+                    if(!$result['ok']){
+                        $protectionFailures++;
+
+                        error_log(
+                            'Custom Design extra-protection regeneration failed '
+                            .'for service '.$id.': '
+                            .($result['message']??'Unknown error')
+                        );
+                    }
+                }
+
+                if($protectionFailures>0){
+                    error_log(
+                        'Custom Design '.$id.' saved with '
+                        .$protectionFailures
+                        .' preview regeneration failure(s).'
+                    );
+                }
+            }
 
             foreach($remove as $old){
                 $this->unlinkPublic(
@@ -1262,8 +1325,69 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
     public function transition(array $order,int $userId,string $action,array $files=[]):void
     {
         $stored=[];$historyId=0;$next='';$kind=null;DB::begin();try{$current=DB::row('select co.*,o.payment_status,d.user_id seller_user_id from custom_orders co join orders o on o.id=co.order_id join designers d on d.id=co.designer_id where co.id=? for update',[$order['id']])??H::abort(404);$seller=$userId===(int)$current['seller_user_id'];$buyer=$userId===(int)$current['buyer_user_id'];if(!$seller&&!$buyer)H::abort(404);if(!self::workflowPaymentEligible($current['payment_status']))throw new \DomainException('Payment must remain eligible for active custom work.');
-            $side=$seller?'seller':'buyer';$next=self::transitionFor($current['status'],$action,$side);if($next===null)throw new \DomainException('The custom order changed; refresh before trying that action.');$from=$current['status'];$kind=$action==='proof'?'proof':($action==='final'?'final':null);$uploads=$kind?$this->validateUploads($files[$kind]??[],$kind==='proof'?'image_or_pdf':'delivery'):[];if($kind&&!$uploads)throw new \InvalidArgumentException('A protected file is required.');$revision=$action==='revision';DB::exec('update custom_orders set status=?,revisions_used=revisions_used+?,completed_at=case when ?="completed" then now() else completed_at end where id=? and status=?',[$next,$revision?1:0,$next,$current['id'],$from]);if(DB::pdo()->query('select row_count()')->fetchColumn()!=1)throw new \DomainException('The custom order changed; refresh and try again.');
-            DB::exec('insert into custom_order_status_history(custom_order_id,from_status,to_status,actor_user_id,transition_source,note) values(?,?,?,?,"user",?)',[$current['id'],$from,$next,$userId,mb_substr(trim($_POST['note']??''),0,1000)]);$historyId=(int)DB::id();foreach($uploads as $upload){$path=$this->store($upload,$kind.'s',true);$stored[]=app_path('storage/protected_uploads/'.$path);DB::exec('insert into custom_order_files(custom_order_id,uploader_user_id,file_kind,original_name,storage_path,mime_type,file_size,revision_number) values(?,?,?,?,?,?,?,?)',[$current['id'],$userId,$kind,$upload['original_name'],$path,$upload['mime'],$upload['size'],(int)$current['revisions_used']]);}DB::commit();
+            $side=$seller?'seller':'buyer';$next=self::transitionFor($current['status'],$action,$side);if($next===null)throw new \DomainException('The custom order changed; refresh before trying that action.');$from=$current['status'];$kind=$action==='proof'?'proof':($action==='final'?'final':null);$uploads=$kind?$this->validateUploads($files[$kind]??[],$kind==='proof'?'proof_image':'delivery'):[];if($kind&&!$uploads)throw new \InvalidArgumentException('A protected file is required.');$revision=$action==='revision';DB::exec('update custom_orders set status=?,revisions_used=revisions_used+?,completed_at=case when ?="completed" then now() else completed_at end where id=? and status=?',[$next,$revision?1:0,$next,$current['id'],$from]);if(DB::pdo()->query('select row_count()')->fetchColumn()!=1)throw new \DomainException('The custom order changed; refresh and try again.');
+            DB::exec('insert into custom_order_status_history(custom_order_id,from_status,to_status,actor_user_id,transition_source,note) values(?,?,?,?,"user",?)',[$current['id'],$from,$next,$userId,mb_substr(trim($_POST['note']??''),0,1000)]);$historyId=(int)DB::id();foreach($uploads as $upload){
+                if($kind==='proof'){
+                    $watermarkErrors=[];
+
+                    $saved=WatermarkService::storeCustomProof(
+                        $upload,
+                        $watermarkErrors
+                    );
+
+                    if(!$saved){
+                        throw new \RuntimeException(
+                            $watermarkErrors[0]
+                            ??'Proof could not be watermarked.'
+                        );
+                    }
+
+                    $path=$saved['storage_path'];
+                    $size=(int)$saved['file_size'];
+
+                    $stored[]=$saved['protected_abs'];
+                    $stored[]=$saved['original_abs'];
+
+                }else{
+                    $path=$this->store(
+                        $upload,
+                        $kind.'s',
+                        true
+                    );
+
+                    $size=(int)$upload['size'];
+
+                    $stored[]=
+                        app_path(
+                            'storage/protected_uploads/'.$path
+                        );
+                }
+
+                DB::exec(
+                    'insert into custom_order_files
+                     (
+                         custom_order_id,
+                         uploader_user_id,
+                         file_kind,
+                         original_name,
+                         storage_path,
+                         mime_type,
+                         file_size,
+                         revision_number
+                     )
+                     values(?,?,?,?,?,?,?,?)',
+                    [
+                        $current['id'],
+                        $userId,
+                        $kind,
+                        $upload['original_name'],
+                        $path,
+                        $upload['mime'],
+                        $size,
+                        (int)$current['revisions_used']
+                    ]
+                );
+            }DB::commit();
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $path)@unlink($path);throw$e;}
         $recipient=$userId===(int)$current['seller_user_id']?(int)$current['buyer_user_id']:(int)$current['seller_user_id'];$audience=$recipient===(int)$current['buyer_user_id']?'buyer':'designer';$title=['proof'=>'Proof available','revision'=>'Revision requested','approve'=>'Proof approved','final'=>'Final file available'][$action]??'Custom-order status changed';self::containCommunicationFailure(fn()=>NotificationService::create($recipient,$action==='final'?'custom_final_available':'custom_order_status',$audience,$title,'Custom order #'.$current['id'].' is now '.str_replace('_',' ',$next).'.','custom-order-history:'.$historyId.':recipient:'.$recipient,$audience==='buyer'?'/buyer/custom-orders/'.$current['id']:'/seller/custom-orders/'.$current['id']),static fn(\Throwable $e)=>NotificationService::reportFailure('custom_order_notification_'.$historyId,$e));if($action==='final')self::containCommunicationFailure(fn()=>EmailQueueService::customFinalAvailable((int)$current['id'],$historyId),static fn(\Throwable $e)=>NotificationService::reportFailure('custom_order_final_email_'.$historyId,$e));
     }
@@ -1492,5 +1616,8 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
         ?copy($file['tmp'],$path)
         :false);
 if(!$saved)throw new \RuntimeException('Could not securely store upload.');return($protected?'':'/uploads/').$relative;}
-    private function unlinkPublic(string $path):void{$base=realpath(public_path('uploads/custom_designs'));$real=realpath(public_path(ltrim($path,'/')));if($base&&$real&&str_starts_with($real,$base.DIRECTORY_SEPARATOR))@unlink($real);}
+    private function unlinkPublic(string $path):void
+    {
+        WatermarkService::deleteCustomDesignPreview($path);
+    }
 }

@@ -569,7 +569,7 @@ class SellerController
         $price = array_key_exists('price', $_POST) ? $_POST['price'] : (array_key_exists('price', $existing) ? $existing['price'] : '0.00');
         $commercialEnabled = isset($_POST['license_enabled']['commercial']);
         $commercialLicensePrice = $_POST['license_price']['commercial'] ?? ($existing['commercial_license_price'] ?? '0.00');
-        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'is_hand_drawn' => isset($_POST['is_hand_drawn']) ? 1 : 0, 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
+        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'is_hand_drawn' => isset($_POST['is_hand_drawn']) ? 1 : 0, 'extra_protection_watermark' => isset($_POST['extra_protection_watermark']) ? 1 : 0, 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
     }
 
@@ -689,7 +689,12 @@ class SellerController
                 'size' => $_FILES['preview_images']['size'][$idx] ?? 0,
                 'type' => $_FILES['preview_images']['type'][$idx] ?? '',
             ];
-            $saved = WatermarkService::applyUploadedPreview($file, 'product_previews', $errors);
+            $saved = WatermarkService::applyUploadedPreview(
+                $file,
+                'product_previews',
+                $errors,
+                isset($_POST['extra_protection_watermark'])
+            );
             if ($saved) {
                 $alt = trim($_POST['preview_alt'][$idx] ?? pathinfo((string)$original, PATHINFO_FILENAME));
                 $sort = (int) ($_POST['preview_sort'][$idx] ?? $idx);
@@ -752,11 +757,151 @@ class SellerController
 
     private function regeneratePreviewImage(int $imageId, int $productId): void
     {
-        $img = DB::row('select * from product_images where id=? and product_id=?', [$imageId, $productId]);
-        if (!$img || empty($img['original_image_path'])) { H::flash('error', 'Original private preview image is unavailable.'); return; }
-        $result = WatermarkService::regenerate($img['original_image_path'], $img['image_path']);
-        DB::exec('update product_images set watermark_status=?,watermark_error=?,updated_at=now() where id=? and product_id=?', [$result['ok'] ? WatermarkService::STATUS_WATERMARKED : WatermarkService::STATUS_FAILED, $result['ok'] ? null : $result['message'], $imageId, $productId]);
-        H::flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Watermark regenerated from the private original preview.' : 'Watermark regeneration failed: ' . $result['message']);
+        $product = DB::row(
+            'select extra_protection_watermark
+             from products
+             where id=?',
+            [$productId]
+        );
+
+        $img = DB::row(
+            'select pi.*,pii.source_url
+             from product_images pi
+             left join product_import_images pii
+               on pii.product_image_id=pi.id
+             where pi.id=? and pi.product_id=?',
+            [$imageId,$productId]
+        );
+
+        if (!$img || !$product) {
+            H::flash('error', 'Preview image is unavailable.');
+            return;
+        }
+
+        $result = $this->regenerateProductPreviewRow(
+            $img,
+            !empty($product['extra_protection_watermark'])
+        );
+
+        DB::exec(
+            'update product_images
+             set watermark_status=?,
+                 watermark_error=?,
+                 updated_at=now()
+             where id=? and product_id=?',
+            [
+                $result['ok']
+                    ? WatermarkService::STATUS_WATERMARKED
+                    : WatermarkService::STATUS_FAILED,
+                $result['ok'] ? null : $result['message'],
+                $imageId,
+                $productId
+            ]
+        );
+
+        H::flash(
+            $result['ok'] ? 'success' : 'error',
+            $result['ok']
+                ? 'Preview watermark regenerated.'
+                : 'Watermark regeneration failed: '.$result['message']
+        );
+    }
+
+    private function regenerateProductPreviewRow(
+        array $img,
+        bool $extraProtection
+    ): array {
+        if (!empty($img['original_image_path'])) {
+            return WatermarkService::regenerate(
+                $img['original_image_path'],
+                $img['image_path'],
+                $extraProtection
+            );
+        }
+
+        $sourceUrl = trim((string)($img['source_url'] ?? ''));
+
+        if ($sourceUrl === '') {
+            return [
+                'ok' => false,
+                'message' => 'Clean preview source is unavailable.',
+            ];
+        }
+
+        $download = null;
+
+        try {
+            $download = (new RemoteProductImageService())->fetch(
+                $sourceUrl
+            );
+
+            return WatermarkService::regenerateImportedRemotePreview(
+                $download['path'],
+                $img['image_path'],
+                $extraProtection
+            );
+
+        } catch (Throwable $e) {
+            return [
+                'ok' => false,
+                'message' => 'Imported preview source could not be retrieved.',
+            ];
+
+        } finally {
+            if (
+                $download &&
+                !empty($download['path']) &&
+                is_file($download['path'])
+            ) {
+                @unlink($download['path']);
+            }
+        }
+    }
+
+    private function regenerateProductProtectionPreviews(
+        int $productId,
+        bool $extraProtection
+    ): int {
+        $rows = DB::rows(
+            'select pi.*,pii.source_url
+             from product_images pi
+             left join product_import_images pii
+               on pii.product_image_id=pi.id
+             where pi.product_id=?
+             order by pi.id',
+            [$productId]
+        );
+
+        $failures = 0;
+
+        foreach ($rows as $img) {
+            $result = $this->regenerateProductPreviewRow(
+                $img,
+                $extraProtection
+            );
+
+            DB::exec(
+                'update product_images
+                 set watermark_status=?,
+                     watermark_error=?,
+                     updated_at=now()
+                 where id=? and product_id=?',
+                [
+                    $result['ok']
+                        ? WatermarkService::STATUS_WATERMARKED
+                        : WatermarkService::STATUS_FAILED,
+                    $result['ok'] ? null : $result['message'],
+                    $img['id'],
+                    $productId
+                ]
+            );
+
+            if (!$result['ok']) {
+                $failures++;
+            }
+        }
+
+        return $failures;
     }
     private function deleteProductFile(int $fileId, int $productId): bool
     {
@@ -1378,10 +1523,11 @@ class SellerController
                         digital_resale_prohibited,
                         ai_disclosure,
                         is_hand_drawn,
+                        extra_protection_watermark,
                         seo_title,
                         seo_description,
                         status
-                    ) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                    ) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                     [
                         $d['id'],
                         $values['category_id'],
@@ -1400,6 +1546,7 @@ class SellerController
                         1,
                         $values['ai_disclosure'],
                         $values['is_hand_drawn'],
+                        $values['extra_protection_watermark'],
                         $values['seo_title'],
                         $values['seo_description'],
                         'draft',
@@ -1838,12 +1985,18 @@ class SellerController
                 $fileTypes = implode(',', $values['file_types']);
                 $ipWorkflow = new ProductIpRiskWorkflow();
                 $publicationSensitive = $status === 'pending_review' || ($p && in_array($p['status'], ['approved','published'], true));
+                $protectionChanged =
+                    $p &&
+                    (int)($p['extra_protection_watermark'] ?? 0)
+                    !== (int)$values['extra_protection_watermark'];
+
+                $protectionPreviewFailures = 0;
 
                 if ($p) {
                     $productId = (int)$p['id'];
                     try {
                         DB::begin();
-                        DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,is_hand_drawn=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['is_hand_drawn'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
+                        DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,is_hand_drawn=?,extra_protection_watermark=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['is_hand_drawn'], $values['extra_protection_watermark'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
                         $this->syncTags($productId, $values['tags']);
                         LicenseService::syncProductLicenses($productId, $postedLicenses);
                         (new ProductImportReviewService())->clearAfterExplicitSave($productId,$this->explicitImportReviewKeys($values));
@@ -1887,7 +2040,7 @@ class SellerController
                 } else {
                     $productId = 0;
                     try {
-                        DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,is_hand_drawn,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['is_hand_drawn'], $values['seo_title'], $values['seo_description'], $status, ] );
+                        DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,is_hand_drawn,extra_protection_watermark,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['is_hand_drawn'], $values['extra_protection_watermark'], $values['seo_title'], $values['seo_description'], $status, ] );
                         $productId = (int)DB::id();
                         $this->syncTags($productId, $values['tags']);
                         LicenseService::syncProductLicenses($productId, $postedLicenses);
@@ -1938,7 +2091,29 @@ class SellerController
                     }
                 }
 
-                H::flash('success', $this->flashMessageForProductStatus($status));
+                if ($p && $protectionChanged) {
+                    $protectionPreviewFailures =
+                        $this->regenerateProductProtectionPreviews(
+                            (int)$productId,
+                            !empty($values['extra_protection_watermark'])
+                        );
+                }
+
+                $message = $this->flashMessageForProductStatus($status);
+
+                if ($protectionPreviewFailures > 0) {
+                    $message .= ' Extra protection was saved, but '
+                        . $protectionPreviewFailures
+                        . ' preview image(s) could not be regenerated.';
+                }
+
+                H::flash(
+                    $protectionPreviewFailures > 0
+                        ? 'warning'
+                        : 'success',
+                    $message
+                );
+
                 H::redirect('/seller/products');
 
            }

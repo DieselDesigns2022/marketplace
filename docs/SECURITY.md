@@ -62,9 +62,9 @@ The repository should ignore environment files, public uploads, protected upload
 
 ## Phase 8.75 upload, watermark, and external-link security
 - Product preview image uploads are validated by extension, MIME type, image metadata, and size before storage. Filenames are random server-generated values; original upload names are not trusted for storage paths.
-- Watermarking applies only to public product preview images. Protected purchased/download files in `storage/protected_uploads/products` are not processed by the watermark service.
+- Watermarking applies to public regular-product previews, public Custom Design example previews, and buyer-visible Custom Design proof images. Protected purchased product files and final Custom Design delivery files are never processed by the watermark service.
 - Newly uploaded preview originals are retained under `storage/app/private/product_previews/` for seller/admin regeneration and are not served as public product images when a watermarked public version exists.
-- The watermark source image can be placed at `storage/app/private/branding/watermark.png` or overridden with `WATERMARK_SOURCE_PATH`. If GD or the configured source is unavailable, the app fails gracefully and records a seller/admin-safe status message instead of breaking product pages.
+- The standard watermark source is `storage/app/private/branding/watermark.png`; optional full-preview protection uses `storage/app/private/branding/extra-protection-watermark.png`. Both stay below private application storage. If GD or a required source is unavailable, the app fails safely rather than exposing clean private originals.
 - Storefront social links are normalized to http/https URLs, reject dangerous schemes such as `javascript:`, and render publicly with `target="_blank"` and `rel="noopener noreferrer nofollow ugc"`.
 
 - Phase 8.75 live testing historically raised seller preview/avatar/banner image validation to 15MB while keeping extension, MIME, image metadata, and server-generated filename checks. That avatar/banner limit is superseded: current seller avatar and store-banner uploads allow up to 25MB. PHP upload handling is capped through `public/.user.ini`; Nginx dotfile protection was verified so `.user.ini` returns 403 publicly.
@@ -196,3 +196,19 @@ Required brief fields (`design_request`, `required_text`, `design_direction`), o
 
 Custom checkout calculates Stripe Tax on authoritative price before buyer-selected Phase 11 credit. Credit reserves against subtotal plus tax; Stripe collects a positive remainder, while full coverage uses internal finalization and `platform_credit_hold`. Cancellation/failure releases reservations through the existing lifecycle. Product/cart coupons are not evaluated or snapshotted for custom orders.
 Custom terminal payment transitions participate in the caller's transaction so standard and custom state cannot commit separately; repeated observations repair missing idempotent system history without duplicating it.
+
+## Pre-Phase 12.7 preview deterrence
+
+Creative Moth uses layered deterrence for marketplace previews:
+
+- server-side standard Creative Moth watermark
+- optional seller-selected full-preview protection layer
+- public preview derivatives instead of clean originals
+- normal browser right-click, dragging, selection, and touch-callout deterrence
+
+These browser controls are deterrence only and are not treated as access
+control. Clean originals remain protected by storage placement and server-side
+delivery rules.
+
+Custom Design proofs receive the standard watermark before buyer access.
+Final Custom Design files are never watermarked.

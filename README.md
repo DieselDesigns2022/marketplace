@@ -1,8 +1,8 @@
-# Asset Moth
+# Creative Moth
 
 ## Project Overview
 
-Asset Moth is a custom PHP marketplace application for selling digital design products such as SVG cut files, fonts, and Canva templates. The current implementation includes public browsing, buyer accounts, designer applications, seller storefronts, product management, cart checkout, orders, protected downloads, and admin moderation.
+Creative Moth is a custom PHP marketplace application for selling digital design products such as SVG cut files, fonts, and Canva templates. The current implementation includes public browsing, buyer accounts, designer applications, seller storefronts, product management, cart checkout, orders, protected downloads, and admin moderation.
 
 ## Current Project Status
 
@@ -11,7 +11,7 @@ Asset Moth is a custom PHP marketplace application for selling digital design pr
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
-- Future planned domain after purchase/migration: `https://assetmoth.com`.
+- Current public domain: `https://creativemoth.com/`.
 
 ## Marketplace Purpose
 
@@ -186,7 +186,7 @@ public/
 
 ## Phase 6 SEO launch foundation
 
-The application now includes Asset Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
+The application now includes Creative Moth public branding, shared metadata rendering, absolute canonicals, robots meta controls, browse filtered-URL noindex behavior, dynamic `/sitemap.xml`, `public/robots.txt`, conservative JSON-LD structured data, public launch copy, and internal links across key public pages.
 
 
 ## Historical feature section: Phase 10 — Stripe Payment Integration
@@ -196,12 +196,12 @@ The application now includes Asset Moth public branding, shared metadata renderi
 Phase 8.5 adds the marketplace licensing foundation with Personal always included/free and seller-enabled add-on permissions that may be free (`$0.00`) or paid. Sellers can enable Basic, Commercial, POD, Wholesale, Fabric with overseas printing, Fabric without overseas printing, VA, Reseller with credit required, Reseller with no credit required, and Extended Commercial licenses; buyers can select multiple permissions; guest carts persist until checkout/login; carts and orders store normalized selected license keys plus license price snapshots; and order/admin/buyer views show the selected license details clearly. The product page, cart, seller edit form, and Licensing Help page now use license detail tooltips/modals so long terms stay readable without cluttering the listing.
 
 ### Phase 8.75 marketplace protection and sharing
-Asset Moth watermarks seller-uploaded public product preview images server-side. Watermarking is limited to public preview images; purchased/downloadable files are stored separately and are not watermarked or altered. Newly uploaded preview originals are retained privately for regeneration. The default watermark source path is `storage/app/private/branding/watermark.png`, with optional override via `WATERMARK_SOURCE_PATH`.
+Creative Moth watermarks public product previews, Custom Design example previews, and Custom Design proofs server-side. Final purchased/downloadable files are stored separately and are never watermarked or altered. The standard Creative Moth watermark is centered at 40% opacity. Sellers may optionally enable an additional full-preview protection layer rendered beneath the standard watermark at 15% opacity. Manually uploaded product and Custom Design preview originals are retained privately for clean regeneration; imported remote product previews retain their source URL instead of a permanent private duplicate. Branding sources are stored under `storage/app/private/branding/`.
 
 Product pages include buyer-friendly social sharing controls and Open Graph/Twitter preview metadata. Seller storefronts support optional validated website, Facebook, Instagram, TikTok, Pinterest, Etsy, and Shopify links rendered with safe external-link attributes.
 
 ## Phase 9 cart/order/download/manual-delivery foundation
-Phase 9 added the foundation for carts, order records, downloadable delivery, and Google Drive/manual delivery. Phase 10 now connects that pending-payment foundation to Stripe Checkout and webhook-confirmed payment state. Google Drive delivery remains manual: buyers provide a Google Drive email, sellers grant access outside the app after payment clears, and sellers/admins update delivery status in Asset Moth.
+Phase 9 added the foundation for carts, order records, downloadable delivery, and Google Drive/manual delivery. Phase 10 now connects that pending-payment foundation to Stripe Checkout and webhook-confirmed payment state. Google Drive delivery remains manual: buyers provide a Google Drive email, sellers grant access outside the app after payment clears, and sellers/admins update delivery status in Creative Moth.
 
 ## Phase 10 — Stripe Payment Integration
 - Adds Stripe Checkout session creation for buyer checkout using server-side order snapshots and environment-only Stripe configuration.
@@ -218,12 +218,12 @@ Phase 9 added the foundation for carts, order records, downloadable delivery, an
 - International VAT/GST expansion and seller refund/cancellation requests remain future work; referrals and store credit are implemented in Phase 11.
 
 ### Phase 10 Stripe marketplace payments and seller onboarding
-Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Asset Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Asset Moth's 18% commission.
+Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Creative Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Creative Moth's 18% commission.
 
-Sellers pay no startup fee, no monthly fee, and no listing fee; Asset Moth only earns when sellers sell. Buyer checkout can work before seller onboarding, but seller payouts remain pending until onboarding is complete. Refunds are Stripe-processed admin exceptions only; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
+Sellers pay no startup fee, no monthly fee, and no listing fee; Creative Moth only earns when sellers sell. Buyer checkout can work before seller onboarding, but seller payouts remain pending until onboarding is complete. Refunds are Stripe-processed admin exceptions only; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
 
 #### Phase 10 payout math and Connect webhook note
-Phase 10 calculates Asset Moth's commission from the gross sale amount and transfers the seller portion from that gross sale snapshot before separate Stripe fee reconciliation. Stripe/payment processing fees still apply separately; seller-facing copy must not claim sellers receive exactly 82% after all fees. `STRIPE_WEBHOOK_SECRET` is required, and `STRIPE_CONNECT_WEBHOOK_SECRET` is optional for a separate Connect webhook destination that uses a different signing secret.
+Phase 10 calculates Creative Moth's commission from the gross sale amount and transfers the seller portion from that gross sale snapshot before separate Stripe fee reconciliation. Stripe/payment processing fees still apply separately; seller-facing copy must not claim sellers receive exactly 82% after all fees. `STRIPE_WEBHOOK_SECRET` is required, and `STRIPE_CONNECT_WEBHOOK_SECRET` is optional for a separate Connect webhook destination that uses a different signing secret.
 
 #### Phase 10 source-transaction transfer reliability
 Seller transfers use the original Stripe charge as `source_transaction` when `stripe_charge_id` is available. If the paid order is waiting for the charge id, payout records stay `pending_transfer` for a later webhook retry instead of being failed solely because Stripe balance timing is not ready.
@@ -238,13 +238,13 @@ Seller transfers use the original Stripe charge as `source_transaction` when `st
 - A coupon alone may not create a `$0.00` checkout; an otherwise positive order may reach `$0.00` only when store credit covers the coupon-adjusted total plus authoritative tax.
 
 ### Phase 10.3B Stripe Tax and tax compliance
-Phase 10.3B introduced Stripe Tax. The current Phase 11 flow creates an authoritative Tax Calculation from the normalized US billing address before applying credit, then creates an idempotent Tax Transaction during atomic order finalization. Tax is excluded from seller payouts and marketplace commission math. Asset Moth remains US-only, sells digital files only, and has no shipping; international VAT/GST remains future work. 1099 reporting remains a Stripe Connect/tax-forms concern rather than a homemade filing system.
+Phase 10.3B introduced Stripe Tax. The current Phase 11 flow creates an authoritative Tax Calculation from the normalized US billing address before applying credit, then creates an idempotent Tax Transaction during atomic order finalization. Tax is excluded from seller payouts and marketplace commission math. Creative Moth remains US-only, sells digital files only, and has no shipping; international VAT/GST remains future work. 1099 reporting remains a Stripe Connect/tax-forms concern rather than a homemade filing system.
 
 Delivery unlock requires committed finalization and a created Stripe Tax Transaction: verified Stripe payment for a remaining balance, or atomic internal finalization for a fully credit-funded order.
 
 ### Phase 10.4 — Advisory IP Risk Warning
 
-Asset Moth includes an advisory IP-risk warning workflow for seller product metadata. It scans saved product title, short/full description, tags, SEO title, SEO description, and stored original downloadable product-file names; preview-image filenames are not scanned. There is no separate seller product keyword field in the current schema, so Phase 10.4 does not invent one against admin-managed terms and aliases. Matches warn sellers and require the exact rights-confirmation checkbox before submitting flagged products for review. The scanner is not legal advice, does not determine infringement, and does not scan file contents, images, OCR, audio, video, private paths, or external trademark databases. Automated matching can produce false positives and false negatives. Starter advisory terms are incomplete and are not comprehensive trademark, copyright, celebrity, franchise, or protected-content coverage.
+Creative Moth includes an advisory IP-risk warning workflow for seller product metadata. It scans saved product title, short/full description, tags, SEO title, SEO description, and stored original downloadable product-file names; preview-image filenames are not scanned. There is no separate seller product keyword field in the current schema, so Phase 10.4 does not invent one against admin-managed terms and aliases. Matches warn sellers and require the exact rights-confirmation checkbox before submitting flagged products for review. The scanner is not legal advice, does not determine infringement, and does not scan file contents, images, OCR, audio, video, private paths, or external trademark databases. Automated matching can produce false positives and false negatives. Starter advisory terms are incomplete and are not comprehensive trademark, copyright, celebrity, franchise, or protected-content coverage.
 
 ## Phase 10.5 — emails, notifications, and launch waitlist
 Phase 10.5 provides authenticated notifications, a consent-aware public waitlist, admin waitlist/campaign tools, and a durable email queue. Development uses `MAIL_TRANSPORT=log`; run `php scripts/process_email_queue.php 50`. See [the operational guide](docs/EMAILS_NOTIFICATIONS_WAITLIST.md).
@@ -267,7 +267,7 @@ Each referred user has one immutable referrer. The relationship records buyer an
 > Phase 11 database/migration readiness requires the disposable MariaDB suite to run without `SKIP`; a skipped environment is not release verification. Stripe Tax uses a Calculation followed by an idempotent Tax Transaction after successful financial finalization.
 
 ### Phase 11 seller referrals
-Seller referrals select one immutable reward at the referred seller's first qualifying paid sale: a non-seller referrer alone receives $5 store credit, while an approved seller referrer receives an Asset Moth-funded 1% of each stored net seller earning. Integer cents use half-up rounding. Disabled, inactive, or deleted stores permanently stop new accrual; prior earnings remain payable through UTC monthly Stripe Connect platform-balance transfers.
+Seller referrals select one immutable reward at the referred seller's first qualifying paid sale: a non-seller referrer alone receives $5 store credit, while an approved seller referrer receives an Creative Moth-funded 1% of each stored net seller earning. Integer cents use half-up rounding. Disabled, inactive, or deleted stores permanently stop new accrual; prior earnings remain payable through UTC monthly Stripe Connect platform-balance transfers.
 
 GitHub issue #57 remains open and deferred for live validation of the complete seller-referral flow: registration through an approved seller's referral link, permanent attachment, a qualifying sale and 1% commission, refund/reversal behavior, and the resulting seller/admin referral-page records.
 

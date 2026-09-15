@@ -113,9 +113,14 @@ button,
 }
 .grid.products {
   grid-template-columns: repeat(1, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
 }
 .product {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 @media (min-width: 560px) {
   .grid.products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -154,6 +159,17 @@ button,
   aspect-ratio: 1 / 1;
   height: auto;
   object-fit: cover;
+}
+
+.grid.products > .product {
+  min-width: 0;
+}
+
+.product h3,
+.product p,
+.product a {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .big {
@@ -2575,4 +2591,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   .dashboard-nav-group summary small {
     font-size: .68rem;
   }
+}
+
+/* Protected marketplace preview-image deterrence */
+img[src*="/uploads/product_previews/"],
+img[src*="/uploads/custom_designs/examples/"] {
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }

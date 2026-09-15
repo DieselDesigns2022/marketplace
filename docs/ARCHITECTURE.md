@@ -78,3 +78,25 @@ All new SQL should use prepared statements.
 
 ### Phase 11 seller-referral lifetime commission
 Seller-referral qualification permanently selects either referrer-only $5 store credit or, when the referrer is then an approved seller, an Creative Moth-funded 1% commission calculated per stored seller-payout item using integer-cent half-up rounding. Accruals and linked refund/recovery adjustments are append-only. Disabled, inactive, and deleted store states permanently stop new accrual without cancelling earned balances. Closed UTC-month platform-balance transfers reuse the seller's existing Stripe Connect account, omit `source_transaction`, and retain stable idempotency, processing leases, attempt history, and retryable failures. Active admins retry failed/not-ready batches only through CSRF-protected `POST /admin/seller-referral-payouts/{id}/retry`; immutable audit rows record the result. Unpaid prior-period amounts and post-payout recovery adjustments roll into the next positive batch, and no negative transfer is created.
+
+## Pre-Phase 12.7 preview-protection architecture
+
+Preview protection is centralized in `WatermarkService`.
+
+The standard source is `storage/app/private/branding/watermark.png`.
+Optional seller-selected full-preview protection uses
+`storage/app/private/branding/extra-protection-watermark.png`.
+
+Layer order is:
+
+1. clean/source preview
+2. optional full-preview protection layer at 15% opacity
+3. centered Creative Moth watermark at 40% opacity
+
+Manual product and Custom Design preview uploads retain clean originals below
+private application storage. Imported remote previews retain their validated
+source URL instead of keeping a permanent duplicate clean file and can be
+securely refetched for regeneration.
+
+Custom Design proofs use the standard Creative Moth watermark only. Final
+buyer delivery files never enter the watermark pipeline.

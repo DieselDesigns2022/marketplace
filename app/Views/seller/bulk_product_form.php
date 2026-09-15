@@ -111,6 +111,29 @@ $licenseMap = $configuredLicenses ?? [];
                 Select preview images to add separate alt text for each image.
             </p>
         </div>
+
+        <?php
+        $extraProtectionChecked =
+            ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+                ? isset($_POST['extra_protection_watermark'])
+                : !empty($values['extra_protection_watermark']);
+        ?>
+
+        <label class="checkbox-option">
+            <input
+                type="checkbox"
+                name="extra_protection_watermark"
+                value="1"
+                <?=$extraProtectionChecked ? 'checked' : ''?>
+            >
+            <strong>Extra preview protection</strong>
+        </label>
+
+        <p class="help-text">
+            Adds the optional 15% full-image protection layer beneath the
+            centered Creative Moth watermark. Buyer download files are never
+            altered.
+        </p>
     <?php endif; ?>
 
     <h2>Fulfillment</h2>

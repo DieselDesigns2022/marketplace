@@ -17,7 +17,14 @@ class WatermarkService
         return $configured !== '' ? $configured : app_path('storage/app/private/branding/watermark.png');
     }
 
-    public static function applyUploadedPreview(array $file, string $folder, array &$errors): ?array
+    public static function extraProtectionSourcePath(): string
+    {
+        return app_path(
+            'storage/app/private/branding/extra-protection-watermark.png'
+        );
+    }
+
+    public static function applyUploadedPreview(array $file, string $folder, array &$errors, bool $extraProtection = false): ?array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             $errors[] = 'Preview image upload failed.';
@@ -34,7 +41,7 @@ class WatermarkService
             return null;
         }
 
-        return self::storeValidatedPreview($tmp, $ext, $folder, $errors, true);
+        return self::storeValidatedPreview($tmp, $ext, $folder, $errors, true, $extraProtection);
     }
 
     /** Store a validated server-side image through the normal preview pipeline. */
@@ -61,7 +68,8 @@ class WatermarkService
         string $path,
         string $folder,
         array &$errors,
-        int $maxDimension = 1200
+        int $maxDimension = 1200,
+        bool $extraProtection = false
     ): ?array {
         if (!is_file($path) || filesize($path) > 25 * 1024 * 1024) {
             $errors[] = 'Remote image exceeded the 25MB preview-image limit.';
@@ -111,7 +119,8 @@ class WatermarkService
             $path,
             $publicAbs,
             max(1, $maxDimension),
-            $outputType
+            $outputType,
+            $extraProtection
         );
 
         if (!$result['ok']) {
@@ -128,7 +137,7 @@ class WatermarkService
         ];
     }
 
-    private static function storeValidatedPreview(string $tmp, string $ext, string $folder, array &$errors, bool $uploaded): ?array
+    private static function storeValidatedPreview(string $tmp, string $ext, string $folder, array &$errors, bool $uploaded, bool $extraProtection = false): ?array
     {
         $name = bin2hex(random_bytes(12)) . '.' . $ext;
         $privateDir = app_path('storage/app/private/product_previews');
@@ -145,7 +154,13 @@ class WatermarkService
 
         $watermarkedName = pathinfo($name, PATHINFO_FILENAME) . '-wm.' . $ext;
         $publicAbs = $publicDir . '/' . $watermarkedName;
-        $result = self::watermarkFile($originalAbs, $publicAbs);
+        $result = self::watermarkFile(
+            $originalAbs,
+            $publicAbs,
+            null,
+            null,
+            $extraProtection
+        );
         if (!$result['ok']) {
             $fallbackAbs = $publicDir . '/' . $name;
             if (!copy($originalAbs, $fallbackAbs)) {
@@ -171,7 +186,7 @@ class WatermarkService
         ];
     }
 
-    public static function regenerate(string $originalRelative, string $currentPublicPath): array
+    public static function regenerate(string $originalRelative, string $currentPublicPath, bool $extraProtection = false): array
     {
         $originalRelative = ltrim(str_replace(['..', '\\'], '', $originalRelative), '/');
         $originalAbs = app_path('storage/app/private/' . $originalRelative);
@@ -201,7 +216,397 @@ class WatermarkService
         if (!is_file($originalReal)) {
             return ['ok' => false, 'message' => 'Original private preview image is unavailable.'];
         }
-        return self::watermarkFile($originalReal, $publicAbs);
+        return self::watermarkFile(
+            $originalReal,
+            $publicAbs,
+            null,
+            null,
+            $extraProtection
+        );
+    }
+
+    public static function regenerateImportedRemotePreview(
+        string $sourceAbs,
+        string $currentPublicPath,
+        bool $extraProtection = false
+    ): array {
+        if (!is_file($sourceAbs)) {
+            return [
+                'ok' => false,
+                'message' => 'Imported preview source is unavailable.',
+            ];
+        }
+
+        $info = @getimagesize($sourceAbs);
+
+        if (
+            !$info ||
+            !in_array(
+                (int)$info[2],
+                [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP],
+                true
+            )
+        ) {
+            return [
+                'ok' => false,
+                'message' => 'Imported preview source is invalid.',
+            ];
+        }
+
+        $relative = ltrim(
+            str_replace('\\', '/', $currentPublicPath),
+            '/'
+        );
+
+        if (
+            $relative === '' ||
+            str_contains($relative, '..') ||
+            !str_starts_with(
+                $relative,
+                'uploads/product_previews/'
+            )
+        ) {
+            return [
+                'ok' => false,
+                'message' => 'Public preview path is invalid.',
+            ];
+        }
+
+        $ext = strtolower(
+            pathinfo($relative, PATHINFO_EXTENSION)
+        );
+
+        $outputType = match ($ext) {
+            'webp' => IMAGETYPE_WEBP,
+            'png' => IMAGETYPE_PNG,
+            'jpg', 'jpeg' => IMAGETYPE_JPEG,
+            default => 0,
+        };
+
+        if (
+            !$outputType ||
+            (
+                $outputType === IMAGETYPE_WEBP &&
+                !function_exists('imagewebp')
+            )
+        ) {
+            return [
+                'ok' => false,
+                'message' => 'Existing preview format is unsupported.',
+            ];
+        }
+
+        $publicAbs = public_path($relative);
+
+        return self::watermarkFile(
+            $sourceAbs,
+            $publicAbs,
+            1200,
+            $outputType,
+            $extraProtection
+        );
+    }
+
+    public static function storeCustomDesignPreview(array $file, array &$errors, bool $extraProtection = false): ?array
+    {
+        $ext = strtolower((string)($file['ext'] ?? ''));
+        $type = [
+            'jpg' => IMAGETYPE_JPEG,
+            'jpeg' => IMAGETYPE_JPEG,
+            'png' => IMAGETYPE_PNG,
+            'webp' => IMAGETYPE_WEBP,
+        ][$ext] ?? null;
+
+        $tmp = (string)($file['tmp'] ?? '');
+
+        if (!$type || !is_uploaded_file($tmp)) {
+            $errors[] = 'Custom Design preview could not be stored safely.';
+            return null;
+        }
+
+        $name = bin2hex(random_bytes(24)) . '.' . $ext;
+        $relative = 'custom_designs/examples/' . $name;
+
+        $originalAbs = app_path(
+            'storage/app/private/custom_design_previews/' . $relative
+        );
+
+        $publicAbs = public_path(
+            'uploads/' . $relative
+        );
+
+        if (
+            !is_dir(dirname($originalAbs)) &&
+            !mkdir(dirname($originalAbs), 0750, true) &&
+            !is_dir(dirname($originalAbs))
+        ) {
+            $errors[] = 'Private Custom Design preview storage is unavailable.';
+            return null;
+        }
+
+        if (
+            !is_dir(dirname($publicAbs)) &&
+            !mkdir(dirname($publicAbs), 0755, true) &&
+            !is_dir(dirname($publicAbs))
+        ) {
+            $errors[] = 'Public Custom Design preview storage is unavailable.';
+            return null;
+        }
+
+        if (!move_uploaded_file($tmp, $originalAbs)) {
+            $errors[] = 'Custom Design preview could not be saved.';
+            return null;
+        }
+
+        $result = self::watermarkFile(
+            $originalAbs,
+            $publicAbs,
+            null,
+            $type,
+            $extraProtection
+        );
+
+        if (!$result['ok']) {
+            @unlink($originalAbs);
+            @unlink($publicAbs);
+            $errors[] = $result['message'];
+            return null;
+        }
+
+        return [
+            'image_path' => '/uploads/' . $relative,
+            'original_abs' => $originalAbs,
+            'public_abs' => $publicAbs,
+        ];
+    }
+
+    public static function regenerateCustomDesignPreview(string $publicPath, bool $extraProtection = false): array
+    {
+        $publicRelative = ltrim(str_replace('\\', '/', $publicPath), '/');
+
+        if (
+            $publicRelative === '' ||
+            str_contains($publicRelative, "\0") ||
+            str_contains($publicRelative, '..') ||
+            !str_starts_with(
+                $publicRelative,
+                'uploads/custom_designs/examples/'
+            )
+        ) {
+            return [
+                'ok' => false,
+                'message' => 'Custom Design preview path is invalid.',
+            ];
+        }
+
+        $publicAbs = public_path($publicRelative);
+
+        if (!is_file($publicAbs)) {
+            return [
+                'ok' => false,
+                'message' => 'Custom Design preview file is missing.',
+            ];
+        }
+
+        $relative = substr(
+            $publicRelative,
+            strlen('uploads/')
+        );
+
+        $originalAbs = app_path(
+            'storage/app/private/custom_design_previews/' . $relative
+        );
+
+        if (!is_dir(dirname($originalAbs))) {
+            mkdir(dirname($originalAbs), 0750, true);
+        }
+
+        if (!is_file($originalAbs)) {
+            if (!copy($publicAbs, $originalAbs)) {
+                return [
+                    'ok' => false,
+                    'message' => 'Custom Design preview original could not be preserved.',
+                ];
+            }
+        }
+
+        return self::watermarkFile(
+            $originalAbs,
+            $publicAbs,
+            null,
+            null,
+            $extraProtection
+        );
+    }
+
+    public static function deleteCustomDesignPreview(string $publicPath): void
+    {
+        $publicRelative = ltrim(str_replace('\\', '/', $publicPath), '/');
+
+        if (
+            str_contains($publicRelative, '..') ||
+            !str_starts_with(
+                $publicRelative,
+                'uploads/custom_designs/examples/'
+            )
+        ) {
+            return;
+        }
+
+        $publicAbs = public_path($publicRelative);
+        $relative = substr(
+            $publicRelative,
+            strlen('uploads/')
+        );
+
+        $originalAbs = app_path(
+            'storage/app/private/custom_design_previews/' . $relative
+        );
+
+        @unlink($publicAbs);
+        @unlink($originalAbs);
+    }
+
+    public static function storeCustomProof(array $file, array &$errors): ?array
+    {
+        $ext = strtolower((string)($file['ext'] ?? ''));
+        $type = [
+            'jpg' => IMAGETYPE_JPEG,
+            'jpeg' => IMAGETYPE_JPEG,
+            'png' => IMAGETYPE_PNG,
+            'webp' => IMAGETYPE_WEBP,
+        ][$ext] ?? null;
+
+        $tmp = (string)($file['tmp'] ?? '');
+
+        if (!$type || !is_uploaded_file($tmp)) {
+            $errors[] = 'Proof must be a valid JPG, PNG, or WEBP image.';
+            return null;
+        }
+
+        $relative =
+            'custom_designs/proofs/' .
+            bin2hex(random_bytes(24)) .
+            '.' .
+            $ext;
+
+        $originalAbs = app_path(
+            'storage/app/private/custom_design_proof_originals/' .
+            $relative
+        );
+
+        $protectedAbs = app_path(
+            'storage/protected_uploads/' . $relative
+        );
+
+        if (
+            !is_dir(dirname($originalAbs)) &&
+            !mkdir(dirname($originalAbs), 0750, true) &&
+            !is_dir(dirname($originalAbs))
+        ) {
+            $errors[] = 'Private proof storage is unavailable.';
+            return null;
+        }
+
+        if (
+            !is_dir(dirname($protectedAbs)) &&
+            !mkdir(dirname($protectedAbs), 0750, true) &&
+            !is_dir(dirname($protectedAbs))
+        ) {
+            $errors[] = 'Protected proof storage is unavailable.';
+            return null;
+        }
+
+        if (!move_uploaded_file($tmp, $originalAbs)) {
+            $errors[] = 'Proof could not be saved safely.';
+            return null;
+        }
+
+        $result = self::watermarkFile(
+            $originalAbs,
+            $protectedAbs,
+            null,
+            $type
+        );
+
+        if (!$result['ok']) {
+            @unlink($originalAbs);
+            @unlink($protectedAbs);
+            $errors[] = $result['message'];
+            return null;
+        }
+
+        @chmod($protectedAbs, 0640);
+
+        return [
+            'storage_path' => $relative,
+            'original_abs' => $originalAbs,
+            'protected_abs' => $protectedAbs,
+            'file_size' => filesize($protectedAbs),
+        ];
+    }
+
+    public static function regenerateCustomProof(string $protectedRelative): array
+    {
+        $protectedRelative = ltrim(
+            str_replace('\\', '/', $protectedRelative),
+            '/'
+        );
+
+        if (
+            $protectedRelative === '' ||
+            str_contains($protectedRelative, "\0") ||
+            str_contains($protectedRelative, '..') ||
+            !str_starts_with(
+                $protectedRelative,
+                'custom_designs/proofs/'
+            )
+        ) {
+            return [
+                'ok' => false,
+                'message' => 'Protected proof path is invalid.',
+            ];
+        }
+
+        $protectedAbs = app_path(
+            'storage/protected_uploads/' . $protectedRelative
+        );
+
+        if (!is_file($protectedAbs)) {
+            return [
+                'ok' => false,
+                'message' => 'Protected proof file is missing.',
+            ];
+        }
+
+        $originalAbs = app_path(
+            'storage/app/private/custom_design_proof_originals/' .
+            $protectedRelative
+        );
+
+        if (!is_dir(dirname($originalAbs))) {
+            mkdir(dirname($originalAbs), 0750, true);
+        }
+
+        if (!is_file($originalAbs)) {
+            if (!copy($protectedAbs, $originalAbs)) {
+                return [
+                    'ok' => false,
+                    'message' => 'Proof original could not be preserved.',
+                ];
+            }
+        }
+
+        $result = self::watermarkFile(
+            $originalAbs,
+            $protectedAbs
+        );
+
+        if ($result['ok']) {
+            @chmod($protectedAbs, 0640);
+        }
+
+        return $result;
     }
 
     private static function isSupportedImage(string $path, string $ext): bool
@@ -216,7 +621,8 @@ class WatermarkService
         string $sourceAbs,
         string $destinationAbs,
         ?int $maxDimension = null,
-        ?int $outputType = null
+        ?int $outputType = null,
+        bool $extraProtection = false
     ): array
     {
         if (!extension_loaded('gd')) return ['ok' => false, 'message' => 'PHP GD extension is not available.'];
@@ -271,11 +677,57 @@ class WatermarkService
                 $bh = $newH;
             }
 
-            $mark = self::watermarkImage(max(1, (int)round($bw * 0.238)), max(1, (int)round($bh * 0.159)));
-            $mark = self::applyOpacity($mark, 50);
-            $mw = imagesx($mark); $mh = imagesy($mark);
-            $pad = max(12, (int)round(min($bw, $bh) * 0.035));
-            imagecopy($base, $mark, $pad, max(0, $bh - $mh - $pad), 0, 0, $mw, $mh);
+            /*
+             * Optional seller-selected extra protection:
+             * design -> stretched full-image protection watermark ->
+             * centered Creative Moth watermark.
+             */
+            if ($extraProtection) {
+                $protection = self::extraProtectionImage($bw, $bh);
+
+                if (!$protection) {
+                    imagedestroy($base);
+
+                    return [
+                        'ok' => false,
+                        'message' => 'Extra-protection watermark image is unavailable.',
+                    ];
+                }
+
+                $protection = self::applyOpacity($protection, 15);
+
+                imagecopy(
+                    $base,
+                    $protection,
+                    0,
+                    0,
+                    0,
+                    0,
+                    $bw,
+                    $bh
+                );
+
+                imagedestroy($protection);
+            }
+
+            $mark = self::watermarkImage(max(1, (int)round($bw * 0.30)), max(1, (int)round($bh * 0.20)));
+            $mark = self::applyOpacity($mark, 40);
+            $mw = imagesx($mark);
+            $mh = imagesy($mark);
+
+            $watermarkX = max(0, (int)round(($bw - $mw) / 2));
+            $watermarkY = max(0, (int)round(($bh - $mh) / 2));
+
+            imagecopy(
+                $base,
+                $mark,
+                $watermarkX,
+                $watermarkY,
+                0,
+                0,
+                $mw,
+                $mh
+            );
             if (!is_dir(dirname($destinationAbs))) mkdir(dirname($destinationAbs), 0755, true);
             $saved = self::saveImage($base, $destinationAbs, $outputType ?? (int)$info[2]);
             imagedestroy($base); imagedestroy($mark);
@@ -293,6 +745,72 @@ class WatermarkService
             IMAGETYPE_WEBP => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
             default => false,
         };
+    }
+
+    private static function extraProtectionImage(int $width, int $height)
+    {
+        $source = self::extraProtectionSourcePath();
+
+        if (!is_file($source)) {
+            return false;
+        }
+
+        $info = @getimagesize($source);
+
+        if (!$info || (int)$info[2] !== IMAGETYPE_PNG) {
+            return false;
+        }
+
+        $original = @imagecreatefrompng($source);
+
+        if (!$original) {
+            return false;
+        }
+
+        $out = imagecreatetruecolor(
+            max(1, $width),
+            max(1, $height)
+        );
+
+        if (!$out) {
+            imagedestroy($original);
+            return false;
+        }
+
+        imagealphablending($out, false);
+        imagesavealpha($out, true);
+
+        $transparent = imagecolorallocatealpha(
+            $out,
+            255,
+            255,
+            255,
+            127
+        );
+
+        imagefill($out, 0, 0, $transparent);
+
+        $ok = imagecopyresampled(
+            $out,
+            $original,
+            0,
+            0,
+            0,
+            0,
+            $width,
+            $height,
+            imagesx($original),
+            imagesy($original)
+        );
+
+        imagedestroy($original);
+
+        if (!$ok) {
+            imagedestroy($out);
+            return false;
+        }
+
+        return $out;
     }
 
     private static function applyOpacity($image, int $opacityPercent)
@@ -356,7 +874,7 @@ class WatermarkService
         $transparent = imagecolorallocatealpha($img, 255, 255, 255, 127);
         imagefill($img, 0, 0, $transparent);
         $white = imagecolorallocatealpha($img, 255, 255, 255, 0);
-        imagestring($img, 5, 12, max(8, (int)($h / 2) - 8), 'AM Creative Moth', $white);
+        imagestring($img, 5, 12, max(8, (int)($h / 2) - 8), 'Creative Moth', $white);
         return $img;
     }
 }

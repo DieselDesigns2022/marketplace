@@ -133,3 +133,40 @@ if (importProgress) {
   const bar=importProgress.querySelector('progress'), count=importProgress.querySelector('[data-import-count]'), message=importProgress.querySelector('[data-import-message]');
   const run=async()=>{try{const body=new URLSearchParams({_csrf:importProgress.dataset.csrf});const response=await fetch(importProgress.dataset.processUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body});if(!response.ok)throw new Error();const data=await response.json();bar.max=Math.max(1,data.selected);bar.value=data.processed;count.textContent=`${Number(data.processed).toLocaleString()} of ${Number(data.selected).toLocaleString()} products`;message.textContent=data.activity || 'Creating draft products…';if(data.done){message.textContent='Import finished. Opening your summary…';window.location.assign(data.redirect);return;}setTimeout(run,Math.max(100,Number(data.retry_ms)||1000));}catch(error){message.textContent='The import was interrupted. Retrying safely…';setTimeout(run,2000);}};run();
 }
+
+/*
+ * Marketplace preview-image deterrence.
+ * Applies only to public watermarked product and Custom Design previews.
+ */
+function isProtectedMarketplacePreview(image) {
+  if (!(image instanceof HTMLImageElement)) return false;
+
+  const src = image.getAttribute("src") || "";
+
+  return (
+    src.includes("/uploads/product_previews/") ||
+    src.includes("/uploads/custom_designs/examples/")
+  );
+}
+
+document.querySelectorAll("img").forEach((image) => {
+  if (isProtectedMarketplacePreview(image)) {
+    image.setAttribute("draggable", "false");
+  }
+});
+
+document.addEventListener("contextmenu", (event) => {
+  const image = event.target.closest?.("img");
+
+  if (isProtectedMarketplacePreview(image)) {
+    event.preventDefault();
+  }
+});
+
+document.addEventListener("dragstart", (event) => {
+  const image = event.target.closest?.("img");
+
+  if (isProtectedMarketplacePreview(image)) {
+    event.preventDefault();
+  }
+});

@@ -108,12 +108,45 @@
         <p>This seller does not currently have any custom designs available.</p>
     </div>
     <?php else: ?>
-    <div class="product-grid">
+    <div class="grid products">
         <?php foreach($customServices as $s):?>
-        <article class="card">
-            <?php if(!empty($s['preview_image'])):?><img src="<?=H::e($s['preview_image'])?>" alt=""><?php endif;?>
-            <h3><a href="/custom-design/<?=H::e($s['slug'])?>"><?=H::e($s['title'])?></a></h3>
-            <p><?=H::money($s['price'])?> · <?=(int)$s['turnaround_days']?> days</p>
+        <article class="card product">
+            <a href="/custom-design/<?=H::e($s['slug'])?>">
+                <?php if(!empty($s['preview_image'])):?>
+                    <img
+                        class="thumb"
+                        src="<?=H::e($s['preview_image'])?>"
+                        alt="<?=H::e($s['title'])?> custom design preview"
+                    >
+                <?php else:?>
+                    <div class="thumb">
+                        Custom design preview unavailable
+                    </div>
+                <?php endif;?>
+            </a>
+
+            <h3>
+                <a href="/custom-design/<?=H::e($s['slug'])?>">
+                    <?=H::e($s['title'])?>
+                </a>
+            </h3>
+
+            <div class="product-card-badges">
+                <span class="badge">Custom Design</span>
+
+                <?php if(!empty($s['turnaround_days'])):?>
+                    <span class="badge">
+                        <?=(int)$s['turnaround_days']?> day turnaround
+                    </span>
+                <?php endif;?>
+            </div>
+
+            <a
+                href="/custom-design/<?=H::e($s['slug'])?>"
+                class="product-meta"
+            >
+                <p><strong><?=H::money($s['price'])?></strong></p>
+            </a>
         </article>
         <?php endforeach;?>
     </div>

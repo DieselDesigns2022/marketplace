@@ -1105,3 +1105,18 @@ Notification View now authorizes the signed-in user against the notification, ma
 Approved sellers can offer separate custom-design services. Paid requests retain immutable service and brief snapshots and progress through protected proof, revision, and final delivery using existing orders, Stripe, messaging, and notifications.
 The correction pass consolidated checkout primitives with cart checkout, added authoritative locked transitions and system history, restricted seller visibility to paid history, and integrated completed files with normal buyer downloads.
 Later corrections repaired route arity; revoked fully refunded final downloads; denied cancelled-request retry; separated historical seller visibility from active payment eligibility; added independent final notification/email delivery and a dedicated template; confined protected paths; integrated Phase 11 credit, buyer counts/empty states, seller Sales, and authoritative custom conversations; and made cancellation/full refund atomic and replay-repairable with `system_event_key` and NULL-safe custom commission identity. Brief and service terms remain immutable snapshots while public examples and private references retain distinct storage roles.
+
+### Post-12.6 / Pre-12.7 marketplace cleanup
+
+Before Phase 12.7 began, live tester feedback triggered a focused marketplace
+cleanup:
+
+- Creative Moth replaced the legacy Asset Moth preview watermark.
+- Existing regular, imported, Custom Design, and proof previews were backfilled.
+- Standard watermark presentation was finalized as centered at 40% opacity.
+- Optional per-listing 15% full-preview protection was added.
+- Custom Design example originals and proof originals gained private clean-source storage.
+- Public preview right-click/drag deterrence was added.
+- Custom Design storefront image sizing was normalized.
+- Storefront product-card overflow/cutoff was corrected.
+- Custom Design upload-directory permissions were corrected.

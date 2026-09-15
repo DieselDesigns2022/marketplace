@@ -31,6 +31,28 @@
         </div>
     <?php endforeach;?>
     <p class="help-text">Public preview images are watermarked automatically. JPG, PNG, or WEBP up to 25MB each. Purchased/downloadable files below are never watermarked or altered.</p>
+    <?php
+    $extraProtectionChecked =
+        ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+            ? isset($_POST['extra_protection_watermark'])
+            : !empty($p['extra_protection_watermark']);
+    ?>
+
+    <label class="checkbox-option">
+        <input
+            type="checkbox"
+            name="extra_protection_watermark"
+            value="1"
+            <?=$extraProtectionChecked ? 'checked' : ''?>
+        >
+        <strong>Extra preview protection</strong>
+    </label>
+
+    <p class="help-text">
+        Adds an additional transparent protection layer across the entire
+        preview image. The standard centered Creative Moth watermark remains
+        on top. Downloadable product files are never altered.
+    </p>
     <label>Upload preview images<input type="file" name="preview_images[]" multiple accept=".jpg,.jpeg,.png,.webp" data-preview-images>
     </label>
     <div data-preview-alt-fields>
