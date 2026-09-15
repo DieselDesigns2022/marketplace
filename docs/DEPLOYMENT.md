@@ -81,7 +81,7 @@ sudo tail -n 100 /var/log/nginx/marketplace.error.log
 
 ## Phase 6 SEO deployment notes
 
-Before requesting indexing, set `APP_URL=https://marketplace.dieseldesigns.co` in the current build/test deployment or rely on the current fallback. After deployment, verify `https://marketplace.dieseldesigns.co/robots.txt`, `https://marketplace.dieseldesigns.co/sitemap.xml`, public canonicals, and noindex behavior for private workflow pages. Treat `https://assetmoth.com` as the future domain migration target after purchase and DNS/application migration. Submit the sitemap in Google Search Console only after production content, support process, and owner legal/privacy review are complete.
+Before requesting indexing, set `APP_URL=https://marketplace.dieseldesigns.co` in the current build/test deployment or rely on the current fallback. After deployment, verify `https://marketplace.dieseldesigns.co/robots.txt`, `https://marketplace.dieseldesigns.co/sitemap.xml`, public canonicals, and noindex behavior for private workflow pages. Treat `https://creativemoth.com` as the future domain migration target after purchase and DNS/application migration. Submit the sitemap in Google Search Console only after production content, support process, and owner legal/privacy review are complete.
 
 ## Phase 6 completed deployment state
 
@@ -104,7 +104,7 @@ Seller product preview images support JPG, PNG, and WEBP uploads up to 25MB each
 - `post_max_size = 30M` or higher
 - Nginx `client_max_body_size 30M` or an equivalent reverse proxy limit
 
-If these server limits are lower than the application limit, sellers may see a server-level upload failure before Asset Moth can show the normal validation message.
+If these server limits are lower than the application limit, sellers may see a server-level upload failure before Creative Moth can show the normal validation message.
 
 ### Phase 10.4 deployment notes
 
@@ -207,4 +207,15 @@ Deployment verification must include a write test executed as the PHP-FPM runtim
 
 ```bash
 sudo -u www-data sh -c 'test -d storage/protected_uploads/messages && touch storage/protected_uploads/messages/.write-test && rm storage/protected_uploads/messages/.write-test'
+```
+
+## Phase 12.6 custom designs
+
+Apply `database/migrations/2026_09_08_phase_12_6_custom_designs.sql` once after both Phase 12.5 migrations and before deploying Phase 12.6 code. It is not safely rerunnable because it directly creates tables and adds columns and constraints. Afterward verify `order_items.custom_service_id`, `platform_commissions.custom_service_id`, `message_conversations.custom_order_id`, `custom_order_status_history.system_event_key`, and the composite unique key on `(custom_order_id,system_event_key)`.
+
+Provision `storage/protected_uploads/custom_designs` outside the public web root with the same runtime-only ownership and `0750` policy as message attachments. Public examples use `public/uploads/custom_designs/examples`; protected references, proofs, and finals must not be served directly. Following the existing runtime-user convention, verify both locations are writable without retaining test files:
+
+```bash
+sudo -u www-data sh -c 'test -d storage/protected_uploads/custom_designs && touch storage/protected_uploads/custom_designs/.write-test && rm storage/protected_uploads/custom_designs/.write-test'
+sudo -u www-data sh -c 'test -d public/uploads/custom_designs/examples && touch public/uploads/custom_designs/examples/.write-test && rm public/uploads/custom_designs/examples/.write-test'
 ```

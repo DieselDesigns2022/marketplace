@@ -81,12 +81,13 @@ if ($json && json_decode($json) !== null):
 </head>
 <body>
 <header class="top">
-    <a class="brand brand-logo" href="/" aria-label="Asset Moth home">
-        <img src="/assets/img/asset-moth-logo.png" alt="Asset Moth" width="190" height="42" style="display:block;max-height:42px;width:auto;max-width:190px;object-fit:contain;" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
-        <span hidden>Asset Moth</span>
+    <a class="brand brand-logo" href="/" aria-label="Creative Moth home">
+        <img src="/assets/img/creative-moth-logo.png" alt="Creative Moth" width="190" height="42" style="display:block;max-height:42px;width:auto;max-width:190px;object-fit:contain;" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+        <span hidden>Creative Moth</span>
     </a>
     <nav>
         <a href="/browse">Browse</a>
+        <a href="/custom-designs">Custom Designs</a>
         <a href="/sell">Sell</a>
         <a href="/about">About</a>
         <a href="/cart">Cart</a>
@@ -112,11 +113,12 @@ if ($json && json_decode($json) !== null):
 </main>
 <footer class="site-footer">
     <div>
-        <strong>Asset Moth</strong>
+        <strong>Creative Moth</strong>
         <p class="muted">A digital design marketplace for downloadable creative files from reviewed independent designers.</p>
     </div>
     <nav aria-label="Footer navigation">
         <a href="/browse">Browse</a>
+        <a href="/custom-designs">Custom Designs</a>
         <a href="/sell">Sell</a>
         <a href="/about">About</a>
         <a href="/waitlist">Waitlist</a>

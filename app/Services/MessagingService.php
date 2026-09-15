@@ -25,6 +25,13 @@ final class MessagingService
         if(!$this->canStartProduct($p,$buyerId))H::abort(403);
         return $this->create($buyerId,(int)$p['seller_user_id'],(int)$p['designer_id'],(int)$p['id'],null,null,'Product: '.(string)$p['title'],'product:'.$p['id']);
     }
+    public function startCustomService(int $serviceId,int $buyerId): int
+    {
+        $s=DB::row('select s.id,s.title,s.designer_id,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.is_active=1 and d.status="approved"',[$serviceId])??H::abort(404);
+        if($buyerId<=0||$buyerId===(int)$s['seller_user_id'])H::abort(403);
+        return $this->create($buyerId,(int)$s['seller_user_id'],(int)$s['designer_id'],null,null,null,'Custom Design: '.(string)$s['title'],'custom-service:'.$s['id']);
+    }
+
     public function startStore(int $designerId,int $buyerId): int
     {
         $d=DB::row('select id,user_id,display_name from designers where id=? and status="approved"',[$designerId])??H::abort(404);
@@ -33,14 +40,25 @@ final class MessagingService
     public function startBuyerOrderItem(int $itemId,int $buyerId): int
     {
         if(!$this->buyerOrderItemEligible($itemId,$buyerId))H::abort(404);
+        $custom=DB::row('select id from custom_orders where order_item_id=?',[$itemId]);
+        if($custom)return $this->startCustomOrder((int)$custom['id'],$buyerId);
         $i=DB::row('select oi.id,oi.order_id,oi.product_id,oi.product_title,p.title live_title,oi.designer_id,d.user_id seller_user_id from order_items oi join orders o on o.id=oi.order_id left join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id where oi.id=? and o.user_id=? and o.payment_status in ("paid","partially_refunded")',[$itemId,$buyerId])??H::abort(404);
         return $this->create($buyerId,(int)$i['seller_user_id'],(int)$i['designer_id'],(int)$i['product_id'],(int)$i['order_id'],(int)$i['id'],'Purchased product: '.(string)($i['product_title']?:$i['live_title']?:('Order item #'.$i['id'])),'order-item:'.$i['id']);
     }
     public function startSellerOrderItem(int $itemId,int $sellerId): int
     {
         if(!$this->sellerOrderItemEligible($itemId,$sellerId))H::abort(404);
+        $custom=DB::row('select id from custom_orders where order_item_id=?',[$itemId]);
+        if($custom)return $this->startCustomOrder((int)$custom['id'],$sellerId);
         $i=DB::row('select oi.id,oi.order_id,oi.product_id,oi.product_title,p.title live_title,oi.designer_id,o.user_id buyer_id from order_items oi join orders o on o.id=oi.order_id left join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id where oi.id=? and d.user_id=? and o.payment_status in ("paid","partially_refunded")',[$itemId,$sellerId])??H::abort(404);
         return $this->create((int)$i['buyer_id'],$sellerId,(int)$i['designer_id'],(int)$i['product_id'],(int)$i['order_id'],(int)$i['id'],'Purchased product: '.(string)($i['product_title']?:$i['live_title']?:('Order item #'.$i['id'])),'order-item:'.$i['id']);
+    }
+    public function startCustomOrder(int $customOrderId,int $userId): int
+    {
+        $o=DB::row('select co.id,co.order_id,co.order_item_id,co.buyer_user_id,co.designer_id,o.payment_status,d.user_id seller_user_id,JSON_UNQUOTE(JSON_EXTRACT(co.service_snapshot,"$.title")) title from custom_orders co join orders o on o.id=co.order_id join designers d on d.id=co.designer_id where co.id=?',[$customOrderId])??H::abort(404);
+        if(!in_array($o['payment_status'],['paid','partially_refunded'],true)||!in_array($userId,[(int)$o['buyer_user_id'],(int)$o['seller_user_id']],true))H::abort(404);
+        $id=$this->create((int)$o['buyer_user_id'],(int)$o['seller_user_id'],(int)$o['designer_id'],null,(int)$o['order_id'],(int)$o['order_item_id'],'Custom order: '.($o['title']?:('#'.$o['id'])),'custom-order:'.$o['id']);
+        DB::exec('update message_conversations set custom_order_id=? where id=?',[$o['id'],$id]);return$id;
     }
     public function canStartProduct(array $product,int $buyerId): bool
     { return $buyerId>0&&$buyerId!==(int)($product['seller_user_id']??0); }
@@ -86,7 +104,7 @@ final class MessagingService
         } catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $f)@unlink($dir.'/'.$f['stored_name']);throw $e;}
         $recipientSide=$side==='buyer'?'seller':'buyer';$sellerIdentity=(string)$c['shop_name'].' ('.(string)$c['seller_owner_name'].')';
         try{NotificationService::internalMessage($recipient,$recipientSide,$messageId,$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'/'.$recipientSide.'/messages/'.$c['id']);}catch(\Throwable $e){NotificationService::reportFailure('internal-message notification',$e);}
-        try{$u=DB::row('select email,name from users where id=? and status="active"',[$recipient]);if($u)EmailQueueService::queue('transactional',$u['email'],'You have a new Asset Moth message','internal_message',['name'=>$u['name'],'sender'=>$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'shop'=>$c['shop_name'],'context'=>$c['context_label']??null,'order_id'=>$c['order_id']??null,'conversation_url'=>H::baseUrl().'/'.($side==='buyer'?'seller':'buyer').'/messages/'.$c['id']],"internal-message:$messageId:recipient:$recipient");}catch(\Throwable $e){NotificationService::reportFailure('internal-message email',$e);}
+        try{$u=DB::row('select email,name from users where id=? and status="active"',[$recipient]);if($u)EmailQueueService::queue('transactional',$u['email'],'You have a new Creative Moth message','internal_message',['name'=>$u['name'],'sender'=>$side==='buyer'?(string)$c['buyer_name']:$sellerIdentity,'shop'=>$c['shop_name'],'context'=>$c['context_label']??null,'order_id'=>$c['order_id']??null,'conversation_url'=>H::baseUrl().'/'.($side==='buyer'?'seller':'buyer').'/messages/'.$c['id']],"internal-message:$messageId:recipient:$recipient");}catch(\Throwable $e){NotificationService::reportFailure('internal-message email',$e);}
         return $messageId;
     }
     private function validateUploads(array $files): array

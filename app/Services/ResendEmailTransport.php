@@ -15,7 +15,7 @@ final class ResendEmailTransport
     {
         $apiKey=trim((string)($_ENV['RESEND_API_KEY']??''));
         $fromAddress=trim((string)($_ENV['MAIL_FROM_ADDRESS']??''));
-        $fromName=trim((string)($_ENV['MAIL_FROM_NAME']??'Asset Moth'));
+        $fromName=trim((string)($_ENV['MAIL_FROM_NAME']??'Creative Moth'));
         if($apiKey===''||!filter_var($fromAddress,FILTER_VALIDATE_EMAIL)||preg_match('/[\r\n]/',$fromName.$fromAddress))throw new \RuntimeException('Resend mail transport is not configured');
         if(!EmailQueueService::validEnvelope($recipient,$subject))throw new \RuntimeException('Invalid email envelope');
 

@@ -411,7 +411,7 @@ $licenseMap = $configuredLicenses ?? [];
 <?php if (!$isTemplate): ?>
     <p class="help-text">
         Product <?=$step?> will not be created until you click Next.
-        Asset Moth does not create blank product listings ahead of you.
+        Creative Moth does not create blank product listings ahead of you.
     </p>
 <?php endif; ?>
 

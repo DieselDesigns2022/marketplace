@@ -113,7 +113,7 @@ final class WaitlistController
             if(!EmailQueueService::queue(
                 'transactional',
                 $values['email'],
-                'Welcome to the Asset Moth waitlist',
+                'Welcome to the Creative Moth waitlist',
                 'waitlist_confirmation',
                 [
                     'name'=>$values['name'],

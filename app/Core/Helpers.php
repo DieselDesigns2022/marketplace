@@ -3,9 +3,9 @@
 namespace App\Core;
 class Helpers
 {
-    public const SITE_NAME = 'Asset Moth';
-    public const SITE_SHORT_NAME = 'Asset Moth';
-    public const DEFAULT_DESCRIPTION = 'Shop digital designs, templates, graphics, and creative files from independent designers on Asset Moth.';
+    public const SITE_NAME = 'Creative Moth';
+    public const SITE_SHORT_NAME = 'Creative Moth';
+    public const DEFAULT_DESCRIPTION = 'Shop digital designs, templates, graphics, and creative files from independent designers on Creative Moth.';
 
     public static function baseUrl(): string
     {

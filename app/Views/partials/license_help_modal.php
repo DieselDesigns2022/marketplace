@@ -8,8 +8,8 @@
 </div>
 <script>
 (function(){
-    if (window.assetMothLicenseHelpModalReady) return;
-    window.assetMothLicenseHelpModalReady = true;
+    if (window.creativeMothLicenseHelpModalReady) return;
+    window.creativeMothLicenseHelpModalReady = true;
 
     function modal() {
         return document.querySelector('[data-license-modal]');

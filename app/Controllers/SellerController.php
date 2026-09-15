@@ -332,7 +332,7 @@ class SellerController
                 StripeService::syncConnectedAccountStatus((int)$d['id'], StripeService::retrieveConnectedAccount($d['stripe_connect_account_id']));
                 $this->refreshPendingPayouts((int)$d['id']);
                 H::flash('success', 'Stripe payout setup status was refreshed.');
-            } catch (Throwable $e) { H::flash('warning', 'Stripe returned you to Asset Moth, but status refresh failed: ' . $e->getMessage()); }
+            } catch (Throwable $e) { H::flash('warning', 'Stripe returned you to Creative Moth, but status refresh failed: ' . $e->getMessage()); }
         }
         H::redirect('/seller/stripe');
     }
@@ -418,7 +418,7 @@ class SellerController
            }
 
         }
-        H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, 'meta' => ['title' => 'Apply to Sell | Asset Moth', 'description' => 'Apply for a reviewed designer storefront on Asset Moth.', 'canonical' => H::canonical('/apply'), 'robots' => 'noindex,follow'] ]);
+        H::view('seller/apply', [ 'application' => $application, 'errors' => $errors, 'values' => $values, 'meta' => ['title' => 'Apply to Sell | Creative Moth', 'description' => 'Apply for a reviewed designer storefront on Creative Moth.', 'canonical' => H::canonical('/apply'), 'robots' => 'noindex,follow'] ]);
 
     }
     private function refundSummary(int $designerId): array
@@ -1103,7 +1103,7 @@ class SellerController
 
     public function payhipImportTemplate(): void
     {
-        $this->requireOnboardingComplete(); header('Content-Type: text/csv; charset=UTF-8'); header('Content-Disposition: attachment; filename="asset-moth-payhip-products.csv"'); echo "\xEF\xBB\xBFproduct_key,product_url,title,description,price,tags,sku,product_type,image_url\r\n"; exit;
+        $this->requireOnboardingComplete(); header('Content-Type: text/csv; charset=UTF-8'); header('Content-Disposition: attachment; filename="creative-moth-payhip-products.csv"'); echo "\xEF\xBB\xBFproduct_key,product_url,title,description,price,tags,sku,product_type,image_url\r\n"; exit;
     }
 
     private function bulkWizardLicenseMap(array $licenses): array
@@ -1703,7 +1703,7 @@ class SellerController
             ) {
                 H::flash(
                     'error',
-                    'Open the source product, review its Asset Moth licenses, and save it first.'
+                    'Open the source product, review its Creative Moth licenses, and save it first.'
                 );
                 H::redirect('/seller/product-batch/' . (int)$id);
             }
@@ -2269,7 +2269,7 @@ class SellerController
     {
         $this->requireOnboardingComplete();
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
+        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
 
     }
 
@@ -2283,7 +2283,7 @@ class SellerController
             H::flash('success','Manual delivery item marked delivered.');
             H::redirect('/seller/order-item/'.(int)$id);
         }
-        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
+        $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
         H::view('seller/order_item',['item'=>$item]);
     }
     public function referrals()

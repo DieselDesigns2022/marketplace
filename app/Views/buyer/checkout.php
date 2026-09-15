@@ -1,5 +1,5 @@
 <h1>Secure checkout</h1>
-<p class="notice warning">Asset Moth will calculate US sales tax before applying store credit. If credit covers the authoritative total, the order completes immediately; otherwise Stripe securely collects only the remainder.</p>
+<p class="notice warning">Creative Moth will calculate US sales tax before applying store credit. If credit covers the authoritative total, the order completes immediately; otherwise Stripe securely collects only the remainder.</p>
 <?php if(!$items):?>
     <p>Your cart is empty.</p>
 <?php else:?>
@@ -18,7 +18,7 @@
     <div class="card">
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
-      <p class="muted">Sales tax calculated at checkout when required. Asset Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
+      <p class="muted">Sales tax calculated at checkout when required. Creative Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
       <p>Tax: <strong>calculated as applicable</strong></p><p>Available store credit: <strong><?=H::money($balances['available']??0)?></strong></p>
       <h2>Subtotal − coupon + tax − credits = final total</h2><p>Before tax and selected credits: <strong><?=H::money($finalTotal ?? $subtotal)?></strong></p>
     </div>
@@ -44,7 +44,7 @@
             <?php endforeach;?>
           </div>
           <label>Google Drive email required for manual delivery<input type="email" name="google_drive_email" required value="<?=H::e($_POST['google_drive_email'] ?? H::user()['email'] ?? '')?>"></label>
-          <p class="help-text">Sellers use this email to manually grant Google Drive access outside Asset Moth.</p>
+          <p class="help-text">Sellers use this email to manually grant Google Drive access outside Creative Moth.</p>
         <?php endif;?>
         <button class="btn">Calculate tax and complete checkout</button>
     </form>

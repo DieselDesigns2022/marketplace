@@ -1,7 +1,7 @@
 <h1>Referrals &amp; store credit</h1>
 <p>Your buyer referral link: <code><?= H::e(H::baseUrl() . '/register?ref=' . rawurlencode($referrals['code'])) ?></code></p>
 <p>You and a new buyer each receive $1.50 after their first completed order with a positive payment after credits. Credit-only, failed, cancelled, refunded, unpaid, or unresolved review orders do not qualify.</p>
-<p>Refer a completely new seller and receive one $5.00 Asset Moth credit after approval and their first qualifying paid sale. The new seller does not receive a matching credit.</p>
+<p>Refer a completely new seller and receive one $5.00 Creative Moth credit after approval and their first qualifying paid sale. The new seller does not receive a matching credit.</p>
 <p>Store credit never expires, is marketplace-only, non-transferable, and has no cash value.</p>
 <div class="cards"><div class="card"><strong>Total</strong><br><?= H::money($balances['total']) ?></div><div class="card"><strong>Reserved</strong><br><?= H::money($balances['reserved']) ?></div><div class="card"><strong>Available</strong><br><?= H::money($balances['available']) ?></div></div>
 <h2>Referrals you made</h2>

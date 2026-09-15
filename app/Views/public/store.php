@@ -1,6 +1,7 @@
 <article class="storefront" itemscope itemtype="https://schema.org/ProfilePage">
     <nav class="store-links">
         <a href="/browse">← Browse designs</a>
+        <a href="#custom-designs">Custom Designs</a>
         <a href="#newest-products">Newest products</a>
         <a href="#store-categories">Store categories</a>
     </nav>
@@ -100,6 +101,25 @@
     <?php endif; ?>
 </section>
 <?php if(H::user() && !$isOwner):?><form method="post" action="/messages/start/store/<?=$d['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn secondary">Message seller</button></form><?php endif;?>
+<section id="custom-designs">
+    <h2>Custom Designs</h2>
+    <?php if(empty($customServices)): ?>
+    <div class="card empty-state">
+        <p>This seller does not currently have any custom designs available.</p>
+    </div>
+    <?php else: ?>
+    <div class="product-grid">
+        <?php foreach($customServices as $s):?>
+        <article class="card">
+            <?php if(!empty($s['preview_image'])):?><img src="<?=H::e($s['preview_image'])?>" alt=""><?php endif;?>
+            <h3><a href="/custom-design/<?=H::e($s['slug'])?>"><?=H::e($s['title'])?></a></h3>
+            <p><?=H::money($s['price'])?> · <?=(int)$s['turnaround_days']?> days</p>
+        </article>
+        <?php endforeach;?>
+    </div>
+    <?php endif; ?>
+</section>
+
 <section id="featured-products">
     <h2>Featured products</h2>
     <?php if(empty($products)): ?>

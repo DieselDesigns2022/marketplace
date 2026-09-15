@@ -32,7 +32,7 @@ foreach (['q'=>'Search','category'=>'Category','ai'=>'AI','pod'=>'POD','creator'
 ?>
 <nav class="breadcrumbs"><a href="/">Home</a> / <a href="/browse">Browse</a><?php if($isCategory): ?> / <?=H::e($category['name'])?><?php endif; ?></nav>
 <section class="page-hero"><p class="eyebrow"><?= $isCategory ? 'Category' : 'Marketplace browse' ?></p><h1><?= $isCategory ? H::e($category['name']) : 'Browse digital designs' ?></h1>
-<p><?= $isCategory ? H::e($category['description'] ?: 'Browse approved downloadable products in this category on Asset Moth.') : 'Discover SVGs, print-ready PNG files, seamless patterns, templates, fonts, brushes, mockups, printables, and other creative files from independent designers.' ?></p></section>
+<p><?= $isCategory ? H::e($category['description'] ?: 'Browse approved downloadable products in this category on Creative Moth.') : 'Discover SVGs, print-ready PNG files, seamless patterns, templates, fonts, brushes, mockups, printables, and other creative files from independent designers.' ?></p></section>
 <section class="card">
     <h2>Categories</h2>
     <div class="grid"><?php foreach($cats as $c):?><a href="/category/<?=H::e($c['slug'])?>"><?=H::e($c['name'])?></a><?php endforeach;?></div>

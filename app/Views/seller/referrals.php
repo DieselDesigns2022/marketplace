@@ -1,6 +1,6 @@
 <h1>Seller referrals</h1>
 <p>Your seller referral link: <code><?= H::e(H::baseUrl() . '/apply?seller_ref=' . rawurlencode($referralCode)) ?></code></p>
-<p>If you are an approved seller when the referral qualifies, you earn 1% of that store's net seller earnings for its eligible lifetime, funded by Asset Moth. Otherwise you earn one $5.00 store credit. The referred seller receives no matching credit.</p>
+<p>If you are an approved seller when the referral qualifies, you earn 1% of that store's net seller earnings for its eligible lifetime, funded by Creative Moth. Otherwise you earn one $5.00 store credit. The referred seller receives no matching credit.</p>
 <p>The account keeps one immutable referrer. Store credit never expires, is marketplace-only, non-transferable, and has no cash value.</p>
 <div class="responsive-table"><table><thead><tr><th>Status</th><th>Qualifying sale</th><th>Reward</th></tr></thead><tbody>
 <?php if (!$refs): ?><tr><td colspan="3">No seller referrals yet.</td></tr><?php endif; ?>
