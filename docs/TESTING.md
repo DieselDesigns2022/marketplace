@@ -1,5 +1,8 @@
 # Testing
 
+## Phase 12.7 marketplace fee checks
+The fast tests `php tests/Phase127MarketplaceFeeModelTest.php` and `php tests/Phase127RefundRecoveryWorkflowTest.php` cover pure integer-cent fee, outstanding-refund, exact-allocation, seller-isolation, recovery growth/closure, and recovery-planning functions. They do not claim database/webhook integration. Run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase127DatabaseIntegrationTest.php` with disposable MariaDB credentials for migration-backed resumable observations, review repair, allocation/tax validation, seller/recognition/referral isolation, partial-payout planning, recovery baselines, reservation competition, retry/zero-transfer idempotency, and legacy snapshots. Live Stripe and HTTP webhook validation remain separate staging checks.
+
 ## Phase 12.4
 
 Final external tester review completed with four submitted tester responses across computer, tablet, and phone use. No remaining Phase 12.4 blocker was reported after the live licensing usability correction.
@@ -180,7 +183,7 @@ Verify downloadable and Google Drive products can be added to the cart, mixed ca
 Phase 10 does not implement emails/notifications, buyer self-cancellation of completed digital purchases, or seller refund-request approval UI.
 
 ### Phase 10 Stripe seller onboarding test coverage
-Check that approved sellers can open `/seller/onboarding`, start `/seller/stripe`, create/continue Stripe Express onboarding with test keys, and return to Creative Moth with status fields synced. Verify buyer Checkout can complete before seller onboarding; seller payout records should remain `pending_stripe_onboarding` until the seller is payout-ready, then become `pending_transfer`/`transferred` or `transfer_failed` without reversing buyer access. Confirm seller-facing pages state no startup fee, no monthly fee, no listing fee, 18% Creative Moth commission, separate Stripe/payment processing fees, Stripe Connect payout requirement, admin-exception refunds, no buyer self-cancellation of completed digital purchases, and no seller instant refunds.
+Check that approved sellers can open `/seller/onboarding`, start `/seller/stripe`, create/continue Stripe Express onboarding with test keys, and return to Creative Moth with status fields synced. Verify buyer Checkout can complete before seller onboarding; seller payout records should remain `pending_stripe_onboarding` until the seller is payout-ready, then become `pending_transfer`/`transferred` or `transfer_failed` without reversing buyer access. Confirm seller-facing pages state no startup fee, monthly fee, or listing fee; a 9% + $0.30 marketplace fee once per seller portion of an order; platform-paid Stripe processing; Stripe Connect payout requirements; admin-exception refunds; no buyer self-cancellation of completed digital purchases; and no seller instant refunds.
 
 #### Phase 10 correction tests
 After an approved seller completes Stripe onboarding or an `account.updated` webhook marks the seller payout-ready, verify old `pending_stripe_onboarding` paid-order payouts become attempted transfers with idempotency key `asset_moth_payout_order_{orderId}_designer_{designerId}`. Confirm unpaid, manual-review, and refunded orders are skipped; successful transfers become `transferred`, failures become `transfer_failed`, and buyer paid access remains unchanged. Test webhook signatures with `STRIPE_WEBHOOK_SECRET` and, when configured for a separate Connect destination, `STRIPE_CONNECT_WEBHOOK_SECRET`.
@@ -209,7 +212,7 @@ Recommended manual checks:
 
 ## Admin commission report checks
 - Admin can open `/admin/payment-logs` and see gross sales, Creative Moth commission, seller payout totals, transfer status, payment transactions, and webhook logs.
-- A $5.00 paid order at 18% commission should show $0.90 Creative Moth commission and $4.10 seller payout.
+- Historical Phase 10 verification may retain a $5.00 order at 18% as $0.90 commission/$4.10 payout. A current Phase 12.7 $5.00 sale must show a $0.75 marketplace fee and $4.25 seller entitlement.
 - Failed seller transfers should show the transfer error without changing the commission snapshot.
 - Admin commission report should count live Stripe payments only by default, excluding old `cs_test_` test-mode orders from live money totals.
 - Admin payment log tables should stay inside their content area without causing full-page sideways scrolling.
@@ -476,3 +479,7 @@ the per-product extra-protection selection. Imported products default extra
 protection off but receive the standard Creative Moth watermark and may later
 be regenerated with extra protection after seller selection. Product
 duplication does not copy preview files.
+
+### Phase 12.7 correction coverage
+
+`Phase127RefundRecoveryWorkflowTest.php` directly exercises pure cent/state helpers. The guarded `Phase127DatabaseIntegrationTest.php` applies the real migration and performs persisted service/controller reconciliation checks, including duplicate-event replay, cumulative refund deltas, exact item/tax allocation, allocated-state resume, unresolved-review retention, seller isolation, referral/recognition replay, recovery reservation/finalization, partial payout planning, zero-cash settlement, waiver growth, legacy percentage snapshots, platform-credit processing-state replay through the CLI Stripe test transport, and simulated post-Stripe/local-finalization repair for normal and onboarding-retry payouts. It does not contact Stripe. The suite uses separate worker processes for duplicate-observation, recovery-claim, and refund-review-clearing races; it also invokes the real ambiguous-refund controller method, exercises the admin allocated-refund retry with recognition and payout restoration, and verifies stored-transfer repair for normal, onboarding, and refunded platform-credit payouts. These scenarios must be reported as SKIP/UNEXECUTED whenever disposable MariaDB is unavailable.

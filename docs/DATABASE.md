@@ -132,7 +132,9 @@ Product images are public preview assets. Product files are protected downloadab
 
 ## Orders, earnings, and commissions
 
-Orders contain one or more order items. Each order item can produce seller earning and platform commission records. The default commission rate in `order_items` is `.2000`, representing a 20% platform commission unless changed by future business logic.
+Phase 12.7 marks new orders with `marketplace_fee_model=percentage_plus_fixed`. Order items store allocated percentage and fixed portions alongside total commission and seller payout. `seller_payouts` is the seller/order authority and snapshots seller gross, model, rate, configured fixed cents, percentage fee, fixed fee, total fee, original/current entitlement, reserved/applied recovery, exact net transfer, completed economic value, and a leased execution state. Existing rows default to `legacy_percentage`; their already-stored gross and payout are copied into new baseline columns without repricing or changing historical financial values. `marketplace_refund_observations` stores each Stripe event, cumulative total, new delta, merchandise/tax split, and resumable `needs_allocation`/`allocated`/`reconciled` state; `marketplace_refund_allocations` identifies the observation and refunded items. Ambiguous refunds require an exact admin allocation and never silently prorate sellers. Recovery adjustments are incremental audit tranches, so waived obligations remain waived while later refund growth opens only a new delta. `seller_recovery_applications` distinguishes reserved from applied deductions; transfer retries reuse the durable amount/key plan and stale execution leases can be reclaimed.
+
+Orders contain one or more order items. Each order item can produce seller earning and platform commission records. The legacy `order_items.commission_rate` column and its historical `.2000` schema default remain for backward compatibility and old snapshots only. Current Phase 12.7 orders use `marketplace_fee_model=percentage_plus_fixed` with snapshotted 9% + $0.30 fee configuration once per seller/order portion.
 
 ## Phase 8 search and browsing data usage
 

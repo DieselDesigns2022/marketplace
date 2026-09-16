@@ -53,13 +53,12 @@ final class CreatorRecognitionService
 
     public function qualifyingOrders(int $designerId): array
     {
-        $orders=DB::rows('select o.id,o.paid_at,o.finalized_at,o.created_at,o.payment_status,o.tax_amount from orders o join order_items oi on oi.order_id=o.id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded","refunded") and o.status in ("paid","completed","refunded") and o.manual_review_required=0 group by o.id,o.paid_at,o.finalized_at,o.created_at,o.payment_status,o.tax_amount order by coalesce(o.paid_at,o.finalized_at,o.created_at),o.id',[$designerId]);
+        $orders=DB::rows('select o.id,o.paid_at,o.finalized_at,o.created_at,o.payment_status,o.tax_amount,o.marketplace_fee_model from orders o join order_items oi on oi.order_id=o.id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded","refunded") and o.status in ("paid","completed","refunded") and (o.manual_review_required=0 or o.manual_review_reason like "Stripe refund observation%") group by o.id,o.paid_at,o.finalized_at,o.created_at,o.payment_status,o.tax_amount,o.marketplace_fee_model order by coalesce(o.paid_at,o.finalized_at,o.created_at),o.id',[$designerId]);
         $out=[];
         foreach($orders as $order){
-            if($order['payment_status']==='refunded')continue;
             $items=DB::rows('select id,designer_id,total_price,commission_rate from order_items where order_id=? order by id',[$order['id']]);
-            $refund=DB::row('select coalesce(max(amount),0) amount from payment_transactions where order_id=? and transaction_type in ("partial_refund","refund")',[$order['id']]);
-            $allocation=StripeController::allocateSellerRefund($items,StripeService::cents($refund['amount']??0),StripeService::cents($order['tax_amount']??0));
+            if(($order['marketplace_fee_model']??'legacy_percentage')==='percentage_plus_fixed'){$allocation=[];foreach(DB::rows('select order_item_id,sum(merchandise_refund_cents) refunded from marketplace_refund_allocations where order_id=? group by order_item_id',[$order['id']]) as $a)$allocation[(int)$a['order_item_id']]=['gross_refund_cents'=>(int)$a['refunded']];}
+            else{$refund=DB::row('select coalesce(max(amount),0) amount from payment_transactions where order_id=? and transaction_type in ("partial_refund","refund")',[$order['id']]);$allocation=StripeController::allocateSellerRefund($items,StripeService::cents($refund['amount']??0),StripeService::cents($order['tax_amount']??0));}
             $remaining=0;
             foreach($items as $item)if((int)$item['designer_id']===$designerId)$remaining+=max(0,StripeService::cents($item['total_price'])-(int)($allocation[(int)$item['id']]['gross_refund_cents']??0));
             if($remaining>0)$out[]=['id'=>(int)$order['id'],'at'=>$order['paid_at']?:($order['finalized_at']?:$order['created_at'])];

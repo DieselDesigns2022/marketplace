@@ -21,9 +21,6 @@ final class CheckoutOrderService
         return (int)DB::id();
     }
 
-    public function addSellerEarning(int $orderId,?int $productId,int $designerId,int $buyerId,string $gross,float $rate):void
-    { $commission=round((float)$gross*$rate,2);DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,"pending_payment")',[$orderId,$productId,$designerId,$buyerId,$gross,$commission,round((float)$gross-$commission,2)]); }
-
     public function checkout(array $order,array $items):array
     { return StripeService::createCheckoutSession($order,$items); }
 }

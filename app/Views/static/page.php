@@ -154,7 +154,7 @@
     <p class="eyebrow">Creative Moth Terms</p>
     <h1>Terms &amp; Conditions</h1>
     <p>These Terms &amp; Conditions explain the rules for using Creative Moth, including buyer purchases, digital downloads, product licensing, designer storefronts, seller responsibilities, marketplace moderation, referrals, credits, and account use.</p>
-    <p class="policy-date"><strong>Effective Date:</strong> June 29, 2026<br><strong>Last Updated:</strong> June 29, 2026</p>
+    <p class="policy-date"><strong>Effective Date:</strong> June 29, 2026<br><strong>Last Updated:</strong> September 15, 2026</p>
 </section>
 
 <section class="page-section card policy-content terms-content">
@@ -261,8 +261,9 @@
     <p>Sellers may set product prices within marketplace rules. Creative Moth may set minimum prices, maximum prices, discount rules, sale rules, bundle rules, sponsored listing pricing, category pricing rules, or other pricing controls.</p>
 
     <h3>25. Marketplace commission</h3>
-    <p>Creative Moth may collect a marketplace commission from seller sales. Commission rates, fees, payout timing, and seller earning calculations may be shown in seller settings, onboarding materials, or marketplace policy updates.</p>
-    <p>Final seller earnings may be affected by payment processor fees, refunds, chargebacks, referral commissions, taxes, discounts, credits, bundle rules, sponsored listing fees, or other marketplace adjustments.</p>
+    <p>There is no startup fee, monthly fee, or listing fee. Creative Moth charges a marketplace fee equal to 9% of each seller’s post-discount merchandise amount plus $0.30 once for that seller’s portion of a completed order. The $0.30 is not charged per product. Paid license add-ons are merchandise.</p>
+    <p>Taxes are excluded from the marketplace-fee basis. Store credit is payment or funding and does not reduce the seller’s merchandise amount or fee basis. Stripe payment processing is absorbed by Creative Moth and is not deducted as a separate seller fee.</p>
+    <p>Refunds, disputes, and chargebacks may change a seller’s final entitlement under the refund rules. If funds were already transferred, the resulting recovery may be applied against future seller earnings; completed transfers are not changed and no negative transfer is created.</p>
 
     <h3>26. Payments and seller payouts</h3>
     <p>Creative Moth may use a third-party payment processor for payments and seller payouts. Sellers may be required to create or connect a payment account, verify identity, provide tax information, accept payment processor terms, and complete onboarding before receiving payouts.</p>
@@ -278,7 +279,7 @@
     <p>Creative Moth may offer designer referral rewards. Creative Moth may deny, pause, revoke, or adjust referral rewards if there is fraud, self-referral, duplicate accounts, abuse, fake sales, chargebacks, refunds, policy violations, or technical errors.</p>
 
     <h3>30. Creator ranks</h3>
-    <p>Creative Moth currently calculates creator ranks only from qualifying completed paid sales: Bronze at 0, Silver at 25, Gold at 100, Platinum at 500, and Diamond at 1,500. One order counts once for each participating seller regardless of item count. Full or partial cumulative refunds remove a seller’s participation only when the platform’s proportional allocation leaves that seller with no positive merchandise value. Creative Moth may change or discontinue the creator-rank program in the future by updating these Terms and applicable program information.</p>
+    <p>Creative Moth currently calculates creator ranks only from qualifying completed paid sales: Bronze at 0, Silver at 25, Gold at 100, Platinum at 500, and Diamond at 1,500. One order counts once for each participating seller regardless of item count. Refunds remove a seller’s participation only when authoritative item-specific refund allocations leave that seller with no positive merchandise value. Creative Moth may change or discontinue the creator-rank program in the future by updating these Terms and applicable program information.</p>
 
     <h3>31. Sponsored listings and featured placements</h3>
     <p>Creative Moth may allow sellers to promote products, storefronts, collections, or bundle participation through sponsored listings or featured placements. Creative Moth does not guarantee sales, clicks, views, ranking, or profit from sponsored listings.</p>
@@ -491,7 +492,7 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
     <h3>What should I set up in my store?</h3>
     <p>Your store should include a clear display name, store URL name, bio, avatar or logo, banner image, optional social links, and any announcement buyers should see. Keep store information accurate and professional.</p>
     <h3>How do Stripe payouts work?</h3>
-    <p>Creative Moth processes buyer checkout through Stripe, and seller payouts are handled through Stripe Connect. Approved sellers must complete Stripe onboarding before they can receive payouts. Creative Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens, and Stripe/payment processing fees also apply.</p>
+    <p>Creative Moth processes buyer checkout through Stripe, and seller payouts are handled through Stripe Connect. Approved sellers must complete Stripe onboarding before they can receive payouts. There is no startup fee, monthly fee, or listing fee. Creative Moth charges 9% + $0.30 when you make a sale. Stripe payment processing is handled by Creative Moth and is not deducted as a separate seller fee. The $0.30 applies once to each seller’s portion of a completed order, not to every product.</p>
     <p>When earnings are paid out can depend on Stripe processing, your Stripe account status, refunds, disputes, and any platform payout rules. Keep your Stripe account information accurate so Stripe can review and send payouts without avoidable delays.</p>
     <h3>What about sales tax?</h3>
     <p>Creative Moth handles applicable checkout sales tax through Stripe Tax at checkout. Sellers should still track their own income, expenses, records, business registrations, and tax obligations. Creative Moth does not provide tax advice.</p>

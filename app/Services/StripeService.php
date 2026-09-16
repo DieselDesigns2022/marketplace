@@ -18,7 +18,9 @@ class StripeService
     public static function webhookSecret(): string { return trim((string)($_ENV['STRIPE_WEBHOOK_SECRET'] ?? '')); }
     public static function connectWebhookSecret(): string { return trim((string)($_ENV['STRIPE_CONNECT_WEBHOOK_SECRET'] ?? '')); }
     public static function currency(): string { return strtolower(trim((string)($_ENV['STRIPE_CURRENCY'] ?? 'usd')) ?: 'usd'); }
-    public static function commissionRate(): float { return max(0, min(100, (float)($_ENV['PLATFORM_COMMISSION_PERCENT'] ?? 18))) / 100; }
+    public static function commissionBasisPoints(): int { return max(0, min(10000, (int)round((float)($_ENV['PLATFORM_COMMISSION_PERCENT'] ?? 9) * 100))); }
+    public static function commissionFixedCents(): int { return max(0, (int)($_ENV['PLATFORM_COMMISSION_FIXED_CENTS'] ?? 30)); }
+    public static function commissionRate(): float { return self::commissionBasisPoints() / 10000; }
     public static function appUrl(): string
     {
         return \App\Core\Helpers::baseUrl();
@@ -103,6 +105,7 @@ class StripeService
         ) {
             return false;
         }
+        if ($expected['line1']==='' || $actual['line1']==='' || $expected['line1']!==$actual['line1'] || $expected['city']==='' || $actual['city']==='' || $expected['city']!==$actual['city']) return false;
 
         $expectedZip = preg_replace('/\\D+/', '', $expected['postal_code']);
         $actualZip = preg_replace('/\\D+/', '', $actual['postal_code']);
@@ -259,17 +262,19 @@ class StripeService
 
     public static function attemptPendingTransfersForDesigner(int $designerId): array
     {
-        $summary = ['attempted' => 0, 'transferred' => 0, 'failed' => 0, 'skipped' => 0];
+        $summary = ['attempted' => 0, 'transferred' => 0, 'recovery_applied' => 0, 'failed' => 0, 'skipped' => 0];
         $designer = DB::row('select * from designers where id=?', [$designerId]);
         $ready = $designer && !empty($designer['stripe_connect_account_id']) && !empty($designer['stripe_details_submitted']) && !empty($designer['stripe_payouts_enabled']);
         if (!$ready) return $summary;
 
-        DB::exec('update seller_payouts sp join orders o on o.id=sp.order_id set sp.payout_status="pending_transfer",sp.updated_at=now() where sp.designer_id=? and sp.payout_status="pending_stripe_onboarding" and o.payment_status="paid" and o.status not in ("failed","cancelled","refunded") and coalesce(o.manual_review_required,0)=0', [$designerId]);
-        DB::exec('update order_items oi join orders o on o.id=oi.order_id set oi.seller_payout_status="pending_transfer" where oi.designer_id=? and oi.seller_payout_status="pending_stripe_onboarding" and o.payment_status="paid" and o.status not in ("failed","cancelled","refunded") and coalesce(o.manual_review_required,0)=0', [$designerId]);
+        DB::exec('update seller_payouts sp join orders o on o.id=sp.order_id set sp.payout_status="pending_transfer",sp.updated_at=now() where sp.designer_id=? and sp.payout_status="pending_stripe_onboarding" and o.payment_status in ("paid","partially_refunded") and o.status not in ("failed","cancelled","refunded") and coalesce(o.manual_review_required,0)=0', [$designerId]);
+        DB::exec('update order_items oi join orders o on o.id=oi.order_id set oi.seller_payout_status="pending_transfer" where oi.designer_id=? and oi.seller_payout_status="pending_stripe_onboarding" and o.payment_status in ("paid","partially_refunded") and o.status not in ("failed","cancelled","refunded") and coalesce(o.manual_review_required,0)=0', [$designerId]);
 
-        $rows = DB::rows('select sp.*,o.payment_status,o.status order_status,o.manual_review_required,o.stripe_charge_id from seller_payouts sp join orders o on o.id=sp.order_id where sp.designer_id=? and sp.payout_status in ("pending_transfer","transfer_failed") order by sp.id', [$designerId]);
+        $rows = DB::rows('select sp.*,o.payment_status,o.status order_status,o.manual_review_required,o.stripe_charge_id from seller_payouts sp join orders o on o.id=sp.order_id where sp.designer_id=? and sp.payout_status in ("pending_transfer","transfer_failed","recovery_applied") order by sp.id', [$designerId]);
         foreach ($rows as $row) {
-            if (($row['payment_status'] ?? '') !== 'paid' || in_array(($row['order_status'] ?? ''), ['failed','cancelled','refunded'], true) || !empty($row['manual_review_required'])) {
+            $refundService=new MarketplaceRefundService();if(!empty($row['stripe_transfer_id'])){if($refundService->repairStoredTransfer((int)$row['id']))$summary['transferred']++;else $summary['skipped']++;continue;}
+            if($row['payout_status']==='recovery_applied'&&$row['recovery_claim_status']==='applied'){$summary['recovery_applied']++;continue;}
+            if (!in_array(($row['payment_status'] ?? ''),['paid','partially_refunded'],true) || in_array(($row['order_status'] ?? ''), ['failed','cancelled','refunded'], true) || !empty($row['manual_review_required'])) {
                 $summary['skipped']++;
                 continue;
             }
@@ -287,13 +292,17 @@ class StripeService
             $summary['attempted']++;
             $orderId = (int)$row['order_id'];
             $idempotencyKey = 'asset_moth_payout_order_' . $orderId . '_designer_' . $designerId;
+            $recovery=$refundService->claimPayout((int)$row['id']);
+            if($recovery['transfer_cents']===0){$refundService->finalizePayoutClaim((int)$row['id']);DB::exec('update seller_payouts set payout_status="recovery_applied" where id=?',[$row['id']]);DB::exec('update order_items set seller_payout_status="recovery_applied" where order_id=? and designer_id=?',[$orderId,$designerId]);$summary['recovery_applied']++;continue;}
+            $execution=$refundService->beginPayoutExecution((int)$row['id'],$idempotencyKey);if(!$execution['execute']){$summary['skipped']++;continue;}
             try {
-                $transfer = self::createTransfer($designer['stripe_connect_account_id'], self::cents($row['seller_payout_amount']), strtolower((string)($row['currency'] ?: self::currency())), ['order_id'=>(string)$orderId,'designer_id'=>(string)$designerId,'seller_payout_id'=>(string)$row['id']], $idempotencyKey, $chargeId, 'order_' . $orderId);
+                $transfer = self::createTransfer($designer['stripe_connect_account_id'], $recovery['transfer_cents'], strtolower((string)($row['currency'] ?: self::currency())), ['order_id'=>(string)$orderId,'designer_id'=>(string)$designerId,'seller_payout_id'=>(string)$row['id']], $idempotencyKey, $chargeId, 'order_' . $orderId);
                 $transferId = $transfer['id'] ?? null;
-                DB::exec('update seller_payouts set payout_status="transferred",stripe_transfer_id=coalesce(?,stripe_transfer_id),stripe_transfer_error=null,updated_at=now() where id=?', [$transferId,$row['id']]);
-                DB::exec('update order_items set seller_payout_status="transferred",stripe_transfer_id=coalesce(?,stripe_transfer_id),stripe_transfer_error=null where order_id=? and designer_id=?', [$transferId,$orderId,$designerId]);
+                if(empty($transferId))throw new \RuntimeException('Stripe transfer did not return an identifier.');DB::exec('update seller_payouts set stripe_transfer_id=? where id=?',[$transferId,$row['id']]);$refundService->repairStoredTransfer((int)$row['id']);
                 $summary['transferred']++;
             } catch (Throwable $e) {
+                $storedTransfer=DB::row('select stripe_transfer_id from seller_payouts where id=?',[$row['id']]);if(!empty($storedTransfer['stripe_transfer_id'])){$summary['skipped']++;continue;}
+                $refundService->failPayoutExecution((int)$row['id']);
                 $error = mb_substr($e->getMessage(),0,1000);
                 DB::exec('update seller_payouts set payout_status="transfer_failed",stripe_transfer_error=?,updated_at=now() where id=? and payout_status<>"transferred"', [$error,$row['id']]);
                 DB::exec('update order_items set seller_payout_status="transfer_failed",stripe_transfer_error=? where order_id=? and designer_id=? and seller_payout_status<>"transferred"', [$error,$orderId,$designerId]);
