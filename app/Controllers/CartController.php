@@ -301,13 +301,13 @@ class CartController
                 foreach($valid as $idx=>$p)$feeInput[]=['id'=>$idx+1,'seller_id'=>(int)$p['designer_id'],'gross_cents'=>max(0,CreditService::parseCents((string)$p['line_total'])-CreditService::parseCents((string)($allocations[$idx]??'0.00')))];
                 $sellerFees=MarketplaceFeeService::configured()->calculate($feeInput);
                 $platformCommissionCents=array_sum(array_column($sellerFees,'fee_cents'));
-                $order=(new CheckoutOrderService)->createOrder(['user_id'=>H::user()['id'],'subtotal'=>$subtotal,'tax_amount'=>$tax,'tax_snapshot'=>$taxCalculation['snapshot'],'tax_calculation_id'=>$taxCalculation['id'],'billing_snapshot'=>json_encode($billingAddress,JSON_THROW_ON_ERROR),'credits'=>$credits,'coupon_discount'=>$couponDiscount,'coupon_id'=>$coupon['id']??null,'coupon_code'=>$coupon['code']??null,'coupon_snapshot'=>$coupon?json_encode($coupon):null,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>$total,'commission_total'=>CreditService::formatCents($platformCommissionCents)]);
+                $order=(new CheckoutOrderService)->createOrder(['user_id'=>H::user()['id'],'subtotal'=>$subtotal,'tax_amount'=>$tax,'tax_snapshot'=>$taxCalculation['snapshot'],'tax_calculation_id'=>$taxCalculation['id'],'billing_snapshot'=>json_encode($billingAddress,JSON_THROW_ON_ERROR),'credits'=>$credits,'coupon_discount'=>$couponDiscount,'coupon_id'=>$coupon['id']??null,'coupon_code'=>$coupon['code']??null,'coupon_snapshot'=>$coupon?json_encode($coupon):null,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>'0.00','commission_total'=>CreditService::formatCents($platformCommissionCents)]);
                 DB::exec('update orders set marketplace_fee_model="percentage_plus_fixed",marketplace_fee_basis_points=?,marketplace_fixed_fee_cents=? where id=?',[StripeService::commissionBasisPoints(),StripeService::commissionFixedCents(),$order]);
                 if ($creditCents > 0) {
                     $credits = (new CreditService)->reserve((int)H::user()['id'], $credits, (int)$order, 'order:' . $order . ':credit:reserve');
                     $creditCents = CreditService::parseCents($credits);
                     $total = CreditService::formatCents($grossCents - $creditCents);
-                    DB::exec('update orders set credits_applied=?,credit_reserved=?,credit_payment_status=?,total=?,stripe_amount_total=?,stripe_paid_amount=? where id=?', [$credits, $credits, $creditCents > 0 ? 'reserved' : 'none', $total, $grossCents - $creditCents, $total, $order]);
+                    DB::exec('update orders set credits_applied=?,credit_reserved=?,credit_payment_status=?,total=?,stripe_amount_total=?,stripe_paid_amount=? where id=?', [$credits, $credits, $creditCents > 0 ? 'reserved' : 'none', $total, $grossCents - $creditCents, '0.00', $order]);
                 }
                 foreach($valid as $idx=>$p)
                {
