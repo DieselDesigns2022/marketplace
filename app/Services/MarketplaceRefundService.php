@@ -14,9 +14,8 @@ final class MarketplaceRefundService
     public function observe(int $orderId,string $eventId,int $cumulativeCents):array
     {
         $owns=!DB::pdo()->inTransaction();if($owns)DB::begin();try{
-            $existing=DB::row('select * from marketplace_refund_observations where stripe_event_id=?',[$eventId]);if($existing){if($owns)DB::commit();return $existing+['replay'=>true];}
             DB::row('select id from orders where id=? for update',[$orderId]);
-            $existing=DB::row('select * from marketplace_refund_observations where stripe_event_id=?',[$eventId]);if($existing){if($owns)DB::commit();return $existing+['replay'=>true];}
+            $existing=DB::row('select * from marketplace_refund_observations where stripe_event_id=? for update',[$eventId]);if($existing){if($owns)DB::commit();return $existing+['replay'=>true];}
             $previous=(int)(DB::row('select coalesce(max(cumulative_refund_cents),0) cents from marketplace_refund_observations where order_id=?',[$orderId])['cents']??0);
             $delta=self::outstandingDelta($cumulativeCents,$previous);$status=$delta>0?'needs_allocation':'reconciled';
             DB::exec('insert into marketplace_refund_observations(order_id,stripe_event_id,cumulative_refund_cents,refund_delta_cents,allocation_status) values (?,?,?,?,?)',[$orderId,$eventId,$cumulativeCents,$delta,$status]);$id=(int)DB::id();$row=DB::row('select * from marketplace_refund_observations where id=?',[$id]);if($owns)DB::commit();return$row+['replay'=>false];

@@ -337,12 +337,6 @@ class StripeController
                 $review = true;
                 $reason = 'The authoritative Stripe Tax Calculation is unavailable.';
             }
-            $returnedAddress = is_array($object['customer_details']['address'] ?? null) ? $object['customer_details']['address'] : [];
-            $authoritativeAddress = json_decode((string)($locked['billing_address_snapshot'] ?? ''), true) ?: [];
-            if ($isCheckoutSession && !StripeService::billingAddressMatches($authoritativeAddress, $returnedAddress)) {
-                $review = true;
-                $reason = 'Stripe billing location differs from the authoritative tax address.';
-            }
             $captured = true;
             DB::exec('update orders set status="pending",payment_status=?,payment_provider="stripe",payment_processor="stripe",stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id),stripe_customer_id=coalesce(?,stripe_customer_id),stripe_charge_id=coalesce(?,stripe_charge_id),stripe_payment_status=?,stripe_amount_total=?,stripe_paid_amount=?,stripe_currency=?,manual_review_required=?,manual_review_reason=? where id=?', [$review ? 'manual_review' : 'captured_pending_finalization',$sessionId,$paymentIntentId,$object['customer'] ?? null,$chargeId,$object['payment_status'] ?? $object['status'] ?? 'paid',$amount,CreditService::formatCents($amount),$currency,$review ? 1 : 0,$reason,$locked['id']]);
             StripeService::logTransaction((int)$locked['id'], $eventId, $source, $review ? 'manual_review' : 'captured_pending_finalization', CreditService::formatCents($amount), $currency, ['session'=>$sessionId ?? $locked['stripe_checkout_session_id'],'intent'=>$paymentIntentId,'charge'=>$chargeId], $reason ?? 'Stripe payment captured; atomic finalization started.', $review);
