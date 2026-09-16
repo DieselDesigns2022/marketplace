@@ -7,6 +7,8 @@
   <p>Product: <?=H::e($item['product_title'] ?: ('Product #'.$item['product_id']))?></p>
   <p>License: <?=H::e($item['license_name'] ?: $item['license_type'])?><?php if(!empty($item['license_description'])):?><br><span class="muted"><?=nl2br(H::e($item['license_description']))?></span><?php endif;?></p>
   <p>License add-on price: <?=H::money($item['license_price'] ?? 0)?></p>
+  <p>Sale amount: <?=H::money($item['total_price']??0)?> · Marketplace fee: <?=H::money($item['platform_commission_amount']??0)?> · You earned: <?=H::money($item['seller_payout_amount']??0)?></p>
+  <?php if($item['transfer_amount_after_recovery']!==null):?><p>Actual cash transferred for your order portion: <?=H::money($item['transfer_amount_after_recovery'])?> · Applied to recovery: <?=H::money($item['recovery_applied_amount']??0)?><?php if((float)($item['recovery_reserved_amount']??0)>0):?> · Reserved for recovery: <?=H::money($item['recovery_reserved_amount'])?><?php endif;?><?=!empty($item['stripe_transfer_id'])?' · Transfer '.H::e($item['stripe_transfer_id']):' · No Stripe transfer was needed'?></p><?php endif;?>
   <?php if(!empty($item['coupon_code'])):?><p>Coupon <?=H::e($item['coupon_code'])?> item discount: <?=H::money($item['coupon_discount'] ?? 0)?>. Earnings use the discounted item total.</p><?php endif;?>
   <p class="muted">Sales tax, when required, is handled by Creative Moth through Stripe Tax and is excluded from seller payout.</p>
   <p>Fulfillment: <?=($item['fulfillment_type']==='custom_design')?'Custom Design':(($item['fulfillment_type']==='google_drive')?'Google Drive / Manual Delivery':'Downloadable Product')?></p>

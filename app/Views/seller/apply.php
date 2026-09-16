@@ -2,6 +2,7 @@
 <section class="card application-intro">
     <h2>Become a designer on Creative Moth</h2>
     <p><strong>Step 1 is creating an account. Step 2 is completing this seller application.</strong> Your account is not submitted for seller approval until this form is complete and submitted.</p>
+    <p><strong>Seller fees:</strong> There is no startup fee, monthly fee, or listing fee. Creative Moth charges 9% + $0.30 when you make a sale. The $0.30 applies once to each seller’s portion of a completed order, not to every product. Stripe payment processing is handled by Creative Moth and is not deducted as a separate seller fee.</p>
     <ul>
         <li>Designers can create a public storefront after approval.</li>
         <li>Approved designers can upload digital products for admin review.</li>

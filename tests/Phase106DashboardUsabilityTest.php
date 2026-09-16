@@ -50,8 +50,8 @@ $refundItems=[['id'=>1,'total_price'=>'10.00','commission_rate'=>.20],['id'=>2,'
 $partial=StripeController::allocateSellerRefund($refundItems,1650,300);$full=StripeController::allocateSellerRefund($refundItems,3300,300);
 $check(array_sum(array_column($partial,'gross_refund_cents'))===1500&&array_sum(array_column($partial,'seller_refund_cents'))===1200,'partial cumulative refund is cents-safe and excludes proportional tax');
 $check(array_sum(array_column($full,'gross_refund_cents'))===3000&&array_sum(array_column($full,'seller_refund_cents'))===2400,'full cumulative refund reconciles merchandise and excludes tax');
-$check($partial===StripeController::allocateSellerRefund($refundItems,1650,300)&&str_contains($sellerControllerSource,'max(amount) cumulative_refund'),'refund replay is deterministic and dashboard uses highest authoritative cumulative amount');
-$stripeControllerSource=$source('app/Controllers/StripeController.php');$check(str_contains($stripeControllerSource,'max(amount) amount')&&str_contains($stripeControllerSource,'payout_status<>"transferred"'),'refund reconciliation applies the highest cumulative amount only to non-transferred ledgers');
+$check($partial===StripeController::allocateSellerRefund($refundItems,1650,300)&&str_contains($sellerControllerSource,'marketplace_refund_allocations'),'legacy refund replay remains deterministic and current dashboard uses durable item allocations');
+$stripeControllerSource=$source('app/Controllers/StripeController.php');$check(str_contains($stripeControllerSource,'MarketplaceRefundService')&&str_contains($stripeControllerSource,'marketplace_fee_model'),'current refund reconciliation uses authoritative allocation while preserving legacy snapshots');
 $pngChunk=static function(string $type,string $data):string{return pack('N',strlen($data)).$type.$data.hash('crc32b',$type.$data,true);};
 $png="\x89PNG\r\n\x1a\n".$pngChunk('IHDR',pack('NNCCCCC',1,1,8,6,0,0,0)).$pngChunk('IEND','');
 $webp='RIFF'.pack('V',4).'WEBP';$jpeg="\xFF\xD8\xFF\xD9";

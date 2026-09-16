@@ -7,7 +7,7 @@ Creative Moth is a custom PHP marketplace application for selling digital design
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current implemented phase: Phase 12.3 — Email Preferences, Digests & Favorite-Shop Emails. Phase 12.3 is not yet fully released: its disposable MariaDB suite has not successfully executed in the current Codex environment, and live account, unsubscribe, scheduled-producer, and queue-worker verification remains required. Email delivery supports the safe local `log` transport and the production `resend` transport.
+- Current repository implementation: Phase 12.7 — Marketplace Fee Model. Phase 12.7 disposable MariaDB, live Stripe, webhook-server, browser, and deployment verification have not been completed; a skipped database suite is not release verification.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -218,12 +218,12 @@ Phase 9 added the foundation for carts, order records, downloadable delivery, an
 - International VAT/GST expansion and seller refund/cancellation requests remain future work; referrals and store credit are implemented in Phase 11.
 
 ### Phase 10 Stripe marketplace payments and seller onboarding
-Phase 10 includes buyer Stripe Checkout, Stripe webhook-controlled payment status, seller onboarding, seller Stripe Connect onboarding, and payout readiness. Creative Moth charges buyers on the platform Stripe account, keeps an 18% marketplace commission on each sale by default (`PLATFORM_COMMISSION_PERCENT=18`), and transfers only the seller payout portion to the seller's connected account when Stripe Connect onboarding is complete and payout-ready. Stripe/payment processing fees also apply and are separate from Creative Moth's 18% commission.
+Creative Moth charges buyers on the platform Stripe account and transfers seller earnings through Stripe Connect after payout onboarding. Current Phase 12.7 sales use 9% of post-discount merchandise plus $0.30 once per seller’s order portion (`PLATFORM_COMMISSION_PERCENT=9`, `PLATFORM_COMMISSION_FIXED_CENTS=30`). Stripe payment processing is absorbed by Creative Moth rather than deducted as a separate seller fee; historical percentage-only snapshots remain unchanged.
 
 Sellers pay no startup fee, no monthly fee, and no listing fee; Creative Moth only earns when sellers sell. Buyer checkout can work before seller onboarding, but seller payouts remain pending until onboarding is complete. Refunds are Stripe-processed admin exceptions only; buyers cannot self-cancel completed digital purchases and sellers cannot issue instant refunds themselves.
 
-#### Phase 10 payout math and Connect webhook note
-Phase 10 calculates Creative Moth's commission from the gross sale amount and transfers the seller portion from that gross sale snapshot before separate Stripe fee reconciliation. Stripe/payment processing fees still apply separately; seller-facing copy must not claim sellers receive exactly 82% after all fees. `STRIPE_WEBHOOK_SECRET` is required, and `STRIPE_CONNECT_WEBHOOK_SECRET` is optional for a separate Connect webhook destination that uses a different signing secret.
+#### Current payout math and Connect webhook note
+Phase 12.7 transfers the stored seller entitlement after the 9% + $0.30 marketplace fee and any authoritative recovery withholding. Creative Moth absorbs Stripe payment processing; it is not a separate seller deduction. `STRIPE_WEBHOOK_SECRET` is required, and `STRIPE_CONNECT_WEBHOOK_SECRET` is optional for a separate Connect webhook destination that uses a different signing secret. Historical Phase 10 percentage-only snapshots remain unchanged.
 
 #### Phase 10 source-transaction transfer reliability
 Seller transfers use the original Stripe charge as `source_transaction` when `stripe_charge_id` is available. If the paid order is waiting for the charge id, payout records stay `pending_transfer` for a later webhook retry instead of being failed solely because Stripe balance timing is not ready.

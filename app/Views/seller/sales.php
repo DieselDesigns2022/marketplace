@@ -3,9 +3,9 @@
     <tr>
         <th>Product</th>
         <th>Buyer</th>
-        <th>Total</th>
+        <th>Sale amount</th><th>Marketplace fee</th><th>You earned</th>
         <th>Fulfillment</th>
-        <th>Payment/Payout</th><th>Delivery</th>
+        <th>Payment/Payout</th><th>Actual cash / recovery</th><th>Delivery</th>
         <th>Date</th>
     </tr>
     <?php foreach($sales as $s):?>
@@ -18,8 +18,8 @@
            </td>
            <td>
            <?=H::money($s['total_price'])?>
-           </td>
-           <td><?=H::e(($s['fulfillment_type']??'')==='custom_design'?'Custom Design':(($s['fulfillment_type']??'')==='google_drive'?'Google Drive / Manual Delivery':'Downloadable Product'))?></td><td><?=H::e($s['payment_status'] ?? 'paid')?> / <?=H::e(($s['seller_payout_status'] ?? $s['payout_status'] ?? '')==='platform_credit_hold'?'Platform-funded credit — admin transfer required':str_replace('_',' ',$s['seller_payout_status'] ?? $s['payout_status'] ?? 'pending'))?></td>
+           </td><td><?=H::money($s['platform_commission_amount']??0)?></td><td><?=H::money($s['seller_payout_amount']??0)?></td>
+           <td><?=H::e(($s['fulfillment_type']??'')==='custom_design'?'Custom Design':(($s['fulfillment_type']??'')==='google_drive'?'Google Drive / Manual Delivery':'Downloadable Product'))?></td><td><?=H::e($s['payment_status'] ?? 'paid')?> / <?=H::e(($s['seller_payout_status'] ?? $s['payout_status'] ?? '')==='platform_credit_hold'?'Platform-funded credit — admin transfer required':str_replace('_',' ',$s['seller_payout_status'] ?? $s['payout_status'] ?? 'pending'))?></td><td><?php if($s['transfer_amount_after_recovery']!==null):?>Cash <?=H::money($s['transfer_amount_after_recovery'])?><br>Recovery applied <?=H::money($s['recovery_applied_amount']??0)?><?php if((float)($s['recovery_reserved_amount']??0)>0):?><br>Reserved <?=H::money($s['recovery_reserved_amount'])?><?php endif;?><?php else:?><span class="muted">Not transferred or legacy amount unavailable</span><?php endif;?></td>
            <td><?php if(($s['fulfillment_type'] ?? '')==='google_drive'):?><?=H::e(str_replace('_',' ',$s['manual_delivery_status'] ?? ''))?><?php else:?><span class="muted">Not manual delivery</span><?php endif;?></td>
            <td><?=$s['created_at']?> · <a href="<?=($s['fulfillment_type']??'')==='custom_design'&&$s['custom_order_id']?'/seller/custom-orders/'.(int)$s['custom_order_id']:'/seller/order-item/'.(int)$s['id']?>">View</a></td>
         </tr>
