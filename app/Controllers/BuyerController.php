@@ -18,18 +18,18 @@ class BuyerController
     {
         H::requireLogin();
         $uid=(int)H::user()['id'];
-        $summary=DB::row('select (select count(*) from orders where user_id=?) purchase_count,(select count(*) from wishlists where user_id=?) wishlist_count,(select count(*) from notifications where user_id=? and read_at is null) unread_count',[$uid,$uid,$uid]);
+        $summary=DB::row('select (select count(*) from orders where user_id=? and payment_status in ("paid","partially_refunded","refunded")) purchase_count,(select count(*) from wishlists where user_id=?) wishlist_count,(select count(*) from notifications where user_id=? and read_at is null) unread_count',[$uid,$uid,$uid]);
         $eligibleFiles=DB::rows('select pf.storage_path from order_items oi join orders o on o.id=oi.order_id join product_files pf on pf.product_id=oi.product_id where o.user_id=? and o.payment_status="paid" and oi.fulfillment_type="downloadable" and (oi.download_expires_at is null or oi.download_expires_at>=now())',[$uid]);
         $customFiles=DB::rows('select f.storage_path from custom_order_files f join custom_orders co on co.id=f.custom_order_id join orders o on o.id=co.order_id where co.buyer_user_id=? and co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded")',[$uid]);
         $customBase=realpath(app_path('storage/protected_uploads/custom_designs'));$customAvailable=array_filter($customFiles,static function(array $file)use($customBase):bool{$real=realpath(app_path('storage/protected_uploads/'.ltrim($file['storage_path']??'','/')));return(bool)($customBase&&$real&&str_starts_with($real,$customBase.DIRECTORY_SEPARATOR)&&is_file($real)&&is_readable($real));});
         $summary['available_downloads']=count(array_filter($eligibleFiles,fn(array $file):bool=>$this->protectedFileAvailable($file['storage_path']??null)))+count($customAvailable);
-        H::view('buyer/home',['summary'=>$summary,'orders'=>DB::rows('select * from orders where user_id=? order by created_at desc limit 5',[$uid]),'wishlist'=>DB::rows('select p.title,p.slug,(select image_path from product_images where product_id=p.id order by sort_order,id limit 1) preview_image from wishlists w join products p on p.id=w.product_id where w.user_id=? order by w.created_at desc limit 4',[$uid]),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc limit 5',[$uid])]);
+        H::view('buyer/home',['summary'=>$summary,'orders'=>DB::rows('select * from orders where user_id=? and payment_status in ("paid","partially_refunded","refunded") order by created_at desc limit 5',[$uid]),'wishlist'=>DB::rows('select p.title,p.slug,(select image_path from product_images where product_id=p.id order by sort_order,id limit 1) preview_image from wishlists w join products p on p.id=w.product_id where w.user_id=? order by w.created_at desc limit 4',[$uid]),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc limit 5',[$uid])]);
 
     }
     public function purchases()
     {
         H::requireLogin();
-        H::view('buyer/purchases',['orders'=>DB::rows('select o.*, group_concat(concat(coalesce(oi.product_title,p.title,"Purchased item")," (",oi.license_name,")") separator ", ") product_titles from orders o join order_items oi on oi.order_id=o.id left join products p on p.id=oi.product_id where o.user_id=? group by o.id order by o.created_at desc',[H::user()['id']])]);
+        H::view('buyer/purchases',['orders'=>DB::rows('select o.*, group_concat(concat(coalesce(oi.product_title,p.title,"Purchased item")," (",oi.license_name,")") separator ", ") product_titles from orders o join order_items oi on oi.order_id=o.id left join products p on p.id=oi.product_id where o.user_id=? and o.payment_status in ("paid","partially_refunded","refunded") group by o.id order by o.created_at desc',[H::user()['id']])]);
 
     }
     public function order($id)

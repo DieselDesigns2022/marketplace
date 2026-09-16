@@ -1,5 +1,8 @@
 # Deployment
 
+## Phase 12.7 marketplace fees
+Apply `database/migrations/2026_09_15_phase_12_7_marketplace_fee_model.sql` before deploying Phase 12.7 code, then set `PLATFORM_COMMISSION_PERCENT=9` and `PLATFORM_COMMISSION_FIXED_CENTS=30`. Do not enable a Stripe application fee or Stripe Platform Pricing fee; that would double-charge the marketplace fee. The migration labels existing orders as legacy and does not update historical financial values.
+
 ## Environment
 
 - Live URL: `https://marketplace.dieseldesigns.co`

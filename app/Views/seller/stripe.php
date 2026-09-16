@@ -15,7 +15,7 @@
 </section>
 <section class="card page-section">
     <h2>Fees and payout notes</h2>
-    <p>Sellers must complete Stripe onboarding before payouts/transfers can be sent. Stripe/payment processing fees apply.</p>
-    <p>Creative Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission on each sale. Creative Moth has no startup fee, no monthly fee, and no listing fee.</p>
+    <p>Sellers must complete Stripe onboarding before payouts/transfers can be sent. Stripe payment processing is handled by Creative Moth and is not deducted as a separate seller fee.</p>
+    <p>There is no startup fee, monthly fee, or listing fee. Creative Moth charges 9% + $0.30 when you make a sale. The $0.30 applies once to each seller’s portion of a completed order, not to every product.</p>
     <p>Sales tax, when required, is handled by Creative Moth through Stripe Tax and is excluded from seller payouts.</p>
 </section>

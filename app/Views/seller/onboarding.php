@@ -34,7 +34,7 @@
 
     <h3 id="faq-selling-costs" style="color:#4c1d95;">What does it cost to sell on Creative Moth?</h3>
     <p style="color:#334155;">There is no startup fee, no monthly fee, and no listing fee. Creative Moth only earns when you make a sale.</p>
-    <p style="color:#334155;">Creative Moth keeps an <?=H::e((string)$commissionPercent)?>% marketplace commission when a sale happens. Stripe/payment processing fees also apply, and Creative Moth’s <?=H::e((string)$commissionPercent)?>% commission is separate from Stripe/payment processing fees.</p>
+    <p style="color:#334155;">Creative Moth charges 9% + $0.30 when you make a sale. The $0.30 applies once to your portion of a completed order, not to every product. Stripe payment processing is handled by Creative Moth and is not deducted as a separate seller fee.</p>
 
     <h3 id="faq-seller-payouts" style="color:#4c1d95;">How do seller payouts work?</h3>
     <p style="color:#334155;">Buyer checkout can work before seller onboarding is complete, but seller payouts remain pending until Stripe Connect onboarding is complete and Stripe marks the account payout-ready. Seller payouts are handled through Stripe Connect after onboarding.</p>

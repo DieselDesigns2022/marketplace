@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 12.7 — Marketplace Fee Model
+- Replaced the current percentage-only marketplace commission with one integer-cent, seller-grouped fee: 9% of post-discount merchandise plus $0.30 once per seller per completed order.
+- Added immutable item and seller/order snapshots, deterministic largest-remainder item allocation, cumulative-refund entitlement recalculation, transferred-payout recovery records, and fee-cap warnings.
+- Historical percentage-only orders retain their stored rates and amounts; Stripe processing remains platform-paid and no Stripe application or Platform Pricing fee is added.
+- Corrected refund handling to require durable item allocation, isolate sellers, send ambiguous external refunds to admin review, maintain one cumulative post-transfer recovery obligation represented by incremental, auditable recovery tranches, and apply open balances idempotently against future seller payouts.
+
 ## Phase 12.4 — Multi-platform CSV product import
 - Added a shared CSV-only preview, mapping, draft creation, import-history, duplicate-protection, and Phase 12.2 batch-review workflow for Shopify, Etsy, Payhip, Square, Squarespace, Wix, Weebly, and WordPress/WooCommerce product exports.
 - Payhip uses an Asset Moth template or seller-directed column mapping; no native Payhip catalogue export, API connection, credentials, or synchronization is claimed.
@@ -18,7 +24,7 @@
 
 ## Current status
 
-The project history documents repository work from the original MVP through the current Phase 12.4 CSV-import work. Changelog entries describe implementation in the repository and do not by themselves claim deployment or completed live testing; Phase 9 provided cart, pending-payment order, download logging, and Google Drive/manual delivery foundations, while Phase 10 connected that foundation to Stripe Checkout and webhook-driven payment state.
+The project history documents repository implementation from the original MVP through the current Phase 12.7 marketplace-fee work. Changelog entries do not by themselves claim deployment, live Stripe verification, or completed live testing.
 
 ## Original MVP — completed 2026-06-22
 

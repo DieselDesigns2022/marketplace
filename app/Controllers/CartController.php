@@ -9,6 +9,7 @@ use App\Services\CouponService;
 use App\Services\SellerReceiptService;
 use App\Services\CreditService;
 use App\Services\OrderFinalizationService;
+use App\Services\MarketplaceFeeService;
 use Throwable;
 
 use App\Services\CheckoutOrderService;
@@ -296,13 +297,17 @@ class CartController
                 $total = CreditService::formatCents(max(0, $grossCents - $creditCents));
                 if ($total <= 0 && $creditCents <= 0) { DB::rollBack();H::flash('error','Coupon-only free checkout is not available.');H::redirect('/cart'); }
                 $commissionRate = StripeService::commissionRate();
-                $platformCommissionTotal = 0.0;
-                $order=(new CheckoutOrderService)->createOrder(['user_id'=>H::user()['id'],'subtotal'=>$subtotal,'tax_amount'=>$tax,'tax_snapshot'=>$taxCalculation['snapshot'],'tax_calculation_id'=>$taxCalculation['id'],'billing_snapshot'=>json_encode($billingAddress,JSON_THROW_ON_ERROR),'credits'=>$credits,'coupon_discount'=>$couponDiscount,'coupon_id'=>$coupon['id']??null,'coupon_code'=>$coupon['code']??null,'coupon_snapshot'=>$coupon?json_encode($coupon):null,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>$total,'commission_total'=>0]);
+                $feeInput=[];
+                foreach($valid as $idx=>$p)$feeInput[]=['id'=>$idx+1,'seller_id'=>(int)$p['designer_id'],'gross_cents'=>max(0,CreditService::parseCents((string)$p['line_total'])-CreditService::parseCents((string)($allocations[$idx]??'0.00')))];
+                $sellerFees=MarketplaceFeeService::configured()->calculate($feeInput);
+                $platformCommissionCents=array_sum(array_column($sellerFees,'fee_cents'));
+                $order=(new CheckoutOrderService)->createOrder(['user_id'=>H::user()['id'],'subtotal'=>$subtotal,'tax_amount'=>$tax,'tax_snapshot'=>$taxCalculation['snapshot'],'tax_calculation_id'=>$taxCalculation['id'],'billing_snapshot'=>json_encode($billingAddress,JSON_THROW_ON_ERROR),'credits'=>$credits,'coupon_discount'=>$couponDiscount,'coupon_id'=>$coupon['id']??null,'coupon_code'=>$coupon['code']??null,'coupon_snapshot'=>$coupon?json_encode($coupon):null,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>'0.00','commission_total'=>CreditService::formatCents($platformCommissionCents)]);
+                DB::exec('update orders set marketplace_fee_model="percentage_plus_fixed",marketplace_fee_basis_points=?,marketplace_fixed_fee_cents=? where id=?',[StripeService::commissionBasisPoints(),StripeService::commissionFixedCents(),$order]);
                 if ($creditCents > 0) {
                     $credits = (new CreditService)->reserve((int)H::user()['id'], $credits, (int)$order, 'order:' . $order . ':credit:reserve');
                     $creditCents = CreditService::parseCents($credits);
                     $total = CreditService::formatCents($grossCents - $creditCents);
-                    DB::exec('update orders set credits_applied=?,credit_reserved=?,credit_payment_status=?,total=?,stripe_amount_total=?,stripe_paid_amount=? where id=?', [$credits, $credits, $creditCents > 0 ? 'reserved' : 'none', $total, $grossCents - $creditCents, $total, $order]);
+                    DB::exec('update orders set credits_applied=?,credit_reserved=?,credit_payment_status=?,total=?,stripe_amount_total=?,stripe_paid_amount=? where id=?', [$credits, $credits, $creditCents > 0 ? 'reserved' : 'none', $total, $grossCents - $creditCents, '0.00', $order]);
                 }
                 foreach($valid as $idx=>$p)
                {
@@ -311,18 +316,18 @@ class CartController
                    $receiptSnapshot=SellerReceiptService::snapshotFromSeller($receipt);
                    $lineDiscount = (float)($allocations[$idx] ?? 0);
                    $discountedLine = max(0, round((float)$p['line_total'] - $lineDiscount, 2));
-                   $comm=round($discountedLine * $commissionRate, 2);
-                   $platformCommissionTotal = round($platformCommissionTotal + $comm, 2);
+                   $fee=$sellerFees[(int)$p['designer_id']]['items'][$idx+1];
                     $manualEmail = trim($_POST['google_drive_email'] ?? '');
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
                     $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
                     DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version,seller_receipt_note_snapshot,seller_receipt_image_path_snapshot) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null,$receiptSnapshot['note'],$receiptSnapshot['image_path']]);
-                    DB::exec('update order_items set coupon_id=?,coupon_code=?,coupon_discount=? where id=?', [$coupon['id'] ?? null,$coupon['code'] ?? null,$lineDiscount,DB::id()]);
-                    (new CheckoutOrderService)->addSellerEarning((int)$order,(int)$p['id'],(int)$p['designer_id'],(int)H::user()['id'],CreditService::formatCents(CreditService::parseCents((string)$discountedLine)),$commissionRate);
+                    $itemId=(int)DB::id();
+                    DB::exec('update order_items set coupon_id=?,coupon_code=?,coupon_discount=?,platform_commission_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,seller_payout_amount=? where id=?', [$coupon['id'] ?? null,$coupon['code'] ?? null,$lineDiscount,CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['percentage_fee_cents']),CreditService::formatCents($fee['fixed_fee_cents']),CreditService::formatCents($fee['seller_earnings_cents']),$itemId]);
+                    DB::exec('insert into seller_earnings (order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,?,?,?,?,?,?,"pending_payment")',[$order,$p['id'],$p['designer_id'],H::user()['id'],CreditService::formatCents($fee['gross_cents']),CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);
+                    if($sellerFees[(int)$p['designer_id']]['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$p['designer_id'],'fee-cap:order:'.$order.':seller:'.$p['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);
 
                }
-                DB::exec('update orders set platform_commission_total=? where id=?', [$platformCommissionTotal,$order]);
                 $createdOrder = DB::row('select * from orders where id=?', [$order]);
                 $createdItems = DB::rows('select * from order_items where order_id=?', [$order]);
                 if (CreditService::parseCents($total) === 0) {
