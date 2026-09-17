@@ -12,6 +12,7 @@ use App\Services\SellerReferralCommissionService;
 use App\Services\CreatorRecognitionService;
 use App\Services\MarketplaceRefundService;
 use App\Services\StripeService;
+use App\Services\PromoService;
 use Throwable;
 class AdminController
 {
@@ -958,8 +959,23 @@ class AdminController
     public function ads()
     {
         $this->gate();
-        if($_POST) DB::exec('insert into ads (product_id,designer_id,placement,start_date,end_date,status) values (?,?,?,?,?,?)',[$_POST['product_id'],$_POST['designer_id'],$_POST['placement'],$_POST['start_date'],$_POST['end_date'],$_POST['status']]);
-        H::view('admin/ads',['ads'=>DB::rows('select * from ads')]);
+        if($_SERVER['REQUEST_METHOD']==='POST'){
+            H::verifyCsrf();$id=(int)($_POST['id']??0);$action=(string)($_POST['action']??'');
+            try{
+                $ok=false;$success='';$failure='That promotion could not be updated in its current state.';
+                switch($action){
+                    case 'update_price':$ok=PromoService::updatePrice($id,\App\Services\CreditService::parseCents((string)($_POST['price']??''),false));$success='Promotion price updated.';$failure='That promotion package could not be updated.';break;
+                    case 'pause':$ok=PromoService::pause($id);$success='Promotion paused.';$failure='That promotion could not be paused in its current state.';break;
+                    case 'resume':$ok=PromoService::resume($id);$success='Promotion resumed.';$failure='That promotion could not be resumed in its current state.';break;
+                    case 'remove':$ok=PromoService::remove($id);$success='Promotion removed.';$failure='That promotion could not be removed in its current state.';break;
+                    default:throw new \InvalidArgumentException('Invalid promotion action.');
+                }
+                H::flash($ok?'success':'warning',$ok?$success:$failure);
+            }catch(\InvalidArgumentException $e){H::flash('error',$e->getMessage());}
+            catch(\Throwable $e){try{NotificationService::reportFailure('admin_promotion_action',$e);}catch(\Throwable $ignored){}H::flash('error','The promotion action could not be completed. Please try again.');}
+            H::redirect('/admin/ads');
+        }
+        H::view('admin/ads',['packages'=>PromoService::packages(),'campaigns'=>PromoService::campaigns()]);
 
     }
 

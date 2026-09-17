@@ -9,13 +9,13 @@ final class EmailDigestClaimService
 
     public static function queue(string $category,array $user,array $products,string $start,string $end,string $subject,string $template,array $data,string $dedupe): bool
     {
-        if(!isset(self::PRIORITY[$category])||!$products)return false;
+        if(!isset(self::PRIORITY[$category])||(!$products&&empty($data['paid_promos'])))return false;
         DB::begin();
         try{
             DB::row('select id from users where id=? for update',[(int)$user['id']]);
             $assigned=[];
             foreach($products as $product)if(self::claimable((int)$user['id'],(int)$product['id'],$category,$start,$end))$assigned[]=$product;
-            if(!$assigned){DB::commit();return false;}
+            if(!$assigned&&empty($data['paid_promos'])){DB::commit();return false;}
             $data['products']=$assigned;
             $queued=EmailQueueService::queue('marketing',$user['email'],$subject,$template,$data,$dedupe);
             $message=DB::row('select id from email_messages where deduplication_key=?',[$dedupe]);

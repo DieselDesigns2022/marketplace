@@ -84,6 +84,13 @@ final class EmailQueueService
             $category=(string)($d['marketing_preference']??'');
             $consented=$preference&&($category!==''?EmailPreferenceService::enabled($preference,$category):((int)$preference['marketing_opt_in']===1&&$preference['marketing_opted_out_at']===null));
             if(!$consented)return false;
+            if($category==='weekly'){
+                $d['paid_promos']=PromoService::revalidateQueuedWeekly(is_array($d['paid_promos']??null)?$d['paid_promos']:[],(string)($d['period_start']??''),(string)($d['period_end']??''));
+                $products=is_array($d['products']??null)?$d['products']:[];
+                if(!$d['paid_promos']&&!$products)return false;
+                $m['template_data']=json_encode($d,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+                DB::exec('update email_messages set template_data=? where id=? and status="processing"',[$m['template_data'],$m['id']]);
+            }
             if($category==='favorite_shop'){
                 $products=is_array($d['products']??null)?$d['products']:[];
                 $ids=array_values(array_unique(array_filter(array_map(static fn($product)=>(int)($product['id']??0),$products))));
@@ -127,7 +134,29 @@ final class EmailQueueService
     private static function render(string $template,array $data): string { ob_start(); require app_path('app/Views/emails/'.$template.'.php'); $content=(string)ob_get_clean(); ob_start(); require app_path('app/Views/emails/layout.php'); return (string)ob_get_clean(); }
     private static function recordFailure(array $m,string $error): void { $attempt=(int)$m['attempt_count']+1; $safe=self::safeError($error); $delay=self::retryDelay($attempt); DB::exec('update email_messages set status=?,attempt_count=?,next_attempt_at=if(?="pending",date_add(now(),interval ? minute),null),last_error=?,claimed_at=null where id=? and status="processing"',[$delay===null?'failed':'pending',$attempt,$delay===null?'failed':'pending',$delay??0,$safe,$m['id']]); self::syncSafely($m,$delay===null?'failed':'queued',$safe); }
     private static function cancelSuppressed(array $m): void { DB::exec('update email_messages set status="cancelled",last_error="Consent withdrawn before delivery" where id=? and status="processing"',[$m['id']]); self::syncSafely($m,'suppressed','Consent withdrawn before delivery'); }
-    private static function recordDelivered(array $m): void { try { DB::begin(); DB::exec('update email_messages set status="sent",attempt_count=attempt_count+1,sent_at=now(),claimed_at=null,last_error=null where id=? and status="processing"',[$m['id']]); if(!empty($m['waitlist_entry_id'])) { if($m['template']==='waitlist_confirmation')DB::exec('update waitlist_entries set confirmation_sent_at=coalesce(confirmation_sent_at,now()) where id=?',[$m['waitlist_entry_id']]); if($m['template']==='launch_invite')DB::exec('update waitlist_entries set invited_at=coalesce(invited_at,now()),status=if(status="subscribed","invited",status) where id=?',[$m['waitlist_entry_id']]); } if(!empty($m['campaign_recipient_id']))DB::exec('update email_campaign_recipients set status="sent",last_error=null where id=?',[$m['campaign_recipient_id']]); DB::commit(); } catch(Throwable $e) { try{if(DB::pdo()->inTransaction())DB::rollBack();}catch(Throwable $ignored){self::safeReport('post_delivery_rollback',$ignored);}try{DB::exec('update email_messages set status="sent",attempt_count=attempt_count+1,sent_at=coalesce(sent_at,now()),claimed_at=null,last_error=? where id=? and status="processing"',["Delivered; reconciliation required: ".self::safeError($e->getMessage()),$m['id']]);}catch(Throwable $fallback){self::safeReport('post_delivery_fallback',$fallback);}self::safeReport('post_delivery_reconciliation',$e);return;}if(!empty($m['campaign_id']))try{EmailCampaignService::recalculate((int)$m['campaign_id']);}catch(Throwable $e){try{DB::exec('update email_messages set last_error=? where id=? and status="sent"',["Delivered; campaign reconciliation required: ".self::safeError($e->getMessage()),$m['id']]);}catch(Throwable $diagnostic){self::safeReport('campaign_reconciliation_diagnostic',$diagnostic);}self::safeReport('campaign_reconciliation',$e);} }
+    private static function recordDelivered(array $m): void
+    {
+        try {
+            DB::begin();
+            DB::exec('update email_messages set status="sent",attempt_count=attempt_count+1,sent_at=now(),claimed_at=null,last_error=null where id=? and status="processing"',[$m['id']]);
+            if(!empty($m['waitlist_entry_id'])) { if($m['template']==='waitlist_confirmation')DB::exec('update waitlist_entries set confirmation_sent_at=coalesce(confirmation_sent_at,now()) where id=?',[$m['waitlist_entry_id']]); if($m['template']==='launch_invite')DB::exec('update waitlist_entries set invited_at=coalesce(invited_at,now()),status=if(status="subscribed","invited",status) where id=?',[$m['waitlist_entry_id']]); }
+            if(!empty($m['campaign_recipient_id']))DB::exec('update email_campaign_recipients set status="sent",last_error=null where id=?',[$m['campaign_recipient_id']]);
+            DB::commit();
+        } catch(Throwable $e) {
+            try{if(DB::pdo()->inTransaction())DB::rollBack();}catch(Throwable $ignored){self::safeReport('post_delivery_rollback',$ignored);}
+            try{DB::exec('update email_messages set status="sent",attempt_count=attempt_count+1,sent_at=coalesce(sent_at,now()),claimed_at=null,last_error=? where id=? and status="processing"',["Delivered; reconciliation required: ".self::safeError($e->getMessage()),$m['id']]);}
+            catch(Throwable $fallback){self::safeReport('post_delivery_fallback',$fallback);return;}
+            self::safeReport('post_delivery_reconciliation',$e);
+        }
+        try {
+            $data=json_decode($m['template_data'],true,512,JSON_THROW_ON_ERROR);
+            if(($data['marketing_preference']??'')==='weekly'&&!empty($data['paid_promos']))PromoService::recordWeeklyDelivery((int)$m['id']);
+        } catch(Throwable $e) {
+            try{DB::exec('update email_messages set last_error=? where id=? and status="sent"',["Delivered; promotion accounting requires reconciliation: ".self::safeError($e->getMessage()),$m['id']]);}catch(Throwable $diagnostic){self::safeReport('promo_delivery_reconciliation_diagnostic',$diagnostic);}
+            self::safeReport('promo_delivery_reconciliation',$e);
+        }
+        if(!empty($m['campaign_id']))try{EmailCampaignService::recalculate((int)$m['campaign_id']);}catch(Throwable $e){try{DB::exec('update email_messages set last_error=? where id=? and status="sent"',["Delivered; campaign reconciliation required: ".self::safeError($e->getMessage()),$m['id']]);}catch(Throwable $diagnostic){self::safeReport('campaign_reconciliation_diagnostic',$diagnostic);}self::safeReport('campaign_reconciliation',$e);}
+    }
     private static function safeError(string $error): string{return OperationalErrorSanitizer::sanitize($error,400);}
     private static function syncSafely(array $m,string $status,?string $error):void{try{self::syncRecipient($m,$status,$error);}catch(Throwable $e){try{DB::exec('update email_messages set last_error=? where id=? and status in ("pending","failed","cancelled")',["Message state saved; reconciliation required: ".self::safeError($e->getMessage()),$m['id']]);}catch(Throwable $diagnostic){self::safeReport('queue_reconciliation_diagnostic',$diagnostic);}self::safeReport('queue_recipient_reconciliation',$e);}}
     private static function safeReport(string $context,Throwable $error):void{try{NotificationService::reportFailure($context,$error);}catch(Throwable $ignored){/* Reporting must never alter queue state or worker progress. */}}
