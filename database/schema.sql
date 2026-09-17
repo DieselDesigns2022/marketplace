@@ -764,20 +764,11 @@ CREATE TABLE platform_commissions
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE ads
-(
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    product_id BIGINT,
-    designer_id BIGINT,
-    placement VARCHAR(80),
-    start_date DATE,
-    end_date DATE,
-    status ENUM('draft','active','paused','ended') DEFAULT 'draft',
-    impressions INT DEFAULT 0,
-    clicks INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE promo_packages (id BIGINT PRIMARY KEY AUTO_INCREMENT,placement ENUM('marketplace','homepage','category','weekly_email') NOT NULL,duration_value INT UNSIGNED NOT NULL,duration_unit ENUM('day','week') NOT NULL,price_cents INT UNSIGNED NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY promo_package_choice(placement,duration_value,duration_unit));
+INSERT INTO promo_packages(placement,duration_value,duration_unit,price_cents) VALUES ('marketplace',1,'day',300),('marketplace',3,'day',800),('marketplace',7,'day',1500),('marketplace',14,'day',2500),('homepage',1,'day',500),('homepage',3,'day',1200),('homepage',7,'day',2500),('homepage',14,'day',4000),('category',1,'day',400),('category',3,'day',1000),('category',7,'day',2000),('category',14,'day',3500),('weekly_email',1,'week',800),('weekly_email',2,'week',1500),('weekly_email',4,'week',2500),('weekly_email',6,'week',3500);
+
+CREATE TABLE ads (id BIGINT PRIMARY KEY AUTO_INCREMENT,product_id BIGINT NULL,designer_id BIGINT NULL,placement ENUM('marketplace','homepage','category','weekly_email') NOT NULL,target_type ENUM('shop','product') NOT NULL DEFAULT 'product',category_id BIGINT NULL,package_id BIGINT NULL,duration_value INT UNSIGNED NULL,duration_unit ENUM('day','week') NULL,price_cents INT UNSIGNED NULL,currency CHAR(3) NOT NULL DEFAULT 'usd',payment_status ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',stripe_checkout_session_id VARCHAR(255) NULL,stripe_payment_intent_id VARCHAR(255) NULL,paid_at DATETIME NULL,starts_at DATETIME NULL,ends_at DATETIME NULL,paused_at DATETIME NULL,last_served_at DATETIME(6) NULL,email_total_appearances INT UNSIGNED NULL,email_appearances_used INT UNSIGNED NOT NULL DEFAULT 0,click_token CHAR(64) NOT NULL,status ENUM('pending_payment','active','paused','ended','payment_failed','cancelled') NOT NULL DEFAULT 'pending_payment',impressions INT DEFAULT 0,clicks INT DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY ads_click_token_unique(click_token),KEY ads_rotation(placement,category_id,status,payment_status,impressions,last_served_at),CONSTRAINT ads_category_fk FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,CONSTRAINT ads_package_fk FOREIGN KEY(package_id) REFERENCES promo_packages(id) ON DELETE RESTRICT);
+CREATE TABLE promo_email_appearances (id BIGINT PRIMARY KEY AUTO_INCREMENT,ad_id BIGINT NOT NULL,period_start DATE NOT NULL,period_end DATE NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY promo_email_period(ad_id,period_start,period_end),CONSTRAINT promo_email_ad_fk FOREIGN KEY(ad_id) REFERENCES ads(id) ON DELETE CASCADE);
 
 CREATE TABLE homepage_features
 (
@@ -1021,6 +1012,7 @@ CREATE TABLE email_messages (
  CONSTRAINT fk_message_recipient FOREIGN KEY (campaign_recipient_id) REFERENCES email_campaign_recipients(id) ON DELETE SET NULL,
  CONSTRAINT fk_message_waitlist FOREIGN KEY (waitlist_entry_id) REFERENCES waitlist_entries(id) ON DELETE SET NULL
 );
+CREATE TABLE promo_email_sends (id BIGINT PRIMARY KEY AUTO_INCREMENT,ad_id BIGINT NOT NULL,email_message_id BIGINT NOT NULL,period_start DATE NOT NULL,period_end DATE NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY promo_email_send_message(ad_id,email_message_id),KEY promo_email_send_totals(ad_id,sent_at),CONSTRAINT promo_email_send_ad_fk FOREIGN KEY(ad_id) REFERENCES ads(id) ON DELETE CASCADE,CONSTRAINT promo_email_send_message_fk FOREIGN KEY(email_message_id) REFERENCES email_messages(id) ON DELETE CASCADE);
 CREATE TABLE email_digest_content_claims (
  id BIGINT PRIMARY KEY AUTO_INCREMENT, user_id BIGINT NOT NULL, product_id BIGINT NOT NULL,
  preference_category ENUM('favorite_shop','weekly','monthly') NOT NULL,

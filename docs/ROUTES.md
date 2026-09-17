@@ -310,3 +310,11 @@ Admin detail URLs always identify a `message_reports.id`; the controller separat
 Only approved sellers may manage services. Buyer and seller detail paths use separate ownership-scoped actions; seller history admits paid, partially refunded, and fully refunded orders, while workflow mutation and a new custom conversation require `paid` or `partially_refunded`. A legitimate existing conversation remains historically accessible under Phase 12.5 retention after refund. `/custom-order-files/{id}` reauthorizes the participant and confines resolution to `storage/protected_uploads/custom_designs`; buyer final access additionally requires custom status `completed` and payment `paid` or `partially_refunded`.
 
 Custom-only orders remain visible in normal buyer Purchases. Normal order detail uses saved item/service labels without generating a product URL for a custom item. Eligible completed finals appear in Downloads and the dashboard available-download count; fully refunded finals are excluded. Seller Sales continues using standard order/payment rows, labels `custom_design` separately, and routes custom rows and messaging to the authoritative custom-order workflow/conversation rather than a second generic order-item context.
+# Phase 13 promotions
+
+- `GET /seller/promos` shows approved sellers their purchase form and history; `POST /seller/promos/checkout` creates Stripe Checkout.
+- `GET /seller/promos/success` and `/seller/promos/cancel` are return pages; only verified webhooks activate a campaign.
+- `GET /promo/click/{token}` tracks an opaque campaign token and derives the public destination server-side.
+- `GET|POST /admin/ads` is promotion pricing and paid-campaign administration (pause, resume, remove), not an approval queue.
+
+The Phase 13 `/admin/ads` campaign table displays campaign details and provides Pause, Resume, and Remove actions when applicable, along with package-price editing. There is no promotion approval/rejection workflow. Pause is reversible: Resume restores paid paused campaigns, extending website end time by the paused interval while preserving weekly purchased appearances. Action-specific success is shown only when the requested transition or valid package-price save succeeds.

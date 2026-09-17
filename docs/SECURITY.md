@@ -216,3 +216,18 @@ delivery rules.
 
 Custom Design proofs receive the standard watermark before buyer access.
 Final Custom Design files are never watermarked.
+# Promotion security
+
+Promotion ownership, target eligibility, category, package price, amount, and currency are validated server-side. Stripe success/cancel return URLs are read-only status messages and cannot activate, fail, or cancel ads: only verified Stripe webhook metadata and the campaign snapshot change payment state. Public links contain random 64-character tokens and destinations are reconstructed from current approved shop/product data, never seller input.
+
+Terminal Stripe events lock the campaign before changing unpaid state, so an out-of-order failure or expiration cannot overwrite confirmed payment. Checkout-session setup failures durably fail only still-unpaid campaigns, expose a generic seller message, and report sanitized operational details. Weekly paid promo eligibility is revalidated and persisted immediately before delivery rather than trusting queued target data.
+
+Weekly delivery accounting accepts only a message ID and reloads final persisted `sent` weekly marketplace content; callers cannot supply authoritative campaign IDs or dates. Emergency removal inspects decoded pending/processing weekly message data rather than seller input or string matching. Click tokens require a paid, non-cancelled campaign and currently public target. Historical links remain valid after pause or natural end, but admin Remove persists `cancelled` and permanently disables the tracked link; removed/cancelled and unpaid tokens return `/browse` without incrementing clicks.
+
+Phase 13 enforces exact `approved` product status at seller selection, purchase validation, website serving, tracked-click resolution, weekly selection, and pre-delivery weekly revalidation. `published` is not accepted for paid product promotions under the current public marketplace rule; historical paid product links fall back without counting a click when the current target is no longer approved. Category selection remains independently validated as active and does not require product-category membership.
+
+Promotion webhook mutation is allowlisted to verified `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `payment_intent.succeeded`, and `payment_intent.payment_failed` events carrying `payment_kind=promo` and a positive campaign ID. Checkout Session and PaymentIntent identifiers are mapped only from their actual object types; unsupported promo-metadata events are processed as no-ops and cannot change campaign/payment state or stored Stripe IDs. Browser success/cancel returns remain read-only.
+
+Verified objects declaring `payment_kind=promo` are structurally validated before event-type dispatch: a missing, zero, or otherwise non-positive `promo_campaign_id` enters the sanitized webhook error/reporting path even when the Stripe event type is unsupported. Only after valid metadata is established may an unsupported type become a state-preserving no-op; supported allowlisted types continue through typed promotion processing.
+
+`promo_campaign_id` is accepted only as a canonical positive decimal integer: digits beginning with 1–9, no sign, whitespace, decimal point, suffix, leading zero, composite value, or out-of-range integer. Validation occurs on the raw Stripe metadata before conversion or event dispatch, preventing PHP numeric coercion from selecting a campaign.

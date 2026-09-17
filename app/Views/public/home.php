@@ -8,6 +8,7 @@
     </form>
     <p><a class="btn" href="/browse">Browse Digital Designs</a> <a class="btn alt" href="/sell">Sell on Creative Moth</a></p>
 </section>
+<?php if(!empty($homepagePromo)):?><section class="page-section sponsored-section"><h2>Sponsored</h2><div class="grid"><?php $sponsoredPromo=$homepagePromo;include app_path('app/Views/public/sponsored_card.php');?></div></section><?php endif;?>
 <section class="page-section">
     <h2>Explore marketplace categories</h2>
     <p class="muted">Browse by creative use case, then narrow results by category, AI disclosure, POD permission, or sort order on the browse page.</p>

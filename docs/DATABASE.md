@@ -124,7 +124,7 @@ Stores admin actions with entity type/id and JSON metadata.
 - Products: `draft`, `pending_review`, `approved`, `published`, `rejected`, `disabled`, `archived`, `deleted`.
 - Orders: `pending`, `paid`, `completed`, `failed`, `refunded`.
 - Reviews: `pending`, `approved`, `rejected`.
-- Ads: `draft`, `active`, `paused`, `ended`.
+- Ads campaigns: `pending_payment`, `active`, `paused`, `ended`, `payment_failed`, `cancelled`.
 
 ## Product images and files
 
@@ -384,3 +384,23 @@ watermark.
 
 Existing `product_images.watermark_status` and `watermark_error` continue to
 record regular product preview regeneration results.
+# Phase 13 paid promotions
+
+`promo_packages` stores the fixed marketplace, homepage, category, and weekly-email duration choices and editable cent prices. `ads` is the campaign ledger and stores immutable duration/price/currency snapshots, target/category, Stripe identifiers, payment state (`pending`, `paid`, `failed`, `cancelled`), campaign state (`pending_payment`, `active`, `paused`, `ended`, `payment_failed`, `cancelled`), website timing, email counters, statistics, and the opaque click token. `last_served_at` uses microsecond precision and drives website round-robin selection; lifetime `impressions` is statistics only. Nullable legacy-compatible campaign fields preserve pre-Phase-13 skeleton rows, which migration normalizes and ends rather than deleting. `promo_email_appearances` uniquely records the first successful delivery for each campaign/week and therefore each consumed purchased appearance. `promo_email_sends` uniquely records each campaign/email-message delivery and supplies actual recipient-send totals without double-counting replayed accounting.
+
+The 16 initial seeded packages are:
+
+- Marketplace: 1 day — $3; 3 days — $8; 7 days — $15; 14 days — $25.
+- Homepage: 1 day — $5; 3 days — $12; 7 days — $25; 14 days — $40.
+- Category: 1 day — $4; 3 days — $10; 7 days — $20; 14 days — $35.
+- Weekly Email: 1 week — $8; 2 weeks — $15; 4 weeks — $25; 6 weeks — $35.
+
+Administrators may edit package prices for future purchases only. Every purchased campaign retains its snapshotted duration and price, so later package-price changes do not alter existing campaigns.
+
+Weekly accounting derives campaign IDs and period dates only from final persisted `sent` weekly marketplace `email_messages.template_data`. Category promotions intentionally store any seller-selected active category; an eligible product need not belong to that category and a promoted shop need not have products in it.
+
+Phase 13 product-target campaigns use the current public marketplace rule: the target product must have status exactly `approved`. A `published` product is not a Phase 13 promotion target. Category Option A is unchanged: an approved product may advertise in any active category without category-membership matching.
+
+Admin Remove retains the existing `cancelled` campaign status as the authoritative historical-link kill switch. Paid paused and naturally ended campaigns may continue resolving tracked links while their target is eligible; cancelled/removed and unpaid campaigns return `/browse` without adding clicks.
+
+For website campaigns, `starts_at` is the verified Stripe payment activation time and `ends_at` is `starts_at` plus the purchased day duration. A website campaign is no longer eligible to serve when `ends_at` is less than or equal to the current time. Admin Pause is reversible: resuming a paid website campaign extends `ends_at` by its actual paused interval and clears `paused_at`; resuming a weekly campaign leaves its appearance counters and null `ends_at` unchanged and restores eligibility for a future issue. Valid same-value package-price saves are successful requests but never rewrite existing campaign snapshots.

@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
+use App\Services\PromoService;
 
 class PublicController
 {
@@ -93,7 +94,7 @@ class PublicController
              limit 6'
         );
         $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Creative Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
-        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'meta'=>$this->pageMeta('Creative Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
+        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'homepagePromo'=>PromoService::chooseWebsite('homepage'), 'meta'=>$this->pageMeta('Creative Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
     }
 
     private function searchTerms(string $query): array
@@ -541,7 +542,7 @@ class PublicController
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
         $filtered = array_filter($state['filters'], fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>'Browse digital designs','url'=>H::canonical('/browse')];
-        H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>null, 'meta'=>$this->pageMeta('Browse Digital Designs', 'Browse digital designs, templates, graphics, fonts, and creative files from independent designers on Creative Moth.', '/browse', $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
+        H::view('public/browse', ['products'=>$result['products'], 'gridSponsoredPromo'=>PromoService::chooseWebsite('marketplace'), 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>null, 'meta'=>$this->pageMeta('Browse Digital Designs', 'Browse digital designs, templates, graphics, fonts, and creative files from independent designers on Creative Moth.', '/browse', $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
     }
 
     public function category($slug): void
@@ -556,7 +557,7 @@ class PublicController
         $description = $cat['description'] ?: 'Shop approved digital design products in the '.$cat['name'].' category on Creative Moth.';
         $schema = ['@context'=>'https://schema.org','@type'=>'CollectionPage','name'=>$cat['name'],'description'=>$description,'url'=>H::canonical('/category/'.$cat['slug'])];
         $filtered = array_filter(array_diff_key($state['filters'], ['category'=>true]), fn($v) => $v !== '') || $state['sort'] !== 'newest' || $state['page'] > 1;
-        H::view('public/browse', ['products'=>$result['products'], 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>$cat, 'meta'=>$this->pageMeta($cat['name'].' Digital Designs', mb_substr(strip_tags($description), 0, 160), '/category/'.$cat['slug'], $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
+        H::view('public/browse', ['products'=>$result['products'], 'gridSponsoredPromo'=>PromoService::chooseWebsite('category',(int)$cat['id']), 'cats'=>$cats, 'creators'=>$creators, 'fileTypes'=>$fileTypes, 'filters'=>$state['filters'], 'sort'=>$state['sort'], 'pagination'=>$result, 'category'=>$cat, 'meta'=>$this->pageMeta($cat['name'].' Digital Designs', mb_substr(strip_tags($description), 0, 160), '/category/'.$cat['slug'], $schema, $filtered ? ['robots'=>'noindex,follow'] : [])]);
     }
 
     public function sell(): void

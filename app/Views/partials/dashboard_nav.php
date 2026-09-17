@@ -163,6 +163,7 @@ if ($area === 'buyer') {
         ],
 
         'Business' => [
+            ['/seller/promos', 'Promotions', ['/seller/promos']],
             [
                 '/seller/stripe',
                 'Payouts / Stripe',
@@ -192,7 +193,7 @@ if ($area === 'buyer') {
                 'Homepage',
                 ['/admin/homepage']
             ],
-            ['/admin/ads', 'Ads', ['/admin/ads']],
+            ['/admin/ads', 'Promotions', ['/admin/ads']],
             [
                 '/admin/waitlist',
                 'Waitlist',

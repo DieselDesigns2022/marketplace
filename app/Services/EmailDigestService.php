@@ -18,14 +18,15 @@ final class EmailDigestService
     public static function queueDigest(string $frequency,?string $ending=null): int
     {
         [$start,$end]=self::period($frequency,$ending);
-        $products=self::products($start,$end);
-        if(!$products)return 0;
+        $paidPromos=$frequency==='weekly'?PromoService::weekly($start,$end):[];
+        $products=$frequency==='weekly'?self::weeklyProducts($paidPromos):self::products($start,$end);
+        if(!$products&&!$paidPromos)return 0;
         $column=EmailPreferenceService::column($frequency);
         $users=DB::rows("select u.id,u.email,u.name from users u join email_preferences ep on ep.user_id=u.id where u.status=\"active\" and ep.$column=1");
-        $count=0;
+        $count=0;$endingChecked=false;
         foreach($users as $user){
-            $data=['user_id'=>(int)$user['id'],'name'=>$user['name'],'frequency'=>$frequency,'period_start'=>$start,'period_end'=>$end,'marketing_preference'=>$frequency,'manage_preferences_url'=>self::manageUrl()];
-            if(EmailDigestClaimService::queue($frequency,$user,$products,$start,$end,ucfirst($frequency).' Creative Moth marketplace digest','marketplace_digest',$data,"digest:$frequency:$start:{$user['id']}"))$count++;
+            $data=['user_id'=>(int)$user['id'],'name'=>$user['name'],'frequency'=>$frequency,'period_start'=>$start,'period_end'=>$end,'marketing_preference'=>$frequency,'manage_preferences_url'=>self::manageUrl(),'paid_promos'=>$paidPromos];
+            if(EmailDigestClaimService::queue($frequency,$user,$products,$start,$end,ucfirst($frequency).' Creative Moth marketplace digest','marketplace_digest',$data,"digest:$frequency:$start:{$user['id']}")){$count++;if($frequency==='weekly'&&!$endingChecked&&$paidPromos){PromoService::notifyWeeklyEndingForQueuedIssue($paidPromos,$start,$end);$endingChecked=true;}}
         }
         return $count;
     }
@@ -50,6 +51,8 @@ final class EmailDigestService
         $products=DB::rows('select p.id,p.designer_id,p.title,p.slug,p.price,p.created_at,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id where p.status in ("approved","published") and d.status="approved" and p.created_at>=? and p.created_at<? order by p.created_at desc,p.id desc',[$start,$end]);
         return self::balanceByDesigner($products);
     }
+    private static function weeklyProducts(array $promos): array
+    { $exclude=[];foreach($promos as $promo)if($promo['type']==='product')$exclude[]=(int)$promo['product_id'];$limit=max(0,24-count($promos));if(!$limit)return [];$sql='select p.id,p.designer_id,p.title,p.slug,p.price,p.created_at,d.display_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order asc,pi.id asc limit 1) preview_image from products p join designers d on d.id=p.designer_id where p.status in ("approved","published") and d.status="approved"';$params=[];if($exclude){$sql.=' and p.id not in ('.implode(',',array_fill(0,count($exclude),'?')).')';$params=$exclude;}$sql.=' order by rand() limit '.(int)$limit;return DB::rows($sql,$params); }
     private static function balanceByDesigner(array $products,int $limit=24): array
     {
         $groups=[];

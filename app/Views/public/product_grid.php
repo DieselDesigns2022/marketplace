@@ -1,4 +1,5 @@
 <div class="grid products">
+<?php if(!empty($gridSponsoredPromo))include app_path('app/Views/public/sponsored_card.php');?>
 <?php foreach ($products as $p): ?>
 <?php
 $listingType = $p['listing_type'] ?? 'product';
