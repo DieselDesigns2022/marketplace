@@ -18,8 +18,10 @@ final class EmailDigestClaimService
             if(!$assigned&&empty($data['paid_promos'])){DB::commit();return false;}
             $data['products']=$assigned;
             $queued=EmailQueueService::queue('marketing',$user['email'],$subject,$template,$data,$dedupe);
+            $inserted=$queued&&(int)(DB::row('select row_count() inserted')['inserted']??0)===1;
+            if(!$inserted){DB::rollBack();return false;}
             $message=DB::row('select id from email_messages where deduplication_key=?',[$dedupe]);
-            if(!$queued||!$message){DB::rollBack();return false;}
+            if(!$message){DB::rollBack();return false;}
             foreach($assigned as $product)DB::exec('insert ignore into email_digest_content_claims (user_id,product_id,preference_category,period_start,period_end,email_message_id) values (?,?,?,?,?,?)',[(int)$user['id'],(int)$product['id'],$category,$start,$end,(int)$message['id']]);
             DB::commit();return true;
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
