@@ -7,7 +7,7 @@ Creative Moth is a custom PHP marketplace application for selling digital design
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current repository implementation: Phase 13.1 — Unified Account Consolidation, Admin Permissions, and Dashboard Capability Switching. The Phase 13.1 production migration and account merge have not been run; successful disposable-MariaDB verification and live verification also remain pending.
+- Current repository implementation: Phase 13.1 — Unified Account Consolidation, Admin Permissions, and Dashboard Capability Switching. The production migration and controlled account merge have been completed, and canonical Buyer/Seller/Admin plus restricted-Admin live verification has passed.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.

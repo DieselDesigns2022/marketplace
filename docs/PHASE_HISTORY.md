@@ -1150,6 +1150,6 @@ Live tester feedback was addressed before Phase 13 closeout. Seller package choi
 
 Phase 13 did not implement the Phase 13.5 public promotional graphics/library or Phase 13.6 Instagram, Pinterest, or other social automation. Sellers cannot upload custom promotional creative; sponsored cards use existing eligible shop or product data. Impressions, clicks, and sales are not guaranteed.
 
-## Phase 13.1 — Unified account foundation and dashboard capabilities (implemented, pending live verification)
+## Phase 13.1 — Unified account foundation and dashboard capabilities
 
-Added the controlled Admin/Seller consolidation, auditable exact-credit reconciliation, live Admin permission model and promotion restrictions, stale-session retirement, and Buyer/Seller/Admin capability switching. The canonical account remains an Admin while owning the existing approved designer record. Production migration and live merge verification remain deployment tasks.
+Added the controlled Admin/Seller consolidation, auditable exact-credit reconciliation, live Admin permission model and promotion restrictions, stale-session retirement, and Buyer/Seller/Admin capability switching. The canonical account remains an Admin while owning the existing approved designer record. Production migration and controlled merge were completed successfully. Live verification confirmed canonical Buyer/Seller/Admin access, restricted-Admin permission enforcement, disabled unauthorized Admin navigation, and direct-route 403 protection.

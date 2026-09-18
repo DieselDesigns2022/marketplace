@@ -365,4 +365,5 @@ Intentionally postponed:
 - Added controlled, audited Admin/Seller account consolidation with exact-cent credit reconciliation and secure interactive password replacement.
 - Added live granular/full-access Admin authorization and protected Admin promotion management.
 - Added capability-based Buyer/Seller/Admin dashboard switching and stale-session validation.
-- Added disposable MariaDB and navigation/security coverage; production rollout remains pending.
+- Added restricted-Admin landing behavior plus permission-aware Admin navigation with unauthorized sections disabled, including Downloads.
+- Completed production migration, controlled account merge, canonical login verification, Buyer/Seller/Admin switching verification, and limited-Admin live authorization checks.

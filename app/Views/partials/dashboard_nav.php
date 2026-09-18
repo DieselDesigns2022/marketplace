@@ -273,6 +273,11 @@ if ($area === 'buyer') {
                 ['/admin/payment-logs']
             ],
             [
+                '/admin/downloads',
+                'Downloads',
+                ['/admin/downloads']
+            ],
+            [
                 '/admin/referrals',
                 'Referrals',
                 ['/admin/referrals']
@@ -300,7 +305,7 @@ if ($area === 'buyer') {
         '/admin'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
         '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
         '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/message-reports'=>'messages.view','/admin/ip-risk-terms'=>'ip_risk.view',
-        '/admin/payment-logs'=>'payments.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
+        '/admin/payment-logs'=>'payments.view','/admin/downloads'=>'downloads.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
     ];
     foreach ($groups as $groupName => $links) {
         foreach ($links as $index => $link) {

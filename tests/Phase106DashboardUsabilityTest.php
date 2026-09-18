@@ -63,7 +63,7 @@ $check(StripeService::connectedAccountStatus(['id'=>'acct','requirements'=>['cur
 $check(StripeService::connectedAccountStatus(['id'=>'acct','details_submitted'=>true,'payouts_enabled'=>true])==='payout_ready','Stripe completed account maps to payout_ready');
 $check(in_array(StripeService::connectedAccountStatus(['id'=>'acct','requirements'=>['disabled_reason'=>'requirements.past_due']]),['restricted','disabled'],true),'Stripe disabled requirements map to a payout-issue status');
 
-$adminDestinations=['/admin','/admin/users','/admin/applications','/admin/designers','/admin/products','/admin/ip-risk-terms','/admin/categories','/admin/coupons','/admin/orders','/admin/referrals','/admin/credits','/admin/homepage','/admin/ads','/admin/payment-logs','/admin/waitlist','/admin/email-campaigns','/account','/notifications'];
+$adminDestinations=['/admin','/admin/users','/admin/applications','/admin/designers','/admin/products','/admin/ip-risk-terms','/admin/categories','/admin/coupons','/admin/orders','/admin/downloads','/admin/referrals','/admin/credits','/admin/homepage','/admin/ads','/admin/payment-logs','/admin/waitlist','/admin/email-campaigns','/account','/notifications'];
 $adminHomeSource=$source('app/Views/admin/home.php');
 foreach($adminDestinations as $destination){$inHome=in_array($destination,['/account','/notifications'],true)?str_contains($adminHomeSource,'href="'.$destination.'"'):str_contains($adminHomeSource,"'".$destination."'");$check(str_contains($nav,"['".$destination."'")&&$inHome,"admin navigation and permission-filtered Quick Actions include $destination");}
 
@@ -71,7 +71,13 @@ foreach($adminDestinations as $destination){$inHome=in_array($destination,['/acc
 $permissionService=$source('app/Services/AdminPermissionService.php');
 $check(str_contains($nav,'class="dashboard-switcher"')&&str_contains($nav,'href="/dashboard"')&&str_contains($nav,'href="/seller"')&&str_contains($nav,'href="/admin"'),'dashboard selector exposes Buyer, conditional Seller, and Admin destinations');
 $check(str_contains($nav,'$hasSeller = H::hasApprovedDesigner')&&str_contains($source('app/Views/layouts/app.php'),"H::hasApprovedDesigner((int)\$u['id'])"),'Seller navigation requires approved designer ownership, including for Admins');
-$check(str_contains($nav,'H::canAdmin($permissionByHref[$link[0]])')&&str_contains($permissionService,'role="admin" and status="active"'),'restricted Admin links are hidden using live permission checks');
+$check(
+    str_contains($nav,'$allowed = $link[3] ?? true;')
+    && str_contains($nav,'H::canAdmin($permission)')
+    && str_contains($nav,'aria-disabled="true"')
+    && str_contains($permissionService,'role="admin" and status="active"'),
+    'restricted Admin links remain visible but disabled using live permission checks'
+);
 $check(substr_count($nav,"'/account'")>=3&&substr_count($nav,"'/notifications'")>=3,'Account and Notifications remain available in every dashboard area');
 $helpers=$source('app/Core/Helpers.php');$check(str_contains($helpers,'select id,name,email,role,status,referral_code from users')&&str_contains($helpers,'$authoritative[\'status\'] !== \'active\'')&&str_contains($helpers,'$_SESSION[\'user\'] = $authoritative'),'protected sessions refresh live identity and retire disabled accounts');
 $adminViews=implode('',array_map($source,['app/Views/admin/users.php','app/Views/admin/application_detail.php','app/Views/admin/products.php','app/Views/admin/categories.php','app/Views/admin/coupons.php','app/Views/admin/payment_logs.php','app/Views/admin/ads.php','app/Views/admin/message_reports.php','app/Views/admin/waitlist/index.php','app/Views/admin/email_campaigns/index.php','app/Views/admin/credits.php','app/Views/admin/ip-risk-terms/index.php']));$check(substr_count($adminViews,'H::canAdmin(')>=15,'view-only Admin mutation controls are permission-filtered');
