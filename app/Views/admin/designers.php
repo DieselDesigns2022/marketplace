@@ -133,7 +133,7 @@
             </td>
 
             <td class="actions-cell">
-                <form method="post" class="designer-action-form">
+                <?php if(H::canAdmin('designers.manage')):?><form method="post" class="designer-action-form">
                     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
                     <input type="hidden" name="id" value="<?=$d['id']?>">
 
@@ -182,7 +182,7 @@
                     </div>
 
                     <button type="submit">Apply</button>
-                </form>
+                </form><?php endif;?>
             </td>
         </tr>
     <?php endforeach; ?>

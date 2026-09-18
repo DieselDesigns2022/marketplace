@@ -10,7 +10,7 @@ final class AdminWaitlistController
 {
     private const ALLOWED=['interest_type'=>['seller','buyer','tester'],'source'=>['direct','homepage','seller','social','referral','campaign'],'status'=>['subscribed','invited','unsubscribed','suppressed']];
     private const TRANSITIONS=['subscribed'=>['subscribed','unsubscribed','suppressed'],'invited'=>['invited','unsubscribed','suppressed'],'unsubscribed'=>['unsubscribed','suppressed'],'suppressed'=>['suppressed']];
-    private function admin():void{H::requireRole('admin');}
+    private function admin(string $permission='waitlist.view'):void{if($_SERVER['REQUEST_METHOD']==='POST')H::verifyCsrf();H::requireAdminPermission($permission);}
     public static function allowedStatusTransition(string $from,string $to):bool{return in_array($to,self::TRANSITIONS[$from]??[],true);}
     public static function statusOptions(string $status):array{return self::TRANSITIONS[$status]??[];}
     public static function interestLabel(string $value):string{return WaitlistController::interestLabel($value);}
@@ -30,7 +30,7 @@ final class AdminWaitlistController
     private static function query(array $f):string{return http_build_query(array_filter($f,fn($v)=>$v!==''));}
     public function index():void
     {
-        $this->admin();$f=$this->state($_SERVER['REQUEST_METHOD']==='POST'?$_POST:$_GET);
+        $this->admin($_SERVER['REQUEST_METHOD']==='POST'?'waitlist.manage':'waitlist.view');$f=$this->state($_SERVER['REQUEST_METHOD']==='POST'?$_POST:$_GET);
         if($_SERVER['REQUEST_METHOD']==='POST'){
             $id=(int)($_POST['id']??0);$to=(string)($_POST['status']??'');$entry=$id>0?DB::row('select status from waitlist_entries where id=?',[$id]):null;
             if(!$entry||!self::allowedStatusTransition($entry['status'],$to))H::flash('warning','That waitlist status transition is not permitted. No changes were made.');
@@ -41,7 +41,7 @@ final class AdminWaitlistController
     }
     public function delete($id): void
     {
-        $this->admin();
+        $this->admin('waitlist.manage');
         $filters = $this->state($_POST);
         $entry = DB::row('select id,email from waitlist_entries where id=?', [(int)$id]);
 
@@ -78,11 +78,11 @@ final class AdminWaitlistController
         $this->back($filters);
     }
 
-    public function export():void{$this->admin();$f=$this->state($_GET);[$w,$p]=$this->where($f);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="creative-moth-waitlist.csv"');$out=fopen('php://output','w');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Name','Email','Interest','Business','Source','Status','Confirmation sent','Invited','Created']);foreach(DB::rows('select name,email,interest_type,business_name,source,status,confirmation_sent_at,invited_at,created_at from waitlist_entries where '.$w.' order by created_at desc',$p) as $r){$r['interest_type']=self::interestLabel($r['interest_type']);fputcsv($out,array_map([self::class,'csvCell'],array_values($r)));}fclose($out);}
+    public function export():void{$this->admin('waitlist.export');$f=$this->state($_GET);[$w,$p]=$this->where($f);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="creative-moth-waitlist.csv"');$out=fopen('php://output','w');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Name','Email','Interest','Business','Source','Status','Confirmation sent','Invited','Created']);foreach(DB::rows('select name,email,interest_type,business_name,source,status,confirmation_sent_at,invited_at,created_at from waitlist_entries where '.$w.' order by created_at desc',$p) as $r){$r['interest_type']=self::interestLabel($r['interest_type']);fputcsv($out,array_map([self::class,'csvCell'],array_values($r)));}fclose($out);}
     public static function csvCell($v):string{$v=(string)$v;return preg_match('/^\s*[=+\-@]/u',$v)?"'".$v:$v;}
     public function invite():void
     {
-        $this->admin();$f=$this->state($_POST);$decision=self::invitationDecision($_POST,$f);if(!$decision['valid']){H::flash('warning',$decision['message']);$this->back($f);}
+        $this->admin('waitlist.manage');$f=$this->state($_POST);$decision=self::invitationDecision($_POST,$f);if(!$decision['valid']){H::flash('warning',$decision['message']);$this->back($f);}
         if($decision['mode']==='individual'){$rows=DB::rows('select * from waitlist_entries where id=? and status in ("subscribed","invited") and unsubscribed_at is null and invited_at is null',[$decision['id']]);$already=$rows?0:(int)(DB::row('select count(*) c from waitlist_entries where id=? and invited_at is not null',[$decision['id']])['c']??0);}
         else{[$w,$p]=$this->where($f,true);$rows=DB::rows('select * from waitlist_entries where '.$w,$p);[$aw,$ap]=$this->where($f);$already=(int)(DB::row('select count(*) c from waitlist_entries where '.$aw.' and invited_at is not null',$ap)['c']??0);}
         $queued=0;$skipped=0;foreach($rows as $r){try{$ok=EmailQueueService::queue('marketing',$r['email'],'Creative Moth is ready for you','launch_invite',['name'=>$r['name'],'cta_url'=>H::baseUrl().'/register'],"waitlist:{$r['id']}:launch-invite",['waitlist_entry_id'=>$r['id']]);$ok?$queued++:$skipped++;}catch(\Throwable $e){$skipped++;NotificationService::reportFailure('admin_waitlist_invite',$e);}}

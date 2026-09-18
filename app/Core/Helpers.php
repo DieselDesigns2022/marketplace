@@ -73,7 +73,20 @@ class Helpers
     }
      public static function requireLogin(): void
     {
-        if (!self::user()) self::redirect('/login');
+        $sessionUser = self::user();
+        if (!$sessionUser || empty($sessionUser['id'])) self::redirect('/login');
+        $authoritative = Database::row(
+            'select id,name,email,role,status,referral_code from users where id=? limit 1',
+            [(int) $sessionUser['id']]
+        );
+        if (!$authoritative || $authoritative['status'] !== 'active') {
+            unset($_SESSION['user']);
+            session_regenerate_id(true);
+            self::flash('warning', 'Your session is no longer active. Please log in again.');
+            self::redirect('/login');
+        }
+        unset($authoritative['status']);
+        $_SESSION['user'] = $authoritative;
 
     }
      public static function requireRole(string $role): void
@@ -82,19 +95,33 @@ class Helpers
         if ((self::user()['role'] ?? '') !== $role) self::abort(403);
 
     }
+     public static function canAdmin(string $permission): bool
+    {
+        $user = self::user();
+        return $user && (new \App\Services\AdminPermissionService())->can((int) $user['id'], $permission);
+
+    }
+     public static function requireAdminPermission(string $permission): void
+    {
+        self::requireLogin();
+        (new \App\Services\AdminPermissionService())->require((int) self::user()['id'], $permission);
+
+    }
      public static function requireSeller(): void
     {
         self::requireLogin();
-        if (in_array(self::user()['role'] ?? '', ['designer','admin'], true)) return;
-        $designer = Database::row('select id from designers where user_id=? and status="approved" limit 1', [self::user()['id']]);
-        if ($designer)
-        {
-            $_SESSION['user']['role'] = 'designer';
-            return;
-
-        }
+        if (self::hasApprovedDesigner((int) self::user()['id'])) return;
         self::flash('warning', 'You need an approved designer account before accessing the seller dashboard.');
         self::redirect('/apply');
+
+    }
+     public static function hasApprovedDesigner(?int $userId = null): bool
+    {
+        $userId ??= (int) (self::user()['id'] ?? 0);
+        return $userId > 0 && (bool) Database::row(
+            'select id from designers where user_id=? and status="approved" limit 1',
+            [$userId]
+        );
 
     }
      public static function flash(string $type, string $message): void

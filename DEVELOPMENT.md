@@ -41,7 +41,7 @@ Routes are defined in `public/index.php`. Dynamic route parameters use `{name}` 
 - `SellerController`: applications, seller dashboard, storefront settings, product management, sales, referrals, rank.
 - `CartController`: cart display, add/remove/update, checkout, order creation.
 - `AdminController`: admin home, users, applications, designers, products, categories, orders, homepage features, ads, and payment logs.
-- `AdminCreditController`: admin-only Credits & Referrals search, immutable ledger/referral review, and CSRF-protected audited adjustments.
+- `AdminCreditController`: two distinct authorized modes. `/admin/credits` uses `credits.view` (and `credits.adjust` for mutations) and retrieves marketplace-credit balances and ledgers. `/admin/referrals` uses `referrals.view` (and `payouts.manage` for payout mutations) and retrieves referral relationships, commission totals, payout batches, and transfer attempts.
 
 ## Views
 
@@ -65,7 +65,7 @@ The database layer uses PDO with exceptions, associative fetches, and native pre
 
 ## Authentication
 
-Authentication is session-based. Passwords are stored as hashes. Role-based access currently includes buyer, designer, and admin. Private dashboard routes should always call the correct helper gate.
+Authentication is session-based. Passwords are stored as hashes. Database roles remain `buyer`, `designer`, and `admin`. Seller authorization requires that the active account own an approved `designers` row. Admin authorization additionally requires a live `AdminPermissionService` grant or full-access profile. Private dashboard routes must call the appropriate server-side helper gate; server-side authorization is authoritative.
 
 ## CSRF
 
@@ -253,7 +253,7 @@ The weekly producer queues favorite-shop work before the weekly marketplace dige
 
 ## Phase 10.6 development notes
 
-Dashboard controller queries must remain scoped to the authenticated buyer, seller, or admin. Seller receipt settings are read authoritatively inside checkout transactions and copied to order-item snapshots; never accept receipt values from checkout input. Use `SellerReceiptService` for note normalization, public-path validation, upload processing, grouping, and deletion decisions. Keep new dashboard tables inside `.responsive-table`, and derive navigation from authenticated roles rather than treating navigation visibility as authorization. Receipt snapshot creation must use `SellerReceiptService::snapshotFromSeller()` so invalid optional values become `null` and never fail checkout. Buyer availability must use filesystem containment, regular-file, and readability checks—not database presence alone.
+Dashboard controller queries must remain scoped to the authenticated buyer, seller, or admin. Seller receipt settings are read authoritatively inside checkout transactions and copied to order-item snapshots; never accept receipt values from checkout input. Use `SellerReceiptService` for note normalization, public-path validation, upload processing, grouping, and deletion decisions. Keep new dashboard tables inside `.responsive-table`, and derive navigation from live capabilities: Buyer for an active authenticated account, Seller for an account that owns an approved designer row, and Admin links for an active Admin with the matching live permission. Navigation visibility is not authorization; server-side authorization remains authoritative. Receipt snapshot creation must use `SellerReceiptService::snapshotFromSeller()` so invalid optional values become `null` and never fail checkout. Buyer availability must use filesystem containment, regular-file, and readability checks—not database presence alone.
 
 Public `/waitlist` intentionally renders through the navigation-free minimal layout. Do not reintroduce the global header, footer, logo, or navigation links there; preserve the existing signup, validation, consent, confirmation, unsubscribe, and administrator-notification flow.
 
@@ -272,3 +272,6 @@ Checkout ordering is subtotal minus coupon discount plus authoritative tax minus
 Recognition uses explicit UTC parsing/storage. Administrative transitions allocate their durable communication/history identity from the transactional `admin_logs.id`; never reintroduce wall-clock/hash-only admin identifiers.
 
 The recognition CLI separates write-free `--dry-run`, silent historical `--apply`, and communicating recurring `--daily`. Payment/refund callers must supply stable trigger keys; automatic history and communication identity comes from `creator_recognition_events.id`. Recovery also requires the seller’s current semantic state to match and the event-linked rank or badge history row to remain latest, so a later automatic or administrative transition permanently supersedes older recovery.
+
+### Phase 13.1 local workflow
+Use only a disposable MariaDB database for `Phase131DatabaseIntegrationTest.php`. The merge CLI defaults to read-only `check`; `execute` requires a verified interactive no-echo terminal and must never receive a password through arguments or fixtures. Admin route work must add both server-side `AdminPermissionService` enforcement and matching navigation visibility.

@@ -1,3 +1,6 @@
+<?php use App\Core\Helpers as H; $canManage=H::canAdmin("homepage.manage"); ?>
+<div class="<?=$canManage?'':'homepage-readonly'?>">
+<?php if(!$canManage):?><style>.homepage-readonly button,.homepage-readonly input,.homepage-readonly select,.homepage-readonly textarea,.homepage-readonly .homepage-drag-handle{display:none!important}</style><?php endif;?>
 <h1>Homepage Management</h1>
 
 <p class="muted">
@@ -5,7 +8,7 @@
     then save that section.
 </p>
 
-<form method="post" class="card form homepage-feature-add">
+<?php if($canManage):?><form method="post" class="card form homepage-feature-add">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <input type="hidden" name="action" value="add">
 
@@ -47,7 +50,7 @@
     </label>
 
     <button type="submit">Add homepage feature</button>
-</form>
+</form><?php endif;?>
 
 <?php
 $featureSections = [
@@ -89,7 +92,7 @@ $featureSections = [
                     <p>No <?=H::e(strtolower($section['title']))?> have been added.</p>
                 </div>
             <?php else: ?>
-                <form method="post" class="homepage-order-form">
+                <?php if($canManage):?><form method="post" class="homepage-order-form">
                     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
                     <input type="hidden" name="action" value="reorder">
                     <input type="hidden" name="feature_type" value="<?=H::e($type)?>">
@@ -128,7 +131,7 @@ $featureSections = [
                                 </div>
 
                                 <div class="homepage-feature-actions">
-                                    <form method="post" class="homepage-visible-form">
+                                    <?php if($canManage):?><form method="post" class="homepage-visible-form">
                                         <input
                                             type="hidden"
                                             name="_csrf"
@@ -159,9 +162,9 @@ $featureSections = [
                                                     : 'Hidden'?>
                                             </span>
                                         </label>
-                                    </form>
+                                    </form><?php endif;?>
 
-                                    <form
+                                    <?php if($canManage):?><form
                                         method="post"
                                         class="homepage-remove-form"
                                         onsubmit="return confirm('Remove this homepage feature?');"
@@ -185,7 +188,7 @@ $featureSections = [
                                         <button type="submit" class="btn alt">
                                             Remove
                                         </button>
-                                    </form>
+                                    </form><?php endif;?>
                                 </div>
                             </article>
                         <?php endforeach; ?>
@@ -194,7 +197,7 @@ $featureSections = [
                     <button type="submit" class="homepage-save-order">
                         Save <?=H::e(strtolower($section['title']))?> order
                     </button>
-                </form>
+                </form><?php endif;?>
             <?php endif; ?>
         </section>
     <?php endforeach; ?>
@@ -259,3 +262,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
+</div>

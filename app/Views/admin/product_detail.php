@@ -51,7 +51,7 @@
         <?php if(!$ipDetections): ?><tr><td colspan="6" class="muted">No IP risk detections recorded.</td></tr><?php endif; ?></table>
         <h3>Seller confirmations</h3><ul><?php foreach($ipConfirmations as $c): ?><li><?=H::e($c['confirmed_at'])?> — <?=H::e($c['seller_email'])?> — <?=H::e($c['confirmation_text'])?></li><?php endforeach; ?><?php if(!$ipConfirmations): ?><li class="muted">No confirmations recorded.</li><?php endif; ?></ul>
         <h3>Admin review history</h3><ul><?php foreach($ipHistory as $h): ?><li><?=H::e($h['created_at'])?> — <?=H::e($h['admin_email'])?>: <?=H::e($h['previous_review_status']??'none')?> → <?=H::e($h['new_review_status'])?>; product <?=H::e($h['previous_product_status']??'none')?> → <?=H::e($h['new_product_status']??'none')?><?php if($h['admin_note']): ?> — <?=H::e($h['admin_note'])?><?php endif; ?></li><?php endforeach; ?><?php if(!$ipHistory): ?><li class="muted">No admin IP review history recorded.</li><?php endif; ?></ul>
-        <form method="post" action="/admin/products/<?=$p['id']?>/ip-risk-review"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><p class="help-text">These controls update only the separate IP-risk review status. Ordinary approval remains blocked while active matches are pending IP review. Use the normal product moderation controls below to reject, disable, archive, restore, or mark a product deleted regardless of whether it has IP-risk matches.</p><label>IP review admin note <span class="muted">(optional)</span><input name="admin_note" value="<?=H::e($ipState['admin_note']??'')?>"></label><button name="ip_action" value="pending">Keep IP Review Pending</button><button class="btn" name="ip_action" value="approve">Approve IP Review</button><button class="btn" name="ip_action" value="published_flagged" onclick="return confirm('Publish or keep this product published while visibly flagged for IP risk review?');">Leave Published While Flagged</button></form>
+        <?php if(H::canAdmin('ip_risk.manage')):?><form method="post" action="/admin/products/<?=$p['id']?>/ip-risk-review"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><p class="help-text">These controls update only the separate IP-risk review status. Ordinary approval remains blocked while active matches are pending IP review. Use the normal product moderation controls below to reject, disable, archive, restore, or mark a product deleted regardless of whether it has IP-risk matches.</p><label>IP review admin note <span class="muted">(optional)</span><input name="admin_note" value="<?=H::e($ipState['admin_note']??'')?>"></label><button name="ip_action" value="pending">Keep IP Review Pending</button><button class="btn" name="ip_action" value="approve">Approve IP Review</button><button class="btn" name="ip_action" value="published_flagged" onclick="return confirm('Publish or keep this product published while visibly flagged for IP risk review?');">Leave Published While Flagged</button></form><?php endif;?>
     </section>
     <h2>Product information</h2>
     <p>
@@ -66,7 +66,7 @@
             <p class="help-text"><a href="<?=H::e($img['image_path'])?>" target="_blank" rel="noopener">Open full-size preview in new tab</a></p>
             <p>
                 <span><?=H::e($img['watermark_status'] ?? 'legacy preview')?><?php if(!empty($img['original_image_path'])):?> · private original retained<?php endif;?></span>
-                <?php if(!empty($img['original_image_path'])):?><form method="post" class="inline"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="image_id" value="<?=$img['id']?>"><button name="action" value="regenerate_watermark">Regenerate watermark</button></form><?php endif;?>
+                <?php if(!empty($img['original_image_path'])):?><?php if(H::canAdmin('products.manage')):?><form method="post" class="inline"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="image_id" value="<?=$img['id']?>"><button name="action" value="regenerate_watermark">Regenerate watermark</button></form><?php endif;?><?php endif;?>
             </p>
             <?php if(!empty($img['watermark_error'])):?><small class="help-text">Watermark note: <?=H::e($img['watermark_error'])?></small><?php endif;?>
         </div>
@@ -79,7 +79,7 @@
            </li>
         <?php endforeach;?>
     </ul>
-    <form method="post">
+    <?php if(H::canAdmin('products.manage')):?><form method="post">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
         <label>Rejection Reason <span class="muted">(required only when rejecting)</span><input name="reason" placeholder="Example: TM, copyright issue, wrong file, needs clearer preview">
         </label>
@@ -89,5 +89,5 @@
         <button name="action" value="archive" onclick="return confirm('Archive this product and hide it from public listings?');">Archive / Hide</button>
         <?php if(in_array($p['status'], ['archived','deleted'], true)):?><button name="action" value="restore" onclick="return confirm('Restore this product as a draft?');">Restore as Draft</button><?php endif;?>
         <button name="action" value="mark_deleted" onclick="return confirm('Mark deleted? This hides the product but keeps records. Use bulk delete for safe permanent deletion only.');">Mark Deleted</button>
-    </form>
+    </form><?php endif;?>
 </section>
