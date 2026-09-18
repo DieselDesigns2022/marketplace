@@ -262,3 +262,18 @@ After the migration and Phase 13 code are deployed and verified, explicitly sche
 ```
 
 Hourly maintenance sends idempotent website 24-hour ending warnings, expires website campaigns, and retries sent weekly messages whose post-delivery promotion accounting needs reconciliation. The weekly marketplace producer and mail queue worker remain separate scheduled processes and must continue running independently.
+
+## Phase 13.1 controlled unified-account deployment (not yet production-complete)
+
+1. Successfully run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase131DatabaseIntegrationTest.php` against an explicitly disposable MariaDB environment.
+2. Do not continue when that suite skips or fails.
+3. Schedule live maintenance and downtime.
+4. Confirm the intended production database, the Phase 13.1 branch, and a clean deployment state.
+5. Take and verify a fresh full production database backup immediately before migration and merge work.
+6. Apply `database/migrations/2026_09_18_phase_13_1_unified_account_foundation.sql` after every earlier migration. This is a one-time, non-idempotent migration; record it and never blindly rerun it.
+7. Run `php scripts/phase_13_1_merge_accounts.php check` against the intended environment.
+8. Resolve every reported blocker before proceeding.
+9. Run `php scripts/phase_13_1_merge_accounts.php execute` from a compatible interactive TTY using verified no-echo password entry and confirmation; never pass the password as an argument.
+10. Verify the canonical `angela@creativemoth.com` login, rejection of both old logins, Admin/Buyer/Seller capabilities, unchanged designer/store/Stripe identity and linked history, exact credit totals, stable canonical-owner protection, permissions/audits, and all required live Admin routes.
+
+None of these live migration, merge, or verification steps are claimed complete by the repository documentation.

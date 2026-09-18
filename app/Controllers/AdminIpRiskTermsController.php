@@ -15,13 +15,13 @@ class AdminIpRiskTermsController
 
     public function index(): void
     {
-        $this->gate();
+        $this->gate(false);
         H::view('admin/ip-risk-terms/index', ['terms' => $this->repo->terms()]);
     }
 
     public function create(): void
     {
-        $this->gate();
+        $this->gate(true);
         H::view('admin/ip-risk-terms/form', [
             'term' => null,
             'aliases' => [],
@@ -32,7 +32,7 @@ class AdminIpRiskTermsController
 
     public function store(): void
     {
-        $this->gate();
+        $this->gate(true);
         $errors = $this->repo->saveTerm($_POST, (int)H::user()['id']);
         if ($errors) {
             H::view('admin/ip-risk-terms/form', [
@@ -49,7 +49,7 @@ class AdminIpRiskTermsController
 
     public function edit($id): void
     {
-        $this->gate();
+        $this->gate(true);
         $term = $this->repo->term((int)$id) ?? H::abort(404);
         H::view('admin/ip-risk-terms/form', [
             'term' => $term,
@@ -61,7 +61,7 @@ class AdminIpRiskTermsController
 
     public function update($id): void
     {
-        $this->gate();
+        $this->gate(true);
         if (!$this->repo->term((int)$id)) {
             H::abort(404);
         }
@@ -83,7 +83,7 @@ class AdminIpRiskTermsController
 
     public function enable($id): void
     {
-        $this->gate();
+        $this->gate(true);
         if (!$this->repo->setTermEnabled((int)$id, true, (int)H::user()['id'])) {
             H::abort(404);
         }
@@ -93,7 +93,7 @@ class AdminIpRiskTermsController
 
     public function disable($id): void
     {
-        $this->gate();
+        $this->gate(true);
         if (!$this->repo->setTermEnabled((int)$id, false, (int)H::user()['id'])) {
             H::abort(404);
         }
@@ -101,8 +101,9 @@ class AdminIpRiskTermsController
         H::redirect('/admin/ip-risk-terms');
     }
 
-    private function gate(): void
+    private function gate(bool $manage): void
     {
-        H::requireRole('admin');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') H::verifyCsrf();
+        H::requireAdminPermission($manage ? 'ip_risk.manage' : 'ip_risk.view');
     }
 }

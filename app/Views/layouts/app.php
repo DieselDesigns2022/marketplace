@@ -94,7 +94,7 @@ if ($json && json_decode($json) !== null):
         <?php if($u): ?>
         <a href="/dashboard">Dashboard</a>
         <a href="/notifications">Notifications<?php if($unreadNotifications):?> <span class="badge" aria-label="<?=$unreadNotifications?> unread"><?=$unreadNotifications>99?'99+':$unreadNotifications?></span><?php endif;?></a>
-        <?php if($u['role']==='designer'||$u['role']==='admin'):?><a href="/seller">Seller</a><?php endif; ?>
+<?php if(H::hasApprovedDesigner((int)$u['id'])):?><a href="/seller">Seller</a><?php endif; ?>
         <?php if($u['role']==='admin'):?><a href="/admin">Admin</a><?php endif; ?>
         <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button type="submit">Logout</button></form>
         <?php else: ?>

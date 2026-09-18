@@ -9,6 +9,10 @@ CREATE TABLE users
     referral_code VARCHAR(40),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    merged_into_user_id BIGINT NULL,
+    merged_at TIMESTAMP NULL,
+    KEY users_merged_into_idx(merged_into_user_id),
+    CONSTRAINT users_merged_into_fk FOREIGN KEY(merged_into_user_id) REFERENCES users(id) ON DELETE RESTRICT,
     UNIQUE KEY users_referral_code_unique(referral_code)
 );
 
@@ -1184,3 +1188,58 @@ CREATE TABLE conversation_messages (id BIGINT PRIMARY KEY AUTO_INCREMENT,convers
 CREATE TABLE message_attachments (id BIGINT PRIMARY KEY AUTO_INCREMENT,message_id BIGINT NOT NULL,original_name VARCHAR(190) NOT NULL,stored_name VARCHAR(100) NOT NULL,mime_type VARCHAR(40) NOT NULL,byte_size BIGINT UNSIGNED NOT NULL,width INT UNSIGNED NOT NULL,height INT UNSIGNED NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY message_attachment_stored_unique(stored_name),KEY message_attachment_message_idx(message_id),CONSTRAINT message_attachment_message_fk FOREIGN KEY(message_id) REFERENCES conversation_messages(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE message_blocks (id BIGINT PRIMARY KEY AUTO_INCREMENT,blocker_user_id BIGINT NOT NULL,blocked_user_id BIGINT NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,removed_at TIMESTAMP NULL,KEY message_blocks_pair_idx(blocker_user_id,blocked_user_id,removed_at),CONSTRAINT message_blocks_blocker_fk FOREIGN KEY(blocker_user_id) REFERENCES users(id) ON DELETE CASCADE,CONSTRAINT message_blocks_blocked_fk FOREIGN KEY(blocked_user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE message_reports (id BIGINT PRIMARY KEY AUTO_INCREMENT,conversation_id BIGINT NOT NULL,reporter_user_id BIGINT NOT NULL,reason ENUM('abuse','spam','inappropriate','other') NOT NULL,details VARCHAR(1000) NULL,status ENUM('open','reviewing','resolved','dismissed') NOT NULL DEFAULT 'open',moderator_user_id BIGINT NULL,moderator_notes VARCHAR(1000) NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,reviewed_at TIMESTAMP NULL,notification_cycle INT UNSIGNED NOT NULL DEFAULT 0,UNIQUE KEY message_report_reporter_unique(conversation_id,reporter_user_id),KEY message_reports_status_idx(status,created_at),CONSTRAINT message_report_conversation_fk FOREIGN KEY(conversation_id) REFERENCES message_conversations(id) ON DELETE CASCADE,CONSTRAINT message_report_reporter_fk FOREIGN KEY(reporter_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT message_report_moderator_fk FOREIGN KEY(moderator_user_id) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE account_merge_audits (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    source_user_id BIGINT NOT NULL,
+    target_user_id BIGINT NOT NULL,
+    designer_id BIGINT NOT NULL,
+    source_seller_email VARCHAR(190) NOT NULL,
+    previous_admin_email VARCHAR(190) NOT NULL,
+    final_canonical_email VARCHAR(190) NOT NULL,
+    acting_admin_user_id BIGINT NOT NULL,
+    counts_summary JSON NOT NULL,
+    reconciliation_summary JSON NOT NULL,
+    source_disabled TINYINT(1) NOT NULL,
+    password_reset_confirmed TINYINT(1) NOT NULL,
+    merged_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY account_merge_source_target_unique (source_user_id,target_user_id),
+    KEY account_merge_target_idx (target_user_id,merged_at),
+    CONSTRAINT account_merge_source_fk FOREIGN KEY (source_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT account_merge_target_fk FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT account_merge_designer_fk FOREIGN KEY (designer_id) REFERENCES designers(id) ON DELETE RESTRICT,
+    CONSTRAINT account_merge_actor_fk FOREIGN KEY (acting_admin_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE admin_access_profiles (
+    user_id BIGINT PRIMARY KEY,
+    full_access TINYINT(1) NOT NULL DEFAULT 0,
+    granted_by BIGINT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT admin_access_profile_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT admin_access_profile_granter_fk FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE admin_permission_grants (
+    user_id BIGINT NOT NULL,
+    permission_key VARCHAR(100) NOT NULL,
+    granted_by BIGINT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id,permission_key),
+    CONSTRAINT admin_permission_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT admin_permission_granter_fk FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE admin_permission_audits (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    admin_user_id BIGINT NOT NULL,
+    permission_key VARCHAR(100) NULL,
+    action ENUM('profile_full_access_enabled','profile_full_access_disabled','permission_granted','permission_revoked') NOT NULL,
+    acting_admin_user_id BIGINT NOT NULL,
+    metadata JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY admin_permission_audit_admin_idx (admin_user_id,created_at),
+    CONSTRAINT admin_permission_audit_admin_fk FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT admin_permission_audit_actor_fk FOREIGN KEY (acting_admin_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

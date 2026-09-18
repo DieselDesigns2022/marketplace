@@ -2427,6 +2427,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* Responsive grouped dashboard navigation */
+.dashboard-switcher{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:0 0 1rem;padding:.65rem .8rem;border:1px solid var(--border,#ddd);border-radius:.65rem}.dashboard-switcher a{padding:.35rem .65rem;border-radius:.45rem}.dashboard-switcher a.active{background:var(--primary,#4f3578);color:#fff;text-decoration:none}
 .dashboard-nav-grouped {
   position: relative;
   z-index: 20;

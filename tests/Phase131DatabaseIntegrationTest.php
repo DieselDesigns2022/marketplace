@@ -1,0 +1,94 @@
+<?php
+require dirname(__DIR__).'/app/bootstrap.php';
+
+use App\Core\Database as DB;
+use App\Core\Helpers as H;
+use App\Services\AccountMergeService;
+use App\Services\AdminPermissionService;
+
+if (($_ENV['RUN_DISPOSABLE_DB_TESTS'] ?? getenv('RUN_DISPOSABLE_DB_TESTS') ?: '') !== '1') {
+    echo "SKIP/UNEXECUTED: set RUN_DISPOSABLE_DB_TESTS=1 with disposable MariaDB credentials; this suite creates and drops an isolated database.\n"; exit(0);
+}
+try {$pdo=DB::pdo();} catch(Throwable $e) {echo 'SKIP/UNEXECUTED: disposable MariaDB unavailable: '.$e->getMessage()."\n";exit(0);}
+$base=(string)$pdo->query('select database()')->fetchColumn();$db='phase131_'.bin2hex(random_bytes(5));$fail=[];
+$check=function(bool $ok,string $m)use(&$fail){echo($ok?'PASS: ':'FAIL: ').$m."\n";if(!$ok)$fail[]=$m;};
+$throws=function(callable $fn,string $contains='')use($check){try{$fn();$check(false,'expected blocker: '.$contains);}catch(DomainException $e){$check($contains===''||str_contains($e->getMessage(),$contains),'blocker: '.$contains);}};
+$pdo->exec("create database `$db` character set utf8mb4 collate utf8mb4_unicode_ci");$pdo->exec("use `$db`");
+try {
+$pdo->exec(<<<'SQL'
+create table users(id bigint primary key auto_increment,name varchar(120) not null,email varchar(190) unique not null,password_hash varchar(255) not null,role enum('buyer','designer','admin') default 'buyer',status enum('active','disabled') default 'active',referral_code varchar(40),created_at timestamp default current_timestamp,updated_at timestamp default current_timestamp on update current_timestamp) engine=InnoDB;
+create table designer_applications(id bigint primary key auto_increment,user_id bigint not null,display_name varchar(120),desired_slug varchar(140),bio text,social_links text,status enum('pending','approved','denied') default 'pending',denial_reason text,admin_notes text,updated_at timestamp default current_timestamp on update current_timestamp);
+create table designers(id bigint primary key,user_id bigint unique not null,display_name varchar(120),store_slug varchar(140) unique,bio text,social_links text,status enum('approved','disabled') default 'approved',creator_rank varchar(20),rank_override tinyint default 0,is_featured tinyint default 0,stripe_connect_account_id varchar(190),updated_at timestamp default current_timestamp on update current_timestamp);
+create table products(id bigint primary key,designer_id bigint,title varchar(190));
+create table seller_payouts(id bigint primary key,designer_id bigint,stripe_transfer_id varchar(190));
+create table ads(id bigint primary key,designer_id bigint);
+create table orders(id bigint primary key,user_id bigint,credit_reserved decimal(12,2) default 0,credit_payment_status enum('none','reserved','finalized','released') default 'none');
+create table cart_items(id bigint primary key auto_increment,user_id bigint,product_id bigint,license_type varchar(80),unique key uq_cart(user_id,product_id,license_type));
+create table wishlists(id bigint primary key auto_increment,user_id bigint,product_id bigint,created_at timestamp default current_timestamp,unique key uq_wish(user_id,product_id));
+create table follows(id bigint primary key auto_increment,user_id bigint,designer_id bigint,created_at timestamp default current_timestamp,unique key uq_follow(user_id,designer_id));
+create table downloads(id bigint primary key,user_id bigint,product_id bigint,product_file_id bigint);
+create table reviews(id bigint primary key,user_id bigint,product_id bigint,designer_id bigint);
+create table custom_orders(id bigint primary key,buyer_user_id bigint,designer_id bigint);
+create table notifications(id bigint primary key auto_increment,user_id bigint,event_key varchar(190),title varchar(190),read_at timestamp null,created_at timestamp default current_timestamp,unique key uq_notice(user_id,event_key));
+create table email_digest_content_claims(id bigint primary key,user_id bigint,product_id bigint);
+create table email_preferences(user_id bigint primary key,marketing_opt_in tinyint,weekly_emails tinyint,monthly_emails tinyint,favorite_shop_emails tinyint,marketing_opted_out_at timestamp null,unsubscribe_nonce char(64) unique);
+create table message_conversations(id bigint primary key,buyer_user_id bigint,seller_user_id bigint,designer_id bigint,context_key varchar(190) unique,buyer_archived_at timestamp null,seller_archived_at timestamp null,buyer_last_read_message_id bigint null,seller_last_read_message_id bigint null);
+create table conversation_messages(id bigint primary key,conversation_id bigint,sender_user_id bigint,body text);
+create table message_blocks(id bigint primary key auto_increment,blocker_user_id bigint,blocked_user_id bigint,removed_at timestamp null);
+create table message_reports(id bigint primary key auto_increment,conversation_id bigint,reporter_user_id bigint,moderator_user_id bigint null,unique key uq_report(conversation_id,reporter_user_id));
+create table marketplace_credits(id bigint primary key auto_increment,user_id bigint unique,total_balance decimal(12,2),reserved_balance decimal(12,2));
+create table credit_transactions(id bigint primary key auto_increment,user_id bigint,amount decimal(12,2),type varchar(40),status enum('reserved','finalized','released'),idempotency_key varchar(190) unique,order_id bigint null,referral_id bigint null,admin_user_id bigint null,related_transaction_id bigint null,description text,finalized_at timestamp null,released_at timestamp null,created_at timestamp default current_timestamp,updated_at timestamp default current_timestamp on update current_timestamp);
+create table referrals(id bigint primary key auto_increment,referrer_user_id bigint,referred_user_id bigint null,unique key uq_referred(referred_user_id));
+create table seller_referral_payout_batches(id bigint primary key auto_increment,referrer_user_id bigint,period_start date,period_end date,sequence_no int,unique key uq_batch(referrer_user_id,period_start,period_end,sequence_no));
+create table admin_logs(id bigint primary key auto_increment,admin_user_id bigint,action varchar(80),entity_type varchar(80),entity_id bigint,metadata json);
+SQL);
+$pdo->exec(file_get_contents(dirname(__DIR__).'/database/migrations/2026_09_18_phase_13_1_unified_account_foundation.sql'));
+$seed=function()use($pdo){
+ $oldA=password_hash('old-admin-password',PASSWORD_DEFAULT);$oldS=password_hash('old-seller-password',PASSWORD_DEFAULT);
+ $s=$pdo->prepare('insert into users(id,name,email,password_hash,role,status) values(?,?,?,?,?,?)');
+ $s->execute([41,'Admin','diesel.designs.contact@gmail.com',$oldA,'admin','active']);$s->execute([93,'Seller','test@dieseldesigns.co',$oldS,'designer','active']);$s->execute([7,'Buyer','buyer@example.test',password_hash('buyer-pass',PASSWORD_DEFAULT),'buyer','active']);$s->execute([8,'Designer Two','designer@example.test',password_hash('designer-pass',PASSWORD_DEFAULT),'designer','active']);
+ $pdo->exec("insert into designers(id,user_id,display_name,store_slug,status,stripe_connect_account_id) values(501,93,'Diesel Designs','diesel-designs','approved','acct_keep_me'),(502,8,'Second Designer','second-designer','approved','acct_second');
+ insert into products values(601,501,'Keep Product');insert into seller_payouts values(701,501,'tr_keep');insert into ads values(801,501);
+ insert into orders values(901,93,0,'none');insert into cart_items(user_id,product_id,license_type) values(41,601,'personal'),(93,601,'personal'),(93,602,'commercial');
+ insert into wishlists(user_id,product_id,created_at) values(41,601,'2026-01-02'),(93,601,'2026-01-01'),(93,602,'2026-01-03');insert into follows(user_id,designer_id,created_at) values(41,501,'2026-01-02'),(93,501,'2026-01-01');
+ insert into downloads values(1001,93,601,1);insert into reviews values(1101,93,601,501);insert into custom_orders values(1201,93,501);
+ insert into notifications(user_id,event_key,title,read_at,created_at) values(41,'same','target',now(),'2026-01-02'),(93,'same','source',null,'2026-01-01'),(93,'unique','source',null,'2026-01-03');insert into email_digest_content_claims values(1301,93,601);
+ insert into email_preferences values(41,1,1,0,1,null,repeat('a',64)),(93,0,0,1,1,now(),repeat('b',64));
+ insert into message_conversations values(1401,93,7,501,'b93:s7:product:601',now(),null,10,11);insert into conversation_messages values(1501,1401,93,'hello');insert into message_reports(conversation_id,reporter_user_id) values(1401,93);
+ insert into marketplace_credits(user_id,total_balance,reserved_balance) values(41,0.10,0),(93,0.01,0);");
+};
+$seed();$service=new AccountMergeService();$plan=$service->preflight();
+$check((int)$plan['target']['id']===41&&(int)$plan['source']['id']===93,'identities are resolved by email rather than assumed IDs');
+$pdo->exec("insert into users(name,email,password_hash,role,status) values('Conflict','angela@creativemoth.com','x','buyer','active')");$throws(fn()=>$service->preflight(),'already in use');$pdo->exec("delete from users where email='angela@creativemoth.com'");
+$pdo->exec("update users set email='wrong@example.test' where id=93");$throws(fn()=>$service->preflight(),'Seller identity');$pdo->exec("update users set email='test@dieseldesigns.co' where id=93");
+$pdo->exec("insert into message_conversations values(1402,93,41,501,'b93:s41:store:501',null,null,null,null)");$throws(fn()=>$service->preflight(),'self-conversation');$pdo->exec('delete from message_conversations where id=1402');
+$pdo->exec("insert into message_conversations values(1403,7,93,501,'b7:s93:store:501',null,null,null,null),(1404,7,41,501,'b7:s41:store:501',null,null,null,null)");$throws(fn()=>$service->preflight(),'context-key collision');$pdo->exec('delete from message_conversations where id in(1403,1404)');
+$pdo->exec('update marketplace_credits set reserved_balance=1 where user_id=93');$throws(fn()=>$service->preflight(),'reserved');$pdo->exec('update marketplace_credits set reserved_balance=0 where user_id=93');
+$pdo->exec('insert into referrals(referrer_user_id,referred_user_id) values(93,41)');$throws(fn()=>$service->preflight(),'self-referral');$pdo->exec('delete from referrals');
+$check(\App\Services\CreditService::parseCents('0.01')===1&&\App\Services\CreditService::parseCents('0.10')===10&&\App\Services\CreditService::parseCents('7.25')===725&&\App\Services\CreditService::formatCents(736)==='7.36','credit amounts use exact integer cents');
+DB::exec('update marketplace_credits set total_balance="9999999999.99" where user_id=41');$throws(fn()=>$service->merge('brand-new-password'),'exceeds the supported maximum');DB::exec('update marketplace_credits set total_balance="0.10" where user_id=41');
+DB::exec('insert into credit_transactions(user_id,amount,type,status,idempotency_key) values(93,"-0.01","account_merge_transfer_out","finalized","phase13.1:account-merge:93:41:debit")');$throws(fn()=>$service->merge('brand-new-password'),'partial or previous');DB::exec('delete from credit_transactions');
+$result=$service->merge('brand-new-password');$check(($result['completed']??false)===true,'merge transaction completes');
+$target=DB::row('select * from users where id=41');$source=DB::row('select * from users where id=93');
+$check($target['email']==='angela@creativemoth.com'&&$target['role']==='admin'&&$target['status']==='active','canonical email changes and role remains active admin');
+$check(password_verify('brand-new-password',$target['password_hash'])&&!password_verify('old-admin-password',$target['password_hash'])&&!password_verify('old-seller-password',$target['password_hash']),'new password authenticates and both old passwords do not');
+$check($source['status']==='disabled'&&(int)$source['merged_into_user_id']===41&&$source['merged_at']!==null,'source is disabled and marked merged');
+$d=DB::row('select * from designers where id=501');$check((int)$d['user_id']===41&&$d['store_slug']==='diesel-designs'&&$d['stripe_connect_account_id']==='acct_keep_me','designer ID, slug, and Stripe identity are preserved');
+$check((int)DB::row('select designer_id from products where id=601')['designer_id']===501&&(int)DB::row('select designer_id from seller_payouts where id=701')['designer_id']===501&&(int)DB::row('select designer_id from ads where id=801')['designer_id']===501,'designer-linked product, payout, and promotion history remains linked');
+$check((int)DB::row('select user_id from orders where id=901')['user_id']===41&&count(DB::rows('select * from cart_items where user_id=41'))===2&&count(DB::rows('select * from wishlists where user_id=41'))===2&&count(DB::rows('select * from follows where user_id=41'))===1,'orders move and cart/wishlist/follow duplicates are safely deduplicated');
+$check((int)DB::row('select user_id from downloads where id=1001')['user_id']===41&&(int)DB::row('select user_id from reviews where id=1101')['user_id']===41&&(int)DB::row('select buyer_user_id from custom_orders where id=1201')['buyer_user_id']===41,'downloads, reviews, and custom orders move');
+$check(count(DB::rows('select * from notifications where user_id=41'))===2&&DB::row('select read_at from notifications where user_id=41 and event_key="same"')['read_at']===null&&(int)DB::row('select user_id from email_digest_content_claims where id=1301')['user_id']===41,'notifications deduplicate and email claims move');
+$p=DB::row('select * from email_preferences where user_id=41');$check((int)$p['marketing_opt_in']===0&&(int)$p['weekly_emails']===0&&(int)$p['monthly_emails']===0&&(int)$p['favorite_shop_emails']===1&&$p['unsubscribe_nonce']===str_repeat('a',64)&&!DB::row('select * from email_preferences where user_id=93'),'opt-out wins, canonical unsubscribe identity remains, and source preferences retire');
+$c=DB::row('select * from message_conversations where id=1401');$check((int)$c['buyer_user_id']===41&&$c['context_key']==='b41:s7:product:601'&&(int)$c['buyer_last_read_message_id']===10&&$c['buyer_archived_at']!==null&&(int)DB::row('select sender_user_id from conversation_messages where id=1501')['sender_user_id']===41,'messaging identities/context rewrite while conversation state and IDs remain');
+$balances=array_column(DB::rows('select cast(total_balance as char) balance from marketplace_credits order by user_id'),'balance');$check($balances===['0.11','0.00']&&count(DB::rows('select * from credit_transactions'))===2,'credit transfer preserves exact total with paired ledger entries');
+$again=$service->merge('ignored-rerun-password');$check(($again['completed']??false)&&count(DB::rows('select * from credit_transactions'))===2&&count(DB::rows('select * from account_merge_audits'))===1,'rerun is idempotent and does not duplicate transfers or audit');
+$audit=DB::row('select * from account_merge_audits');$check((int)$audit['password_reset_confirmed']===1,'merge audit confirms password reset without storing credentials');
+$permissions=new AdminPermissionService();$check($permissions->can(41,'dashboard.view')&&!$permissions->can(7,'dashboard.view'),'full-access Admin works and permission storage cannot grant non-admin capability');
+DB::exec('insert into admin_permission_grants(user_id,permission_key,granted_by) values(7,"dashboard.view",41)');$check(!$permissions->can(7,'dashboard.view'),'non-admin remains denied even with a permission row');
+DB::exec("insert into users(id,name,email,password_hash,role,status) values(201,'Restricted','restricted@example.test','x','admin','active'),(202,'Other Admin','other@example.test','x','admin','active')");$permissions->grant(201,'users.view',41);$check($permissions->can(201,'users.view')&&!$permissions->can(201,'users.manage'),'restricted Admin receives only explicit grants');$throws(fn()=>$permissions->grant(201,'users.manage',201),'full-access');$throws(fn()=>$permissions->revoke(201,'users.view',201),'full-access');$throws(fn()=>$permissions->setFullAccess(201,true,201),'full-access');$permissions->grant(202,'users.view',41);$permissions->setFullAccess(202,true,41);$check($permissions->isFullAccess(202),'full-access owner can edit another Admin');$beforeAudit=(int)DB::row('select count(*) n from admin_permission_audits')['n'];$check(!$permissions->grant(202,'users.view',41)&&!$permissions->setFullAccess(202,true,41)&&(int)DB::row('select count(*) n from admin_permission_audits')['n']===$beforeAudit,'no-op permission changes create no misleading audits');DB::exec('update users set email="owner-renamed@example.test" where id=41');$check($permissions->isCanonicalOwner(41),'canonical owner identity remains stable after email change');$throws(fn()=>$permissions->setFullAccess(41,false,41),'canonical owner');DB::exec('update users set email="angela@creativemoth.com" where id=41');
+
+$check(!H::hasApprovedDesigner(7)&&!$permissions->can(7,'dashboard.view'),'Buyer has Buyer capability only');$check(H::hasApprovedDesigner(8)&&!$permissions->can(8,'dashboard.view'),'active Designer has Buyer and Seller but not Admin capability');$check(!H::hasApprovedDesigner(93)&&!$permissions->can(93,'dashboard.view'),'disabled former Designer has neither Seller nor Admin capability');$check($permissions->can(201,'users.view')&&!H::hasApprovedDesigner(201),'Admin without store has Admin but not Seller capability');$check(H::hasApprovedDesigner(41)&&$permissions->can(41,'dashboard.view'),'canonical Admin with approved designer has Buyer, Seller, and Admin capability');$permissions->configureAdmin(7,['users.view'],false,41);$check(DB::row('select role from users where id=7')['role']==='admin'&&$permissions->can(7,'users.view'),'full-access Admin promotes Buyer with assigned permission');$designerOwner=(int)DB::row('select user_id from designers where id=502')['user_id'];$permissions->configureAdmin(8,['dashboard.view'],false,41);$check(DB::row('select role from users where id=8')['role']==='admin'&&(int)DB::row('select user_id from designers where id=502')['user_id']===$designerOwner&&H::hasApprovedDesigner(8),'Designer promotion preserves designer ownership and Seller capability');$throws(fn()=>$permissions->configureAdmin(202,['users.manage'],true,201),'full-access');
+DB::exec("insert into users(id,name,email,password_hash,role,status) values(200,'Admin Two','admin2@example.test','x','admin','active')");
+DB::exec("insert into designer_applications(id,user_id,display_name,desired_slug,status) values(300,200,'Admin Shop','admin-shop','pending')");$_SESSION['user']=['id'=>41,'role'=>'admin'];$method=new ReflectionMethod(App\Controllers\AdminController::class,'approveApplication');$method->setAccessible(true);$method->invoke(new App\Controllers\AdminController(),300);$check(DB::row('select role from users where id=200')['role']==='admin','seller application approval never downgrades an Admin');
+} finally {$pdo->exec("use `$base`");$pdo->exec("drop database if exists `$db`");}
+exit($fail?1:0);

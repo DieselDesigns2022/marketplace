@@ -8,11 +8,11 @@ use App\Services\EmailQueueService;
 
 final class AdminEmailCampaignController
 {
-    private function admin():void{H::requireRole('admin');}
+    private function admin(bool $manage=false):void{if($_SERVER['REQUEST_METHOD']==='POST')H::verifyCsrf();H::requireAdminPermission($manage?'email_campaigns.manage':'email_campaigns.view');}
     public function index():void{$this->admin();H::view('admin/email_campaigns/index',['campaigns'=>DB::rows('select c.*,(select count(*) from email_campaign_recipients r where r.campaign_id=c.id) total,(select count(*) from email_campaign_recipients r where r.campaign_id=c.id and r.status="sent") sent,(select count(*) from email_campaign_recipients r where r.campaign_id=c.id and r.status="failed") failed from email_campaigns c order by c.created_at desc')]);}
     public function create():void
     {
-        $this->admin();$errors=[];$campaign=$_POST;$preview=false;
+        $this->admin(true);$errors=[];$campaign=$_POST;$preview=false;
         if($_SERVER['REQUEST_METHOD']==='POST'){
             $action=(string)($_POST['action']??'');
             if(!in_array($action,['preview','save','queue'],true))$errors[]='Choose Preview, Save draft, or Save and queue.';
@@ -24,7 +24,7 @@ final class AdminEmailCampaignController
     }
     public function show($id):void
     {
-        $this->admin();if(!ctype_digit((string)$id))H::abort(404);$campaign=DB::row('select * from email_campaigns where id=?',[(int)$id])??H::abort(404);
+        $this->admin($_SERVER['REQUEST_METHOD']==='POST');if(!ctype_digit((string)$id))H::abort(404);$campaign=DB::row('select * from email_campaigns where id=?',[(int)$id])??H::abort(404);
         if($_SERVER['REQUEST_METHOD']==='POST'){
             $action=(string)($_POST['action']??'');
             if(!in_array($action,['queue','cancel','test'],true)){H::flash('warning','Unsupported campaign action. No changes were made.');H::redirect('/admin/email-campaigns/'.$id);}

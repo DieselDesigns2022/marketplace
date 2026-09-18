@@ -20,16 +20,16 @@
   <?php if($app['admin_notes']): ?><h3>Admin Notes</h3><p><?=nl2br(H::e($app['admin_notes']))?></p><?php endif; ?>
 </section>
 <section class="grid">
-  <form method="post" class="card form">
+  <?php if(H::canAdmin('applications.manage')):?><form method="post" class="card form">
     <h2>Approve Application</h2>
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="id" value="<?=$app['id']?>">
     <button class="btn" name="action" value="approve">Approve Application</button>
-  </form>
-  <form method="post" class="card form">
+  </form><?php endif;?>
+  <?php if(H::canAdmin('applications.manage')):?><form method="post" class="card form">
     <h2>Deny Application</h2>
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="id" value="<?=$app['id']?>">
     <label>Denial reason <textarea name="reason" required minlength="5"><?=H::e($app['denial_reason'])?></textarea></label>
     <label>Admin notes <textarea name="admin_notes"><?=H::e($app['admin_notes'])?></textarea></label>
     <button class="btn alt" name="action" value="deny">Deny Application</button>
-  </form>
+  </form><?php endif;?>
 </section>

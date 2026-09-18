@@ -360,3 +360,10 @@ Intentionally postponed:
 - Hardened storefront product grids against card overflow/cutoff on responsive layouts.
 - Corrected Custom Design runtime directory ownership/permissions so seller preview and proof uploads can be written safely by PHP-FPM.
 - Added migration `2026_09_15_pre_12_7_extra_preview_protection.sql`.
+
+## Phase 13.1 — Unified account and Admin permissions
+- Added controlled, audited Admin/Seller account consolidation with exact-cent credit reconciliation and secure interactive password replacement.
+- Added live granular/full-access Admin authorization and protected Admin promotion management.
+- Added capability-based Buyer/Seller/Admin dashboard switching and stale-session validation.
+- Added restricted-Admin landing behavior plus permission-aware Admin navigation with unauthorized sections disabled, including Downloads.
+- Completed production migration, controlled account merge, canonical login verification, Buyer/Seller/Admin switching verification, and limited-Admin live authorization checks.
