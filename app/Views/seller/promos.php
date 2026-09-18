@@ -15,10 +15,33 @@
     </label>
     <label>Placement <select name="placement" id="promo-placement"><option value="marketplace">Marketplace</option><option value="homepage">Homepage</option><option value="category">Category</option><option value="weekly_email">Weekly Email</option></select></label>
     <label id="promo-category">Category <select name="category_id"><option value="">Choose category</option><?php foreach($categories as $c):?><option value="<?=$c['id']?>"><?=H::e($c['name'])?></option><?php endforeach;?></select></label>
-    <fieldset><legend>Package</legend><?php foreach($packages as $p):?><label class="promo-package" data-placement="<?=H::e($p['placement'])?>"><input type="radio" name="package_id" value="<?=$p['id']?>" data-summary="<?=$p['duration_value'].' '.$p['duration_unit'].($p['duration_value']>1?'s':'').' — '.H::money($p['price_cents']/100)?>"> <?=$p['duration_value'].' '.$p['duration_unit'].($p['duration_value']>1?'s':'')?> — <?=H::money($p['price_cents']/100)?></label><?php endforeach;?></fieldset>
+    <fieldset><legend>Package</legend><?php foreach($packages as $p):$placementLabel=ucwords(str_replace('_',' ',$p['placement']));$durationLabel=$p['duration_value'].' '.$p['duration_unit'].($p['duration_value']>1?'s':'');$packageLabel=$placementLabel.' — '.$durationLabel.' — '.H::money($p['price_cents']/100);?><label class="promo-package" data-placement="<?=H::e($p['placement'])?>"><input type="radio" name="package_id" value="<?=$p['id']?>" data-summary="<?=H::e($packageLabel)?>"> <?=H::e($packageLabel)?></label><?php endforeach;?></fieldset>
     <p><strong>Final:</strong> <span id="promo-summary">Choose a package</span></p>
     <button>Buy Promotion</button>
 </form>
 <script>(()=>{const f=document.querySelector('#promo-form'),t=f.target_type,p=f.placement;function sync(){document.querySelector('#promo-product').hidden=t.value!=='product';document.querySelector('#promo-category').hidden=p.value!=='category';f.querySelectorAll('.promo-package').forEach(x=>x.hidden=x.dataset.placement!==p.value);const c=f.querySelector('input[name=package_id]:checked');if(c&&c.closest('label').hidden)c.checked=false;document.querySelector('#promo-summary').textContent=(f.querySelector('input[name=package_id]:checked')||{}).dataset?.summary||'Choose a package'}f.addEventListener('change',sync);sync()})();</script>
 <h2>Campaign history</h2>
-<?php if(empty($campaigns)):?><div class="card empty-state"><h3>No promotions yet</h3><p>Your purchased promotions and verified payment status will appear here.</p></div><?php else:?><div class="promo-table"><table><tr><th>Target</th><th>Placement/package</th><th>Payment / campaign</th><th>Schedule</th><th>Results</th></tr><?php foreach($campaigns as $a):$used=(int)($a['email_appearances_used']??0);$total=(int)($a['email_total_appearances']??0);?><tr><td><?=H::e($a['target_type']==='shop'?$a['display_name']:($a['product_title']??'Unavailable product'))?></td><td><?=H::e(ucwords(str_replace('_',' ',$a['placement'])))?><?php if($a['placement']==='category'):?><br>Category: <?=H::e($a['category_name']??'Unavailable category')?><?php endif;?><br><?=$a['duration_value'].' '.$a['duration_unit']?> / <?=H::money($a['price_cents']/100)?></td><td><?=H::e($a['payment_status'])?> / <?=H::e($a['status'])?></td><td><?php if($a['placement']==='weekly_email'):?>Appearances: <?=$used?> of <?=$total?><br>Remaining: <?=max(0,$total-$used)?><?php else:?><?=H::e($a['starts_at']??'—')?> – <?=H::e($a['ends_at']??'—')?><?php endif;?></td><td><?php if($a['placement']==='weekly_email'):?>Sends: <?=(int)$a['email_recipient_sends']?><br>Clicks: <?=(int)$a['clicks']?><?php else:?><?=(int)$a['impressions']?> impressions<br><?=(int)$a['clicks']?> clicks<?php endif;?></td></tr><?php endforeach;?></table></div><?php endif;?>
+<?php if(empty($campaigns)):?><div class="card empty-state"><h3>No promotions yet</h3><p>Your purchased promotions and verified payment status will appear here.</p></div><?php else:?><div class="promo-table"><table><tr><th>Target</th><th>Placement/package</th><th>Payment / campaign</th><th>Schedule</th><th>Results</th></tr><?php foreach($campaigns as $a):$used=(int)($a['email_appearances_used']??0);$total=(int)($a['email_total_appearances']??0);?><tr><td><?=H::e($a['target_type']==='shop'?$a['display_name']:($a['product_title']??'Unavailable product'))?></td><td><?=H::e(ucwords(str_replace('_',' ',$a['placement'])))?><?php if($a['placement']==='category'):?><br>Category: <?=H::e($a['category_name']??'Unavailable category')?><?php endif;?><br><?=$a['duration_value'].' '.$a['duration_unit']?> / <?=H::money($a['price_cents']/100)?></td><?php
+$paymentLabel=match((string)$a['payment_status']){
+    'paid'=>'Paid',
+    'pending'=>'Not completed',
+    'failed'=>'Payment failed',
+    'cancelled'=>'Cancelled',
+    default=>ucwords(str_replace('_',' ',(string)$a['payment_status']))
+};
+$campaignLabel=match((string)$a['status']){
+    'active'=>'Active',
+    'paused'=>'Paused',
+    'ended'=>'Ended',
+    'pending_payment'=>'Not active',
+    'payment_failed'=>'Not active',
+    'cancelled'=>'Not active',
+    default=>ucwords(str_replace('_',' ',(string)$a['status']))
+};
+?>
+<td>
+    <?=H::e($paymentLabel)?> / <?=H::e($campaignLabel)?>
+    <?php if($a['payment_status']==='pending' && $a['status']==='pending_payment'):?>
+        <br><small class="muted">Checkout was not completed. This promotion is not active.</small>
+    <?php endif;?>
+</td><td><?php if($a['placement']==='weekly_email'):?>Appearances: <?=$used?> of <?=$total?><br>Remaining: <?=max(0,$total-$used)?><?php else:?><?=H::e($a['starts_at']??'—')?> – <?=H::e($a['ends_at']??'—')?><?php endif;?></td><td><?php if($a['placement']==='weekly_email'):?>Sends: <?=(int)$a['email_recipient_sends']?><br>Clicks: <?=(int)$a['clicks']?><?php else:?><?=(int)$a['impressions']?> impressions<br><?=(int)$a['clicks']?> clicks<?php endif;?></td></tr><?php endforeach;?></table></div><?php endif;?>

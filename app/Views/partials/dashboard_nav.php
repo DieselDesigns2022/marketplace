@@ -162,8 +162,15 @@ if ($area === 'buyer') {
             ],
         ],
 
+        'Promotions / Ads' => [
+            [
+                '/seller/promos',
+                'Manage Promotions',
+                ['/seller/promos']
+            ],
+        ],
+
         'Business' => [
-            ['/seller/promos', 'Promotions', ['/seller/promos']],
             [
                 '/seller/stripe',
                 'Payouts / Stripe',

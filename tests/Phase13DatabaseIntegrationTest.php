@@ -11,7 +11,7 @@ $check=function(bool $ok,string $message)use(&$failures):void{echo($ok?'PASS: ':
 $pdo->exec("create database `$db` character set utf8mb4 collate utf8mb4_unicode_ci");$pdo->exec("use `$db`");
 try{
     $pdo->exec("create table users(id bigint primary key,name varchar(120),email varchar(190),role varchar(30),status varchar(30));
-      create table designers(id bigint primary key,user_id bigint,display_name varchar(120),store_slug varchar(120),banner_path varchar(255),avatar_path varchar(255),status varchar(30));
+      create table designers(id bigint primary key,user_id bigint,display_name varchar(120),store_slug varchar(120),banner_path varchar(255),avatar_path varchar(255),bio text null,average_rating decimal(3,2) null default 0.00,status varchar(30));
       create table categories(id bigint primary key auto_increment,name varchar(120),slug varchar(120),description text,is_active tinyint default 1,sort_order int default 0) engine=InnoDB;
       create table products(id bigint primary key auto_increment,designer_id bigint,category_id bigint,title varchar(190),slug varchar(190),price decimal(10,2),status varchar(40),created_at timestamp default current_timestamp) engine=InnoDB;
       create table product_images(id bigint primary key auto_increment,product_id bigint,image_path varchar(255),sort_order int default 0);
@@ -22,7 +22,7 @@ try{
       create table ads(id bigint primary key auto_increment,product_id bigint null,designer_id bigint null,placement varchar(80) null,start_date date null,end_date date null,status enum('draft','active','paused','ended') default 'draft',impressions int default 0,clicks int default 0,created_at timestamp default current_timestamp,updated_at timestamp default current_timestamp on update current_timestamp) engine=InnoDB;
       insert into users values(1,'Seller One','one@example.test','designer','active'),(2,'Seller Two','two@example.test','designer','active');
       insert into email_preferences(user_id,unsubscribe_nonce) values(1,repeat('a',64));
-      insert into designers values(10,1,'Seller One','seller-one','/banner-one.webp','/avatar-one.webp','approved'),(20,2,'Seller Two','seller-two',null,'/avatar-two.webp','approved');
+      insert into designers values(10,1,'Seller One','seller-one','/banner-one.webp','/avatar-one.webp','Seller One bio',4.75,'approved'),(20,2,'Seller Two','seller-two',null,'/avatar-two.webp',null,0.00,'approved');
       insert into categories(id,name,slug,is_active,sort_order) values(1,'Graphics','graphics',1,1),(2,'Templates','templates',1,2),(3,'Disabled','disabled',0,3);
       insert into products(id,designer_id,category_id,title,slug,price,status) values(100,10,1,'One Product','one-product',9.50,'approved'),(101,10,1,'Published Product','published-product',8.00,'published'),(200,20,1,'Other Product','other-product',12.00,'approved'),(201,20,1,'Disabled Product','disabled-product',3.00,'disabled');
       insert into product_images(product_id,image_path,sort_order) values(100,'/one.webp',0),(101,'/published.webp',0),(200,'/other.webp',0);
