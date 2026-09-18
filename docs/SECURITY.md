@@ -231,3 +231,9 @@ Promotion webhook mutation is allowlisted to verified `checkout.session.complete
 Verified objects declaring `payment_kind=promo` are structurally validated before event-type dispatch: a missing, zero, or otherwise non-positive `promo_campaign_id` enters the sanitized webhook error/reporting path even when the Stripe event type is unsupported. Only after valid metadata is established may an unsupported type become a state-preserving no-op; supported allowlisted types continue through typed promotion processing.
 
 `promo_campaign_id` is accepted only as a canonical positive decimal integer: digits beginning with 1–9, no sign, whitespace, decimal point, suffix, leading zero, composite value, or out-of-range integer. Validation occurs on the raw Stripe metadata before conversion or event dispatch, preventing PHP numeric coercion from selecting a campaign.
+
+## Phase 13.1 unified account and Admin authorization
+
+Admin authorization has two independent requirements: the live `users` row must be active with `role='admin'`, and the requested action must be allowed by `AdminPermissionService`. A full-access profile permits every registered Admin action; otherwise only explicit grants apply. Only a full-access Admin can change Admin access. Restricted Admins cannot self-escalate, and the canonical owner (`angela@creativemoth.com`) cannot be disabled or stripped of full access through the management service/UI. Permission changes are transactional with their audit rows.
+
+Seller access is a capability, not an Admin shortcut: the active account must own an approved `designers` row. Protected requests refresh the session identity from `users`, so disabled/merged accounts lose access and role/email changes take effect without trusting stale session data.

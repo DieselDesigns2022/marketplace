@@ -87,9 +87,9 @@ Routes are registered in `public/index.php`.
 | GET/POST | `/admin/categories` | `AdminController::categories` | Admin protected |
 | GET | `/admin/orders` | `AdminController::orders` | Admin protected |
 | GET/POST | `/admin/order/{id}` | `AdminController::orderDetail` | Admin protected + CSRF on POST |
-| GET | `/admin/referrals` | `AdminCreditController::index` | Admin protected |
-| GET | `/admin/credits` | `AdminCreditController::index` | Admin protected alias |
-| POST | `/admin/credits/adjust` | `AdminCreditController::adjust` | Admin protected + CSRF |
+| GET | `/admin/referrals` | `AdminCreditController::index` | Requires `referrals.view`; retrieves/renders only referral relationships, commission totals, seller-referral payout batches, and transfer-attempt history |
+| GET | `/admin/credits` | `AdminCreditController::index` | Requires `credits.view`; retrieves/renders only marketplace-credit balances and selected-user ledger data |
+| POST | `/admin/credits/adjust` | `AdminCreditController::adjust` | Requires `credits.adjust`; server-side CSRF verification; redirects to `/admin/credits` |
 | GET/POST | `/admin/homepage` | `AdminController::homepage` | Admin protected |
 | GET/POST | `/admin/ads` | `AdminController::ads` | Admin protected |
 
@@ -262,10 +262,10 @@ There are no public term-list endpoints and no state-changing GET routes.
 ### Phase 11 routes
 - `GET /dashboard/referrals` — authenticated buyer balances, ledger, referrals made, and attached referral.
 - `GET /seller/referrals` — approved seller referral link and seller qualification status.
-- `GET /admin/referrals` — admin-only primary Credits & Referrals search/review page.
+- `GET /admin/referrals` — requires `referrals.view` and retrieves/renders only referral relationships, commission totals, seller-referral payout batches, and transfer-attempt history.
 - `POST /admin/platform-credit-payouts/{id}/settle` — active-admin, CSRF-protected settlement of one eligible `platform_credit_hold` from Stripe platform balance; idempotent replay returns the existing transfer.
-- `GET /admin/credits` — admin-only alias of the primary page.
-- `POST /admin/credits/adjust` — admin-only, CSRF-protected audited adjustment.
+- `GET /admin/credits` — requires `credits.view` and retrieves/renders only marketplace-credit balances and selected-user ledger data.
+- `POST /admin/credits/adjust` — requires `credits.adjust`, performs server-side CSRF verification, records an audited adjustment, and redirects back to `/admin/credits`.
 - `GET|POST /register` accepts an optional normalized `ref`; `GET|POST /apply` preserves optional `seller_ref` intent.
 
 ### Phase 11 seller-referral lifetime commission
@@ -318,3 +318,7 @@ Custom-only orders remain visible in normal buyer Purchases. Normal order detail
 - `GET|POST /admin/ads` is promotion pricing and paid-campaign administration (pause, resume, remove), not an approval queue.
 
 The Phase 13 `/admin/ads` campaign table displays campaign details and provides Pause, Resume, and Remove actions when applicable, along with package-price editing. There is no promotion approval/rejection workflow. Pause is reversible: Resume restores paid paused campaigns, extending website end time by the paused interval while preserving weekly purchased appearances. Action-specific success is shown only when the requested transition or valid package-price save succeeds.
+
+## Phase 13.1 dashboard capabilities and Admin routes
+
+Authenticated accounts always retain Buyer dashboard access at `/dashboard`. `/seller` requires ownership of an approved designer row. `/admin` requires an active Admin plus `dashboard.view`; every other `/admin` GET and mutation is checked against its registered view/manage permission. The dashboard selector links to these existing routes and never changes roles, permissions, sessions, or identity. `/admin/users` allows full-access Admins to promote an existing Buyer/Designer and assign granular or deliberate full access while preserving any designer relationship.

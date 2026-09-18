@@ -3,6 +3,8 @@
 use App\Core\Helpers as H;
 
 $role = H::user()['role'] ?? '';
+$hasSeller = H::hasApprovedDesigner((int) (H::user()['id'] ?? 0));
+$hasAdmin = $role === 'admin';
 
 $area = str_starts_with($path, '/buyer/messages')
     ? 'buyer'
@@ -102,7 +104,7 @@ if ($area === 'buyer') {
 
 } elseif (
     $area === 'seller' &&
-    in_array($role, ['designer', 'admin'], true)
+    $hasSeller
 ) {
 
     $groups = [
@@ -272,8 +274,13 @@ if ($area === 'buyer') {
             ],
             [
                 '/admin/referrals',
-                'Credits & Referrals',
-                ['/admin/referrals', '/admin/credits']
+                'Referrals',
+                ['/admin/referrals']
+            ],
+            [
+                '/admin/credits',
+                'Credits',
+                ['/admin/credits']
             ],
             [
                 '/admin/email-campaigns',
@@ -288,11 +295,29 @@ if ($area === 'buyer') {
             ],
         ],
     ];
+
+    $permissionByHref = [
+        '/admin'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
+        '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
+        '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/message-reports'=>'messages.view','/admin/ip-risk-terms'=>'ip_risk.view',
+        '/admin/payment-logs'=>'payments.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
+    ];
+    foreach ($groups as $groupName => $links) {
+        $groups[$groupName] = array_values(array_filter($links, static fn(array $link): bool => !isset($permissionByHref[$link[0]]) || H::canAdmin($permissionByHref[$link[0]])));
+        if (!$groups[$groupName]) unset($groups[$groupName]);
+    }
 }
 
 ?>
 
 <?php if ($groups): ?>
+
+<nav class="dashboard-switcher" aria-label="Choose dashboard">
+    <strong>Dashboard:</strong>
+    <a href="/dashboard" <?=$area==='buyer'?'aria-current="page" class="active"':''?>>Buyer</a>
+    <?php if($hasSeller):?><a href="/seller" <?=$area==='seller'?'aria-current="page" class="active"':''?>>Seller</a><?php endif;?>
+    <?php if($hasAdmin):?><a href="/admin" <?=$area==='admin'?'aria-current="page" class="active"':''?>>Admin</a><?php endif;?>
+</nav>
 
 <nav
     class="dashboard-nav-grouped"

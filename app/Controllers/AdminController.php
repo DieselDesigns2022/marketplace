@@ -13,14 +13,14 @@ use App\Services\CreatorRecognitionService;
 use App\Services\MarketplaceRefundService;
 use App\Services\StripeService;
 use App\Services\PromoService;
+use App\Services\AdminPermissionService;
 use Throwable;
 class AdminController
 {
-    private function gate()
+    private function gate(string $viewPermission, ?string $managePermission = null): void
     {
-        H::requireRole('admin');
-        if(!DB::row('select id from users where id=? and role="admin" and status="active"',[(int)H::user()['id']]))H::abort(403);
-
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') H::verifyCsrf();
+        H::requireAdminPermission($_SERVER['REQUEST_METHOD'] === 'POST' && $managePermission ? $managePermission : $viewPermission);
     }
     private function applicationById($id)
     {
@@ -83,7 +83,7 @@ class AdminController
 
            }
             DB::exec('update designer_applications set status="approved",denial_reason=null,updated_at=now() where id=?',[$id]);
-            DB::exec('update users set role="designer",updated_at=now() where id=?',[$a['user_id']]);
+            DB::exec('update users set role=case when role="admin" then "admin" else "designer" end,updated_at=now() where id=?',[$a['user_id']]);
             $this->log('approved_designer_application','designer_application',$id,['user_id'=>$a['user_id'],'designer_id'=>$designerId]);
             DB::commit();
             H::flash('success','Designer application approved.');
@@ -119,7 +119,7 @@ class AdminController
     }
     public function home()
     {
-        $this->gate();
+        $this->gate('dashboard.view');
         $adminId=(int)H::user()['id'];
         $stats=DB::row('select
             (select count(*) from users) total_users,
@@ -150,27 +150,18 @@ class AdminController
     }
     public function users()
     {
-        $this->gate();
+        $this->gate('users.view', 'users.manage');$permissions=new AdminPermissionService();$actor=(int)H::user()['id'];$full=$permissions->isFullAccess($actor);
         if ($_POST) {
-            H::verifyCsrf();
-            $userId = (int)($_POST['id'] ?? 0);
-            $status = ($_POST['status'] ?? '') === 'active' ? 'active' : 'disabled';
-            DB::begin();
+            $userId=(int)($_POST['id']??0);$action=(string)($_POST['action']??'status');$target=DB::row('select id,email,role,status from users where id=?',[$userId]);if(!$target)H::abort(404);
             try {
-                $commissionStopped = $status === 'disabled'
-                    && (new SellerReferralCommissionService())->permanentlyStop($userId, 'store_disabled');
-                DB::exec('update users set status=? where id=?', [$status, $userId]);
-                DB::commit();
-                if ($commissionStopped) {
-                    (new SellerReferralCommissionService())->notifyPermanentStop($userId);
+                if($action==='save_admin'){
+                    $permissions->configureAdmin($userId,(array)($_POST['permissions']??[]),($_POST['full_access']??'')==='1',$actor);if($target['role']!=='admin')$this->log('promoted_admin','user',$userId,['previous_role'=>$target['role']]);H::flash('success','Admin access updated.');
+                }else{
+                    $status=($_POST['status']??'')==='active'?'active':'disabled';if($target['role']==='admin')$permissions->requireFullAccess($actor);if($permissions->isCanonicalOwner($userId)&&$status!=='active')throw new \DomainException('The canonical owner cannot be disabled.');DB::begin();$commissionStopped=$status==='disabled'&&(new SellerReferralCommissionService())->permanentlyStop($userId,'store_disabled');DB::exec('update users set status=? where id=?',[$status,$userId]);$this->log('changed_user_status','user',$userId,['status'=>$status]);DB::commit();if($commissionStopped)(new SellerReferralCommissionService())->notifyPermanentStop($userId);H::flash('success','Account status updated.');
                 }
-            } catch (Throwable $error) {
-                DB::rollBack();
-                H::flash('error', 'Account status was not changed.');
-            }
+            } catch(Throwable $error){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$error instanceof \DomainException?$error->getMessage():'Account access was not changed.');}
         }
-        H::view('admin/users',['users'=>DB::rows('select id,name,email,role,status,created_at from users order by created_at desc')]);
-
+        H::view('admin/users',['users'=>DB::rows('select u.id,u.name,u.email,u.role,u.status,u.created_at,coalesce(p.full_access,0) full_access,(select group_concat(g.permission_key order by g.permission_key) from admin_permission_grants g where g.user_id=u.id) permission_keys from users u left join admin_access_profiles p on p.user_id=u.id order by u.created_at desc'),'permissionRegistry'=>AdminPermissionService::PERMISSIONS,'fullAccessAdmin'=>$full,'canonicalOwnerId'=>$permissions->canonicalOwnerUserId()]);
     }
     private function userDeletionBlockReason(array $user): ?string
     {
@@ -214,7 +205,7 @@ class AdminController
     }
     public function deleteUser($id): void
     {
-        $this->gate(); $id=(int)$id;
+        $this->gate('users.manage'); $id=(int)$id;
         $user=DB::row('select id,name,email,role,status from users where id=?',[$id]);
         if (!$user) { H::flash('error','User not found.'); H::redirect('/admin/users'); }
         $reason=$this->userDeletionBlockReason($user);
@@ -261,7 +252,7 @@ class AdminController
     }
     public function applications($id=null)
     {
-        $this->gate();
+        $this->gate('applications.view', 'applications.manage');
         if($_POST)
         {
            $id=(int)($_POST['id']??0);
@@ -290,7 +281,7 @@ class AdminController
     }
     public function designers()
     {
-        $this->gate();
+        $this->gate('designers.view', 'designers.manage');
         if($_POST) {
             H::verifyCsrf();
             $id = (int)($_POST['id'] ?? 0);
@@ -346,7 +337,7 @@ class AdminController
     }
     public function products()
     {
-        $this->gate();
+        $this->gate('products.view', 'products.manage');
         if($_POST)
         {
             $action = $_POST['action'] ?? '';
@@ -494,7 +485,7 @@ class AdminController
 
     public function bulkProductCleanup(): void
     {
-        $this->gate();
+        $this->gate('products.manage');
         $action = $_POST['bulk_action'] ?? '';
         $ids = array_values(array_filter(array_map('intval', $_POST['product_ids'] ?? [])));
         if (!$ids || !in_array($action, ['archive','delete'], true)) {
@@ -537,7 +528,7 @@ class AdminController
 
     public function productDetail($id)
     {
-        $this->gate();
+        $this->gate('products.view', 'products.manage');
         if($_POST)
         {
            if (($_POST['action'] ?? '') === 'regenerate_watermark') {
@@ -560,7 +551,7 @@ class AdminController
     }
     public function productIpRiskReview($id): void
     {
-        $this->gate();
+        $this->gate('ip_risk.manage');
         $productId = (int)$id;
         $action = $_POST['ip_action'] ?? '';
         $note = trim($_POST['admin_note'] ?? '');
@@ -575,14 +566,14 @@ class AdminController
 
     public function categories()
     {
-        $this->gate();
+        $this->gate('categories.view', 'categories.manage');
         if($_POST) DB::exec('insert into categories (name,slug,description,is_active) values (?,?,?,1) on duplicate key update name=values(name),description=values(description),is_active=values(is_active)',[$_POST['name'],H::slug($_POST['slug']),$_POST['description']]);
         H::view('admin/categories',['cats'=>DB::rows('select * from categories')]);
 
     }
     public function orders()
     {
-        $this->gate();
+        $this->gate('orders.view');
         H::view('admin/orders',['orders'=>DB::rows('select o.*,u.email buyer_email from orders o join users u on u.id=o.user_id order by o.created_at desc')]);
 
     }
@@ -592,7 +583,7 @@ class AdminController
     }
     public function orderDetail($id)
     {
-        $this->gate();
+        $this->gate('orders.view', 'orders.manage');
         if($_POST&&in_array($_POST['action']??'', ['resolve_adjustment','waive_adjustment'],true)){H::verifyCsrf();$adjustmentId=(int)($_POST['adjustment_id']??0);$action=$_POST['action']==='waive_adjustment'?'waived':'resolved';$note=mb_substr(trim((string)($_POST['resolution_note']??'')),0,500);try{DB::begin();$target=DB::row('select adjustment_type,reserved_cents,status from seller_financial_adjustments where id=? and order_id=? for update',[$adjustmentId,(int)$id]);if(!$target||!in_array($target['adjustment_type'],['refund_recovery','manual_recovery'],true))throw new \DomainException('Recovery adjustment was not found.');if($target['status']!=='open')throw new \DomainException('Recovery adjustment is no longer open.');if(!MarketplaceRefundService::recoveryCanClose((int)$target['reserved_cents']))throw new \DomainException('This recovery is reserved by a payout and cannot be resolved or waived until that payout finishes.');$update=DB::pdo()->prepare('update seller_financial_adjustments set status=?,balance_cents=0,note=concat_ws(" | ",note,?),resolved_by=?,resolved_at=now() where id=? and order_id=? and status="open"');$update->execute([$action,$note,H::user()['id'],$adjustmentId,(int)$id]);if($update->rowCount()!==1)throw new \DomainException('Recovery adjustment changed while it was being closed.');$this->log($action.'_seller_financial_adjustment','seller_financial_adjustment',$adjustmentId,['order_id'=>(int)$id,'note'=>$note]);DB::commit();H::flash('success','Seller financial adjustment updated.');}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$e->getMessage());}H::redirect('/admin/order/'.(int)$id);}
         if($_POST&&($_POST['action']??'')==='retry_refund_reconciliation'){H::verifyCsrf();try{$this->retryAllocatedRefund((int)$id,(int)($_POST['refund_observation_id']??0));H::flash('success','Stored refund allocation reconciled successfully.');}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$e->getMessage());}H::redirect('/admin/order/'.(int)$id);}
         if($_POST&&($_POST['action']??'')==='allocate_refund'){H::verifyCsrf();$observationId=(int)($_POST['refund_observation_id']??0);$affected=[];try{DB::begin();$ob=DB::row('select * from marketplace_refund_observations where id=? and order_id=?',[$observationId,(int)$id]);if(!$ob)throw new \DomainException('Unresolved refund observation was not found.');$service=new MarketplaceRefundService();$service->completeAllocation($observationId,(array)($_POST['refund_cents']??[]),max(0,(int)($_POST['tax_refund_cents']??0)),'admin');(new StripeController)->reconcileRefundPayouts((int)$id);$service->markReconciled($observationId);DB::exec('update seller_financial_adjustments set status="resolved",balance_cents=0,resolved_by=?,resolved_at=now(),note=concat_ws(" | ",note,"Admin completed exact item/tax allocation.") where order_id=? and adjustment_type="refund_allocation_review" and event_key like ? and status="open"',[H::user()['id'],(int)$id,'refund-allocation-review:observation:'.$observationId.':seller:%']);$service->clearReviewWhenFullyReconciled((int)$id);$affected=array_map('intval',array_column(DB::rows('select distinct designer_id from marketplace_refund_allocations a join order_items oi on oi.id=a.order_item_id where a.refund_observation_id=?',[$observationId]),'designer_id'));$this->log('allocated_refund_observation','marketplace_refund_observation',$observationId,['order_id'=>(int)$id]);DB::commit();foreach($affected as $designer){(new CreatorRecognitionService)->recalculate($designer,false,true,'refund_allocation',null,'recognition:refund-allocation:observation:'.$observationId.':seller:'.$designer);StripeService::attemptPendingTransfersForDesigner($designer);}H::flash('success','Refund allocation exactly reconciled.');}catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$e->getMessage());}H::redirect('/admin/order/'.(int)$id);}
@@ -620,7 +611,7 @@ class AdminController
 
     public function paymentLogs()
     {
-        $this->gate();
+        $this->gate('payments.view', 'payments.manage');
         $issue = in_array($_GET['issue'] ?? '', ['failed_transfers','webhook_issues','platform_credit_holds'], true) ? $_GET['issue'] : '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -720,12 +711,12 @@ class AdminController
 
     public function downloads()
     {
-        $this->gate();
+        $this->gate('downloads.view');
         H::view('admin/table',['title'=>'Download logs','rows'=>DB::rows('select dl.id,dl.order_id,dl.order_item_id,dl.product_id,dl.product_file_id,dl.status,dl.message,u.email user_email,dl.ip_address,dl.created_at from downloads dl join users u on u.id=dl.user_id order by dl.created_at desc limit 200')]);
     }
     public function homepage()
     {
-        $this->gate();
+        $this->gate('homepage.view', 'homepage.manage');
 
         if ($_POST) {
             H::verifyCsrf();
@@ -958,7 +949,7 @@ class AdminController
     }
     public function ads()
     {
-        $this->gate();
+        $this->gate('promotions.view', 'promotions.manage');
         if($_SERVER['REQUEST_METHOD']==='POST'){
             H::verifyCsrf();$id=(int)($_POST['id']??0);$action=(string)($_POST['action']??'');
             try{
@@ -1033,8 +1024,10 @@ class AdminController
 
     public function coupons($id = null)
     {
-        $this->gate();
         $creating = ($id === 'new');
+        if ($creating || $id !== null) H::requireAdminPermission('coupons.manage');
+        else $this->gate('coupons.view', 'coupons.manage');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') H::verifyCsrf();
         if ($creating) $id = null;
         if ($_POST) {
             $errors = [];
