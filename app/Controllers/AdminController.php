@@ -119,8 +119,40 @@ class AdminController
     }
     public function home()
     {
-        $this->gate('dashboard.view');
+        H::requireLogin();
         $adminId=(int)H::user()['id'];
+        $permissions=new AdminPermissionService();
+
+        if (!$permissions->can($adminId,'dashboard.view')) {
+            $firstAllowed=[
+                'users.view'=>'/admin/users',
+                'applications.view'=>'/admin/applications',
+                'designers.view'=>'/admin/designers',
+                'products.view'=>'/admin/products',
+                'ip_risk.view'=>'/admin/ip-risk-terms',
+                'categories.view'=>'/admin/categories',
+                'coupons.view'=>'/admin/coupons',
+                'orders.view'=>'/admin/orders',
+                'custom_orders.view'=>'/admin/custom-orders',
+                'downloads.view'=>'/admin/downloads',
+                'payments.view'=>'/admin/payment-logs',
+                'credits.view'=>'/admin/credits',
+                'referrals.view'=>'/admin/referrals',
+                'homepage.view'=>'/admin/homepage',
+                'promotions.view'=>'/admin/ads',
+                'messages.view'=>'/admin/message-reports',
+                'waitlist.view'=>'/admin/waitlist',
+                'email_campaigns.view'=>'/admin/email-campaigns',
+            ];
+
+            foreach ($firstAllowed as $permission=>$url) {
+                if ($permissions->can($adminId,$permission)) {
+                    H::redirect($url);
+                }
+            }
+
+            H::abort(403);
+        }
         $stats=DB::row('select
             (select count(*) from users) total_users,
             (select count(*) from users where role="buyer") total_buyers,

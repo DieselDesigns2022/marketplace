@@ -303,8 +303,10 @@ if ($area === 'buyer') {
         '/admin/payment-logs'=>'payments.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
     ];
     foreach ($groups as $groupName => $links) {
-        $groups[$groupName] = array_values(array_filter($links, static fn(array $link): bool => !isset($permissionByHref[$link[0]]) || H::canAdmin($permissionByHref[$link[0]])));
-        if (!$groups[$groupName]) unset($groups[$groupName]);
+        foreach ($links as $index => $link) {
+            $permission = $permissionByHref[$link[0]] ?? null;
+            $groups[$groupName][$index][3] = $permission === null || H::canAdmin($permission);
+        }
     }
 }
 
@@ -360,10 +362,14 @@ if ($area === 'buyer') {
 
             <div class="dashboard-nav-menu">
 
-                <?php foreach ($links as [$href, $label, $matches]): ?>
+                <?php foreach ($links as $link): ?>
+                    <?php
+                    [$href, $label, $matches] = $link;
+                    $allowed = $link[3] ?? true;
+                    $active = $allowed && $isActive($matches);
+                    ?>
 
-                    <?php $active = $isActive($matches); ?>
-
+                    <?php if ($allowed): ?>
                     <a
                         href="<?=$href?>"
                         class="<?=$active ? 'active' : ''?>"
@@ -371,6 +377,15 @@ if ($area === 'buyer') {
                     >
                         <?=H::e($label)?>
                     </a>
+                    <?php else: ?>
+                    <span
+                        class="disabled"
+                        aria-disabled="true"
+                        style="opacity:.45;cursor:not-allowed;"
+                    >
+                        <?=H::e($label)?>
+                    </span>
+                    <?php endif; ?>
 
                 <?php endforeach; ?>
 
