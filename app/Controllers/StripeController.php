@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\StripeService;
+use App\Services\PromoService;
 use App\Services\EmailQueueService;
 use App\Services\NotificationService;
 use App\Services\OperationalErrorSanitizer;
@@ -162,11 +163,33 @@ class StripeController
     private function processEvent(array $event, string $eventId, string $type): void
     {
         $object = $event['data']['object'] ?? [];
+        $promoTypes=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.async_payment_failed','checkout.session.expired','payment_intent.succeeded','payment_intent.payment_failed'];
+        if(($object['metadata']['payment_kind']??'')==='promo'){
+            $rawPromoId=$object['metadata']['promo_campaign_id']??null;
+            $validPromoId=is_int($rawPromoId)?$rawPromoId>0:(is_string($rawPromoId)&&preg_match('/^[1-9][0-9]*$/D',$rawPromoId)===1&&filter_var($rawPromoId,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])!==false);
+            if(!$validPromoId)throw new \RuntimeException('Promotion metadata is incomplete.');
+            $promoId=(int)$rawPromoId;
+            if(!in_array($type,$promoTypes,true))return;
+            $this->processPromo($object,$type,$promoId);return;
+        }
         if (str_starts_with($type, 'checkout.session.')) $this->processCheckoutSession($object, $eventId, $type);
         elseif ($type === 'payment_intent.payment_failed') $this->markFailedByIntent($object, $eventId, $object['last_payment_error']['message'] ?? 'Payment failed.');
         elseif ($type === 'payment_intent.succeeded') $this->markPaidByIntent($object, $eventId);
         elseif (in_array($type, ['charge.refunded','charge.updated'], true)) $this->processChargeRefund($object, $eventId, $type);
         elseif ($type === 'account.updated') $this->processAccountUpdated($object);
+    }
+
+    private function processPromo(array $object,string $type,int $id): void
+    {
+        if($id<1)throw new \RuntimeException('Promotion metadata is incomplete.');
+        $sessionTypes=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.async_payment_failed','checkout.session.expired'];$intentTypes=['payment_intent.succeeded','payment_intent.payment_failed'];
+        if(!in_array($type,$sessionTypes,true)&&!in_array($type,$intentTypes,true))return;
+        $isSession=in_array($type,$sessionTypes,true);$session=$isSession?($object['id']??null):null;$intent=$isSession?($object['payment_intent']??null):($object['id']??null);
+        PromoService::storeCheckoutIds($id,$session,$intent);
+        if(($type==='checkout.session.completed'&&($object['payment_status']??'')==='paid')||$type==='checkout.session.async_payment_succeeded')PromoService::activate($id,(int)($object['amount_total']??0),strtolower((string)($object['currency']??StripeService::currency())),$session,$intent);
+        elseif($type==='payment_intent.succeeded')PromoService::activate($id,(int)($object['amount_received']??$object['amount']??0),strtolower((string)($object['currency']??StripeService::currency())),null,$intent);
+        elseif(in_array($type,['checkout.session.async_payment_failed','payment_intent.payment_failed'],true))PromoService::paymentFailed($id,$session,$intent);
+        elseif($type==='checkout.session.expired')PromoService::checkoutExpired($id,$session);
     }
 
 

@@ -1,5 +1,14 @@
 # Phase History
 
+## Phase 13 correction — paid promotion durability and rotation
+Website campaigns rotate by never-served first and then oldest microsecond-precision `last_served_at`; lifetime impressions remain statistics. Legacy skeleton ads are preserved, normalized, and ended during migration. Expiration and activation notifications use stable deduplication keys and are best-effort after durable campaign state, while browser Stripe return URLs are read-only. Phase 13 now includes behavioral rendering/Checkout coverage and an opt-in disposable-MariaDB integration suite that explicitly skips when unavailable.
+
+Remaining hardening added row-locked terminal Stripe transitions, cleanup of incomplete Checkout setup, payment-date cutoffs for weekly backfills, and authoritative paid-promo revalidation immediately before weekly delivery. Final recorded appearances remain eligible only for their exact queued period, and monthly digest wording remains unchanged.
+
+Final weekly accounting consumes a purchased appearance on the first successful recipient delivery for a period rather than at queue time. A separate idempotent send ledger counts every actual recipient delivery, including additional recipients in a final campaign week. Paid promos remain unlimited; organic products only fill remaining room toward 24 cards.
+
+The final hardening pass made persisted sent-message content the sole weekly accounting authority, added emergency removal for remaining final-week recipients, stable website/final-appearance ending warnings, hourly maintenance reconciliation, category Option A targeting, and a paid-campaign gate for historical click tracking.
+
 ## Phase 12.7 — Marketplace Fee Model
 The repository implements 9% of each seller's post-discount merchandise plus $0.30 once for that seller's portion of the completed order. Integer-cent grouped rounding and deterministic item allocations are authoritative; paid licenses are merchandise, while tax and store credit are excluded from the basis. Stored checkout snapshots drive finalization and item-specific refund reconciliation. Transferred payouts remain immutable and create admin-visible recovery balances reserved against future payouts. Legacy percentage-only orders retain their historical snapshots forever. Creative Moth absorbs Stripe processing and does not use a Stripe application/Platform Pricing fee. Deployment and live Stripe verification are not implied by this repository history.
 
@@ -1123,3 +1132,20 @@ cleanup:
 - Custom Design storefront image sizing was normalized.
 - Storefront product-card overflow/cutoff was corrected.
 - Custom Design upload-directory permissions were corrected.
+# Phase 13 — Sponsored Listings, Paid Promos & Weekly Promo Emails
+
+Added database-priced shop/product promotion purchases, Stripe-webhook activation, fair website placement rotation, opaque click tracking, pause/resume/remove controls, paid-first weekly email appearances, seller history, and admin pricing/campaign operations without an approval workflow.
+
+The final Phase 13 eligibility correction aligned paid product promotions with the current public marketplace: only exact-`approved` products are selectable, purchasable, served, click-resolvable, and weekly-deliverable. `published` products are excluded, while Category Option A continues to permit an approved product in any active promotion category.
+
+The historical-link rule was finalized so paid paused and naturally ended campaigns retain eligible tracked links, while the existing admin Remove transition to `cancelled` permanently disables the link and prevents further click increments.
+
+The final admin/webhook hardening retained the admin campaign table with Pause/Resume/Remove controls, made admin feedback conditional on valid service transitions, preserved website paused duration and weekly appearances, and restricted promotion mutations/Stripe-ID storage to explicit verified Checkout Session and PaymentIntent event types. Unsupported promo-metadata events are now state-preserving no-ops.
+
+The final metadata-order correction validates every verified `payment_kind=promo` declaration before checking its event type: malformed campaign IDs are reported through the safe webhook failure path, while valid metadata on unsupported events remains a mutation-free no-op.
+
+Strict raw promotion-ID validation now rejects non-canonical or coercible Stripe metadata such as `1abc`, signed, decimal, padded, composite, and out-of-range values before integer conversion or event dispatch.
+
+Live tester feedback was addressed before Phase 13 closeout. Seller package choices now show placement, duration, and price together; abandoned or incomplete checkout history uses seller-friendly `Not completed / Not active` wording instead of raw internal statuses; seller Promotions / Ads navigation is exposed as its own dashboard group and as a Quick Action; and sponsored shop cards use the existing shop banner, title, bio, store rating state, and a tracked Visit Shop action so shop promotions fit the marketplace grid more naturally. Product sponsored cards retain their product-focused presentation.
+
+Phase 13 did not implement the Phase 13.5 public promotional graphics/library or Phase 13.6 Instagram, Pinterest, or other social automation. Sellers cannot upload custom promotional creative; sponsored cards use existing eligible shop or product data. Impressions, clicks, and sales are not guaranteed.
