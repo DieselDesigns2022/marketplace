@@ -35,6 +35,7 @@ $listingUrl = $listingType === 'custom'
             <?=H::e($sellerName !== '' ? $sellerName : 'Independent designer')?>
         <?php endif;?>
     </p>
+    <p><a href="/store/<?=H::e($sellerSlug)?>#seller-reviews"><?=empty($p['review_count'])?'No reviews yet':'★ '.number_format((float)$p['average_rating'],1).' ('.(int)$p['review_count'].' reviews)'?></a></p>
 
     <?php if(!empty($p['category_slug'])):?>
         <p>

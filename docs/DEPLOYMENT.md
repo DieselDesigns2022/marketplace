@@ -277,3 +277,12 @@ Hourly maintenance sends idempotent website 24-hour ending warnings, expires web
 10. Verify the canonical `angela@creativemoth.com` login, rejection of both old logins, Admin/Buyer/Seller capabilities, unchanged designer/store/Stripe identity and linked history, exact credit totals, stable canonical-owner protection, permissions/audits, and all required live Admin routes.
 
 None of these live migration, merge, or verification steps are claimed complete by the repository documentation.
+
+## Phase 13.2 seller ratings and reviews deployment
+
+1. Take and verify a fresh database backup immediately before the Phase 13.2 migration.
+2. Against a disposable MariaDB database first, run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase132DatabaseIntegrationTest.php`. `SKIP/UNEXECUTED` is not a pass and must not be treated as successful verification. The current Codex environment did not complete this suite because MariaDB was unavailable.
+3. Apply `database/migrations/2026_09_18_phase_13_2_seller_reviews.sql` after all earlier migrations. Record the application and do not blindly rerun this non-idempotent migration.
+4. Verify `order_items.downloaded_at`, `review_eligible_at`, and `reviewed_at`, plus the cached average, review total, and 5/4/3/2/1-star summary columns on `designers`.
+5. Verify `seller_reviews`, `seller_review_replies`, `review_reports`, `seller_review_moderation_audits`, and `seller_review_reply_moderation_audits`, including their foreign keys, unique constraints, rating check, moderation/report statuses, and independent review-query indexes.
+6. Confirm the historical eligibility backfill populated only order items with reliable `downloads.status='served'` evidence; denied and other non-served download rows must not unlock reviews.

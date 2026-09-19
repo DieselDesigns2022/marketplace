@@ -7,7 +7,7 @@ Creative Moth is a custom PHP marketplace application for selling digital design
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current repository implementation: Phase 13.1 — Unified Account Consolidation, Admin Permissions, and Dashboard Capability Switching. The production migration and controlled account merge have been completed, and canonical Buyer/Seller/Admin plus restricted-Admin live verification has passed.
+- Current repository implementation: Phase 13.2 — Seller Ratings + Reviews, building on the Phase 13.1 unified-account, Admin-permission, and dashboard-capability foundation. Phase 13.2 database-backed verification has not been completed in the current Codex environment because disposable MariaDB was unavailable.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -33,13 +33,13 @@ These features represent current implemented functionality in the codebase; phas
 - Phase 10.1 product cleanup tools for seller archive/hide, restore-as-draft, safe permanent delete, admin bulk cleanup, archived/deleted statuses, and completed-order delete protection.
 - Admin dashboards for users, applications, designers, products, categories, orders, referrals, homepage features, and ads.
 - Phase 4.5 codebase standardization for readability, plus restoration of public product previews and sell page regressions.
+- Phase 13.2 provides download-gated verified-buyer reviews with required 1–5 star ratings, optional written feedback, buyer editing, seller replies and reporting, permissioned Admin moderation, and public seller rating/review displays.
 - Phase 12.3 provides independent Weekly Emails, Monthly Emails, and Favorite/Followed-Shop Emails preferences managed at `/account`; signed category-specific unsubscribe links; weekly and monthly queue producers; and marketplace-generated favorite-shop updates. Durable per-user/product claims apply favorite-shop → weekly → monthly precedence for overlapping periods. Admin visibility is aggregate-only, sellers receive no subscriber email addresses, and transactional email remains independent. Producers use the existing durable queue; `MAIL_TRANSPORT=log` remains available locally and `MAIL_TRANSPORT=resend` enables production delivery.
 
 ### Planned / Future Phase
 
 - Stripe Checkout payment creation and webhook-driven payment status are implemented in Phase 10; production keys remain environment-only.
 - Additional payout automation and reporting workflows; Stripe Tax for US checkout is implemented in Phase 10.3B, while international VAT/GST expansion remains future work.
-- Full review workflow and review display polish.
 - Advanced search, filtering, and recommendations.
 - Advanced SEO iteration after launch data is available.
 - Phase 10.5 implements the durable email queue, log transport, escaped templates, consent controls, promotional campaign foundation, waitlist workflows, and in-app notification center. Resend production-provider authentication and request delivery are implemented; live production verification, sender verification, bounce/suppression handling, and advanced production email operations still require testing or future work as applicable.

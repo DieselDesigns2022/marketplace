@@ -49,6 +49,7 @@ if ($area === 'buyer') {
     $groups = [
         'Overview' => [
             ['/dashboard', 'Overview', ['/dashboard']],
+            ['/dashboard/reviews', 'My Reviews', ['/dashboard/reviews', '/dashboard/reviews/']],
             [
                 '/buyer/messages',
                 'Messages',
@@ -142,6 +143,7 @@ if ($area === 'buyer') {
         ],
 
         'Orders' => [
+            ['/seller/reviews', 'Reviews', ['/seller/reviews']],
             [
                 '/seller/sales',
                 'Sales / Orders',
@@ -254,6 +256,7 @@ if ($area === 'buyer') {
                 'Sellers',
                 ['/admin/designers']
             ],
+            ['/admin/reviews', 'Reviews', ['/admin/reviews']],
             [
                 '/admin/message-reports',
                 'Message Reports',
@@ -304,7 +307,7 @@ if ($area === 'buyer') {
     $permissionByHref = [
         '/admin'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
         '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
-        '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/message-reports'=>'messages.view','/admin/ip-risk-terms'=>'ip_risk.view',
+        '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/reviews'=>'reviews.view','/admin/message-reports'=>'messages.view','/admin/ip-risk-terms'=>'ip_risk.view',
         '/admin/payment-logs'=>'payments.view','/admin/downloads'=>'downloads.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
     ];
     foreach ($groups as $groupName => $links) {

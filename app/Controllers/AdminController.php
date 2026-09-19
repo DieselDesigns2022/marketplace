@@ -128,6 +128,7 @@ class AdminController
                 'users.view'=>'/admin/users',
                 'applications.view'=>'/admin/applications',
                 'designers.view'=>'/admin/designers',
+                'reviews.view'=>'/admin/reviews',
                 'products.view'=>'/admin/products',
                 'ip_risk.view'=>'/admin/ip-risk-terms',
                 'categories.view'=>'/admin/categories',
