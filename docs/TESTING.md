@@ -510,3 +510,9 @@ Final live/external testing verified real Stripe promotion purchase and webhook 
 ## Phase 13.1 verification
 
 Run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase131DatabaseIntegrationTest.php` only with MariaDB credentials allowed to create and drop an isolated database. Also run `php tests/Phase106DashboardUsabilityTest.php`, `php tests/Phase123AccountSettingsTest.php`, `php tests/Phase125InternalMessagingTest.php`, and `php tests/Phase11ReferralsCreditsStoreCreditTest.php`. If MariaDB is unavailable, report the Phase 13.1 database suite as `SKIP/UNEXECUTED`, never as passed.
+
+## Phase 13.2
+
+Run `php tests/Phase132SellerReviewsTest.php` for the fast structural regression suite. It checks delivery completion before eligibility; failed delivery not unlocking eligibility; isolated notification failures; self-review prevention; one review per order item; required review indexes; whole-star and text validation; centralized recalculation; preserved reply moderation; removed replies staying removed; report lifecycle presence; mandatory moderation notes; safe unexpected-error handling; complete Admin filters; absence of destructive seller review routes; public hiding of removed replies; and historical eligibility from `served` evidence only.
+
+Run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase132DatabaseIntegrationTest.php` only with MariaDB credentials permitted to create and drop an isolated database. The suite applies the actual Phase 13.2 migration and exercises eligibility, validation, aggregates, seller authorization, reports, review/reply moderation, notifications, and historical snapshots. When disposable MariaDB is unavailable it explicitly prints `SKIP/UNEXECUTED`; that result is not a pass. The current Codex execution was `SKIP/UNEXECUTED` because MariaDB was unavailable, so repository documentation does not claim database-backed Phase 13.2 verification passed.

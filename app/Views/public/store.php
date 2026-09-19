@@ -65,11 +65,8 @@
         </strong>
         <span>Sales</span>
     </div>
-    <div class="card">
-        <strong>
-        <?=H::e((string)($d['average_rating'] ?? '0.00'))?>
-        </strong>
-        <span>Average rating</span>
+    <div class="card"><a href="#seller-reviews"><strong><?=empty($d['review_count'])?'No reviews yet':str_repeat('★',5).' '.number_format((float)$d['average_rating'],1).' ('.(int)$d['review_count'].' reviews)'?></strong></a>
+        <span>Seller rating</span>
     </div>
 </section>
 <?php if(!empty($d['announcement'])): ?>
@@ -190,3 +187,7 @@
 <?php endif; ?>
 </section>
 </article>
+<section id="seller-reviews" class="card"><h2>Seller Reviews</h2>
+<?php if(empty($reviews)):?><p>No reviews yet</p><?php else:?><p><strong aria-label="<?=number_format((float)$d['average_rating'],1)?> out of 5 stars"><?=str_repeat('★',(int)round($d['average_rating']))?> <?=number_format((float)$d['average_rating'],1)?> (<?=(int)$d['review_count']?> reviews)</strong></p>
+<div class="rating-distribution"><?php for($n=5;$n>=1;$n--):?><p><?=$n?> stars: <?=(int)$d['rating_'.$n.'_count']?></p><?php endfor;?></div>
+<?php foreach($reviews as $r):?><article id="review-<?=(int)$r['id']?>"><h3><?=str_repeat('★',(int)$r['rating'])?> <span class="sr-only"><?=(int)$r['rating']?> out of 5</span></h3><p><?=H::e($r['buyer_name_snapshot'])?> · <strong>Verified Purchase</strong> · <?=H::e($r['product_title_snapshot'])?></p><?php if($r['review_text']):?><p><?=nl2br(H::e($r['review_text']))?></p><?php endif;?><small><?=H::e($r['reviewed_at'])?><?=$r['edited_at']?' · Edited':''?></small><?php if($r['reply_text']&&$r['reply_moderation_status']==='published'):?><aside><strong>Seller Response</strong><p><?=nl2br(H::e($r['reply_text']))?></p><small><?=H::e($r['reply_created_at'])?><?php if(strtotime($r['reply_updated_at'])>strtotime($r['reply_created_at'])):?> · Edited<?php endif;?></small></aside><?php endif;?></article><?php endforeach;?><?php endif;?></section>

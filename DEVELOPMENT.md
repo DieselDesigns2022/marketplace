@@ -79,7 +79,8 @@ All POST requests are checked by the router through `Helpers::verifyCsrf()`. For
 4. Buyer adds approved products to cart.
 5. Buyer checkout creates a Stripe-backed pending order snapshot and redirects to Stripe Checkout; webhooks, not browser redirects, confirm payment.
 6. Buyer views purchases/order detail with license, fulfillment, download, or manual delivery status.
-7. Buyer downloads through protected download routes only after the order is in a paid/fulfilled/completed status.
+7. Protected digital-product downloads require `payment_status="paid"`; fulfilled or completed order status alone does not grant access. After a protected file is successfully delivered, Phase 13.2 unlocks one review for that specific order item.
+8. Buyer can create and later edit only their own review while the transaction identity and verified-purchase state remain fixed.
 
 ## Seller workflow
 
@@ -91,6 +92,7 @@ All POST requests are checked by the router through `Helpers::verifyCsrf()`. For
 6. Seller submits products for admin review.
 7. Approved products appear publicly.
 8. Seller reviews sales, referrals, and rank pages.
+9. Seller can view received reviews, create or edit their own public response, and report a review. Sellers cannot delete or hide buyer reviews or change buyer ratings or feedback.
 
 ## Admin workflow
 
@@ -99,6 +101,7 @@ All POST requests are checked by the router through `Helpers::verifyCsrf()`. For
 3. Admin approves/denies applications.
 4. Admin moderates products.
 5. Admin manages categories, designers, users, homepage features, ads, orders, and referrals.
+6. `reviews.view` grants read-only review/report access. `reviews.manage` is required for review moderation, report resolution, and seller-reply removal or restoration.
 
 ## Product workflow
 

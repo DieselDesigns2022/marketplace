@@ -367,3 +367,7 @@ Intentionally postponed:
 - Added capability-based Buyer/Seller/Admin dashboard switching and stale-session validation.
 - Added restricted-Admin landing behavior plus permission-aware Admin navigation with unauthorized sections disabled, including Downloads.
 - Completed production migration, controlled account merge, canonical login verification, Buyer/Seller/Admin switching verification, and limited-Admin live authorization checks.
+
+## Phase 13.2 — Seller ratings and reviews (2026-09-18)
+- Added download-gated verified-purchase seller reviews, buyer editing, seller replies/reports, Admin moderation/auditing, notifications, cached distributions, and public storefront ratings.
+- Corrected Phase 13.2 delivery completion timing, self-review prevention, historical buyer context, reply edit/moderation visibility, complete Admin filters, mandatory moderation notes, report lifecycle handling, review indexes, safe errors, and disposable database coverage.

@@ -408,3 +408,15 @@ For website campaigns, `starts_at` is the verified Stripe payment activation tim
 ## Phase 13.1 account consolidation storage
 
 Migration `database/migrations/2026_09_18_phase_13_1_unified_account_foundation.sql` adds `users.merged_into_user_id`/`merged_at`, `account_merge_audits`, and the Admin profile, grant, and permission-audit tables. The merge audit records identities, row counts, reconciliation results, source disablement, and a non-secret `password_reset_confirmed` flag; it never stores passwords, hashes, tokens, or Stripe secrets. Historical designer-linked records retain the same designer ID, slug, Stripe Connect state, products, sales, payouts, promotions, rank, and founder history. Credit transfers use exact integer cents and paired idempotent ledger entries while retaining existing ledger history.
+
+## Phase 13.2 seller reviews
+
+Migration `database/migrations/2026_09_18_phase_13_2_seller_reviews.sql` adds `order_items.downloaded_at`, `order_items.review_eligible_at`, and `order_items.reviewed_at`. Historical eligibility is backfilled only from reliable `downloads.status='served'` evidence; denied or otherwise non-served records do not qualify.
+
+`seller_reviews` permanently links the buyer, designer, product, order, and order item and retains buyer, seller, and product snapshots. Its moderation statuses are `published`, `under_review`, and `removed`. A unique constraint on `order_item_id` enforces one review per purchased order item. Independent indexes cover designer, buyer, product, order, rating, moderation status, `reviewed_at`, and `created_at`, with an additional public seller/status/date index.
+
+`seller_review_replies` permits one reply per review through its unique `review_id` constraint and uses `published` and `removed` moderation statuses. Admin removal preserves the response. `seller_review_reply_moderation_audits` preserves reply removal/restoration actions, acting Admin, previous status, required reason, required internal note, and timestamp.
+
+`review_reports` prevents duplicate reports from the same seller for the same review through a unique `(review_id, designer_id)` constraint. Its lifecycle statuses are `open`, `reviewing`, `reviewed`, `no_action`, `review_removed`, and `resolved`. It retains the reviewing/resolving Admin, Admin note, `reviewed_at`, and `resolved_at` where applicable. Review moderation remains preserved in `seller_review_moderation_audits`; review and reply moderation audit notes are required.
+
+Cached `average_rating`, `review_count`, and 5/4/3/2/1-star counts live on `designers`. Only reviews with `moderation_status='published'` are included, and application mutations use the centralized `SellerReviewService::recalculate()` path.
