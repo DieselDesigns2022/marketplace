@@ -1153,3 +1153,7 @@ Phase 13 did not implement the Phase 13.5 public promotional graphics/library or
 ## Phase 13.1 — Unified account foundation and dashboard capabilities
 
 Added the controlled Admin/Seller consolidation, auditable exact-credit reconciliation, live Admin permission model and promotion restrictions, stale-session retirement, and Buyer/Seller/Admin capability switching. The canonical account remains an Admin while owning the existing approved designer record. Production migration and controlled merge were completed successfully. Live verification confirmed canonical Buyer/Seller/Admin access, restricted-Admin permission enforcement, disabled unauthorized Admin navigation, and direct-route 403 protection.
+
+## Phase 13.2 — Seller Ratings + Reviews
+Added verified, item-level post-download reviews with seller responses/reporting, permissioned Admin moderation, preserved audits, cached rating summaries, notifications, and public storefront review displays.
+- Phase 13.2 corrections moved eligibility after completed delivery, added self-review rejection, completed report and reply moderation lifecycles, expanded Admin filtering, and added real disposable-database coverage.

@@ -102,11 +102,11 @@
                             <span>
                                 <?=number_format((int)($d['follower_count'] ?? 0))?> followers
                             </span>
-                            <?php if((float)($d['average_rating'] ?? 0) > 0): ?>
-                                <span>
-                                    ★ <?=number_format((float)$d['average_rating'], 1)?>
-                                </span>
-                            <?php endif; ?>
+                            <a href="/store/<?=H::e($d['store_slug'])?>#seller-reviews">
+                                <?=((int)($d['review_count'] ?? 0) > 0)
+                                    ? '★ '.number_format((float)$d['average_rating'], 1).' ('.(int)$d['review_count'].' reviews)'
+                                    : 'No reviews yet'?>
+                            </a>
                         </div>
 
                         <a

@@ -277,3 +277,14 @@ Hourly maintenance sends idempotent website 24-hour ending warnings, expires web
 10. Verify the canonical `angela@creativemoth.com` login, rejection of both old logins, Admin/Buyer/Seller capabilities, unchanged designer/store/Stripe identity and linked history, exact credit totals, stable canonical-owner protection, permissions/audits, and all required live Admin routes.
 
 None of these live migration, merge, or verification steps are claimed complete by the repository documentation.
+
+## Phase 13.2 seller ratings and reviews deployment
+
+1. Take and verify a fresh database backup immediately before the Phase 13.2 migration.
+2. Against a disposable MariaDB database first, run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase132DatabaseIntegrationTest.php`. `SKIP/UNEXECUTED` is not a pass and must not be treated as successful verification. The current Codex environment did not complete this suite because MariaDB was unavailable.
+3. Apply `database/migrations/2026_09_18_phase_13_2_seller_reviews.sql` after all earlier migrations. Record the application and do not blindly rerun this non-idempotent migration.
+4. After the original Phase 13.2 migration succeeds, apply `database/migrations/2026_09_20_phase_13_2_custom_design_reviews_live_fix.sql`. The live-fix migration depends on the original `seller_reviews` table and must never be run first.
+5. Verify `order_items.downloaded_at`, `review_eligible_at`, and `reviewed_at`, plus the cached average, review total, and 5/4/3/2/1-star summary columns on `designers`.
+6. Verify `seller_reviews.product_id` is nullable, `custom_service_id` has its index and restrictive foreign key, and `seller_reviews_purchase_link_check` requires exactly one product/custom-service identity. Also verify the existing unique `order_item_id`, rating check, moderation/report statuses, audit tables, and independent review-query indexes.
+7. Confirm the original historical eligibility backfill populated only normal order items with reliable `downloads.status='served'` evidence; denied and other non-served download rows must not unlock reviews. Do not backfill Custom Design eligibility: existing completed custom purchases must establish evidence by successfully downloading their final file again.
+8. Smoke-test that only an eligible buyer download of a completed final Custom Design file unlocks a review. Proof/reference downloads, seller/Admin access, failed delivery, and repeats must not create eligibility or duplicate notifications. Confirm normal partially-refunded products remain ineligible while an otherwise eligible partially-refunded Custom Design remains reviewable.

@@ -322,3 +322,8 @@ The Phase 13 `/admin/ads` campaign table displays campaign details and provides 
 ## Phase 13.1 dashboard capabilities and Admin routes
 
 Authenticated accounts always retain Buyer dashboard access at `/dashboard`. `/seller` requires ownership of an approved designer row. `/admin` requires an active Admin; full-access or `dashboard.view` Admins see the overview, while restricted Admins are redirected to their first permitted Admin section. Every other `/admin` GET and mutation is checked against its registered view/manage permission. The Admin navigation keeps all sections visible, disables sections without permission, and includes `/admin/downloads` under `downloads.view`. The dashboard selector links to the existing Buyer/Seller/Admin routes and never changes roles, permissions, sessions, or identity. `/admin/users` allows full-access Admins to promote an existing Buyer/Designer and assign granular or deliberate full access while preserving any designer relationship.
+
+## Phase 13.2 reviews
+- Buyer: `GET /dashboard/reviews`, `GET|POST /dashboard/reviews/new/{orderItemId}`, `GET|POST /dashboard/reviews/{reviewId}`.
+- Seller: `GET /seller/reviews`, `POST /seller/reviews/{reviewId}/reply`, `POST /seller/reviews/{reviewId}/report`.
+- Admin: `GET|POST /admin/reviews` (`reviews.view` / `reviews.manage`).

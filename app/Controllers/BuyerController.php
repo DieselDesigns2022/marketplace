@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\SellerReceiptService;
+use App\Services\SellerReviewService;
 class BuyerController
 {
     private function protectedFileAvailable(?string $storagePath): bool
@@ -36,7 +37,7 @@ class BuyerController
     {
         H::requireLogin();
         $order=DB::row('select * from orders where id=? and user_id=?',[(int)$id,H::user()['id']])??H::abort(404);
-        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title,"Purchased item") title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id,(select storage_path from product_files pf where pf.product_id=p.id order by id limit 1) file_storage_path from order_items oi left join products p on p.id=oi.product_id left join designers d on d.id=oi.designer_id where oi.order_id=?',[$order['id']]);
+        $items=DB::rows('select oi.*,(select id from seller_reviews sr where sr.order_item_id=oi.id) review_id,coalesce(oi.product_title,p.title,"Purchased item") title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(select id from product_files pf where pf.product_id=p.id order by id limit 1) file_id,(select storage_path from product_files pf where pf.product_id=p.id order by id limit 1) file_storage_path from order_items oi left join products p on p.id=oi.product_id left join designers d on d.id=oi.designer_id where oi.order_id=?',[$order['id']]);
         foreach($items as &$item) $item['file_available']=$this->protectedFileAvailable($item['file_storage_path']??null);
         unset($item);
         $customOrder=DB::row('select * from custom_orders where order_id=? and buyer_user_id=?',[$order['id'],H::user()['id']]);
@@ -48,10 +49,10 @@ class BuyerController
     {
         H::requireLogin();
         $uid=(int)H::user()['id'];
-        $items=DB::rows('select oi.*,o.payment_status,o.status order_status,o.created_at purchase_date,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,pf.id file_id,pf.original_name file_name,pf.storage_path from order_items oi join orders o on o.id=oi.order_id join products p on p.id=oi.product_id left join product_files pf on pf.product_id=oi.product_id left join designers d on d.id=oi.designer_id where o.user_id=? order by o.created_at desc,oi.id desc,pf.id',[$uid]);
+        $items=DB::rows('select oi.*,(select id from seller_reviews sr where sr.order_item_id=oi.id) review_id,o.payment_status,o.status order_status,o.created_at purchase_date,coalesce(oi.product_title,p.title) title,coalesce(oi.product_slug,p.slug) slug,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,d.store_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,pf.id file_id,pf.original_name file_name,pf.storage_path from order_items oi join orders o on o.id=oi.order_id join products p on p.id=oi.product_id left join product_files pf on pf.product_id=oi.product_id left join designers d on d.id=oi.designer_id where o.user_id=? order by o.created_at desc,oi.id desc,pf.id',[$uid]);
         foreach($items as &$item) $item['file_available']=$this->protectedFileAvailable($item['storage_path']??null);
         unset($item);
-        $customFinals=DB::rows('select f.*,co.id custom_order_id,co.service_snapshot,o.created_at purchase_date,d.display_name seller_name from custom_order_files f join custom_orders co on co.id=f.custom_order_id join orders o on o.id=co.order_id join designers d on d.id=co.designer_id where co.buyer_user_id=? and co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded") order by f.created_at desc',[$uid]);
+        $customFinals=DB::rows('select f.*,co.id custom_order_id,co.order_item_id,co.service_snapshot,o.created_at purchase_date,d.display_name seller_name,oi.review_eligible_at,(select id from seller_reviews sr where sr.order_item_id=co.order_item_id) review_id from custom_order_files f join custom_orders co on co.id=f.custom_order_id join orders o on o.id=co.order_id join order_items oi on oi.id=co.order_item_id join designers d on d.id=co.designer_id where co.buyer_user_id=? and co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded") order by f.created_at desc',[$uid]);
         H::view('buyer/downloads',['items'=>$items,'customFinals'=>$customFinals]);
 
     }
@@ -72,11 +73,16 @@ class BuyerController
             DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$file,'denied','Protected file is unavailable.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
             H::abort(404);
         }
-        DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,ip_address,user_agent) values (?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$f['id'],'served',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
-        DB::exec('update order_items set download_count=download_count+1 where id=?',[$f['order_item_id']]);
         header('Content-Type: application/octet-stream');
         header('Content-Disposition: attachment; filename="'.basename($f['original_name']).'"');
-        readfile($real);
+        $delivered=readfile($real);
+        if($delivered===false) {
+            try { DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,message,ip_address,user_agent) values (?,?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$f['id'],'denied','Protected file delivery failed.',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']); } catch (\Throwable $e) { error_log('Download failure logging failed.'); }
+            exit;
+        }
+        DB::exec('insert into downloads (user_id,order_id,order_item_id,product_id,product_file_id,status,ip_address,user_agent) values (?,?,?,?,?,?,?,?)',[H::user()['id'],$f['order_id'],$f['order_item_id'],$f['product_id'],$f['id'],'served',$_SERVER['REMOTE_ADDR']??'',$_SERVER['HTTP_USER_AGENT']??'']);
+        DB::exec('update order_items set download_count=download_count+1 where id=?',[$f['order_item_id']]);
+        try { (new SellerReviewService())->markDownloaded((int)$f['order_item_id'],(int)H::user()['id']); } catch (\Throwable $e) { \App\Services\NotificationService::reportFailure('post-download review eligibility',$e); }
         exit;
 
     }
