@@ -30,11 +30,12 @@
            <?php elseif(($i['fulfillment_type'] ?? 'downloadable')==='downloadable'):?>
              <?php $paymentStatus = $order['payment_status'] ?? ''; $downloadExpired = !empty($i['download_expires_at']) && strtotime($i['download_expires_at']) < time(); $downloadEligible = $i['file_id'] && !empty($i['file_available']) && $paymentStatus === 'paid' && !$downloadExpired; ?>
              <?php if($paymentStatus==='refunded'):?><span class="muted">Refunded — download unavailable.</span><?php elseif($downloadEligible):?><a class="btn" href="/download/<?=$i['file_id']?>">Download</a><?php elseif($downloadExpired):?><span class="muted">Download access has expired.</span><?php elseif($paymentStatus==='paid'):?><span class="muted">File unavailable.</span><?php else:?><span class="muted">Download access unlocks after Stripe webhook payment confirmation.</span><?php endif;?>
-             <br><span class="muted">Downloads: <?=number_format((int)($i['download_count'] ?? 0))?></span><?php if(!empty($i['review_id'])):?><br><a href="/dashboard/reviews/<?=(int)$i['review_id']?>">View/Edit Review</a><?php elseif(!empty($i['review_eligible_at'])):?><br><a href="/dashboard/reviews/new/<?=(int)$i['id']?>">Leave a Review</a><?php endif;?>
+             <br><span class="muted">Downloads: <?=number_format((int)($i['download_count'] ?? 0))?></span>
            <?php else:?>
              <span>Status: <?=H::e(str_replace('_',' ', $i['manual_delivery_status']))?></span><br>
              <?php if(($order['payment_status'] ?? $order['status']) === 'paid'):?><span class="muted">Google Drive email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?></span><?php else:?><span class="muted">Google Drive delivery details unlock after payment clears.</span><?php endif;?>
            <?php endif;?>
+           <?php if(!empty($i['review_id'])):?><br><a href="/dashboard/reviews/<?=(int)$i['review_id']?>">View/Edit Review</a><?php elseif(!empty($i['review_eligible_at'])):?><br><a href="/dashboard/reviews/new/<?=(int)$i['id']?>">Leave a Review</a><?php endif;?>
            </td>
         <td><?php if(in_array(($order['payment_status']??$order['status']),['paid','partially_refunded'],true)):?><form method="post" action="<?=($i['fulfillment_type']??'')==='custom_design'?'/messages/start/custom-order/'.(int)$customOrder['id']:'/messages/start/buyer-order-item/'.(int)$i['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Message seller</button></form><?php else:?><span class="muted">Available after eligible payment</span><?php endif;?></td>
         </tr>
