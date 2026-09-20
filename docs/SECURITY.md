@@ -53,6 +53,12 @@ Product files must not be directly public. Download routes must verify the curre
 
 The repository should ignore environment files, public uploads, protected uploads, backups, logs, and other generated artifacts. If new generated folders are added, update `.gitignore` before committing work.
 
+### Phase 13.5 Promo Graphics
+
+Public Promotional Graphics Library image bytes are stored outside the web root under `storage/protected_uploads/promo_graphics` and are delivered only through application routes. Public inline/download delivery requires an active, non-archived database row; Admin preview requires `promotions.view` and a non-archived row. Both delivery paths canonicalize the configured file and require it to remain inside the promo-graphics directory, be a readable regular file, and send `X-Content-Type-Options: nosniff`. Public responses use the persisted detected MIME; downloads use an encoded original filename. Admin preview is private/no-store.
+
+Upload, replacement, and archive mutations require `promotions.manage`, with CSRF validation on POST. Uploads are limited to 10 MB and 25 megapixels; must be genuine PHP uploads; and must have matching allowlisted JPG/JPEG, PNG, or WEBP extension, Fileinfo MIME, and decoded image MIME. Exact PNG/WEBP/JPEG container termination and GD decoding are required. Stored names are random, permissions are restricted, failed persistence removes only the newly stored file, and successful replacement unlinks only an allowlisted, canonically contained prior promo file. Soft archive disables public eligibility and retains the protected file and attributed database record.
+
 ## Phase 8.5 licensing security
 - Seller license saves continue to load products by both product id and designer id before editing.
 - License pricing is server-authoritative: Personal is always included/free, seller-enabled add-on licenses may be free (`$0.00`) or paid, cart totals are recalculated server-side, and order items snapshot selected licenses plus their prices.

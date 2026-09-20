@@ -205,6 +205,7 @@ if ($area === 'buyer') {
                 ['/admin/homepage']
             ],
             ['/admin/ads', 'Promotions', ['/admin/ads']],
+            ['/admin/promo-library', 'Promo Graphics', ['/admin/promo-library', '/admin/promo-library/']],
             [
                 '/admin/waitlist',
                 'Waitlist',
@@ -305,7 +306,7 @@ if ($area === 'buyer') {
     ];
 
     $permissionByHref = [
-        '/admin'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
+        '/admin'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/promo-library'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
         '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
         '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/reviews'=>'reviews.view','/admin/message-reports'=>'messages.view','/admin/ip-risk-terms'=>'ip_risk.view',
         '/admin/payment-logs'=>'payments.view','/admin/downloads'=>'downloads.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',

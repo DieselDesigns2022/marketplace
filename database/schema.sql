@@ -16,6 +16,30 @@ CREATE TABLE users
     UNIQUE KEY users_referral_code_unique(referral_code)
 );
 
+CREATE TABLE promo_graphics (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  platform ENUM('pinterest','instagram_square','instagram_story','facebook','website_banners','email_graphics','profile_header') NOT NULL,
+  size_label VARCHAR(100) NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  image_path VARCHAR(255) NOT NULL,
+  original_name VARCHAR(190) NOT NULL,
+  mime_type ENUM('image/jpeg','image/png','image/webp') NOT NULL,
+  alt_text VARCHAR(500) NOT NULL,
+  suggested_caption TEXT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  archived_by BIGINT NULL,
+  archived_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY promo_graphics_public_idx(is_active,archived_at,platform,sort_order,id),
+  CONSTRAINT promo_graphics_created_by_fk FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT promo_graphics_updated_by_fk FOREIGN KEY(updated_by) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT promo_graphics_archived_by_fk FOREIGN KEY(archived_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE designer_applications
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

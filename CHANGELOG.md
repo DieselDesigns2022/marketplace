@@ -1,5 +1,9 @@
 # Changelog
 
+## Phase 13.5 — Public Promotional Graphics Library
+- Added the public Creative Moth Promo Graphics library, grouped by the seven approved platforms and then by size, with accessible images, optional suggested captions, copy-link, attachment download, and Web Share actions.
+- Added permissioned Admin upload, metadata editing, active/inactive control, sort ordering, safe image replacement, and soft archival backed by validated protected image storage.
+
 ## Phase 12.7 — Marketplace Fee Model
 - Replaced the current percentage-only marketplace commission with one integer-cent, seller-grouped fee: 9% of post-discount merchandise plus $0.30 once per seller per completed order.
 - Added immutable item and seller/order snapshots, deterministic largest-remainder item allocation, cumulative-refund entitlement recalculation, transferred-payout recovery records, and fee-cap warnings.
