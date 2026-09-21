@@ -20,6 +20,9 @@ Routes are registered in `public/index.php`.
 | GET | `/` | `PublicController::home` | Public |
 | GET | `/browse` | `PublicController::browse` | Public |
 | GET | `/sell` | `PublicController::sell` | Public |
+| GET | `/promo-library` | `PromoLibraryController::index` | Public; active, non-archived graphics only |
+| GET | `/promo-library/image/{id}` | `PromoLibraryController::image` | Public; active, non-archived inline image only |
+| GET | `/promo-library/download/{id}` | `PromoLibraryController::download` | Public; active, non-archived attachment only |
 | GET | `/category/{slug}` | `PublicController::category` | Public |
 | GET | `/product/{slug}` | `PublicController::product` | Public |
 | GET | `/store/{slug}` | `PublicController::store` | Public |
@@ -92,6 +95,13 @@ Routes are registered in `public/index.php`.
 | POST | `/admin/credits/adjust` | `AdminCreditController::adjust` | Requires `credits.adjust`; server-side CSRF verification; redirects to `/admin/credits` |
 | GET/POST | `/admin/homepage` | `AdminController::homepage` | Admin protected |
 | GET/POST | `/admin/ads` | `AdminController::ads` | Admin protected |
+| GET | `/admin/promo-library` | `AdminPromoGraphicController::index` | Requires `promotions.view` |
+| GET/POST | `/admin/promo-library/new` | `AdminPromoGraphicController::create` | Requires `promotions.manage`; POST is CSRF protected |
+| GET/POST | `/admin/promo-library/{id}` | `AdminPromoGraphicController::update` | Requires `promotions.manage`; POST is CSRF protected |
+| GET | `/admin/promo-library/{id}/image` | `AdminPromoGraphicController::image` | Requires `promotions.view` |
+| POST | `/admin/promo-library/{id}/archive` | `AdminPromoGraphicController::archive` | Requires `promotions.manage` and CSRF |
+
+The public Promo Graphics routes expose only active, non-archived records. Inline and attachment responses resolve files only inside `storage/protected_uploads/promo_graphics`, send the stored detected MIME type and `X-Content-Type-Options: nosniff`, and return 404 for an ineligible record or unavailable file. The Admin image route can preview active or inactive non-archived records, requires `promotions.view`, and uses private, no-store caching. Create/edit pages require `promotions.manage`; their POST requests upload or replace the image and update platform, size, category, alt text, optional caption, active state, and sort order. Archive is a CSRF-protected soft archive rather than a file or row deletion.
 
 ## Cart, checkout, and download routes
 

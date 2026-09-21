@@ -1157,3 +1157,7 @@ Added the controlled Admin/Seller consolidation, auditable exact-credit reconcil
 ## Phase 13.2 — Seller Ratings + Reviews
 Added verified, item-level post-download reviews with seller responses/reporting, permissioned Admin moderation, preserved audits, cached rating summaries, notifications, and public storefront review displays.
 - Phase 13.2 corrections moved eligibility after completed delivery, added self-review rejection, completed report and reply moderation lifecycles, expanded Admin filtering, and added real disposable-database coverage.
+
+## Phase 13.5 — Public Promotional Graphics Library
+
+Added the public Creative Moth Promo Graphics library with active, non-archived graphics grouped by approved platform and size, then shown in configured sort order. Public cards retain category, useful alt text, optional suggested caption, copy-link, attachment download, and Web Share actions with responsive presentation. Permissioned Admins can upload strictly validated JPG/PNG/WEBP images into protected storage, edit metadata and visibility, replace images safely, reorder entries, preview inactive records, and soft-archive records without changing Phase 13 paid promotions or adding Phase 13.6 social auto-posting.

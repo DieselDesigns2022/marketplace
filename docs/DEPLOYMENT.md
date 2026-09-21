@@ -10,6 +10,14 @@ Apply `database/migrations/2026_09_15_phase_12_7_marketplace_fee_model.sql` befo
 - Stack: Ubuntu, Nginx, PHP 8.3, MariaDB
 - Error log: `/var/log/nginx/marketplace.error.log`
 
+## Phase 13.5 Promo Graphics storage
+
+Apply `database/migrations/2026_09_20_phase_13_5_public_promo_library.sql` before enabling the Public Promotional Graphics Library. Provision `storage/protected_uploads/promo_graphics` outside the public web root for the PHP runtime identity; it must be writable by PHP, unreadable through direct Nginx paths, and excluded from Git and deployment cleanup. A typical production check is:
+
+```bash
+sudo -u www-data sh -c 'mkdir -p storage/protected_uploads/promo_graphics && touch storage/protected_uploads/promo_graphics/.write-test && rm storage/protected_uploads/promo_graphics/.write-test'
+```
+
 ## Source of truth
 
 GitHub is the source of truth. The VPS is the deployment and testing target. Codex is temporary and must not be treated as permanent source control.

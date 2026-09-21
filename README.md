@@ -7,7 +7,7 @@ Creative Moth is a custom PHP marketplace application for selling digital design
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current repository implementation: Phase 13.2 — Seller Ratings + Reviews, building on the Phase 13.1 unified-account, Admin-permission, and dashboard-capability foundation. Phase 13.2 database-backed verification has not been completed in the current Codex environment because disposable MariaDB was unavailable.
+- Current repository implementation: Phase 13.5 — Public Promotional Graphics Library, building on the Phase 13.2 Seller Ratings + Reviews and Phase 13.1 unified-account foundation. Environment-dependent Phase 13.5 live verification remains documented in `docs/TESTING.md`.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -34,6 +34,7 @@ These features represent current implemented functionality in the codebase; phas
 - Admin dashboards for users, applications, designers, products, categories, orders, referrals, homepage features, and ads.
 - Phase 4.5 codebase standardization for readability, plus restoration of public product previews and sell page regressions.
 - Phase 13.2 provides download-gated verified-buyer reviews with required 1–5 star ratings, optional written feedback, buyer editing, seller replies and reporting, permissioned Admin moderation, and public seller rating/review displays.
+- Phase 13.5 provides the public Creative Moth Promo Graphics library at `/promo-library`, grouped by platform and size, plus permissioned Admin upload, replacement, visibility, ordering, and archival management.
 - Phase 12.3 provides independent Weekly Emails, Monthly Emails, and Favorite/Followed-Shop Emails preferences managed at `/account`; signed category-specific unsubscribe links; weekly and monthly queue producers; and marketplace-generated favorite-shop updates. Durable per-user/product claims apply favorite-shop → weekly → monthly precedence for overlapping periods. Admin visibility is aggregate-only, sellers receive no subscriber email addresses, and transactional email remains independent. Producers use the existing durable queue; `MAIL_TRANSPORT=log` remains available locally and `MAIL_TRANSPORT=resend` enables production delivery.
 
 ### Planned / Future Phase
