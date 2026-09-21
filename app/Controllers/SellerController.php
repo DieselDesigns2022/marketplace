@@ -13,6 +13,7 @@ use App\Services\NotificationService;
 use App\Services\SellerReceiptService;
 use App\Services\ProductBatchService;
 use App\Services\ProductSubmissionService;
+use App\Services\ProductPublicationTransitionService;
 use App\Services\CsvProductImportService;
 use App\Services\RemoteProductImageService;
 use App\Services\ProductImportReviewService;
@@ -1894,6 +1895,7 @@ class SellerController
                     $result = (new ProductSubmissionService())->submit((int)$p['id'], (int)$d['id'], (int)H::user()['id'], $confirmRights);
                     if (!$result['ok']) { DB::rollBack(); DB::exec('update product_batch_items set submission_errors=? where batch_id=? and product_id=?', [json_encode([$result['error']]),(int)$id,$p['id']]); $invalid++; continue; }
                     DB::exec('update product_batch_items set validation_errors=null,submission_errors=null,submitted_at=now() where batch_id=? and product_id=?', [(int)$id,$p['id']]); DB::commit();
+                    ProductPublicationTransitionService::dispatchAfterCommit((int)$p['id'],$result['previous_status']??null,$result['status']);
                     $submitted++; $published += (int)($result['status']==='approved'); $review += (int)($result['status']==='pending_review');
                 } catch (Throwable $e) { if (DB::pdo()->inTransaction()) DB::rollBack(); $invalid++; DB::exec('update product_batch_items set submission_errors=? where batch_id=? and product_id=?', [json_encode(['Product could not be submitted safely. Please try again.']),(int)$id,$p['id']]); }
             }
@@ -1978,6 +1980,7 @@ class SellerController
                     }
                 }
 
+                $previousStatus = $p['status'] ?? null;
                 $status = $this->productStatusForSave($p, $values);
                 $values['slug'] = $p ? (string)$p['slug'] : $this->uniqueProductSlug($values['title']);
                 $fileTypes = implode(',', $values['file_types']);
@@ -2088,6 +2091,8 @@ class SellerController
                         return;
                     }
                 }
+
+                ProductPublicationTransitionService::dispatchAfterCommit((int)$productId,$previousStatus,$status);
 
                 if ($p && $protectionChanged) {
                     $protectionPreviewFailures =
@@ -2418,6 +2423,7 @@ class SellerController
             if (!$result['ok']) { DB::rollBack(); H::flash('error',(string)($result['error']??'Product could not be submitted.')); H::redirect('/seller/product/'.$productId); }
             $nextStatus = $result['status'];
             DB::commit();
+            ProductPublicationTransitionService::dispatchAfterCommit($productId,$result['previous_status']??null,$nextStatus);
         } catch (Throwable $e) {
             if (DB::pdo()->inTransaction()) {
                 DB::rollBack();

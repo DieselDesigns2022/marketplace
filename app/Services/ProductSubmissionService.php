@@ -34,6 +34,6 @@ class ProductSubmissionService
         $requiresIpReview = !empty($risk['matches']) && !in_array($risk['state']['review_status'] ?? '', ['approved','published_flagged'], true);
         $status = $requiresIpReview ? 'pending_review' : 'approved';
         DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$status,$productId,$designerId]);
-        return ['ok'=>true, 'status'=>$status, 'error'=>null];
+        return ['ok'=>true, 'status'=>$status, 'previous_status'=>$product['status'], 'auto_post_required'=>ProductPublicationTransitionService::shouldDispatch($product['status'],$status), 'error'=>null];
     }
 }

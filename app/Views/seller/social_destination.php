@@ -1,0 +1,3 @@
+<?php use App\Core\Helpers as H; ?>
+<header class="dashboard-heading"><h1>Choose <?=H::e(ucfirst($platform))?> destination</h1></header>
+<form class="card" method="post"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><p>Select the business destination Creative Moth may publish to. Nothing is selected automatically.</p><?php foreach($destinations as $destination):?><label><input type="radio" name="destination_id" value="<?=H::e($destination['id'])?>" required> <?=H::e($destination['name'])?></label><?php endforeach;?><button class="btn" type="submit">Connect selected destination</button></form>

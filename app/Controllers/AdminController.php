@@ -14,6 +14,7 @@ use App\Services\MarketplaceRefundService;
 use App\Services\StripeService;
 use App\Services\PromoService;
 use App\Services\AdminPermissionService;
+use App\Services\ProductPublicationTransitionService;
 use Throwable;
 class AdminController
 {
@@ -445,6 +446,7 @@ class AdminController
             $owner=DB::row('select d.user_id,u.email,u.name,p.title,p.rejection_reason from products p join designers d on d.id=p.designer_id join users u on u.id=d.user_id where p.id=?',[$id]);
             if($owner){$event="product:$id:moderation:$transitionId";$message='Your product “'.$owner['title'].'” is now '.$status.'.';if($status==='rejected'&&!empty($owner['rejection_reason']))$message.=' Reason: '.mb_substr(strip_tags($owner['rejection_reason']),0,500);NotificationService::create((int)$owner['user_id'],'product_'.$status,'designer','Product status updated',$message,$event,'/seller/product/'.$id);if(in_array($status,['approved','rejected'],true))EmailQueueService::foundationSellerEmail($owner['email'],'product_'.$status,['name'=>$owner['name'],'title'=>'Product '.ucfirst($status),'message'=>$message,'action_url'=>'/seller/product/'.$id],$event.':email');}}
         } catch(Throwable $e) { NotificationService::reportFailure('product_moderation',$e); }
+        ProductPublicationTransitionService::dispatchAfterCommit($id,$before['status']??null,$status);
         if ($flashSuccess) {
             H::flash('success', $status === 'approved' ? 'Product approved and published.' : 'Product status updated.');
         }
@@ -590,6 +592,7 @@ class AdminController
         $note = trim($_POST['admin_note'] ?? '');
         try {
             $result = (new IpRiskRepository())->applyAdminReviewTransition($productId, $action, $note, (int)H::user()['id']);
+            ProductPublicationTransitionService::dispatchAfterCommit($productId,$result['previous_product_status']??null,$result['new_product_status']??null);
             H::flash('success', $result['message'] ?? 'IP risk review updated.');
         } catch (\InvalidArgumentException $e) {
             H::flash('error', $e->getMessage());
