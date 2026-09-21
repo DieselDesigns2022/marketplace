@@ -142,6 +142,7 @@ use App\Controllers\AdminPromoGraphicController;
  $router->get('/admin', [AdminController::class, 'home']);
  $router->get('/admin/promo-library', [AdminPromoGraphicController::class, 'index']);
  $router->match(['GET','POST'], '/admin/promo-library/new', [AdminPromoGraphicController::class, 'create']);
+ $router->match(['GET','POST'], '/admin/promo-library/batch/{token}', [AdminPromoGraphicController::class, 'batch']);
  $router->match(['GET','POST'], '/admin/promo-library/{id}', [AdminPromoGraphicController::class, 'update']);
  $router->get('/admin/promo-library/{id}/image', [AdminPromoGraphicController::class, 'image']);
  $router->post('/admin/promo-library/{id}/archive', [AdminPromoGraphicController::class, 'archive']);

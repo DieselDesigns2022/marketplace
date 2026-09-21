@@ -1,8 +1,10 @@
 # Changelog
 
 ## Phase 13.5 — Public Promotional Graphics Library
-- Added the public Creative Moth Promo Graphics library, grouped by the seven approved platforms and then by size, with accessible images, optional suggested captions, copy-link, attachment download, and Web Share actions.
-- Added permissioned Admin upload, metadata editing, active/inactive control, sort ordering, safe image replacement, and soft archival backed by validated protected image storage.
+- Added the public Creative Moth Promo Graphics library, grouped by the seven approved platforms and automatically detected image dimensions, with accessible images, optional suggested captions, click-to-copy caption boxes, image downloads, and Pinterest, Facebook, and Instagram sharing actions.
+- Added permissioned Admin bulk upload with an upload-first review flow. Admins choose the platform and images first, then enter a separate category, accessibility description, and optional suggested caption for each graphic before saving the batch.
+- Added automatic image-dimension detection, deterministic ordering without manual sort-order entry, active/inactive control, safe image replacement, and soft archival backed by validated protected image storage.
+- Added abandoned bulk-upload draft cleanup after 24 hours and preservation of entered batch details when validation fails.
 
 ## Phase 12.7 — Marketplace Fee Model
 - Replaced the current percentage-only marketplace commission with one integer-cent, seller-grouped fee: 9% of post-discount merchandise plus $0.30 once per seller per completed order.
