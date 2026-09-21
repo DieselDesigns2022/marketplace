@@ -68,6 +68,7 @@ All new SQL should use prepared statements.
 - Public assets and preview images may be served from web-accessible public upload folders.
 - Product files for purchases must be protected from direct public access.
 - Download routes should validate ownership/order access before serving product files.
+- Phase 13.5 Promo Graphics images live below `storage/protected_uploads/promo_graphics`, not in public uploads. Public application routes serve only active, non-archived records; the permissioned Admin preview route may also serve inactive, non-archived records. Both paths enforce canonical directory containment before delivery.
 
 
 ## Phase 11 financial services

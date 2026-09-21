@@ -2603,3 +2603,88 @@ img[src*="/uploads/custom_designs/examples/"] {
     -webkit-touch-callout: none;
 }
 .sponsored-card{position:relative;border:2px solid #ff6b9f}.sponsored-label{position:absolute;z-index:2;top:.6rem;left:.6rem;background:#231942;color:#fff;border-radius:999px;padding:.25rem .6rem;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.sponsored-card img{width:100%;aspect-ratio:4/3;object-fit:cover}.promo-form{max-width:760px}.promo-form fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.promo-package{border:1px solid #ddd;border-radius:.5rem;padding:.7rem}.promo-pricing{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}.promo-table{overflow-x:auto;-webkit-overflow-scrolling:touch}.promo-table table{min-width:850px;width:100%}.promo-table form{display:inline-block;margin:.15rem}@media(max-width:600px){.promo-form fieldset{grid-template-columns:1fr}.promo-pricing{grid-template-columns:1fr}}
+/* Phase 13.5 public promotional graphics library */
+.promo-library-hero{max-width:760px;margin:2rem auto 3rem;text-align:center}.promo-library-hero h1{margin:.35rem 0}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary,#6d3fc0)}
+.promo-library-section{margin:2.5rem 0}.promo-size-group{margin:1.5rem 0}.promo-size-group>h3{margin:0 0 .75rem}.promo-library-grid,.promo-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1.25rem}.promo-graphic-card{padding:0;overflow:hidden;display:flex;flex-direction:column}.promo-graphic-card>a{background:#f4f1f8;display:flex;min-height:220px;align-items:center;justify-content:center}.promo-graphic-card img{display:block;width:100%;max-height:480px;object-fit:contain}.promo-graphic-details{padding:1rem;display:flex;flex:1;flex-direction:column;gap:.75rem}.promo-graphic-details h3{font-size:1rem;margin:0 0 .25rem}.promo-graphic-details p{margin:0}.promo-meta{color:#625b6b}.promo-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:auto}.promo-actions form{margin:0}.promo-empty{text-align:center}
+.page-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.25rem}.promo-admin-card{display:grid;grid-template-columns:120px 1fr;gap:1rem}.promo-admin-card>img{width:120px;height:120px;object-fit:contain;background:#f4f1f8}.promo-graphic-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.promo-graphic-form label{display:flex;flex-direction:column;gap:.35rem}.promo-graphic-form .full{grid-column:1/-1}.promo-graphic-form .check{flex-direction:row}.promo-form-preview{display:block;max-width:min(100%,420px);max-height:320px;object-fit:contain;background:#f4f1f8}
+@media(max-width:640px){.promo-library-hero{margin:1rem auto 2rem}.promo-library-grid{grid-template-columns:1fr}.promo-actions>*{flex:1;text-align:center}.page-heading{align-items:flex-start;flex-direction:column}.promo-admin-card{grid-template-columns:80px 1fr}.promo-admin-card>img{width:80px;height:80px}.promo-graphic-form{grid-template-columns:1fr}}
+
+/* Phase 13.5 bulk promo upload review */
+.promo-batch-card{
+    display:grid;
+    grid-template-columns:minmax(180px,280px) 1fr;
+    gap:1.25rem;
+    margin-bottom:1rem;
+}
+.promo-batch-preview{
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+}
+.promo-batch-preview img{
+    display:block;
+    width:100%;
+    max-height:360px;
+    object-fit:contain;
+}
+.promo-batch-fields{
+    display:flex;
+    flex-direction:column;
+    gap:.75rem;
+}
+.promo-batch-fields label{
+    display:flex;
+    flex-direction:column;
+    gap:.35rem;
+}
+@media(max-width:700px){
+    .promo-batch-card{
+        grid-template-columns:1fr;
+    }
+}
+
+
+/* Phase 13.5 clickable caption copy box */
+.promo-caption-copybox{
+    width:100%;
+    display:block;
+    text-align:left;
+    border:1px solid #ddd;
+    border-radius:.65rem;
+    background:#faf9fc;
+    padding:.85rem;
+    cursor:pointer;
+    font:inherit;
+    color:inherit;
+}
+.promo-caption-copybox:hover{
+    background:#f4f1f8;
+}
+.promo-caption-copybox:focus-visible{
+    outline:3px solid currentColor;
+    outline-offset:2px;
+}
+.promo-caption-text{
+    display:block;
+    white-space:normal;
+}
+.promo-caption-hint{
+    display:block;
+    margin-top:.6rem;
+    font-weight:700;
+    opacity:.7;
+}
+
+
+/* Phase 13.5 social promo sharing */
+.promo-social{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+}
+.promo-social-pinterest,
+.promo-social-facebook,
+.promo-social-instagram{
+    min-width:105px;
+}

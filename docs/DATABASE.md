@@ -101,6 +101,12 @@ Stores marketplace commission records per order/product/designer, including refe
 
 Stores ad campaign placeholders/management records with product/designer, placement, dates, status, impressions, and clicks.
 
+### `promo_graphics`
+
+Stores the Public Promotional Graphics Library records. Each row contains one approved `platform`, automatically detected `size_label`, required `category`, protected `image_path`, original filename, detected MIME type, required accessibility `alt_text`, optional `suggested_caption`, `is_active`, and legacy `sort_order`, plus creator/updater and soft-archive attribution/timestamps. Manual size and sort-order entry are not part of the Admin workflow. Public listing and public image/download delivery require both `is_active=1` and `archived_at IS NULL`; Admin listing and preview include active and inactive non-archived rows except temporary bulk-upload draft rows. Public display order is approved platform order, then detected `size_label`, then `id`.
+
+Bulk upload initially stores inactive draft rows using the reserved internal category `__PROMO_DRAFT__`. The Admin review screen then replaces that marker with each graphic's real category, accessibility description, optional caption, and chosen visibility state. Abandoned inactive draft rows older than 24 hours are automatically removed along with their protected files. Archiving sets a normal graphic inactive and records `archived_at`/`archived_by`; it retains the protected file and excludes the row from public and Admin listings.
+
 ### `homepage_features`
 
 Stores featured products, designers, or categories for homepage placement.

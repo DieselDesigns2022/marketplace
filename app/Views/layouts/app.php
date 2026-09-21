@@ -120,6 +120,7 @@ if ($json && json_decode($json) !== null):
         <a href="/browse">Browse</a>
         <a href="/custom-designs">Custom Designs</a>
         <a href="/sell">Sell</a>
+        <a href="/promo-library">Promo Graphics</a>
         <a href="/about">About</a>
         <a href="/waitlist">Waitlist</a>
         <a href="/contact">Contact</a>
