@@ -6,6 +6,7 @@
 - Added `2026_09_23_phase_13_6_custom_design_social_posting.sql` after the original Phase 13.6 migration to preserve Product history while adding Custom Design identity and the listing-identity CHECK constraint.
 - Added type-prefixed automatic idempotency keys so Products and Custom Designs with the same numeric ID cannot collide.
 - Added Instagram discovery through the seller's stored connected Facebook Page when `/me/accounts` omits it, using server-side credential decryption, header-only tokens, and Instagram-ID deduplication.
+- Fixed Instagram publishing so Creative Moth waits for media-container processing to finish before calling `media_publish`, preventing the live `Media ID is not available` failure. Owner live verification confirmed manual Custom Design delivery to Facebook and Instagram; broader tester/provider, automatic-posting, and Pinterest delivery testing is deferred to the pre-launch checklist.
 - Delayed Custom Design activation posting until preview regeneration and cleanup complete, and suppresses the automatic post when required preview regeneration fails. Database-backed and real-provider delivery require separate verification; no skipped or mocked check is recorded as a live pass.
 
 ## Phase 13.5 — Public Promotional Graphics Library

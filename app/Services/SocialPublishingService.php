@@ -176,7 +176,32 @@ final class SocialPublishingService
     {
         $caption=$this->platformCaption($platform,$caption,$url);
         if($platform==='facebook'){$r=$this->request('POST','https://graph.facebook.com/'.$this->metaVersion().'/'.$connection['external_account_id'].'/photos',['Authorization: Bearer '.$credentials['access_token']],['url'=>$imageUrl,'caption'=>$caption]);return $this->requiredProviderId($r['post_id']??$r['id']??null,'Facebook did not return a post ID.');}
-        if($platform==='instagram'){$media=$this->request('POST','https://graph.facebook.com/'.$this->metaVersion().'/'.$connection['external_account_id'].'/media',['Authorization: Bearer '.$credentials['access_token']],['image_url'=>$imageUrl,'caption'=>$caption]);$container=$this->requiredProviderId($media['id']??null,'Instagram did not return a media container ID.');$r=$this->request('POST','https://graph.facebook.com/'.$this->metaVersion().'/'.$connection['external_account_id'].'/media_publish',['Authorization: Bearer '.$credentials['access_token']],['creation_id'=>$container]);return $this->requiredProviderId($r['id']??null,'Instagram did not return a published media ID.');}
+        if($platform==='instagram'){
+            $media=$this->request('POST','https://graph.facebook.com/'.$this->metaVersion().'/'.$connection['external_account_id'].'/media',['Authorization: Bearer '.$credentials['access_token']],['image_url'=>$imageUrl,'caption'=>$caption]);
+            $container=$this->requiredProviderId($media['id']??null,'Instagram did not return a media container ID.');
+
+            $ready=false;
+            for($attempt=0;$attempt<10;$attempt++){
+                $status=$this->request('GET','https://graph.facebook.com/'.$this->metaVersion().'/'.$container,['Authorization: Bearer '.$credentials['access_token']],['fields'=>'status_code']);
+                $statusCode=strtoupper((string)($status['status_code']??''));
+
+                if(in_array($statusCode,['FINISHED','PUBLISHED'],true)){
+                    $ready=true;
+                    break;
+                }
+
+                if(in_array($statusCode,['ERROR','EXPIRED'],true)){
+                    throw new \RuntimeException('Instagram media processing failed.');
+                }
+
+                if($attempt<9)sleep(2);
+            }
+
+            if(!$ready)throw new \RuntimeException('Instagram media is still processing. Please try again shortly.');
+
+            $r=$this->request('POST','https://graph.facebook.com/'.$this->metaVersion().'/'.$connection['external_account_id'].'/media_publish',['Authorization: Bearer '.$credentials['access_token']],['creation_id'=>$container]);
+            return $this->requiredProviderId($r['id']??null,'Instagram did not return a published media ID.');
+        }
         if(empty($connection['pinterest_board_id']))throw new \DomainException('Select a Pinterest board before posting.');
         $r=$this->request('POST','https://api.pinterest.com/v5/pins',['Authorization: Bearer '.$credentials['access_token']],['board_id'=>$connection['pinterest_board_id'],'title'=>mb_substr($product['title'],0,100),'description'=>mb_substr($caption,0,500),'link'=>$url,'media_source'=>['source_type'=>'image_url','url'=>$imageUrl]],false,true);return $this->requiredProviderId($r['id']??null,'Pinterest did not return a Pin ID.');
     }
