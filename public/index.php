@@ -98,6 +98,8 @@ use App\Controllers\AdminSocialPublishingController;
  $router->post('/seller/social/{platform}/disconnect', [SocialPublishingController::class, 'disconnect']);
  $router->get('/seller/social/product/{id}', [SocialPublishingController::class, 'compose']);
  $router->post('/seller/social/product/{id}', [SocialPublishingController::class, 'post']);
+ $router->get('/seller/social/custom-design/{id}', [SocialPublishingController::class, 'composeCustomDesign']);
+ $router->post('/seller/social/custom-design/{id}', [SocialPublishingController::class, 'postCustomDesign']);
  $router->post('/seller/social/retry/{id}', [SocialPublishingController::class, 'retry']);
  $router->get('/seller/products', [SellerController::class, 'products']);
  $router->get('/seller/custom-designs', [CustomDesignController::class, 'sellerList']);

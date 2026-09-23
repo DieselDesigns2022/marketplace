@@ -469,6 +469,7 @@ final class CustomDesignService
 
         $stored=[];
         $remove=[];
+        $wasActive=false;
 
         $extraProtection=
             !empty($input['extra_protection_watermark'])
@@ -486,7 +487,7 @@ final class CustomDesignService
             if($id){
 
                 $existing=DB::row(
-                    'select id,slug,extra_protection_watermark
+                    'select id,slug,extra_protection_watermark,is_active
                      from custom_design_services
                      where id=? and designer_id=?
                      for update',
@@ -494,6 +495,7 @@ final class CustomDesignService
                 )??H::abort(404);
 
                 $slug=(string)$existing['slug'];
+                $wasActive=!empty($existing['is_active']);
 
                 $protectionChanged=
                     (int)($existing['extra_protection_watermark']??0)
@@ -756,9 +758,9 @@ final class CustomDesignService
 
             DB::commit();
 
-            if($protectionChanged){
-                $protectionFailures=0;
+            $protectionFailures=0;
 
+            if($protectionChanged){
                 foreach(
                     DB::rows(
                         'select image_path
@@ -800,6 +802,8 @@ final class CustomDesignService
                     $old['image_path']
                 );
             }
+
+            CustomDesignPublicationTransitionService::dispatchAfterPreviewProcessing((int)$id,$wasActive,(bool)$isActive,$protectionFailures);
 
             return [];
 
