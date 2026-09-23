@@ -21,7 +21,7 @@ final class SocialPublishingController
         $d=$this->designer();$service=new SocialPublishingService();$boards=[];$boardError=null;
         $connections=DB::rows('select * from seller_social_connections where designer_id=?',[$d['id']]);
         foreach($connections as $connection)if($connection['platform']==='pinterest'&&$connection['connection_status']==='connected')try{$boards=$service->boards($connection);}catch(\Throwable $e){$boardError='Pinterest boards could not be refreshed. Reconnect if this continues.';}
-        H::view('seller/social_publishing',['connections'=>array_column($connections,null,'platform'),'integrations'=>array_column(DB::rows('select * from social_platform_integrations'),null,'platform'),'boards'=>$boards,'boardError'=>$boardError,'products'=>DB::rows('select p.id,p.title,p.slug from products p where p.designer_id=? and p.status in ("approved","published") order by p.updated_at desc',[$d['id']]),'logs'=>DB::rows('select l.*,p.id current_product_id,p.status current_product_status,coalesce(p.title,concat("Deleted product #",l.product_id)) product_title from social_post_logs l left join products p on p.id=l.product_id where l.designer_id=? order by l.attempted_at desc limit 100',[$d['id']])]);
+        H::view('seller/social_publishing',['connections'=>array_column($connections,null,'platform'),'integrations'=>array_column(DB::rows('select * from social_platform_integrations'),null,'platform'),'boards'=>$boards,'boardError'=>$boardError,'products'=>DB::rows('select p.id,p.title,p.slug from products p where p.designer_id=? and p.status in ("approved","published") order by p.updated_at desc',[$d['id']]),'customDesigns'=>DB::rows('select s.id,s.title,s.slug from custom_design_services s where s.designer_id=? and s.is_active=1 order by s.updated_at desc',[$d['id']]),'logs'=>DB::rows('select l.*,p.id current_product_id,p.status current_product_status,s.id current_custom_service_id,s.is_active current_custom_service_active,coalesce(l.listing_title,p.title,s.title,if(l.custom_service_id is not null,concat("Deleted Custom Design #",l.custom_service_id),concat("Deleted product #",l.product_id))) listing_title,if(l.custom_service_id is null,"Product","Custom Design") listing_type from social_post_logs l left join products p on p.id=l.product_id left join custom_design_services s on s.id=l.custom_service_id where l.designer_id=? order by l.attempted_at desc limit 100',[$d['id']])]);
     }
 
     public function connect(string $platform): void
@@ -36,7 +36,7 @@ final class SocialPublishingController
         $d=$this->designer();$pending=$_SESSION['social_oauth'][$platform]??null;unset($_SESSION['social_oauth'][$platform]);
         if(!SocialPublishingService::validOAuthState($pending,(string)($_GET['state']??''),time()))H::abort(419);
         if(!empty($_GET['error'])){H::flash('warning','The social provider did not authorize the connection.');H::redirect('/seller/social-publishing');}
-        try{$service=new SocialPublishingService();if($platform==='pinterest'){$service->connectPinterestFromCode((int)$d['id'],(string)($_GET['code']??''));H::flash('success','Pinterest connected.');}else{$authorization=$service->metaDestinations($platform,(string)($_GET['code']??''));if(empty($authorization['destinations']))throw new \RuntimeException($platform==='instagram'?'No eligible professional Instagram accounts were found.':'No permitted Facebook Pages were found.');$_SESSION['social_meta_selection'][$platform]=['payload'=>\App\Services\SocialCredentialCipher::encrypt($authorization),'expires'=>time()+600];H::redirect('/seller/social/'.$platform.'/select');}}catch(\Throwable $e){H::flash('error','Connection failed: '.OperationalErrorSanitizer::sanitize($e->getMessage()));}
+        try{$service=new SocialPublishingService();if($platform==='pinterest'){$service->connectPinterestFromCode((int)$d['id'],(string)($_GET['code']??''));H::flash('success','Pinterest connected.');}else{$authorization=$service->metaDestinations($platform,(string)($_GET['code']??''),(int)$d['id']);if(empty($authorization['destinations']))throw new \RuntimeException($platform==='instagram'?'No eligible professional Instagram accounts were found.':'No permitted Facebook Pages were found.');$_SESSION['social_meta_selection'][$platform]=['payload'=>\App\Services\SocialCredentialCipher::encrypt($authorization),'expires'=>time()+600];H::redirect('/seller/social/'.$platform.'/select');}}catch(\Throwable $e){H::flash('error','Connection failed: '.OperationalErrorSanitizer::sanitize($e->getMessage()));}
         H::redirect('/seller/social-publishing');
     }
 
@@ -64,18 +64,32 @@ final class SocialPublishingController
 
     public function compose(string $id): void
     {
-        $d=$this->designer();$p=DB::row('select p.*,d.display_name from products p join designers d on d.id=p.designer_id where p.id=? and p.designer_id=? and p.status in ("approved","published")',[(int)$id,$d['id']]);if(!$p)H::abort(404);
-        $images=DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]);$caption=$p['title'].' — '.$p['display_name']."\n\n".strip_tags((string)$p['description']);H::view('seller/social_compose',['p'=>$p,'images'=>$images,'caption'=>mb_substr($caption,0,5000),'connections'=>DB::rows('select platform,external_account_name,connection_status,pinterest_board_id from seller_social_connections where designer_id=?',[$d['id']])]);
+        $this->composeListing('product',(int)$id);
+    }
+
+    public function composeCustomDesign(string $id):void{$this->composeListing('custom_design',(int)$id);}
+
+    private function composeListing(string $type,int $id):void
+    {
+        $d=$this->designer();$custom=$type==='custom_design';$p=$custom?DB::row('select s.*,d.display_name from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.designer_id=? and s.is_active=1',[$id,$d['id']]):DB::row('select p.*,d.display_name from products p join designers d on d.id=p.designer_id where p.id=? and p.designer_id=? and p.status in ("approved","published")',[$id,$d['id']]);if(!$p)H::abort(404);
+        $images=$custom?DB::rows('select * from custom_service_images where custom_service_id=? order by sort_order,id',[$id]):DB::rows('select * from product_images where product_id=? order by sort_order,id',[$id]);$caption=$p['title'].' — '.$p['display_name']."\n\n".strip_tags((string)$p['description']);H::view('seller/social_compose',['p'=>$p,'images'=>$images,'caption'=>mb_substr($caption,0,5000),'listingType'=>$type,'connections'=>DB::rows('select platform,external_account_name,connection_status,pinterest_board_id from seller_social_connections where designer_id=?',[$d['id']])]);
     }
 
     public function post(string $id): void
     {
-        $d=$this->designer();H::verifyCsrf();$platforms=array_values(array_intersect(SocialPublishingService::PLATFORMS,(array)($_POST['platforms']??[])));if(!$platforms){H::flash('error','Select at least one connected platform.');H::redirect('/seller/social/product/'.$id);}
-        $caption=trim((string)($_POST['caption']??''));if($caption===''||mb_strlen($caption)>5000)H::abort(422);$ok=0;$failed=0;$service=new SocialPublishingService();foreach($platforms as $platform){$r=$service->publish((int)$d['id'],(int)$id,$platform,(int)($_POST['image_id']??0),$caption);$r['status']==='succeeded'?$ok++:$failed++;}H::flash($failed?'warning':'success',"Social posting completed: $ok succeeded, $failed failed.");H::redirect('/seller/social-publishing');
+        $this->postListing('product',(int)$id);
+    }
+
+    public function postCustomDesign(string $id):void{$this->postListing('custom_design',(int)$id);}
+
+    private function postListing(string $type,int $id):void
+    {
+        $d=$this->designer();H::verifyCsrf();$platforms=array_values(array_intersect(SocialPublishingService::PLATFORMS,(array)($_POST['platforms']??[])));if(!$platforms){H::flash('error','Select at least one connected platform.');H::redirect('/seller/social/'.($type==='custom_design'?'custom-design':'product').'/'.$id);}
+        $caption=trim((string)($_POST['caption']??''));if($caption===''||mb_strlen($caption)>5000)H::abort(422);$ok=0;$failed=0;$service=new SocialPublishingService();foreach($platforms as $platform){$r=$type==='custom_design'?$service->publishCustomDesign((int)$d['id'],$id,$platform,(int)($_POST['image_id']??0),$caption):$service->publish((int)$d['id'],$id,$platform,(int)($_POST['image_id']??0),$caption);$r['status']==='succeeded'?$ok++:$failed++;}H::flash($failed?'warning':'success',"Social posting completed: $ok succeeded, $failed failed.");H::redirect('/seller/social-publishing');
     }
 
     public function retry(string $id): void
     {
-        $d=$this->designer();H::verifyCsrf();$log=DB::row('select * from social_post_logs where id=? and designer_id=? and status="failed"',[(int)$id,$d['id']]);if(!$log)H::abort(404);try{$r=(new SocialPublishingService())->publish((int)$d['id'],(int)$log['product_id'],$log['platform'],(int)$log['image_id'],$log['caption'],'retry',(int)$log['id']);H::flash($r['status']==='succeeded'?'success':'warning',$r['status']==='succeeded'?'Post retry succeeded.':'Post retry failed. Review the connection and error below.');}catch(\DomainException $e){H::flash('warning',OperationalErrorSanitizer::sanitize($e->getMessage()));}H::redirect('/seller/social-publishing');
+        $d=$this->designer();H::verifyCsrf();$log=DB::row('select * from social_post_logs where id=? and designer_id=? and status="failed"',[(int)$id,$d['id']]);if(!$log)H::abort(404);try{$service=new SocialPublishingService();$r=$log['custom_service_id']!==null?$service->publishCustomDesign((int)$d['id'],(int)$log['custom_service_id'],$log['platform'],(int)$log['image_id'],$log['caption'],'retry',(int)$log['id']):$service->publish((int)$d['id'],(int)$log['product_id'],$log['platform'],(int)$log['image_id'],$log['caption'],'retry',(int)$log['id']);H::flash($r['status']==='succeeded'?'success':'warning',$r['status']==='succeeded'?'Post retry succeeded.':'Post retry failed. Review the connection and error below.');}catch(\DomainException $e){H::flash('warning',OperationalErrorSanitizer::sanitize($e->getMessage()));}H::redirect('/seller/social-publishing');
     }
 }

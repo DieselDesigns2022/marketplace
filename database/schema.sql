@@ -1405,7 +1405,9 @@ CREATE TABLE seller_social_connections (
 CREATE TABLE social_post_logs (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   designer_id BIGINT NOT NULL,
-  product_id BIGINT NOT NULL,
+  product_id BIGINT NULL,
+  custom_service_id BIGINT NULL,
+  listing_title VARCHAR(190) NOT NULL,
   connection_id BIGINT NULL,
   platform ENUM('facebook','instagram','pinterest') NOT NULL,
   trigger_type ENUM('manual','automatic','retry') NOT NULL,
@@ -1423,6 +1425,8 @@ CREATE TABLE social_post_logs (
   UNIQUE KEY social_post_automatic_unique(automatic_key),
   KEY social_post_seller_idx(designer_id,attempted_at),
   KEY social_post_product_idx(product_id,platform),
+  KEY social_post_custom_service_idx(custom_service_id,platform),
+  CONSTRAINT social_post_listing_identity_chk CHECK ((product_id IS NOT NULL AND custom_service_id IS NULL) OR (product_id IS NULL AND custom_service_id IS NOT NULL)),
   CONSTRAINT social_post_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT,
   CONSTRAINT social_post_connection_fk FOREIGN KEY(connection_id) REFERENCES seller_social_connections(id) ON DELETE SET NULL,
   CONSTRAINT social_post_retry_fk FOREIGN KEY(retry_of_id) REFERENCES social_post_logs(id) ON DELETE SET NULL

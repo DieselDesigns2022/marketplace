@@ -28,22 +28,29 @@ final class SocialPublishingService
         return 'https://www.facebook.com/'.$this->metaVersion().'/dialog/oauth?'.http_build_query(['client_id'=>$this->env('META_APP_ID'),'redirect_uri'=>$redirect,'scope'=>$scopes,'state'=>$state,'response_type'=>'code']);
     }
 
-    public function metaDestinations(string $platform, string $code): array
+    public function metaDestinations(string $platform, string $code, ?int $designerId=null): array
     {
         $this->assertEnabled($platform);
         if ($platform === 'pinterest') throw new \InvalidArgumentException('Pinterest does not use Meta destinations.');
         $token = $this->request('POST','https://graph.facebook.com/'.$this->metaVersion().'/oauth/access_token',[],['client_id'=>$this->env('META_APP_ID'),'client_secret'=>$this->env('META_APP_SECRET'),'redirect_uri'=>$this->redirectUri($platform),'code'=>$code]);
-        $destinations=[];$after=null;$seen=[];
+        $destinations=[];$after=null;$seen=[];$instagramIds=[];
         do{
             $query=['fields'=>'id,name,access_token,instagram_business_account'];if($after!==null)$query['after']=$after;
             $pages=$this->request('GET','https://graph.facebook.com/'.$this->metaVersion().'/me/accounts',['Authorization: Bearer '.$token['access_token']],$query);
             foreach(($pages['data']??[]) as $page){
                 if($platform==='facebook')$destinations[]=['id'=>(string)$page['id'],'name'=>(string)$page['name'],'page_id'=>(string)$page['id'],'access_token'=>(string)$page['access_token']];
-                elseif(!empty($page['instagram_business_account']['id'])){$igId=(string)$page['instagram_business_account']['id'];$profile=$this->request('GET','https://graph.facebook.com/'.$this->metaVersion().'/'.$igId,['Authorization: Bearer '.$page['access_token']],['fields'=>'id,username']);$destinations[]=['id'=>$igId,'name'=>(string)($profile['username']??'Instagram'),'page_id'=>(string)$page['id'],'access_token'=>(string)$page['access_token']];}
+                elseif(!empty($page['instagram_business_account']['id'])){$igId=(string)$page['instagram_business_account']['id'];$profile=$this->request('GET','https://graph.facebook.com/'.$this->metaVersion().'/'.$igId,['Authorization: Bearer '.$page['access_token']],['fields'=>'id,username']);$destinations[]=['id'=>$igId,'name'=>(string)($profile['username']??'Instagram'),'page_id'=>(string)$page['id'],'access_token'=>(string)$page['access_token']];$instagramIds[$igId]=true;}
             }
             $next=(string)($pages['paging']['cursors']['after']??'');
             if($next===''||isset($seen[$next])){$after=null;}else{$seen[$next]=true;$after=$next;}
         }while($after!==null&&count($seen)<100);
+        if($platform==='instagram'&&$designerId!==null){
+            $facebook=DB::row('select * from seller_social_connections where designer_id=? and platform="facebook" and connection_status="connected"',[$designerId]);
+            if($facebook)try{
+                $credentials=SocialCredentialCipher::decrypt($facebook['encrypted_credentials']);$pageToken=(string)($credentials['access_token']??'');$pageId=(string)$facebook['external_account_id'];
+                if($pageToken!==''&&$pageId!==''){$page=$this->request('GET','https://graph.facebook.com/'.$this->metaVersion().'/'.$pageId,['Authorization: Bearer '.$pageToken],['fields'=>'id,name,instagram_business_account']);$igId=(string)($page['instagram_business_account']['id']??'');if($igId!==''&&!isset($instagramIds[$igId])){$profile=$this->request('GET','https://graph.facebook.com/'.$this->metaVersion().'/'.$igId,['Authorization: Bearer '.$pageToken],['fields'=>'id,username']);$destinations[]=['id'=>$igId,'name'=>(string)($profile['username']??'Instagram'),'page_id'=>$pageId,'access_token'=>$pageToken];$instagramIds[$igId]=true;}}
+            }catch(\Throwable){}
+        }
         return ['destinations'=>$destinations,'user_access_token'=>(string)$token['access_token'],'expires_in'=>$token['expires_in']??null];
     }
 
@@ -102,30 +109,45 @@ final class SocialPublishingService
 
     public function publish(int $designerId, int $productId, string $platform, int $imageId, string $caption, string $trigger='manual', ?int $retryOf=null): array
     {
+        return $this->publishListing($designerId,'product',$productId,$platform,$imageId,$caption,$trigger,$retryOf);
+    }
+
+    public function publishCustomDesign(int $designerId, int $serviceId, string $platform, int $imageId, string $caption, string $trigger='manual', ?int $retryOf=null): array
+    {
+        return $this->publishListing($designerId,'custom_design',$serviceId,$platform,$imageId,$caption,$trigger,$retryOf);
+    }
+
+    private function publishListing(int $designerId,string $listingType,int $listingId,string $platform,int $imageId,string $caption,string $trigger,?int $retryOf):array
+    {
         $this->assertPlatform($platform);
-        $product = DB::row('select p.*,d.display_name,d.store_slug,d.user_id from products p join designers d on d.id=p.designer_id where p.id=? and p.designer_id=?',[$productId,$designerId]);
-        if (!$product) throw new \DomainException('This product is no longer available for social posting.');
+        $custom=$listingType==='custom_design';
+        $listing=$custom
+            ?DB::row('select s.*,d.display_name,d.store_slug,d.user_id from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.designer_id=?',[$listingId,$designerId])
+            :DB::row('select p.*,d.display_name,d.store_slug,d.user_id from products p join designers d on d.id=p.designer_id where p.id=? and p.designer_id=?',[$listingId,$designerId]);
+        if (!$listing) throw new \DomainException($custom?'This Custom Design is no longer available for social posting.':'This product is no longer available for social posting.');
         $connection = DB::row('select * from seller_social_connections where designer_id=? and platform=?',[$designerId,$platform]);
-        $automaticKey = $trigger === 'automatic' ? 'product:'.$productId.':platform:'.$platform : null;
+        $automaticKey = $trigger === 'automatic' ? $listingType.':'.$listingId.':platform:'.$platform : null;
         if ($automaticKey && DB::row('select id from social_post_logs where automatic_key=?',[$automaticKey])) return ['status'=>'duplicate'];
-        $logId = $this->startLog($designerId,$productId,$connection,$platform,$imageId,$caption,$trigger,$automaticKey,$retryOf);
+        $logId = $this->startLog($designerId,$custom?null:$listingId,$custom?$listingId:null,$listing['title'],$connection,$platform,$imageId,$caption,$trigger,$automaticKey,$retryOf);
         try {
-            $image = DB::row('select id,image_path from product_images where id=? and product_id=?',[$imageId,$productId]);
-            $this->validatePostingEligibility($product,$image);
+            $image = $custom
+                ?DB::row('select id,image_path from custom_service_images where id=? and custom_service_id=?',[$imageId,$listingId])
+                :DB::row('select id,image_path from product_images where id=? and product_id=?',[$imageId,$listingId]);
+            $this->validatePostingEligibility($listing,$image,$custom);
             $this->assertEnabled($platform);
             if (!$connection || $connection['connection_status'] !== 'connected') throw new \RuntimeException('Reconnect this social account before posting.');
             if (!empty($connection['credential_expires_at']) && strtotime($connection['credential_expires_at']) <= time()) throw new \RuntimeException('This social connection has expired. Reconnect it.');
             $credentials = SocialCredentialCipher::decrypt($connection['encrypted_credentials']);
-            $url = H::canonical('/product/'.$product['slug']);
+            $url = H::canonical(($custom?'/custom-design/':'/product/').$listing['slug']);
             $imageUrl = H::assetUrl($image['image_path']);
-            $postId = $this->send($platform,$connection,$credentials,$product,$imageUrl,$url,$caption);
+            $postId = $this->send($platform,$connection,$credentials,$listing,$imageUrl,$url,$caption);
             DB::exec('update social_post_logs set status="succeeded",platform_post_id=?,completed_at=now() where id=?',[$postId,$logId]);
             return ['status'=>'succeeded','id'=>$logId,'platform_post_id'=>$postId];
         } catch (\Throwable $e) {
             $safe = OperationalErrorSanitizer::sanitize($e->getMessage(),500);
             DB::exec('update social_post_logs set status="failed",error_code=?,error_message=?,completed_at=now() where id=?',[$e instanceof \DomainException?'validation':'api_error',$safe,$logId]);
             if ($connection && preg_match('/expired|token|permission|reconnect|oauth/i',$safe)) DB::exec('update seller_social_connections set connection_status=?,last_error=? where id=?',[preg_match('/permission/i',$safe)?'permission_error':'reconnect_required',$safe,$connection['id']]);
-            if ($trigger === 'automatic') NotificationService::create((int)$product['user_id'],'social_post_failed','designer','Social post needs attention','An automatic '.$platform.' post for “'.$product['title'].'” failed. Review the connection and retry.',"social-post-failed:$logId",'/seller/social-publishing');
+            if ($trigger === 'automatic') NotificationService::create((int)$listing['user_id'],'social_post_failed','designer','Social post needs attention','An automatic '.$platform.' post for “'.$listing['title'].'” failed. Review the connection and retry.',"social-post-failed:$logId",'/seller/social-publishing');
             return ['status'=>'failed','id'=>$logId,'error'=>$safe];
         }
     }
@@ -138,6 +160,16 @@ final class SocialPublishingService
         if(!$image)return;
         $caption=trim($product['title'].' — '.$product['display_name']."\n\n".strip_tags((string)$product['description']));
         foreach(DB::rows('select platform from seller_social_connections where designer_id=? and connection_status="connected" and auto_post_enabled=1',[$product['designer_id']]) as $row) $this->publish((int)$product['designer_id'],$productId,$row['platform'],(int)$image['id'],mb_substr($caption,0,2000),'automatic');
+    }
+
+    public function autoPostCustomDesign(int $serviceId):void
+    {
+        $service=DB::row('select s.*,d.display_name from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.is_active=1',[$serviceId]);
+        if(!$service)return;
+        $image=DB::row('select id from custom_service_images where custom_service_id=? order by sort_order,id limit 1',[$serviceId]);
+        if(!$image)return;
+        $caption=trim($service['title'].' — '.$service['display_name']."\n\n".strip_tags((string)$service['description']));
+        foreach(DB::rows('select platform from seller_social_connections where designer_id=? and connection_status="connected" and auto_post_enabled=1',[$service['designer_id']]) as $row) $this->publishCustomDesign((int)$service['designer_id'],$serviceId,$row['platform'],(int)$image['id'],mb_substr($caption,0,2000),'automatic');
     }
 
     private function send(string $platform,array $connection,array $credentials,array $product,string $imageUrl,string $url,string $caption): string
@@ -161,11 +193,11 @@ final class SocialPublishingService
         return rtrim(mb_substr($caption,0,$limit-mb_strlen($suffix))).$suffix;
     }
 
-    public function validatePostingEligibility(array $product,?array $image):void
-    { if(!in_array($product['status']??null,['approved','published'],true))throw new \DomainException('Only approved or published products can be posted.');if(!$image)throw new \DomainException('The previously selected preview image is no longer available. Choose another image for a new post.'); }
+    public function validatePostingEligibility(array $listing,?array $image,bool $customDesign=false):void
+    { if($customDesign){if(empty($listing['is_active']))throw new \DomainException('Only active Custom Designs can be posted.');}elseif(!in_array($listing['status']??null,['approved','published'],true))throw new \DomainException('Only approved or published products can be posted.');if(!$image)throw new \DomainException('The previously selected preview image is no longer available. Choose another image for a new post.'); }
 
-    private function startLog(int $d,int $p,?array $c,string $platform,int $image,string $caption,string $trigger,?string $key,?int $retry): int
-    { DB::exec('insert into social_post_logs(designer_id,product_id,connection_id,platform,trigger_type,image_id,caption,status,attempted_at,automatic_key,retry_of_id) values(?,?,?,?,?,?,?,"attempting",now(),?,?)',[$d,$p,$c['id']??null,$platform,$trigger,$image,mb_substr($caption,0,5000),$key,$retry]);return (int)DB::id(); }
+    private function startLog(int $d,?int $p,?int $customServiceId,string $title,?array $c,string $platform,int $image,string $caption,string $trigger,?string $key,?int $retry): int
+    { DB::exec('insert into social_post_logs(designer_id,product_id,custom_service_id,listing_title,connection_id,platform,trigger_type,image_id,caption,status,attempted_at,automatic_key,retry_of_id) values(?,?,?,?,?,?,?,?,?,"attempting",now(),?,?)',[$d,$p,$customServiceId,mb_substr($title,0,190),$c['id']??null,$platform,$trigger,$image,mb_substr($caption,0,5000),$key,$retry]);return (int)DB::id(); }
     private function saveConnection(int $d,string $p,string $id,string $name,array $credentials):void
     { if($id==='')throw new \RuntimeException('The provider did not return an account.');$expires=!empty($credentials['expires_in'])?date('Y-m-d H:i:s',time()+(int)$credentials['expires_in']):null;DB::exec('insert into seller_social_connections(designer_id,platform,external_account_id,external_account_name,encrypted_credentials,credential_expires_at,connection_status,connected_at) values(?,?,?,?,?,? ,"connected",now()) on duplicate key update external_account_id=values(external_account_id),external_account_name=values(external_account_name),encrypted_credentials=values(encrypted_credentials),credential_expires_at=values(credential_expires_at),connection_status="connected",last_error=null,connected_at=now()',[$d,$p,$id,mb_substr($name,0,190),SocialCredentialCipher::encrypt($credentials),$expires]); }
     private function request(string $method,string $url,array $headers=[],array $data=[],bool $form=false,bool $json=false):array
