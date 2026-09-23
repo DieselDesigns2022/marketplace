@@ -339,3 +339,11 @@ Authenticated accounts always retain Buyer dashboard access at `/dashboard`. `/s
 - Buyer: `GET /dashboard/reviews`, `GET|POST /dashboard/reviews/new/{orderItemId}`, `GET|POST /dashboard/reviews/{reviewId}`.
 - Seller: `GET /seller/reviews`, `POST /seller/reviews/{reviewId}/reply`, `POST /seller/reviews/{reviewId}/report`.
 - Admin: `GET|POST /admin/reviews` (`reviews.view` / `reviews.manage`).
+
+## Phase 13.6 social publishing
+- `GET /seller/social-publishing` — seller connection/settings and post history.
+- `POST /seller/social/{platform}/connect`, `GET /seller/social/{platform}/callback`, `GET|POST /seller/social/{platform}/select`, `POST /seller/social/{platform}/settings`, `POST /seller/social/{platform}/disconnect` — owned social connection lifecycle and intentional Meta destination selection.
+- `GET|POST /seller/social/product/{id}` — approved/published Product composer and manual posting.
+- `GET|POST /seller/social/custom-design/{id}` — active Custom Design composer and manual posting.
+- `POST /seller/social/retry/{id}` — retry an owned failed attempt only while its Product still exists and is approved/published or its Custom Design still exists and is active.
+- `GET /admin/social-publishing`, `POST /admin/social-publishing/{platform}` — promotions-permission integration controls.
