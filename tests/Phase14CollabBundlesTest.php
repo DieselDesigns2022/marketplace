@@ -82,6 +82,10 @@ $payoutSource=file_get_contents(dirname(__DIR__).'/app/Services/CollabPayoutServ
 phase14Check(str_contains($payoutSource,'MarketplaceFeeService::configured()'),'estimate uses the configured marketplace fee service');
 $collabControllerSource=file_get_contents(dirname(__DIR__).'/app/Controllers/CollabController.php');
 phase14Check(str_contains($collabControllerSource,'function estimatePayout')&&str_contains($collabControllerSource,'H::verifyCsrf()'),'estimate endpoint requires seller authorization and CSRF');
+$adminControllerSource=file_get_contents(dirname(__DIR__).'/app/Controllers/AdminController.php');
+phase14Check(str_contains($adminControllerSource,'oi.collab_id is null')&&str_contains($adminControllerSource,'se.collab_id is null'),'Admin item reporting excludes contributor earnings from shared collab rows');
+phase14Check(str_contains($adminControllerSource,'pc.collab_id=oi.collab_id'),'Admin item reporting identifies the shared collab platform commission explicitly');
+phase14Check(str_contains($adminControllerSource,'sp.order_id=oi.order_id')&&str_contains($adminControllerSource,'sp.designer_id=oi.designer_id'),'ordinary Product/Custom Design payout joins remain available');
 if(class_exists(ZipArchive::class)) {
     $path=tempnam(sys_get_temp_dir(),'p14zip');$zip=new ZipArchive();$zip->open($path,ZipArchive::CREATE|ZipArchive::OVERWRITE);$zip->addFromString('_creative-moth-snapshot.json','manifest');$zip->close();
     phase14Check($service->archiveMatchesSnapshot($path,'manifest'),'deterministic existing archive can be adopted');
