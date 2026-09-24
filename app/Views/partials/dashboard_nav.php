@@ -131,6 +131,16 @@ if ($area === 'buyer') {
                 ['/seller/custom-designs', '/seller/custom-designs/']
             ],
             [
+                '/seller/collabs',
+                'My Collabs',
+                ['/seller/collabs', '/seller/collabs/']
+            ],
+            [
+                '/seller/collabs/find',
+                'Find Collabs',
+                ['/seller/collabs/find']
+            ],
+            [
                 '/seller/store',
                 'Store & Licenses',
                 ['/seller/store']
@@ -232,6 +242,11 @@ if ($area === 'buyer') {
                 ['/admin/products', '/admin/products/']
             ],
             [
+                '/admin/collabs',
+                'Collab Events',
+                ['/admin/collabs', '/admin/collabs/']
+            ],
+            [
                 '/admin/categories',
                 'Categories',
                 ['/admin/categories']
@@ -309,7 +324,7 @@ if ($area === 'buyer') {
 
     $permissionByHref = [
         '/admin'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/social-publishing'=>'promotions.view','/admin/promo-library'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
-        '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
+        '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/collabs'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
         '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/reviews'=>'reviews.view','/admin/message-reports'=>'messages.view','/admin/ip-risk-terms'=>'ip_risk.view',
         '/admin/payment-logs'=>'payments.view','/admin/downloads'=>'downloads.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
     ];

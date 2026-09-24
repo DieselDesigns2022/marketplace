@@ -43,8 +43,9 @@ final class OrderFinalizationService
             DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$orderId]);
             CouponService::recordUsage($orderId);
             $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $internal);
+            $this->prepareCollabFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $internal);
             $this->referrals->qualifyBuyer($orderId, $eventKey . ':buyer');
-            foreach (DB::rows('select distinct designer_id from order_items where order_id=?', [$orderId]) as $seller) {
+            foreach (DB::rows('select designer_id from order_items where order_id=? and collab_id is null union select designer_id from collab_order_allocations where order_id=?', [$orderId,$orderId]) as $seller) {
                 $this->referrals->qualifySeller($orderId, (int)$seller['designer_id'], $eventKey . ':seller:' . $seller['designer_id']);
                 (new SellerReferralCommissionService)->accrueOrder($orderId, (int)$seller['designer_id']);
             }
@@ -80,11 +81,11 @@ final class OrderFinalizationService
 
     private function prepareFinancialLedgers(int $orderId, string $currency, bool $platformFunded): void
     {
-        $items = DB::rows('select oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id,sum(oi.total_price) total_price,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else oi.total_price*oi.commission_rate end) commission_amount from order_items oi join orders o on o.id=oi.order_id where oi.order_id=? group by oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id', [$orderId]);
+        $items = DB::rows('select oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id,sum(oi.total_price) total_price,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else oi.total_price*oi.commission_rate end) commission_amount from order_items oi join orders o on o.id=oi.order_id where oi.order_id=? and oi.collab_id is null group by oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id', [$orderId]);
         foreach ($items as $item) {
             DB::exec('insert into platform_commissions (order_id,product_id,custom_service_id,designer_id,gross_sale,commission_amount) select ?,?,?,?,?,? where not exists (select 1 from platform_commissions where order_id=? and product_id<=>? and custom_service_id<=>? and designer_id=?)', [$orderId,$item['product_id'],$item['custom_service_id'],$item['designer_id'],$item['total_price'],round((float)$item['commission_amount'],2),$orderId,$item['product_id'],$item['custom_service_id'],$item['designer_id']]);
         }
-        foreach (DB::rows('select oi.designer_id,sum(oi.total_price) gross,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else oi.total_price*oi.commission_rate end) commission,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_percentage_fee_amount else oi.total_price*oi.commission_rate end) percentage_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_fixed_fee_amount else 0 end) fixed_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.seller_payout_amount else oi.total_price-(oi.total_price*oi.commission_rate) end) payout,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,max(oi.commission_rate) legacy_rate,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled from order_items oi join orders o on o.id=oi.order_id join designers d on d.id=oi.designer_id where oi.order_id=? group by oi.designer_id,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled', [$orderId]) as $row) {
+        foreach (DB::rows('select oi.designer_id,sum(oi.total_price) gross,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else oi.total_price*oi.commission_rate end) commission,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_percentage_fee_amount else oi.total_price*oi.commission_rate end) percentage_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_fixed_fee_amount else 0 end) fixed_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.seller_payout_amount else oi.total_price-(oi.total_price*oi.commission_rate) end) payout,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,max(oi.commission_rate) legacy_rate,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled from order_items oi join orders o on o.id=oi.order_id join designers d on d.id=oi.designer_id where oi.order_id=? and oi.collab_id is null group by oi.designer_id,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled', [$orderId]) as $row) {
             $gross = round((float)$row['gross'], 2);
             $commission = round((float)$row['commission'], 2);
             $payout = max(0, round((float)$row['payout'], 2));
@@ -97,9 +98,42 @@ final class OrderFinalizationService
         }
     }
 
+    public function prepareCollabFinancialLedgers(int $orderId, string $currency, bool $platformFunded): void
+    {
+        foreach (DB::rows('select oi.*,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents from order_items oi join orders o on o.id=oi.order_id where oi.order_id=? and oi.collab_id is not null', [$orderId]) as $item) {
+            if (DB::row('select id from collab_order_allocations where order_item_id=? limit 1', [$item['id']])) continue;
+            $participants = DB::rows('select designer_id,qualifying_file_count from collab_participants where collab_id=? and eligibility="eligible" order by designer_id', [$item['collab_id']]);
+            $ids = array_map('intval', array_column($participants, 'designer_id'));
+            $gross = CreditService::parseCents((string)$item['total_price'], false);
+            $fee = CreditService::parseCents((string)$item['platform_commission_amount'], false);
+            $payoutSplit = (new CollabPayoutService())->split($gross, $fee, $ids)['allocations'];
+            $splitter = new CollabPayoutService();
+            $grossSplit = $splitter->distribute($gross, $ids);
+            $totalFeeShares = [];
+            foreach ($ids as $id) $totalFeeShares[$id] = $grossSplit[$id] - $payoutSplit[$id];
+            $feeComponents = $splitter->feeComponents($totalFeeShares, CreditService::parseCents((string)$item['marketplace_percentage_fee_amount'], false), CreditService::parseCents((string)$item['marketplace_fixed_fee_amount'], false));
+            $byDesigner = [];
+            foreach ($participants as $participant) $byDesigner[(int)$participant['designer_id']] = $participant;
+            DB::exec('insert into platform_commissions(order_id,product_id,custom_service_id,collab_id,designer_id,gross_sale,commission_amount) values(?,null,null,?,?,?,?)', [$orderId,$item['collab_id'],$item['designer_id'],CreditService::formatCents($gross),CreditService::formatCents($fee)]);
+            foreach ($ids as $designerId) {
+                $allocation = $payoutSplit[$designerId];
+                $grossBasis = $grossSplit[$designerId];
+                $allocatedFee = $grossBasis - $allocation;
+                $percentageFee = $feeComponents[$designerId]['percentage_cents'];
+                $fixedFee = $feeComponents[$designerId]['fixed_cents'];
+                DB::exec('insert into collab_order_allocations(collab_id,order_id,order_item_id,designer_id,qualifying_file_count,eligible_count_snapshot,gross_basis_cents,marketplace_fee_cents,contributor_pool_cents,allocation_cents,storefront_designer_id) values(?,?,?,?,?,?,?,?,?,?,?)', [$item['collab_id'],$orderId,$item['id'],$designerId,$byDesigner[$designerId]['qualifying_file_count'],count($ids),$gross,$fee,array_sum($payoutSplit),$allocation,$item['collab_storefront_designer_id']]);
+                DB::exec('insert into seller_earnings(order_id,order_item_id,product_id,collab_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) select ?,?,null,?,?,o.user_id,?,?,?,"paid_pending_payout" from orders o where o.id=?', [$orderId,$item['id'],$item['collab_id'],$designerId,CreditService::formatCents($grossBasis),CreditService::formatCents($allocatedFee),CreditService::formatCents($allocation),$orderId]);
+                $designer = DB::row('select stripe_connect_account_id,stripe_details_submitted,stripe_payouts_enabled from designers where id=?', [$designerId]);
+                $status = $platformFunded ? 'platform_credit_hold' : (!empty($designer['stripe_connect_account_id']) && !empty($designer['stripe_details_submitted']) && !empty($designer['stripe_payouts_enabled']) ? 'pending_transfer' : 'pending_stripe_onboarding');
+                DB::exec('insert into seller_payouts(order_id,designer_id,gross_amount,fee_model,commission_rate_snapshot,fixed_fee_cents_snapshot,marketplace_percentage_fee_amount,marketplace_fixed_fee_amount,original_gross_amount,original_seller_payout_amount,platform_commission_amount,seller_payout_amount,currency,payout_status) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end', [$orderId,$designerId,CreditService::formatCents($grossBasis),'percentage_plus_fixed',(int)$item['marketplace_fee_basis_points']/10000,(int)$item['marketplace_fixed_fee_cents'],CreditService::formatCents($percentageFee),CreditService::formatCents($fixedFee),CreditService::formatCents($grossBasis),CreditService::formatCents($allocation),CreditService::formatCents($allocatedFee),CreditService::formatCents($allocation),$currency,$status]);
+            }
+            DB::exec('update order_items set seller_payout_status="allocated" where id=?', [$item['id']]);
+        }
+    }
+
     public function communicate(int $orderId): void
     {
-        foreach(DB::rows('select distinct designer_id from order_items where order_id=?',[$orderId]) as $seller){$designerId=(int)$seller['designer_id'];$this->communicationAttempt('creator_recognition_payment',fn()=>(new CreatorRecognitionService)->recalculate($designerId,false,true,'payment',null,'recognition:paid:order:'.$orderId.':seller:'.$designerId));}
+        foreach(DB::rows('select designer_id from order_items where order_id=? and collab_id is null union select designer_id from collab_order_allocations where order_id=?',[$orderId,$orderId]) as $seller){$designerId=(int)$seller['designer_id'];$this->communicationAttempt('creator_recognition_payment',fn()=>(new CreatorRecognitionService)->recalculate($designerId,false,true,'payment',null,'recognition:paid:order:'.$orderId.':seller:'.$designerId));}
         $this->communicationAttempt('paid_order_communications', function () use ($orderId): void {
             $this->queueCommunications($orderId);
         });
@@ -133,7 +167,7 @@ final class OrderFinalizationService
         if($custom) NotificationService::create((int)$custom['seller_user_id'],'custom_order_new','designer','New custom order','A paid custom-design request is ready, including the required buyer information.','custom-order:'.$custom['id'].':seller:new','/seller/custom-orders/'.$custom['id']);
         else NotificationService::create((int)$order['user_id'], 'download_ready', 'buyer', 'Downloads ready', 'Your files for order #' . $orderId . ' are ready.', 'order:' . $orderId . ':buyer:download-ready', '/dashboard/order/' . $orderId);
         $coupon = !empty($order['coupon_id']) ? DB::row('select id,scope,seller_id,code from coupons where id=?', [$order['coupon_id']]) : null;
-        foreach (DB::rows('select d.user_id,oi.designer_id,u.email,u.name,sum(coalesce(oi.coupon_discount,0)) coupon_discount from order_items oi join designers d on d.id=oi.designer_id join users u on u.id=d.user_id where oi.order_id=? group by d.user_id,oi.designer_id,u.email,u.name', [$orderId]) as $seller) {
+        foreach (DB::rows('select d.user_id,x.designer_id,u.email,u.name,sum(x.coupon_discount) coupon_discount from (select designer_id,coalesce(coupon_discount,0) coupon_discount from order_items where order_id=? and collab_id is null union all select designer_id,0 from collab_order_allocations where order_id=?) x join designers d on d.id=x.designer_id join users u on u.id=d.user_id group by d.user_id,x.designer_id,u.email,u.name', [$orderId,$orderId]) as $seller) {
             $key = 'order:' . $orderId . ':seller:' . $seller['designer_id'];
             NotificationService::create((int)$seller['user_id'], 'new_sale', 'designer', 'New sale', 'You made a sale in order #' . $orderId . '.', $key, '/seller/sales');
             EmailQueueService::foundationSellerEmail($seller['email'], 'new_sale', ['name' => $seller['name'], 'title' => 'New sale', 'message' => 'You made a sale in order #' . $orderId . '.', 'action_url' => '/seller/sales'], $key . ':email');

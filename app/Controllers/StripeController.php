@@ -44,6 +44,8 @@ class StripeController
         $allocated=$refundService->allocations($orderId);
         $allocatedTotal=array_sum(array_map(static fn(array $r):int=>(int)$r['refunded_cents'],$allocated));
         if($allocatedTotal<=0){if($owns)DB::commit();return;}
+        $collabItem=DB::row('select oi.* from order_items oi where oi.order_id=? and oi.collab_id is not null limit 1',[$orderId]);
+        if($collabItem){$this->reconcileCollabRefund($order,$collabItem,$allocated,$refundService);(new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();return;}
         if(($order['marketplace_fee_model']??'legacy_percentage')!=='percentage_plus_fixed'){
             $legacy=[];foreach($allocated as $item){$rate=(float)(DB::row('select commission_rate from order_items where id=?',[$item['id']])['commission_rate']??0);$remaining=max(0,StripeService::cents($item['total_price'])-(int)$item['refunded_cents']);$fee=(int)round($remaining*$rate);$seller=$remaining-$fee;DB::exec('update order_items set platform_commission_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($fee),CreditService::formatCents($seller),$item['id']]);$designer=(int)$item['designer_id'];$legacy[$designer]['gross']=($legacy[$designer]['gross']??0)+$remaining;$legacy[$designer]['fee']=($legacy[$designer]['fee']??0)+$fee;$legacy[$designer]['seller']=($legacy[$designer]['seller']??0)+$seller;}
             foreach($legacy as $designer=>$amount){$payout=DB::row('select * from seller_payouts where order_id=? and designer_id=?',[$orderId,$designer]);if(!$payout)continue;$refundService->resetUnattemptedPayoutPlan((int)$payout['id']);DB::exec('update seller_payouts set gross_amount=?,platform_commission_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($amount['gross']),CreditService::formatCents($amount['fee']),CreditService::formatCents($amount['seller']),$payout['id']]);if(in_array($payout['payout_status'],['transferred','recovery_applied'],true)){$baseline=$payout['completed_economic_value_amount']!==null?StripeService::cents($payout['completed_economic_value_amount']):StripeService::cents($payout['original_seller_payout_amount']??$payout['seller_payout_amount']);$refundService->recordRecovery($orderId,$designer,max(0,$baseline-$amount['seller']));}}
@@ -62,6 +64,48 @@ class StripeController
         }
         (new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();
         }catch(Throwable $e){if($owns&&DB::pdo()->inTransaction())DB::rollBack();throw $e;}
+    }
+
+    private function reconcileCollabRefund(array $order, array $item, array $allocated, MarketplaceRefundService $refundService): void
+    {
+        $refunded = 0;
+        foreach ($allocated as $allocationRow) {
+            if ((int)$allocationRow['id'] === (int)$item['id']) {
+                $refunded = (int)$allocationRow['refunded_cents'];
+                break;
+            }
+        }
+        $remaining = max(0, StripeService::cents($item['total_price']) - $refunded);
+        $rows = DB::rows('select * from collab_order_allocations where order_item_id=? order by designer_id', [$item['id']]);
+        if (!$rows) return;
+        $ids = array_map('intval', array_column($rows, 'designer_id'));
+        $calculator = new MarketplaceFeeService((int)$order['marketplace_fee_basis_points'], (int)$order['marketplace_fixed_fee_cents']);
+        $fee = $calculator->calculate([['id'=>(int)$item['id'],'seller_id'=>(int)$item['designer_id'],'gross_cents'=>$remaining]])[(int)$item['designer_id']];
+        $splitter = new \App\Services\CollabPayoutService();
+        $newAllocations = $splitter->split($remaining, (int)$fee['fee_cents'], $ids)['allocations'];
+        $newGross = $splitter->distribute($remaining, $ids);
+        $totalFeeShares = [];
+        foreach ($ids as $designerId) $totalFeeShares[$designerId] = $newGross[$designerId] - $newAllocations[$designerId];
+        $feeComponents = $splitter->feeComponents($totalFeeShares, (int)$fee['percentage_fee_cents'], (int)$fee['fixed_fee_cents']);
+        foreach ($rows as $row) {
+            $designer = (int)$row['designer_id'];
+            $new = $newAllocations[$designer];
+            $gross = $newGross[$designer];
+            $percentage = $feeComponents[$designer]['percentage_cents'];
+            $fixed = $feeComponents[$designer]['fixed_cents'];
+            $payout = DB::row('select * from seller_payouts where order_id=? and designer_id=?', [$order['id'],$designer]);
+            if (!$payout) throw new \DomainException('Collab payout snapshot is missing.');
+            $refundService->resetUnattemptedPayoutPlan((int)$payout['id']);
+            DB::exec('update collab_order_allocations set refunded_allocation_cents=? where id=?', [max(0,(int)$row['allocation_cents']-$new),$row['id']]);
+            DB::exec('update seller_payouts set gross_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,platform_commission_amount=?,seller_payout_amount=?,updated_at=now() where id=?', [CreditService::formatCents($gross),CreditService::formatCents($percentage),CreditService::formatCents($fixed),CreditService::formatCents($percentage+$fixed),CreditService::formatCents($new),$payout['id']]);
+            DB::exec('update seller_earnings set gross_sale=?,marketplace_commission=?,seller_earning=? where order_id=? and collab_id=? and designer_id=?', [CreditService::formatCents($gross),CreditService::formatCents($percentage+$fixed),CreditService::formatCents($new),$order['id'],$item['collab_id'],$designer]);
+            if (in_array($payout['payout_status'], ['transferred','recovery_applied'], true)) {
+                $baseline = StripeService::cents($payout['completed_economic_value_amount'] ?? $payout['original_seller_payout_amount']);
+                $refundService->recordRecovery((int)$order['id'], $designer, max(0,$baseline-$new));
+            }
+        }
+        DB::exec('update order_items set platform_commission_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,seller_payout_amount=? where id=?', [CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['percentage_fee_cents']),CreditService::formatCents($fee['fixed_fee_cents']),CreditService::formatCents($fee['seller_earnings_cents']),$item['id']]);
+        DB::exec('update platform_commissions set gross_sale=?,commission_amount=? where order_id=? and collab_id=?', [CreditService::formatCents($remaining),CreditService::formatCents((int)$fee['fee_cents']),$order['id'],$item['collab_id']]);
     }
 
     public function success(): void

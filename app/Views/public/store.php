@@ -98,6 +98,7 @@
     <?php endif; ?>
 </section>
 <?php if(H::user() && !$isOwner):?><form method="post" action="/messages/start/store/<?=$d['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn secondary">Message seller</button></form><?php endif;?>
+<?php if(!empty($collabs)):?><section id="collab-bundles"><h2>Active Collab Bundles</h2><div class="grid products"><?php foreach($collabs as $c):?><article class="card product"><span class="badge">Collab Event</span><h3><a href="/collab/<?=H::e($c['slug'])?>?store=<?=(int)$d['id']?>"><?=H::e($c['title'])?></a></h3><p><?=H::money($c['price_cents']/100)?> · through <?=H::e($c['sale_close_date'])?></p></article><?php endforeach;?></div></section><?php endif;?>
 <section id="custom-designs">
     <h2>Custom Designs</h2>
     <?php if(empty($customServices)): ?>

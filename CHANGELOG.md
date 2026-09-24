@@ -386,3 +386,9 @@ Intentionally postponed:
 ## Phase 13.2 — Seller ratings and reviews (2026-09-18)
 - Added download-gated verified-purchase seller reviews, buyer editing, seller replies/reports, Admin moderation/auditing, notifications, cached distributions, and public storefront ratings.
 - Corrected Phase 13.2 delivery completion timing, self-review prevention, historical buyer context, reply edit/moderation visibility, complete Admin filters, mandatory moderation notes, report lifecycle handling, review indexes, safe errors, and disposable database coverage.
+
+## Phase 14 — Bundle Events, Collab Bundles & Event Sales (2026-09-23)
+- Added approved-seller hosted open/closed collabs, invitations, join decisions, protected contributions, immutable deadline eligibility snapshots, protected deterministic ZIP assembly, storefront exposure, IP-risk gating, payout estimates and allocation snapshots, admin visibility, and an idempotent deadline worker.
+- Implemented Phase 14 checkout/finalization (pending disposable-database and live verification), contributor allocation and refund reconciliation, buyer downloads, seller/admin reporting, retryable immutable ZIP processing, required Terms eligibility, secure POST invite acceptance, persisted IP review, organizer editing, and canonical fresh-install schema.
+- Hardened Phase 14 deadline enforcement, atomic invitations, upload validation/replacement, stable IP decisions, terminal ineligible events, deterministic ZIP adoption, complete refund ledger synchronization, and item-level refunded download denial without changing the marketplace's global timezone.
+- Made material IP rescans fail closed, serialized ZIP builds and buyer/collab checkout attempts, and bound protected ZIP authorization and logging to the exact successfully delivered order item.

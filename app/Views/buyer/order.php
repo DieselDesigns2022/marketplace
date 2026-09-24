@@ -6,6 +6,7 @@
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?> · Date: <?=$order['created_at']?>
 </p>
 <?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>.</p><?php endif;?>
+<?php foreach(($collabItems ?? []) as $collab):?><section class="card"><span class="badge">Collab Bundle</span><h2><?=H::e($collab['title'])?></h2><p><?=H::money($collab['total_price'])?></p><?php if($collab['download_eligible']):?><a class="btn" href="/collab-download/<?=(int)$collab['id']?>">Download protected ZIP</a><?php else:?><span class="muted">Fully refunded — download unavailable.</span><?php endif;?></section><?php endforeach;?>
 <?php foreach($sellerGroups as $group): $receiptImage=\App\Services\SellerReceiptService::safePublicPath($group['receipt_image_path']??null);?><section class="card seller-receipt-group"><h2>Items from <?=H::e($group['seller_name'])?></h2><?php if($receiptImage):?><img class="receipt-image" src="<?=H::e(H::assetUrl($receiptImage))?>" alt="Receipt image from <?=H::e($group['seller_name'])?>" style="display:block;width:auto;height:auto;max-width:100%;max-height:320px;object-fit:contain;margin:0 auto 18px;"><?php endif;?><?php if($group['receipt_note']):?><p><strong>Message from the seller (not Creative Moth)</strong><br><?=nl2br(H::e($group['receipt_note']))?></p><?php endif;?><div class="responsive-table"><table>
     <tr>
         <th>Product</th>
