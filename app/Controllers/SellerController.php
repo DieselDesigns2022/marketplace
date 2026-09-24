@@ -2448,7 +2448,11 @@ class SellerController
     {
         $this->requireOnboardingComplete();
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
+        $designerId = (int)$this->d()['id'];
+        H::view('seller/sales', [
+            'sales' => DB::rows('select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and oi.collab_id is null and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$designerId]),
+            'collabSales' => DB::rows('select a.*,c.title,o.payment_status,o.created_at,u.email,sp.payout_status,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id from collab_order_allocations a join collab_events c on c.id=a.collab_id join orders o on o.id=a.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=a.order_id and sp.designer_id=a.designer_id where a.designer_id=? and o.payment_status in ("paid","partially_refunded") order by o.created_at desc', [$designerId]),
+        ]);
 
     }
 

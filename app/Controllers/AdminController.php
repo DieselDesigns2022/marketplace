@@ -639,10 +639,47 @@ class AdminController
             H::redirect('/admin/order/'.(int)$id);
         }
         $order=DB::row('select o.*,u.email buyer_email,u.name buyer_name from orders o join users u on u.id=o.user_id where o.id=?',[(int)$id])??H::abort(404);
-        $items=DB::rows('select oi.*,coalesce(oi.product_title,p.title) title,d.display_name designer_name,d.stripe_account_status,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled,u.email designer_email,se.seller_earning,pc.commission_amount,sp.id seller_payout_id,sp.payout_status ledger_payout_status,sp.stripe_transfer_id ledger_transfer_id,sp.stripe_transfer_error ledger_transfer_error,sp.platform_credit_settled_at,sp.platform_credit_settled_by from order_items oi left join products p on p.id=oi.product_id join designers d on d.id=oi.designer_id join users u on u.id=d.user_id left join seller_earnings se on se.order_id=oi.order_id and se.product_id<=>oi.product_id left join platform_commissions pc on pc.order_id=oi.order_id and pc.product_id<=>oi.product_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.order_id=?',[$order['id']]);
+        $items=self::orderDetailItems((int)$order['id']);
         $sellerFinancial=DB::rows('select sp.*,d.display_name seller_name,coalesce(x.pre_discount_gross,sp.original_gross_amount) pre_discount_gross,coalesce(x.coupon_discount,0) coupon_discount,coalesce(x.refunded_cents,0) refunded_cents,coalesce(a.recovery_amount_cents,0) recovery_amount_cents,coalesce(a.recovery_applied_cents,0) recovery_applied_cents,coalesce(a.recovery_reserved_cents,0) recovery_reserved_cents,coalesce(a.recovery_closed_cents,0) recovery_closed_cents,coalesce(a.recovery_balance_cents,0) recovery_balance_cents from seller_payouts sp join designers d on d.id=sp.designer_id left join (select oi.order_id,oi.designer_id,sum(oi.total_price+coalesce(oi.coupon_discount,0)) pre_discount_gross,sum(coalesce(oi.coupon_discount,0)) coupon_discount,coalesce(sum((select coalesce(sum(ra.merchandise_refund_cents),0) from marketplace_refund_allocations ra where ra.order_item_id=oi.id)),0) refunded_cents from order_items oi where oi.order_id=? group by oi.order_id,oi.designer_id) x on x.order_id=sp.order_id and x.designer_id=sp.designer_id left join (select order_id,designer_id,sum(original_amount_cents) recovery_amount_cents,sum(applied_cents) recovery_applied_cents,sum(reserved_cents) recovery_reserved_cents,sum(case when status in ("waived","resolved") then greatest(0,original_amount_cents-applied_cents-reserved_cents) else 0 end) recovery_closed_cents,sum(balance_cents) recovery_balance_cents from seller_financial_adjustments where adjustment_type="refund_recovery" group by order_id,designer_id) a on a.order_id=sp.order_id and a.designer_id=sp.designer_id where sp.order_id=? order by sp.designer_id',[$order['id'],$order['id']]);
-        H::view('admin/order_detail',['order'=>$order,'items'=>$items,'sellerFinancial'=>$sellerFinancial,'refundObservations'=>DB::rows('select * from marketplace_refund_observations where order_id=? order by id',[$order['id']]),'refundAllocations'=>DB::rows('select oi.id,oi.product_title,oi.total_price,coalesce(sum(a.merchandise_refund_cents),0) refunded_cents from order_items oi left join marketplace_refund_allocations a on a.order_item_id=oi.id where oi.order_id=? group by oi.id,oi.product_title,oi.total_price order by oi.id',[$order['id']]),'adjustments'=>DB::rows('select a.*,d.display_name seller_name from seller_financial_adjustments a join designers d on d.id=a.designer_id where a.order_id=? order by a.id',[$order['id']]),'transactions'=>DB::rows('select * from payment_transactions where order_id=? order by created_at desc',[$order['id']]),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 20')]);
+        H::view('admin/order_detail',['order'=>$order,'items'=>$items,'collabAllocations'=>DB::rows('select a.*,c.title,d.display_name from collab_order_allocations a join collab_events c on c.id=a.collab_id join designers d on d.id=a.designer_id where a.order_id=? order by a.order_item_id,a.designer_id',[$order['id']]),'sellerFinancial'=>$sellerFinancial,'refundObservations'=>DB::rows('select * from marketplace_refund_observations where order_id=? order by id',[$order['id']]),'refundAllocations'=>DB::rows('select oi.id,oi.product_title,oi.total_price,coalesce(sum(a.merchandise_refund_cents),0) refunded_cents from order_items oi left join marketplace_refund_allocations a on a.order_item_id=oi.id where oi.order_id=? group by oi.id,oi.product_title,oi.total_price order by oi.id',[$order['id']]),'adjustments'=>DB::rows('select a.*,d.display_name seller_name from seller_financial_adjustments a join designers d on d.id=a.designer_id where a.order_id=? order by a.id',[$order['id']]),'transactions'=>DB::rows('select * from payment_transactions where order_id=? order by created_at desc',[$order['id']]),'events'=>DB::rows('select * from stripe_events order by created_at desc limit 20')]);
 
+    }
+
+    public static function orderDetailItems(int $orderId): array
+    {
+        return DB::rows(
+            'select oi.*,coalesce(oi.product_title,p.title) title,
+                    d.display_name designer_name,d.stripe_account_status,d.stripe_connect_account_id,
+                    d.stripe_details_submitted,d.stripe_payouts_enabled,u.email designer_email,
+                    se.seller_earning,pc.commission_amount,
+                    sp.id seller_payout_id,sp.payout_status ledger_payout_status,
+                    sp.stripe_transfer_id ledger_transfer_id,sp.stripe_transfer_error ledger_transfer_error,
+                    sp.platform_credit_settled_at,sp.platform_credit_settled_by
+               from order_items oi
+               left join products p on p.id=oi.product_id
+               join designers d on d.id=oi.designer_id
+               join users u on u.id=d.user_id
+               left join seller_earnings se
+                 on oi.collab_id is null
+                and se.collab_id is null
+                and se.order_id=oi.order_id
+                and se.designer_id=oi.designer_id
+                and ((oi.product_id is not null and se.product_id=oi.product_id)
+                     or (oi.custom_service_id is not null and se.product_id is null))
+               left join platform_commissions pc
+                 on pc.order_id=oi.order_id
+                and ((oi.collab_id is not null and pc.collab_id=oi.collab_id)
+                     or (oi.collab_id is null and pc.collab_id is null
+                         and pc.product_id<=>oi.product_id
+                         and pc.custom_service_id<=>oi.custom_service_id))
+               left join seller_payouts sp
+                 on oi.collab_id is null
+                and sp.order_id=oi.order_id
+                and sp.designer_id=oi.designer_id
+              where oi.order_id=?
+              order by oi.id',
+            [$orderId]
+        );
     }
 
     public function paymentLogs()

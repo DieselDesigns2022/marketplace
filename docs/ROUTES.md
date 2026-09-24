@@ -347,3 +347,13 @@ Authenticated accounts always retain Buyer dashboard access at `/dashboard`. `/s
 - `GET|POST /seller/social/custom-design/{id}` — active Custom Design composer and manual posting.
 - `POST /seller/social/retry/{id}` — retry an owned failed attempt only while its Product still exists and is approved/published or its Custom Design still exists and is active.
 - `GET /admin/social-publishing`, `POST /admin/social-publishing/{platform}` — promotions-permission integration controls.
+
+## Phase 14 collabs
+- Public sale and checkout: `GET /collab/{slug}` and `GET|POST /collab/{slug}/checkout`. Authenticated protected `GET /collab-download/{item}` uses the exact purchased order-item ID so a refunded purchase and a later valid repurchase cannot be confused.
+- Seller calculator: CSRF-protected `POST /seller/collabs/payout-estimate` returns a read-only estimate from the configured marketplace fee service; it does not mutate a collab.
+- Seller pages: `GET /seller/collabs` (My Collabs), `GET /seller/collabs/find` (Open collabs), `GET|POST /seller/collabs/new`, `GET /seller/collabs/{id}`, and `GET|POST /seller/collabs/{id}/edit`.
+- Seller participation: CSRF-protected `POST /seller/collabs/{id}/request`, `POST /seller/collabs/{id}/participants/{participant}`, `POST /seller/collabs/{id}/invite`, and `POST /seller/collabs/{id}/share-link`. Both Open and Closed hosts may invite; only Open collabs accept unsolicited Find Collabs requests.
+- Seller files: CSRF-protected `POST /seller/collabs/{id}/files`, `POST /seller/collabs/{id}/files/{file}/replace`, and `POST /seller/collabs/{id}/files/{file}/delete`.
+- Invitations: `GET /collabs/invite/{token}` displays confirmation/login without changing membership; CSRF-protected `POST /collabs/invite/{token}` accepts the invitation.
+- Admin reporting/actions: `GET /admin/collabs`, `GET /admin/collabs/{id}`, CSRF-protected `POST /admin/collabs/{id}/retry`, and `POST /admin/collabs/{id}/ip-review`.
+All organizer invitation, decision, edit, upload, replacement, removal, share-link, and acceptance mutations enforce the File Upload Deadline server-side even before cron snapshots the event.

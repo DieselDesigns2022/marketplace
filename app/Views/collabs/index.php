@@ -1,0 +1,3 @@
+<h1>My Collabs</h1><p><a class="btn" href="/seller/collabs/new">Create collab</a> <a href="/seller/collabs/find">Find Collabs</a></p>
+<h2>Hosted Collabs</h2><?php foreach($hosted as $c):?><article class="card"><a href="/seller/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a> — <?=H::e($c['status'])?></article><?php endforeach;?><?php if(!$hosted):?><p>None yet.</p><?php endif;?>
+<h2>Participating Collabs</h2><?php foreach($participating as $c):?><article class="card"><a href="/seller/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a> — <?=H::e($c['membership_status'])?> / <?=H::e($c['eligibility'])?></article><?php endforeach;?><?php if(!$participating):?><p>None yet.</p><?php endif;?>
