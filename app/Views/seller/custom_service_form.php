@@ -7,7 +7,9 @@ if (array_key_exists('brief_fields_present', $_POST)) {
     foreach ($standardBriefFields as $key => $label) {
         if (!empty($_POST['brief_fields'][$key])) {
             $briefFieldConfig[$key] = [
-                'required' => !empty($_POST['brief_required'][$key])
+                'required' => !empty($_POST['brief_required'][$key]),
+                'allow_upload' => !empty($_POST['brief_allow_upload'][$key]),
+                'upload_required' => !empty($_POST['brief_upload_required'][$key]),
             ];
         }
     }
@@ -23,7 +25,9 @@ if (array_key_exists('brief_fields_present', $_POST)) {
 
             if (isset($standardBriefFields[$key])) {
                 $briefFieldConfig[$key] = [
-                    'required' => !empty($field['required'])
+                    'required' => !empty($field['required']),
+                    'allow_upload' => !empty($field['allow_upload']),
+                    'upload_required' => !empty($field['upload_required']),
                 ];
             }
         }
@@ -57,6 +61,8 @@ $postedQuestions = array_key_exists('questions', $_POST)
     : null;
 
 $postedRequired = (array)($_POST['question_required'] ?? []);
+$postedAllowUpload = (array)($_POST['question_allow_upload'] ?? []);
+$postedUploadRequired = (array)($_POST['question_upload_required'] ?? []);
 
 if ($postedQuestions !== null) {
     $questionRows = [];
@@ -64,6 +70,8 @@ if ($postedQuestions !== null) {
         $questionRows[] = [
             'question_text' => (string)$text,
             'is_required' => !empty($postedRequired[$i]),
+            'allow_upload' => !empty($postedAllowUpload[$i]),
+            'upload_required' => !empty($postedUploadRequired[$i]),
         ];
     }
 } else {
@@ -136,20 +144,53 @@ $selectedQuestionCount = max(
                     >
                 </label>
 
-                <label class="custom-field">
+                <div class="custom-field">
                     <span>Expected turnaround</span>
-                    <div class="input-with-suffix">
-                        <input
-                            type="number"
-                            min="1"
-                            max="365"
-                            name="turnaround_days"
-                            required
-                            value="<?=H::e($_POST['turnaround_days'] ?? $service['turnaround_days'] ?? '')?>"
-                        >
-                        <span>days</span>
+
+                    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+
+                        <label style="flex:1;min-width:120px">
+                            <span class="muted">Minimum days</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                name="turnaround_min_days"
+                                required
+                                value="<?=H::e(
+                                    $_POST['turnaround_min_days']
+                                    ??$service['turnaround_min_days']
+                                    ??$service['turnaround_days']
+                                    ??''
+                                )?>"
+                            >
+                        </label>
+
+                        <span style="padding-bottom:10px">to</span>
+
+                        <label style="flex:1;min-width:120px">
+                            <span class="muted">Maximum days</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                name="turnaround_max_days"
+                                required
+                                value="<?=H::e(
+                                    $_POST['turnaround_max_days']
+                                    ??$service['turnaround_days']
+                                    ??''
+                                )?>"
+                            >
+                        </label>
+
                     </div>
-                </label>
+
+                    <p class="help-text">
+                        Example: 3 to 5 days.
+                        Use the same number in both boxes for a single-day estimate.
+                    </p>
+                </div>
 
                 <label class="custom-field">
                     <span>Included revisions</span>
@@ -350,6 +391,12 @@ $selectedQuestionCount = max(
                     $included = isset($briefFieldConfig[$key]);
                     $required = $included
                         && !empty($briefFieldConfig[$key]['required']);
+
+                    $allowUpload = $included
+                        && !empty($briefFieldConfig[$key]['allow_upload']);
+
+                    $uploadRequired = $allowUpload
+                        && !empty($briefFieldConfig[$key]['upload_required']);
                     ?>
 
                     <div class="brief-field-row">
@@ -364,17 +411,45 @@ $selectedQuestionCount = max(
                             <span><?=H::e($label)?></span>
                         </label>
 
-                        <label class="brief-field-required">
-                            <input
-                                type="checkbox"
-                                class="brief-required-checkbox"
-                                name="brief_required[<?=H::e($key)?>]"
-                                value="1"
-                                <?=$required ? 'checked' : ''?>
-                                <?=$included ? '' : 'disabled'?>
-                            >
-                            <span>Required</span>
-                        </label>
+                        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+
+                            <label class="brief-field-required">
+                                <input
+                                    type="checkbox"
+                                    class="brief-required-checkbox"
+                                    name="brief_required[<?=H::e($key)?>]"
+                                    value="1"
+                                    <?=$required ? 'checked' : ''?>
+                                    <?=$included ? '' : 'disabled'?>
+                                >
+                                <span>Require text</span>
+                            </label>
+
+                            <label class="brief-field-required">
+                                <input
+                                    type="checkbox"
+                                    class="brief-upload-checkbox"
+                                    name="brief_allow_upload[<?=H::e($key)?>]"
+                                    value="1"
+                                    <?=$allowUpload ? 'checked' : ''?>
+                                    <?=$included ? '' : 'disabled'?>
+                                >
+                                <span>Allow file upload</span>
+                            </label>
+
+                            <label class="brief-field-required">
+                                <input
+                                    type="checkbox"
+                                    class="brief-upload-required-checkbox"
+                                    name="brief_upload_required[<?=H::e($key)?>]"
+                                    value="1"
+                                    <?=$uploadRequired ? 'checked' : ''?>
+                                    <?=$allowUpload ? '' : 'disabled'?>
+                                >
+                                <span>Require upload</span>
+                            </label>
+
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -557,7 +632,11 @@ $selectedQuestionCount = max(
             question_text:
                 card.querySelector('input[type="text"]')?.value || '',
             is_required:
-                card.querySelector('input[type="checkbox"]')?.checked || false
+                card.querySelector('.question-required-checkbox')?.checked || false,
+            allow_upload:
+                card.querySelector('.question-upload-checkbox')?.checked || false,
+            upload_required:
+                card.querySelector('.question-upload-required-checkbox')?.checked || false
         }));
 
         const values = current.length ? current : existing;
@@ -576,7 +655,9 @@ $selectedQuestionCount = max(
         for (let i = 0; i < count; i++) {
             const saved = values[i] || {
                 question_text: '',
-                is_required: false
+                is_required: false,
+                allow_upload: false,
+                upload_required: false
             };
 
             const card = document.createElement('div');
@@ -593,6 +674,7 @@ $selectedQuestionCount = max(
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
+            checkbox.className = 'question-required-checkbox';
             checkbox.name = 'question_required[' + i + ']';
             checkbox.value = '1';
             checkbox.checked = Boolean(saved.is_required);
@@ -603,8 +685,60 @@ $selectedQuestionCount = max(
             requiredLabel.appendChild(checkbox);
             requiredLabel.appendChild(requiredText);
 
+            requiredText.textContent = 'Require text';
+
+            const uploadLabel = document.createElement('label');
+            uploadLabel.className = 'question-required-toggle';
+
+            const uploadCheckbox = document.createElement('input');
+            uploadCheckbox.type = 'checkbox';
+            uploadCheckbox.className = 'question-upload-checkbox';
+            uploadCheckbox.name = 'question_allow_upload[' + i + ']';
+            uploadCheckbox.value = '1';
+            uploadCheckbox.checked = Boolean(saved.allow_upload);
+
+            const uploadText = document.createElement('span');
+            uploadText.textContent = 'Allow file upload';
+
+            uploadLabel.appendChild(uploadCheckbox);
+            uploadLabel.appendChild(uploadText);
+
+            const uploadRequiredLabel = document.createElement('label');
+            uploadRequiredLabel.className = 'question-required-toggle';
+
+            const uploadRequiredCheckbox = document.createElement('input');
+            uploadRequiredCheckbox.type = 'checkbox';
+            uploadRequiredCheckbox.className = 'question-upload-required-checkbox';
+            uploadRequiredCheckbox.name = 'question_upload_required[' + i + ']';
+            uploadRequiredCheckbox.value = '1';
+            uploadRequiredCheckbox.checked = Boolean(saved.upload_required);
+            uploadRequiredCheckbox.disabled = !uploadCheckbox.checked;
+
+            const uploadRequiredText = document.createElement('span');
+            uploadRequiredText.textContent = 'Require upload';
+
+            uploadRequiredLabel.appendChild(uploadRequiredCheckbox);
+            uploadRequiredLabel.appendChild(uploadRequiredText);
+
+            uploadCheckbox.addEventListener('change', () => {
+                uploadRequiredCheckbox.disabled = !uploadCheckbox.checked;
+
+                if (!uploadCheckbox.checked) {
+                    uploadRequiredCheckbox.checked = false;
+                }
+            });
+
+            const controls = document.createElement('div');
+            controls.style.display = 'flex';
+            controls.style.gap = '14px';
+            controls.style.flexWrap = 'wrap';
+
+            controls.appendChild(requiredLabel);
+            controls.appendChild(uploadLabel);
+            controls.appendChild(uploadRequiredLabel);
+
             top.appendChild(title);
-            top.appendChild(requiredLabel);
+            top.appendChild(controls);
 
             const input = document.createElement('input');
             input.type = 'text';
@@ -628,17 +762,28 @@ $selectedQuestionCount = max(
     document.querySelectorAll('.brief-field-row').forEach((row) => {
         const include = row.querySelector('.brief-field-include');
         const required = row.querySelector('.brief-required-checkbox');
+        const upload = row.querySelector('.brief-upload-checkbox');
+        const uploadRequired = row.querySelector('.brief-upload-required-checkbox');
 
-        const syncRequired = () => {
+        const syncOptions = () => {
             required.disabled = !include.checked;
+            upload.disabled = !include.checked;
+            uploadRequired.disabled = !include.checked || !upload.checked;
 
             if (!include.checked) {
                 required.checked = false;
+                upload.checked = false;
+                uploadRequired.checked = false;
+            }
+
+            if (!upload.checked) {
+                uploadRequired.checked = false;
             }
         };
 
-        include.addEventListener('change', syncRequired);
-        syncRequired();
+        include.addEventListener('change', syncOptions);
+        upload.addEventListener('change', syncOptions);
+        syncOptions();
     });
 })();
 </script>

@@ -18,10 +18,71 @@ final class PublicCollabController
         if (!(new CollabService($repository))->canSell($collab)) H::abort(404);
         $storefront = isset($_GET['store']) ? (int)$_GET['store'] : null;
         if ($storefront && (($repository->participant((int)$collab['id'], $storefront)['eligibility'] ?? '') !== 'eligible')) $storefront = null;
+        $contributionCounts = DB::rows(
+            'select
+                coalesce(cat.name,"Uncategorized") category_name,
+                count(*) file_count
+             from collab_files f
+             left join categories cat
+               on cat.id=f.category_id
+             where f.collab_id=?
+               and f.file_kind="contribution"
+               and f.included_in_snapshot=1
+             group by
+                cat.id,
+                cat.name
+             order by
+                cat.name',
+            [(int)$collab['id']]
+        );
+
+        $totalContributionFiles = array_sum(
+            array_map(
+                static fn(array $row): int =>
+                    (int)$row['file_count'],
+                $contributionCounts
+            )
+        );
+
+        $utc = new \DateTimeZone('UTC');
+
+        $hostTimezoneName =
+            trim((string)($collab['host_timezone'] ?? ''))
+                ?: 'America/New_York';
+
+        try {
+            $hostTimezone = new \DateTimeZone(
+                $hostTimezoneName
+            );
+        } catch (\Throwable) {
+            $hostTimezone = new \DateTimeZone(
+                'America/New_York'
+            );
+        }
+
+        $saleStartsDisplay =
+            (new \DateTimeImmutable(
+                (string)$collab['sale_starts_at'],
+                $utc
+            ))
+            ->setTimezone($hostTimezone)
+            ->format('F j, Y \\a\\t g:i A T');
+
+        $saleCloseDisplay =
+            (new \DateTimeImmutable(
+                (string)$collab['sale_close_date'].' 23:59:59',
+                $hostTimezone
+            ))
+            ->format('F j, Y \\a\\t g:i A T');
+
         H::view('collabs/public', [
             'collab'=>$collab,
             'storefront'=>$storefront,
             'participants'=>array_values(array_filter($repository->participants((int)$collab['id']), fn($participant) => $participant['eligibility'] === 'eligible')),
+            'contributionCounts'=>$contributionCounts,
+            'totalContributionFiles'=>$totalContributionFiles,
+            'saleStartsDisplay'=>$saleStartsDisplay,
+            'saleCloseDisplay'=>$saleCloseDisplay,
         ]);
     }
 

@@ -37,21 +37,293 @@ foreach (['q'=>'Search','category'=>'Category','ai'=>'AI','pod'=>'POD','creator'
     <h2>Categories</h2>
     <div class="grid"><?php foreach($cats as $c):?><a href="/category/<?=H::e($c['slug'])?>"><?=H::e($c['name'])?></a><?php endforeach;?></div>
 </section>
-<form class="filters browse-filters" action="<?=H::e($basePath)?>" method="get">
-    <label class="wide">Search keywords<input name="q" value="<?=H::e($filters['q']??'')?>" placeholder="Try PNG mockup, font, POD..."></label>
-    <?php if(!$isCategory): ?><label>Category<select name="category"><option value="">All categories</option><?php foreach($cats as $c):?><option value="<?=H::e($c['slug'])?>" <?=$selectedCategory===$c['slug']?'selected':''?>><?=H::e($c['name'])?></option><?php endforeach;?></select></label><?php endif; ?>
-    <label>Creator<select name="creator"><option value="">All creators</option><?php foreach(($creators??[]) as $d):?><option value="<?=H::e($d['store_slug'])?>" <?=($filters['creator']??'')===$d['store_slug']?'selected':''?>><?=H::e($d['display_name'])?></option><?php endforeach;?></select></label>
-    <label>Min price<input name="min_price" inputmode="decimal" value="<?=H::e($filters['min_price']??'')?>" placeholder="0"></label>
-    <label>Max price<input name="max_price" inputmode="decimal" value="<?=H::e($filters['max_price']??'')?>" placeholder="50"></label>
-    <label>AI disclosure<select name="ai"><option value="">Any AI disclosure</option><?php foreach(['No AI Used','AI Assisted','AI Generated'] as $o):?><option value="<?=H::e($o)?>" <?=($filters['ai']??'')===$o?'selected':''?>><?=H::e($o)?></option><?php endforeach;?></select></label>
-    <label>POD permission<select name="pod"><option value="">Any POD permission</option><option value="1" <?=($filters['pod']??'')==='1'?'selected':''?>>Allowed</option><option value="0" <?=($filters['pod']??'')==='0'?'selected':''?>>Not allowed</option></select></label>
-    <label>File type<select name="file_type"><option value="">Any file type</option><?php foreach(($fileTypes??[]) as $ft): $value=$ft['file_types']; ?><option value="<?=H::e($value)?>" <?=($filters['file_type']??'')===$value?'selected':''?>><?=H::e($value)?></option><?php endforeach;?></select></label>
-    <label>Featured<select name="featured"><option value="">Any</option><option value="1" <?=($filters['featured']??'')==='1'?'selected':''?>>Featured only</option></select></label>
-    <label>Recently added<select name="new"><option value="">Any age</option><option value="1" <?=($filters['new']??'')==='1'?'selected':''?>>Last 30 days</option></select></label>
-    <label>Commercial license<select name="commercial"><option value="">Any</option><option value="1" <?=($filters['commercial']??'')==='1'?'selected':''?>>Available</option></select></label>
-    <label>Sort results<select name="sort"><option value="relevance" <?=$selectedSort==='relevance'?'selected':''?>>Relevance</option><option value="newest" <?=$selectedSort==='newest'?'selected':''?>>Newest</option><option value="oldest" <?=$selectedSort==='oldest'?'selected':''?>>Oldest</option><option value="price_asc" <?=$selectedSort==='price_asc'?'selected':''?>>Price low to high</option><option value="price_desc" <?=$selectedSort==='price_desc'?'selected':''?>>Price high to low</option><option value="title_asc" <?=$selectedSort==='title_asc'?'selected':''?>>A to Z</option><option value="title_desc" <?=$selectedSort==='title_desc'?'selected':''?>>Z to A</option><option value="featured" <?=$selectedSort==='featured'?'selected':''?>>Featured first</option></select></label>
-    <div class="filter-actions"><button>Apply filters</button><a class="btn alt" href="<?=H::e($basePath)?>">Clear filters</a></div>
+<style>
+.browse-filter-shell{
+    margin:16px 0 10px;
+}
+
+.browse-filter-primary{
+    display:grid;
+    grid-template-columns:minmax(240px,2fr) minmax(150px,1fr) minmax(150px,1fr) minmax(140px,1fr) auto auto;
+    gap:10px;
+    align-items:end;
+}
+
+.browse-filter-primary label,
+.browse-filter-more-grid label{
+    margin:0;
+    font-size:13px;
+    font-weight:700;
+}
+
+.browse-filter-primary input,
+.browse-filter-primary select,
+.browse-filter-more-grid input,
+.browse-filter-more-grid select{
+    width:100%;
+    margin-top:4px;
+    min-height:40px;
+    padding:8px 10px;
+}
+
+.browse-more-filters{
+    margin:0;
+    position:relative;
+}
+
+.browse-more-filters summary{
+    list-style:none;
+    cursor:pointer;
+    white-space:nowrap;
+    min-height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:8px 14px;
+    border:1px solid #d9d0e7;
+    border-radius:12px;
+    background:#fff;
+    font-weight:700;
+}
+
+.browse-more-filters summary::-webkit-details-marker{
+    display:none;
+}
+
+.browse-more-filters[open] summary{
+    background:#f6f1fb;
+}
+
+.browse-filter-more-panel{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    width:min(680px,90vw);
+    padding:14px;
+    border:1px solid #e6deef;
+    border-radius:14px;
+    background:#fff;
+    box-shadow:0 12px 35px rgba(31,20,58,.18);
+    z-index:100;
+}
+
+.browse-filter-more-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:10px;
+}
+
+.browse-filter-actions{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-top:10px;
+}
+
+.browse-filter-primary > button{
+    min-height:40px;
+    white-space:nowrap;
+    padding:8px 16px;
+}
+
+@media(max-width:1050px){
+    .browse-filter-primary{
+        grid-template-columns:2fr 1fr 1fr;
+    }
+
+    .browse-filter-primary > button,
+    .browse-more-filters{
+        width:100%;
+    }
+
+    .browse-filter-more-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+}
+
+@media(max-width:650px){
+    .browse-filter-primary{
+        grid-template-columns:1fr;
+    }
+
+    .browse-filter-more-grid{
+        grid-template-columns:1fr 1fr;
+    }
+
+    .browse-filter-more-panel{
+        left:0;
+        right:auto;
+        width:min(92vw,680px);
+    }
+}
+</style>
+
+<form class="browse-filter-shell" action="<?=H::e($basePath)?>" method="get">
+
+    <div class="browse-filter-primary">
+
+        <label>
+            Search
+            <input
+                name="q"
+                value="<?=H::e($filters['q']??'')?>"
+                placeholder="Search designs..."
+            >
+        </label>
+
+        <?php if(!$isCategory): ?>
+            <label>
+                Category
+                <select name="category">
+                    <option value="">All categories</option>
+                    <?php foreach($cats as $c):?>
+                        <option
+                            value="<?=H::e($c['slug'])?>"
+                            <?=$selectedCategory===$c['slug']?'selected':''?>
+                        >
+                            <?=H::e($c['name'])?>
+                        </option>
+                    <?php endforeach;?>
+                </select>
+            </label>
+        <?php endif; ?>
+
+        <label>
+            Creator
+            <select name="creator">
+                <option value="">All creators</option>
+                <?php foreach(($creators??[]) as $d):?>
+                    <option
+                        value="<?=H::e($d['store_slug'])?>"
+                        <?=($filters['creator']??'')===$d['store_slug']?'selected':''?>
+                    >
+                        <?=H::e($d['display_name'])?>
+                    </option>
+                <?php endforeach;?>
+            </select>
+        </label>
+
+        <label>
+            Sort
+            <select name="sort">
+                <option value="relevance" <?=$selectedSort==='relevance'?'selected':''?>>Relevance</option>
+                <option value="newest" <?=$selectedSort==='newest'?'selected':''?>>Newest</option>
+                <option value="oldest" <?=$selectedSort==='oldest'?'selected':''?>>Oldest</option>
+                <option value="price_asc" <?=$selectedSort==='price_asc'?'selected':''?>>Price low to high</option>
+                <option value="price_desc" <?=$selectedSort==='price_desc'?'selected':''?>>Price high to low</option>
+                <option value="title_asc" <?=$selectedSort==='title_asc'?'selected':''?>>A to Z</option>
+                <option value="title_desc" <?=$selectedSort==='title_desc'?'selected':''?>>Z to A</option>
+                <option value="featured" <?=$selectedSort==='featured'?'selected':''?>>Featured first</option>
+            </select>
+        </label>
+
+        <details class="browse-more-filters">
+            <summary>More filters ▾</summary>
+
+            <div class="browse-filter-more-panel">
+                <div class="browse-filter-more-grid">
+
+                    <label>
+                        Min price
+                        <input
+                            name="min_price"
+                            inputmode="decimal"
+                            value="<?=H::e($filters['min_price']??'')?>"
+                            placeholder="0"
+                        >
+                    </label>
+
+                    <label>
+                        Max price
+                        <input
+                            name="max_price"
+                            inputmode="decimal"
+                            value="<?=H::e($filters['max_price']??'')?>"
+                            placeholder="50"
+                        >
+                    </label>
+
+                    <label>
+                        AI disclosure
+                        <select name="ai">
+                            <option value="">Any</option>
+                            <?php foreach(['No AI Used','AI Assisted','AI Generated'] as $o):?>
+                                <option value="<?=H::e($o)?>" <?=($filters['ai']??'')===$o?'selected':''?>>
+                                    <?=H::e($o)?>
+                                </option>
+                            <?php endforeach;?>
+                        </select>
+                    </label>
+
+                    <label>
+                        POD permission
+                        <select name="pod">
+                            <option value="">Any</option>
+                            <option value="1" <?=($filters['pod']??'')==='1'?'selected':''?>>Allowed</option>
+                            <option value="0" <?=($filters['pod']??'')==='0'?'selected':''?>>Not allowed</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        File type
+                        <select name="file_type">
+                            <option value="">Any file type</option>
+                            <?php foreach(($fileTypes??[]) as $ft): $value=$ft['file_types']; ?>
+                                <option value="<?=H::e($value)?>" <?=($filters['file_type']??'')===$value?'selected':''?>>
+                                    <?=H::e($value)?>
+                                </option>
+                            <?php endforeach;?>
+                        </select>
+                    </label>
+
+                    <label>
+                        Featured
+                        <select name="featured">
+                            <option value="">Any</option>
+                            <option value="1" <?=($filters['featured']??'')==='1'?'selected':''?>>Featured only</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Recently added
+                        <select name="new">
+                            <option value="">Any age</option>
+                            <option value="1" <?=($filters['new']??'')==='1'?'selected':''?>>Last 30 days</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Commercial license
+                        <select name="commercial">
+                            <option value="">Any</option>
+                            <option value="1" <?=($filters['commercial']??'')==='1'?'selected':''?>>Available</option>
+                        </select>
+                    </label>
+
+                </div>
+
+                <div class="browse-filter-actions">
+                    <button type="submit">Apply filters</button>
+                    <a class="btn alt" href="<?=H::e($basePath)?>">Clear filters</a>
+                </div>
+            </div>
+        </details>
+
+        <button type="submit">Apply</button>
+
+    </div>
 </form>
+
+<script>
+document.addEventListener('click', (event) => {
+    document.querySelectorAll('.browse-more-filters[open]').forEach((details) => {
+        if (!details.contains(event.target)) {
+            details.removeAttribute('open');
+        }
+    });
+});
+</script>
+
 <section class="browse-summary">
     <p><strong><?=H::e((string)$pagination['total'])?></strong> approved product<?=($pagination['total']==1?'':'s')?> found. Page <?=H::e((string)$pagination['page'])?> of <?=H::e((string)$pagination['pages'])?>.</p>
     <?php if($active): ?><p>Active filters: <?php foreach($active as $item): ?><span class="badge"><?=H::e($item)?></span><?php endforeach; ?></p><?php endif; ?>

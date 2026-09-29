@@ -10,7 +10,22 @@
         <?php if(!$images):?>
            <div class="thumb big">Preview images are not available for this digital product yet.</div>
         <?php endif;?>
+
+        <h2>Description</h2>
+
+        <?php if($p['short_description']):?>
+            <p>
+                <strong>
+                    <?=H::e($p['short_description'])?>
+                </strong>
+            </p>
+        <?php endif;?>
+
+        <p>
+            <?=nl2br(H::e($p['description']))?>
+        </p>
     </div>
+
     <aside class="card">
         <p>by <a href="/store/<?=H::e($p['store_slug'])?>">
         <?=H::e($p['display_name'])?>
@@ -104,17 +119,6 @@
 
 </aside>
 </div>
-<h2>Description</h2>
-<?php if($p['short_description']):?>
-    <p>
-    <strong>
-    <?=H::e($p['short_description'])?>
-    </strong>
-    </p>
-<?php endif;?>
-<p>
-<?=nl2br(H::e($p['description']))?>
-</p>
 <section class="card"><h2>License and trust notes</h2><p>This is a digital download. Personal use is always included.</p><p><a href="/licensing-help">Read licensing help</a> or <a href="/buyer-faq">visit the buyer FAQ</a>.</p></section>
 
 <h2>More from this designer</h2>

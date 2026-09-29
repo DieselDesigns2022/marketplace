@@ -6,12 +6,12 @@ use DomainException;
 
 final class CollabUploadValidator
 {
-    private const TERMS_EXTENSIONS = ['pdf','txt','rtf','doc','docx','odt'];
+    private const TERMS_EXTENSIONS = ['pdf','txt','rtf','doc','docx','odt','jpg','jpeg','png'];
     private const EXECUTABLE_EXTENSIONS = ['php','php3','php4','php5','phtml','phar','cgi','pl','py','sh','exe','com','bat','cmd','js','html','htm'];
 
     public function validate(array $upload, string $kind): array
     {
-        if (!in_array($kind, ['contribution','terms'], true)) throw new DomainException('Choose a valid file type.');
+        if (!in_array($kind, ['contribution','terms','mockup'], true)) throw new DomainException('Choose a valid file type.');
         $error = (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($error !== UPLOAD_ERR_OK) throw new DomainException($this->uploadError($error));
         $temporary = (string)($upload['tmp_name'] ?? '');
@@ -26,20 +26,20 @@ final class CollabUploadValidator
 
     public function validateMetadata(string $submittedName, int $size, string $kind, string $mime = 'application/octet-stream', ?string $temporary = null): array
     {
-        if (!in_array($kind, ['contribution','terms'], true)) throw new DomainException('Choose a valid file type.');
+        if (!in_array($kind, ['contribution','terms','mockup'], true)) throw new DomainException('Choose a valid file type.');
         if ($size < 1) throw new DomainException('The uploaded file is empty.');
         if ($size > self::serverUploadLimitBytes()) throw new DomainException('The uploaded file exceeds the marketplace server upload limit.');
         $original = basename(str_replace('\\', '/', trim($submittedName)));
         if ($original === '' || strlen($original) > 255) throw new DomainException('The uploaded filename is invalid or too long.');
         $extension = strtolower(pathinfo($original, PATHINFO_EXTENSION));
         if ($extension === '' || in_array($extension, self::EXECUTABLE_EXTENSIONS, true)) throw new DomainException('Executable or unsafe file types are not accepted.');
-        if ($kind === 'terms' && !in_array($extension, self::TERMS_EXTENSIONS, true)) throw new DomainException('Terms/license files must be PDF, TXT, RTF, DOC, DOCX, or ODT.');
+        if ($kind === 'terms' && !in_array($extension, self::TERMS_EXTENSIONS, true)) throw new DomainException('Terms & Conditions & About Me files must be PDF, TXT, RTF, DOC, DOCX, ODT, JPG, JPEG, or PNG.');
         return ['temporary'=>$temporary,'original'=>$original,'extension'=>$extension,'size'=>$size,'mime'=>$mime];
     }
 
     public static function replacementKind(string $existingKind, string $submittedKind): string
     {
-        if (!in_array($existingKind, ['contribution','terms'], true)) throw new DomainException('The stored file type is invalid.');
+        if (!in_array($existingKind, ['contribution','terms','mockup'], true)) throw new DomainException('The stored file type is invalid.');
         if ($submittedKind !== '' && $submittedKind !== $existingKind) throw new DomainException('A replacement must keep the original file type.');
         return $existingKind;
     }

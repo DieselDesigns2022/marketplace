@@ -787,6 +787,17 @@ class AdminController
         $this->gate('downloads.view');
         H::view('admin/table',['title'=>'Download logs','rows'=>DB::rows('select dl.id,dl.order_id,dl.order_item_id,dl.product_id,dl.product_file_id,dl.status,dl.message,u.email user_email,dl.ip_address,dl.created_at from downloads dl join users u on u.id=dl.user_id order by dl.created_at desc limit 200')]);
     }
+    public function homepagePreview(): void
+    {
+        H::requireAdminPermission('homepage.view');
+
+        /*
+         * Render the actual marketplace homepage controller.
+         * This is admin-only and does not change the public waitlist.
+         */
+        (new PublicController())->home();
+    }
+
     public function homepage()
     {
         $this->gate('homepage.view', 'homepage.manage');

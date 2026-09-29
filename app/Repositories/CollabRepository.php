@@ -23,12 +23,12 @@ final class CollabRepository
 
     public function participant(int $collabId, int $designerId): ?array
     {
-        return DB::row('select * from collab_participants where collab_id=? and designer_id=?', [$collabId,$designerId]);
+        return DB::row('select * from collab_participants where collab_id=? and designer_id=? and membership_status not in ("left","removed")', [$collabId,$designerId]);
     }
 
     public function participants(int $id): array
     {
-        return DB::rows('select cp.*,d.display_name,d.store_slug,(select count(*) from collab_files f where f.participant_id=cp.id and f.file_kind="terms") terms_count from collab_participants cp join designers d on d.id=cp.designer_id where cp.collab_id=? order by cp.id', [$id]);
+        return DB::rows('select cp.*,d.display_name,d.store_slug,(select count(*) from collab_files f where f.participant_id=cp.id and f.file_kind="terms") terms_count,(select count(*) from collab_files f where f.participant_id=cp.id and f.file_kind="contribution") live_contribution_count from collab_participants cp join designers d on d.id=cp.designer_id where cp.collab_id=? and cp.membership_status not in ("left","removed") order by cp.id', [$id]);
     }
 
     public function changesOpen(int $id): bool
@@ -38,6 +38,6 @@ final class CollabRepository
 
     public function publicForDesigner(int $designerId): array
     {
-        return DB::rows('select c.* from collab_events c join collab_participants cp on cp.collab_id=c.id where cp.designer_id=? and cp.eligibility="eligible" and c.status="ready" and c.ip_risk_state in ("clear","approved") and c.snapshot_at is not null and c.final_zip_path is not null and c.sale_starts_at<=now() and c.sale_close_date>=current_date order by c.sale_starts_at desc', [$designerId]);
+        return DB::rows('select c.* from collab_events c join collab_participants cp on cp.collab_id=c.id where cp.designer_id=? and cp.eligibility="eligible" and c.status="ready" and c.ip_risk_state in ("clear","approved") and c.snapshot_at is not null and c.final_zip_path is not null and c.sale_starts_at<=now() and c.sale_close_date>=current_date and (c.quantity_limit is null or (select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.collab_id=c.id and o.payment_status in ("paid","partially_refunded"))<c.quantity_limit) order by c.sale_starts_at desc', [$designerId]);
     }
 }

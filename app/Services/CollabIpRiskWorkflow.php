@@ -15,7 +15,7 @@ final class CollabIpRiskWorkflow
             if (!$collab) throw new \DomainException('Collab not found.');
             $terms = DB::rows('select * from ip_risk_terms where is_enabled=1');
             foreach ($terms as &$term) {
-                $term['aliases'] = DB::rows('select * from ip_risk_term_aliases where risk_term_id=? and is_enabled=1', [$term['id']]);
+                $term['aliases'] = DB::rows('select * from ip_risk_term_aliases where ip_risk_term_id=? and is_enabled=1', [$term['id']]);
             }
             unset($term);
             $input = [

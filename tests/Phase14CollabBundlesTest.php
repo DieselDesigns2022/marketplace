@@ -76,7 +76,7 @@ phase14Check($readPosition!==false&&$servedPosition!==false&&$readPosition<$serv
 phase14Check(str_contains($downloadController,'where oi.id=? and o.user_id=?'),'collab downloads authorize the exact owned order item');
 $checkoutSource=file_get_contents(dirname(__DIR__).'/app/Services/CollabCheckoutService.php');
 phase14Check(str_contains($checkoutSource,'creative_moth_collab_checkout_')&&str_contains($checkoutSource,'for update'),'checkout serializes buyer/collab attempts and rechecks locked sale state');
-$calculatorView=file_get_contents(dirname(__DIR__).'/app/Views/collabs/form.php');
+$calculatorView=file_get_contents(dirname(__DIR__).'/app/Views/collabs/index.php');
 phase14Check(str_contains($calculatorView,'/seller/collabs/payout-estimate')&&!str_contains($calculatorView,'basisPoints')&&!str_contains($calculatorView,'fixedCents')&&!str_contains($calculatorView,'/10000'),'calculator delegates to the server without duplicating the fee formula');
 $payoutSource=file_get_contents(dirname(__DIR__).'/app/Services/CollabPayoutService.php');
 phase14Check(str_contains($payoutSource,'MarketplaceFeeService::configured()'),'estimate uses the configured marketplace fee service');

@@ -21,6 +21,8 @@ foreach ($briefConfig as $field) {
         $enabledBriefFields[$key] = [
             'label' => $standardBriefFields[$key],
             'required' => !empty($field['required']),
+            'allow_upload' => !empty($field['allow_upload']),
+            'upload_required' => !empty($field['upload_required']),
         ];
     }
 }
@@ -97,6 +99,10 @@ $globalLicenseTerms = str_replace(
 
         <?php endif; ?>
 
+        <h2>Description</h2>
+
+        <p><?=nl2br(H::e($service['description']))?></p>
+
     </div>
 
     <aside class="card custom-design-summary">
@@ -115,7 +121,7 @@ $globalLicenseTerms = str_replace(
         <h2><?=H::money($service['price'])?></h2>
 
         <p>
-            <?=$service['turnaround_days']?> day turnaround
+            <?=H::e(\App\Services\CustomDesignService::turnaroundLabel($service))?> turnaround
             · <?=$service['included_revisions']?> revisions included
         </p>
 
@@ -276,15 +282,48 @@ $globalLicenseTerms = str_replace(
             <?php endif; ?>
 
             <?php foreach($enabledBriefFields as $key => $field): ?>
-                <label>
-                    <?=H::e($field['label'])?>
-                    <?=$field['required'] ? ' *' : ''?>
 
-                    <textarea
-                        name="<?=H::e($key)?>"
-                        <?=$field['required'] ? 'required' : ''?>
-                    ><?=H::e($_POST[$key] ?? '')?></textarea>
-                </label>
+                <div class="custom-field" style="margin-bottom:16px">
+
+                    <label>
+                        <?=H::e($field['label'])?>
+
+                        <?php if($field['required']): ?>
+                            <span class="muted">— text required</span>
+                        <?php endif; ?>
+
+                        <textarea
+                            name="<?=H::e($key)?>"
+                            <?=$field['required'] ? 'required' : ''?>
+                        ><?=H::e($_POST[$key] ?? '')?></textarea>
+                    </label>
+
+                    <?php if($field['allow_upload']): ?>
+
+                        <label style="margin-top:8px">
+                            Upload file(s)
+
+                            <?=$field['upload_required']
+                                ? '<strong> — required</strong>'
+                                : '<span class="muted"> — optional</span>'?>
+
+                            <span class="muted">
+                                JPG, PNG, WEBP or PDF; 25MB each
+                            </span>
+
+                            <input
+                                type="file"
+                                name="brief_uploads[<?=H::e($key)?>][]"
+                                multiple
+                                accept="image/jpeg,image/png,image/webp,application/pdf"
+                                <?=$field['upload_required'] ? 'required' : ''?>
+                            >
+                        </label>
+
+                    <?php endif; ?>
+
+                </div>
+
             <?php endforeach; ?>
 
             <?php if(!empty($service['buyer_instructions'])): ?>
@@ -294,30 +333,50 @@ $globalLicenseTerms = str_replace(
             <?php endif; ?>
 
             <?php foreach($questions as $q): ?>
-                <label>
-                    <?=H::e($q['question_text'])?>
-                    <?=$q['is_required'] ? ' *' : ''?>
 
-                    <textarea
-                        name="answers[<?=$q['id']?>]"
-                        <?=$q['is_required'] ? 'required' : ''?>
-                    ></textarea>
-                </label>
+                <div class="custom-field" style="margin-bottom:16px">
+
+                    <label>
+                        <?=H::e($q['question_text'])?>
+
+                        <?php if($q['is_required']): ?>
+                            <span class="muted">— text required</span>
+                        <?php endif; ?>
+
+                        <textarea
+                            name="answers[<?=$q['id']?>]"
+                            <?=$q['is_required'] ? 'required' : ''?>
+                        ></textarea>
+                    </label>
+
+                    <?php if(!empty($q['allow_upload'])): ?>
+
+                        <label style="margin-top:8px">
+                            Upload file(s)
+
+                            <?=!empty($q['upload_required'])
+                                ? '<strong> — required</strong>'
+                                : '<span class="muted"> — optional</span>'?>
+
+                            <span class="muted">
+                                JPG, PNG, WEBP or PDF; 25MB each
+                            </span>
+
+                            <input
+                                type="file"
+                                name="question_uploads[<?=$q['id']?>][]"
+                                multiple
+                                accept="image/jpeg,image/png,image/webp,application/pdf"
+                                <?=!empty($q['upload_required']) ? 'required' : ''?>
+                            >
+                        </label>
+
+                    <?php endif; ?>
+
+                </div>
+
             <?php endforeach; ?>
 
-            <label>
-                Reference files
-                <span class="muted">
-                    JPG, PNG, WEBP or PDF; 25MB each
-                </span>
-
-                <input
-                    type="file"
-                    name="references[]"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
-                >
-            </label>
 
             <button class="btn" type="submit">
                 Continue to Secure Checkout
@@ -342,10 +401,6 @@ $globalLicenseTerms = str_replace(
     </aside>
 
 </div>
-
-<h2>Description</h2>
-
-<p><?=nl2br(H::e($service['description']))?></p>
 
 <?php foreach($errors as $e): ?>
     <p class="alert error"><?=H::e($e)?></p>

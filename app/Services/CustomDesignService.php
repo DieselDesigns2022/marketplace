@@ -32,6 +32,26 @@ final class CustomDesignService
     public static function buyerFinalEligible(string $customStatus,string $paymentStatus):bool
     { return $customStatus==='completed'&&in_array($paymentStatus,['paid','partially_refunded'],true); }
     public static function retryEligible(?string $customStatus):bool{return $customStatus===null||$customStatus==='new';}
+
+    public static function turnaroundLabel(array $row):string
+    {
+        $max=(int)($row['turnaround_days']??0);
+        $min=(int)($row['turnaround_min_days']??$max);
+
+        if($min<=0){
+            $min=$max;
+        }
+
+        if($max<=0){
+            $max=$min;
+        }
+
+        if($min===$max){
+            return $max.' '.($max===1?'day':'days');
+        }
+
+        return $min.'–'.$max.' days';
+    }
     public static function workflowPaymentEligible(string $paymentStatus):bool{return in_array($paymentStatus,self::WORKFLOW_PAYMENTS,true);}
 
     public static function containCommunicationFailure(callable $operation,?callable $reporter=null,?callable $fallback=null):bool
@@ -276,6 +296,20 @@ final class CustomDesignService
     {
         $seller=$this->seller($userId);
 
+        $storeRow=DB::row(
+            'select store_slug
+             from designers
+             where id=?',
+            [(int)$seller['id']]
+        );
+
+        $storeSlug=
+            trim((string)($storeRow['store_slug']??''));
+
+        $storeUrl=$storeSlug!==''
+            ?'creativemoth.com/store/'.$storeSlug
+            :null;
+
         $errors=[];
         $isDraft=(($input['save_mode']??'')==='draft');
 
@@ -283,11 +317,24 @@ final class CustomDesignService
         $description=trim((string)($input['description']??''));
 
         $priceRaw=trim((string)($input['price']??''));
-        $daysRaw=trim((string)($input['turnaround_days']??''));
+
+        $minDaysRaw=trim((string)(
+            $input['turnaround_min_days']
+            ??$input['turnaround_days']
+            ??''
+        ));
+
+        $maxDaysRaw=trim((string)(
+            $input['turnaround_max_days']
+            ??$input['turnaround_days']
+            ??''
+        ));
+
         $revisionsRaw=trim((string)($input['included_revisions']??''));
 
         $price=$priceRaw==='' ? 0.00 : round((float)$priceRaw,2);
-        $days=$daysRaw==='' ? 0 : (int)$daysRaw;
+        $minDays=$minDaysRaw==='' ? 0 : (int)$minDaysRaw;
+        $maxDays=$maxDaysRaw==='' ? 0 : (int)$maxDaysRaw;
         $revisions=$revisionsRaw==='' ? 0 : (int)$revisionsRaw;
 
         /*
@@ -308,10 +355,19 @@ final class CustomDesignService
             }
 
             if(
-                $daysRaw!=='' &&
-                ($days<0||$days>365)
+                ($minDaysRaw!=='' && ($minDays<0||$minDays>365))
+                ||
+                ($maxDaysRaw!=='' && ($maxDays<0||$maxDays>365))
             ){
                 $errors[]='Turnaround must be between 0 and 365 days while saved as a draft.';
+            }
+
+            if(
+                $minDaysRaw!=='' &&
+                $maxDaysRaw!=='' &&
+                $minDays>$maxDays
+            ){
+                $errors[]='Minimum turnaround cannot be greater than maximum turnaround.';
             }
 
             if(
@@ -335,8 +391,15 @@ final class CustomDesignService
                 $errors[]='Price must be at least $0.50.';
             }
 
-            if($days<1||$days>365){
+            if(
+                $minDays<1||$minDays>365||
+                $maxDays<1||$maxDays>365
+            ){
                 $errors[]='Turnaround must be between 1 and 365 days.';
+            }
+
+            if($minDays>$maxDays){
+                $errors[]='Minimum turnaround cannot be greater than maximum turnaround.';
             }
 
             if($revisions<0||$revisions>100){
@@ -354,6 +417,12 @@ final class CustomDesignService
                     'key'=>$key,
                     'required'=>!empty(
                         $input['brief_required'][$key]
+                    )?1:0,
+                    'allow_upload'=>!empty(
+                        $input['brief_allow_upload'][$key]
+                    )?1:0,
+                    'upload_required'=>!empty(
+                        $input['brief_upload_required'][$key]
                     )?1:0
                 ];
             }
@@ -419,6 +488,12 @@ final class CustomDesignService
                     'text'=>mb_substr($text,0,500),
                     'required'=>!empty(
                         $input['question_required'][$key]
+                    )?1:0,
+                    'allow_upload'=>!empty(
+                        $input['question_allow_upload'][$key]
+                    )?1:0,
+                    'upload_required'=>!empty(
+                        $input['question_upload_required'][$key]
                     )?1:0
                 ];
             }
@@ -446,6 +521,12 @@ final class CustomDesignService
                     'text'=>mb_substr($text,0,500),
                     'required'=>!empty(
                         $input['question_required'][$key]
+                    )?1:0,
+                    'allow_upload'=>!empty(
+                        $input['question_allow_upload'][$key]
+                    )?1:0,
+                    'upload_required'=>!empty(
+                        $input['question_upload_required'][$key]
                     )?1:0
                 ];
             }
@@ -532,6 +613,7 @@ final class CustomDesignService
                          title=?,
                          description=?,
                          price=?,
+                         turnaround_min_days=?,
                          turnaround_days=?,
                          included_revisions=?,
                          buyer_instructions=?,
@@ -544,7 +626,8 @@ final class CustomDesignService
                         $title,
                         $description,
                         $price,
-                        $days,
+                        $minDays,
+                        $maxDays,
                         $revisions,
                         trim(
                             (string)(
@@ -582,6 +665,7 @@ final class CustomDesignService
                          title,
                          description,
                          price,
+                         turnaround_min_days,
                          turnaround_days,
                          included_revisions,
                          buyer_instructions,
@@ -589,14 +673,15 @@ final class CustomDesignService
                          extra_protection_watermark,
                          is_active
                      )
-                     values(?,?,?,?,?,?,?,?,?,?,?)',
+                     values(?,?,?,?,?,?,?,?,?,?,?,?)',
                     [
                         $seller['id'],
                         $slug,
                         $title,
                         $description,
                         $price,
-                        $days,
+                        $minDays,
+                        $maxDays,
                         $revisions,
                         trim(
                             (string)(
@@ -661,13 +746,17 @@ final class CustomDesignService
                          custom_service_id,
                          question_text,
                          is_required,
+                         allow_upload,
+                         upload_required,
                          sort_order
                      )
-                     values(?,?,?,?)',
+                     values(?,?,?,?,?,?)',
                     [
                         $id,
                         $q['text'],
                         (int)$q['required'],
+                        (int)$q['allow_upload'],
+                        (int)$q['upload_required'],
                         $n
                     ]
                 );
@@ -725,7 +814,8 @@ final class CustomDesignService
                 $saved=WatermarkService::storeCustomDesignPreview(
                     $upload,
                     $watermarkErrors,
-                    (bool)$extraProtection
+                    (bool)$extraProtection,
+                    $storeUrl
                 );
 
                 if(!$saved){
@@ -774,7 +864,8 @@ final class CustomDesignService
                     $result=
                         WatermarkService::regenerateCustomDesignPreview(
                             (string)$preview['image_path'],
-                            (bool)$extraProtection
+                            (bool)$extraProtection,
+                            $storeUrl
                         );
 
                     if(!$result['ok']){
@@ -815,6 +906,278 @@ final class CustomDesignService
 
             foreach($stored as $path){
                 @unlink($path);
+            }
+
+            throw $e;
+        }
+    }
+
+    public function duplicateService(int $userId,int $id):int
+    {
+        $seller=$this->seller($userId);
+
+        $source=DB::row(
+            'select *
+             from custom_design_services
+             where id=? and designer_id=?',
+            [$id,$seller['id']]
+        )??H::abort(404);
+
+        $copiedFiles=[];
+
+        DB::begin();
+
+        try{
+            $title=mb_substr(
+                trim((string)$source['title']).' (Copy)',
+                0,
+                190
+            );
+
+            $slug='custom-design-draft-'.
+                substr(bin2hex(random_bytes(8)),0,16);
+
+            DB::exec(
+                'insert into custom_design_services
+                 (
+                    designer_id,
+                    slug,
+                    title,
+                    description,
+                    price,
+                    turnaround_min_days,
+                    turnaround_days,
+                    included_revisions,
+                    buyer_instructions,
+                    brief_fields,
+                    extra_protection_watermark,
+                    is_active
+                 )
+                 values(?,?,?,?,?,?,?,?,?,?,?,0)',
+                [
+                    $seller['id'],
+                    $slug,
+                    $title,
+                    $source['description'],
+                    $source['price'],
+                    $source['turnaround_min_days']
+                        ??$source['turnaround_days'],
+                    $source['turnaround_days'],
+                    $source['included_revisions'],
+                    $source['buyer_instructions'],
+                    $source['brief_fields'],
+                    $source['extra_protection_watermark']
+                ]
+            );
+
+            $newId=(int)DB::id();
+
+            DB::exec(
+                'insert into custom_service_questions
+                 (
+                    custom_service_id,
+                    question_text,
+                    is_required,
+                    allow_upload,
+                    upload_required,
+                    sort_order
+                 )
+                 select
+                    ?,
+                    question_text,
+                    is_required,
+                    allow_upload,
+                    upload_required,
+                    sort_order
+                 from custom_service_questions
+                 where custom_service_id=?',
+                [$newId,$id]
+            );
+
+            DB::exec(
+                'insert into custom_service_license_options
+                 (
+                    custom_service_id,
+                    license_type_id,
+                    license_key,
+                    custom_name,
+                    description,
+                    price,
+                    is_default,
+                    sort_order
+                 )
+                 select
+                    ?,
+                    license_type_id,
+                    license_key,
+                    custom_name,
+                    description,
+                    price,
+                    is_default,
+                    sort_order
+                 from custom_service_license_options
+                 where custom_service_id=?',
+                [$newId,$id]
+            );
+
+            $images=DB::rows(
+                'select image_path,sort_order
+                 from custom_service_images
+                 where custom_service_id=?
+                 order by sort_order,id',
+                [$id]
+            );
+
+            foreach($images as $image){
+                $oldPublicRelative=ltrim(
+                    str_replace(
+                        '\\',
+                        '/',
+                        (string)$image['image_path']
+                    ),
+                    '/'
+                );
+
+                if(
+                    !str_starts_with(
+                        $oldPublicRelative,
+                        'uploads/custom_designs/examples/'
+                    )
+                    ||
+                    str_contains($oldPublicRelative,'..')
+                ){
+                    throw new \RuntimeException(
+                        'A Custom Design preview path is invalid.'
+                    );
+                }
+
+                $oldRelative=substr(
+                    $oldPublicRelative,
+                    strlen('uploads/')
+                );
+
+                $oldPublic=public_path($oldPublicRelative);
+
+                $oldPrivate=app_path(
+                    'storage/app/private/custom_design_previews/'.
+                    $oldRelative
+                );
+
+                if(!is_file($oldPublic)){
+                    throw new \RuntimeException(
+                        'A Custom Design preview file is missing.'
+                    );
+                }
+
+                $ext=strtolower(
+                    (string)pathinfo(
+                        $oldRelative,
+                        PATHINFO_EXTENSION
+                    )
+                );
+
+                if(
+                    !in_array(
+                        $ext,
+                        ['jpg','jpeg','png','webp'],
+                        true
+                    )
+                ){
+                    throw new \RuntimeException(
+                        'A Custom Design preview format is unsupported.'
+                    );
+                }
+
+                $newRelative=
+                    'custom_designs/examples/'.
+                    bin2hex(random_bytes(24)).
+                    '.'.
+                    $ext;
+
+                $newPublic=public_path(
+                    'uploads/'.$newRelative
+                );
+
+                $newPrivate=app_path(
+                    'storage/app/private/custom_design_previews/'.
+                    $newRelative
+                );
+
+                if(
+                    !is_dir(dirname($newPublic))
+                    &&
+                    !mkdir(dirname($newPublic),0755,true)
+                    &&
+                    !is_dir(dirname($newPublic))
+                ){
+                    throw new \RuntimeException(
+                        'Public Custom Design preview storage is unavailable.'
+                    );
+                }
+
+                if(
+                    !is_dir(dirname($newPrivate))
+                    &&
+                    !mkdir(dirname($newPrivate),0750,true)
+                    &&
+                    !is_dir(dirname($newPrivate))
+                ){
+                    throw new \RuntimeException(
+                        'Private Custom Design preview storage is unavailable.'
+                    );
+                }
+
+                $privateSource=
+                    is_file($oldPrivate)
+                        ?$oldPrivate
+                        :$oldPublic;
+
+                if(!copy($privateSource,$newPrivate)){
+                    throw new \RuntimeException(
+                        'Custom Design preview original could not be duplicated.'
+                    );
+                }
+
+                $copiedFiles[]=$newPrivate;
+                @chmod($newPrivate,0640);
+
+                if(!copy($oldPublic,$newPublic)){
+                    throw new \RuntimeException(
+                        'Custom Design preview could not be duplicated.'
+                    );
+                }
+
+                $copiedFiles[]=$newPublic;
+                @chmod($newPublic,0644);
+
+                DB::exec(
+                    'insert into custom_service_images
+                     (
+                        custom_service_id,
+                        image_path,
+                        sort_order
+                     )
+                     values(?,?,?)',
+                    [
+                        $newId,
+                        '/uploads/'.$newRelative,
+                        (int)$image['sort_order']
+                    ]
+                );
+            }
+
+            DB::commit();
+
+            return $newId;
+
+        }catch(\Throwable $e){
+
+            if(DB::pdo()->inTransaction()){
+                DB::rollBack();
+            }
+
+            foreach($copiedFiles as $file){
+                @unlink($file);
             }
 
             throw $e;
@@ -910,6 +1273,7 @@ final class CustomDesignService
         }
 
         $enabledBriefFields=[];
+        $uploads=[];
 
         foreach($briefConfig as $field){
 
@@ -922,37 +1286,126 @@ final class CustomDesignService
                 continue;
             }
 
-            $enabledBriefFields[$key]=[
-                'required'=>!empty($field['required'])
+            $config=[
+                'required'=>!empty($field['required']),
+                'allow_upload'=>!empty($field['allow_upload']),
+                'upload_required'=>!empty($field['upload_required'])
             ];
 
+            $enabledBriefFields[$key]=$config;
+
+            $answer=trim((string)($input[$key]??''));
+
+            $fieldUploads=[];
+
+            if($config['allow_upload']){
+
+                try{
+                    $fieldUploads=$this->validateUploads(
+                        $this->nestedUploadBag(
+                            $files,
+                            'brief_uploads',
+                            $key
+                        ),
+                        'image_or_pdf'
+                    );
+
+                }catch(\InvalidArgumentException $e){
+                    $errors[]=
+                        self::BRIEF_FIELDS[$key].': '.
+                        $e->getMessage();
+                }
+
+                foreach($fieldUploads as $upload){
+                    $upload['context_key']='brief:'.$key;
+                    $upload['context_label']=self::BRIEF_FIELDS[$key];
+                    $uploads[]=$upload;
+                }
+            }
+
+            if($config['required'] && $answer===''){
+                $errors[]=
+                    self::BRIEF_FIELDS[$key].
+                    ': text response is required.';
+            }
+
             if(
-                $enabledBriefFields[$key]['required'] &&
-                trim((string)($input[$key]??''))===''
+                $config['upload_required'] &&
+                !$fieldUploads
             ){
-                $errors[]=self::BRIEF_FIELDS[$key].' is required.';
+                $errors[]=
+                    self::BRIEF_FIELDS[$key].
+                    ': file upload is required.';
             }
         }
 
-        foreach(
-            DB::rows(
-                'select *
-                 from custom_service_questions
-                 where custom_service_id=?
-                 order by sort_order,id',
-                [$service['id']]
-            ) as $q
-        ){
+        $questions=DB::rows(
+            'select *
+             from custom_service_questions
+             where custom_service_id=?
+             order by sort_order,id',
+            [$service['id']]
+        );
+
+        foreach($questions as $q){
+
+            $qid=(int)$q['id'];
+
             $answer=trim(
-                (string)($input['answers'][$q['id']]??'')
+                (string)($input['answers'][$qid]??'')
             );
 
+            $questionUploads=[];
+
+            if(!empty($q['allow_upload'])){
+
+                try{
+                    $questionUploads=$this->validateUploads(
+                        $this->nestedUploadBag(
+                            $files,
+                            'question_uploads',
+                            $qid
+                        ),
+                        'image_or_pdf'
+                    );
+
+                }catch(\InvalidArgumentException $e){
+                    $errors[]=
+                        $q['question_text'].': '.
+                        $e->getMessage();
+                }
+
+                foreach($questionUploads as $upload){
+                    $upload['context_key']='question:'.$qid;
+                    $upload['context_label']=(string)$q['question_text'];
+                    $uploads[]=$upload;
+                }
+            }
+
             if(
-                $q['is_required'] &&
+                !empty($q['is_required']) &&
                 $answer===''
             ){
-                $errors[]='Please answer: '.$q['question_text'];
+                $errors[]=
+                    $q['question_text'].
+                    ': text response is required.';
             }
+
+            if(
+                !empty($q['upload_required']) &&
+                !$questionUploads
+            ){
+                $errors[]=
+                    $q['question_text'].
+                    ': file upload is required.';
+            }
+        }
+
+        if(count($uploads)>self::MAX_FILES){
+            $errors[]=
+                'You may upload up to '.
+                self::MAX_FILES.
+                ' reference files total.';
         }
 
         $selectedLicenses=$this->selectedServiceLicenses(
@@ -963,16 +1416,6 @@ final class CustomDesignService
         if(!$selectedLicenses){
             $errors[]=
                 'Please choose only licenses currently available for this custom design.';
-        }
-
-        try{
-            $uploads=$this->validateUploads(
-                $files['references']??[],
-                'image_or_pdf'
-            );
-        }catch(\InvalidArgumentException $e){
-            $errors[]=$e->getMessage();
-            $uploads=[];
         }
 
         if($errors){
@@ -1027,7 +1470,9 @@ final class CustomDesignService
                     'path'=>$absolute,
                     'size'=>$upload['size'],
                     'mime'=>$upload['mime'],
-                    'ext'=>$upload['ext']
+                    'ext'=>$upload['ext'],
+                    'context_key'=>$upload['context_key'],
+                    'context_label'=>$upload['context_label']
                 ];
             }
 
@@ -1045,6 +1490,7 @@ final class CustomDesignService
         $savedInput=[];
 
         foreach(self::BRIEF_FIELDS as $key=>$label){
+
             $savedInput[$key]=trim(
                 (string)($input[$key]??'')
             );
@@ -1067,6 +1513,14 @@ final class CustomDesignService
                 'strval',
                 (array)($input['license_type']??[])
             )
+        );
+
+        $savedInput['reference_contexts']=array_map(
+            static fn(array $reference):array => [
+                'key'=>(string)($reference['context_key']??''),
+                'label'=>(string)($reference['context_label']??'')
+            ],
+            $stored
         );
 
         $_SESSION['custom_design_checkout']??=[];
@@ -1211,27 +1665,125 @@ final class CustomDesignService
     {
         if(!$buyerId||$buyerId===(int)$service['seller_user_id'])H::abort(403);
         $errors=[];
-        $briefConfig=json_decode((string)($service['brief_fields']??'[]'),true);
-        if(!is_array($briefConfig))$briefConfig=[];
+
+        $briefConfig=json_decode(
+            (string)($service['brief_fields']??'[]'),
+            true
+        );
+
+        if(!is_array($briefConfig)){
+            $briefConfig=[];
+        }
+
+        $contexts=(array)($input['reference_contexts']??[]);
+
+        $contextKeys=[];
+
+        foreach($contexts as $context){
+            $contextKeys[]=(string)($context['key']??'');
+        }
+
         $enabledBriefFields=[];
+
         foreach($briefConfig as $field){
+
             $key=(string)($field['key']??'');
-            if(!isset(self::BRIEF_FIELDS[$key])||isset($enabledBriefFields[$key]))continue;
+
+            if(
+                !isset(self::BRIEF_FIELDS[$key]) ||
+                isset($enabledBriefFields[$key])
+            ){
+                continue;
+            }
+
             $enabledBriefFields[$key]=[
-                'required'=>!empty($field['required'])
+                'required'=>!empty($field['required']),
+                'allow_upload'=>!empty($field['allow_upload']),
+                'upload_required'=>!empty($field['upload_required'])
             ];
+
             if(
                 $enabledBriefFields[$key]['required'] &&
                 trim((string)($input[$key]??''))===''
             ){
-                $errors[]=self::BRIEF_FIELDS[$key].' is required.';
+                $errors[]=
+                    self::BRIEF_FIELDS[$key].
+                    ': text response is required.';
+            }
+
+            if(
+                $enabledBriefFields[$key]['upload_required'] &&
+                !in_array('brief:'.$key,$contextKeys,true)
+            ){
+                $errors[]=
+                    self::BRIEF_FIELDS[$key].
+                    ': file upload is required.';
             }
         }
-        $answers=[];foreach(DB::rows('select * from custom_service_questions where custom_service_id=? order by sort_order,id',[$service['id']]) as $q){$answer=trim((string)($input['answers'][$q['id']]??''));if($q['is_required']&&$answer==='')$errors[]='Please answer: '.$q['question_text'];$answers[]=['question_id'=>(int)$q['id'],'question'=>$q['question_text'],'required'=>(bool)$q['is_required'],'answer'=>$answer];}
-        $uploads=$this->validateUploads($files['references']??[],'image_or_pdf');
-        if($errors)throw new \InvalidArgumentException(implode(' ',$errors));
+
+        $answers=[];
+
+        foreach(
+            DB::rows(
+                'select *
+                 from custom_service_questions
+                 where custom_service_id=?
+                 order by sort_order,id',
+                [$service['id']]
+            ) as $q
+        ){
+            $qid=(int)$q['id'];
+
+            $answer=trim(
+                (string)($input['answers'][$qid]??'')
+            );
+
+            if(
+                !empty($q['is_required']) &&
+                $answer===''
+            ){
+                $errors[]=
+                    $q['question_text'].
+                    ': text response is required.';
+            }
+
+            if(
+                !empty($q['upload_required']) &&
+                !in_array(
+                    'question:'.$qid,
+                    $contextKeys,
+                    true
+                )
+            ){
+                $errors[]=
+                    $q['question_text'].
+                    ': file upload is required.';
+            }
+
+            $answers[]=[
+                'question_id'=>$qid,
+                'question'=>$q['question_text'],
+                'required'=>(bool)$q['is_required'],
+                'allow_upload'=>(bool)$q['allow_upload'],
+                'upload_required'=>(bool)$q['upload_required'],
+                'answer'=>$answer
+            ];
+        }
+
+        $uploads=$this->validateUploads(
+            $files['references']??[],
+            'image_or_pdf'
+        );
+
+        if($errors){
+            throw new \InvalidArgumentException(
+                implode(' ',$errors)
+            );
+        }
+
         $brief=[];
         foreach($enabledBriefFields as $key=>$config){
+
             $brief[$key]=trim((string)($input[$key]??''));
         }
         $brief['answers']=$answers;
@@ -1323,8 +1875,52 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                 'commission_rate'=>$rate
             ]);
             $itemFee=$fee['items'][1];DB::exec('update order_items set platform_commission_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($itemFee['fee_cents']),CreditService::formatCents($itemFee['percentage_fee_cents']),CreditService::formatCents($itemFee['fixed_fee_cents']),CreditService::formatCents($itemFee['seller_earnings_cents']),$item]);
-            DB::exec('insert into custom_orders(order_id,order_item_id,custom_service_id,buyer_user_id,designer_id,status,service_snapshot,brief_snapshot,agreed_price,turnaround_days,included_revisions) values(?,?,?,?,?,"new",?,?,?,?,?)',[$order,$item,$fresh['id'],$buyerId,$fresh['designer_id'],json_encode(['title'=>$fresh['title'],'description'=>$fresh['description'],'buyer_instructions'=>$fresh['buyer_instructions'],'brief_fields'=>$briefConfig,'licenses'=>json_decode($licenseSnapshot,true)],JSON_THROW_ON_ERROR),json_encode($brief,JSON_THROW_ON_ERROR),$price,$fresh['turnaround_days'],$fresh['included_revisions']]);$custom=(int)DB::id();
-            foreach($uploads as $upload){$path=$this->store($upload,'references',true);$stored[]=app_path('storage/protected_uploads/'.$path);DB::exec('insert into custom_order_files(custom_order_id,uploader_user_id,file_kind,original_name,storage_path,mime_type,file_size) values(?, ?,"reference",?,?,?,?)',[$custom,$buyerId,$upload['original_name'],$path,$upload['mime'],$upload['size']]);}DB::exec('insert into seller_earnings(order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,null,?,?,?,?,?,"pending_payment")',[$order,$fresh['designer_id'],$buyerId,$price,CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);if($fee['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$fresh['designer_id'],'fee-cap:order:'.$order.':seller:'.$fresh['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);$created=DB::row('select * from orders where id=?',[$order]);$items=DB::rows('select * from order_items where order_id=?',[$order]);if(CreditService::parseCents($total)===0){$finalizer=new OrderFinalizationService;$finalizer->finalize($order,'internal-credit-order:'.$order,true);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);$finalizer->communicate($order);H::redirect('/dashboard/order/'.$order);}$session=$checkout->checkout($created,$items);DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?',[$session['id']??null,$order]);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);header('Location: '.$session['url'],true,303);exit;
+            DB::exec('insert into custom_orders(order_id,order_item_id,custom_service_id,buyer_user_id,designer_id,status,service_snapshot,brief_snapshot,agreed_price,turnaround_min_days,turnaround_days,included_revisions) values(?,?,?,?,?,"new",?,?,?,?,?,?)',[$order,$item,$fresh['id'],$buyerId,$fresh['designer_id'],json_encode(['title'=>$fresh['title'],'description'=>$fresh['description'],'buyer_instructions'=>$fresh['buyer_instructions'],'brief_fields'=>$briefConfig,'licenses'=>json_decode($licenseSnapshot,true)],JSON_THROW_ON_ERROR),json_encode($brief,JSON_THROW_ON_ERROR),$price,$fresh['turnaround_min_days']??$fresh['turnaround_days'],$fresh['turnaround_days'],$fresh['included_revisions']]);$custom=(int)DB::id();
+            foreach($uploads as $uploadIndex=>$upload){
+                $path=$this->store($upload,'references',true);
+
+                $stored[]=
+                    app_path(
+                        'storage/protected_uploads/'.$path
+                    );
+
+                $context=
+                    (array)($input['reference_contexts'][$uploadIndex]??[]);
+
+                DB::exec(
+                    'insert into custom_order_files
+                     (
+                        custom_order_id,
+                        uploader_user_id,
+                        file_kind,
+                        original_name,
+                        storage_path,
+                        mime_type,
+                        file_size,
+                        reference_context_key,
+                        reference_context_label
+                     )
+                     values(?, ?,"reference",?,?,?,?,?,?)',
+                    [
+                        $custom,
+                        $buyerId,
+                        $upload['original_name'],
+                        $path,
+                        $upload['mime'],
+                        $upload['size'],
+                        mb_substr(
+                            (string)($context['key']??''),
+                            0,
+                            190
+                        ) ?: null,
+                        mb_substr(
+                            (string)($context['label']??''),
+                            0,
+                            500
+                        ) ?: null
+                    ]
+                );
+            }DB::exec('insert into seller_earnings(order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,null,?,?,?,?,?,"pending_payment")',[$order,$fresh['designer_id'],$buyerId,$price,CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);if($fee['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$fresh['designer_id'],'fee-cap:order:'.$order.':seller:'.$fresh['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);$created=DB::row('select * from orders where id=?',[$order]);$items=DB::rows('select * from order_items where order_id=?',[$order]);if(CreditService::parseCents($total)===0){$finalizer=new OrderFinalizationService;$finalizer->finalize($order,'internal-credit-order:'.$order,true);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);$finalizer->communicate($order);H::redirect('/dashboard/order/'.$order);}$session=$checkout->checkout($created,$items);DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?',[$session['id']??null,$order]);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);header('Location: '.$session['url'],true,303);exit;
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $path)@unlink($path);throw$e;}
     }
 
@@ -1407,6 +2003,31 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
     {$row=DB::row('select co.*,o.payment_status,o.total,d.user_id seller_user_id,u.name buyer_name,d.display_name,oi.license_name,oi.license_price,oi.license_description,oi.license_snapshot from custom_orders co join orders o on o.id=co.order_id join order_items oi on oi.id=co.order_item_id join designers d on d.id=co.designer_id join users u on u.id=co.buyer_user_id where co.id=?',[$id])??H::abort(404);if($side==='seller'&&($userId!==(int)$row['seller_user_id']||!in_array($row['payment_status'],self::HISTORICALLY_PAID,true))||$side==='buyer'&&$userId!==(int)$row['buyer_user_id'])H::abort(404);return$row;}
     public function file(int $id,int $userId):array
     {$f=DB::row('select f.*,co.buyer_user_id,co.status,d.user_id seller_user_id,o.payment_status from custom_order_files f join custom_orders co on co.id=f.custom_order_id join orders o on o.id=co.order_id join designers d on d.id=co.designer_id where f.id=?',[$id])??H::abort(404);$buyer=$userId===(int)$f['buyer_user_id'];$seller=$userId===(int)$f['seller_user_id']&&in_array($f['payment_status'],self::HISTORICALLY_PAID,true);if(!$seller&&!$buyer||$buyer&&$f['file_kind']==='final'&&!self::buyerFinalEligible($f['status'],$f['payment_status']))H::abort(404);return$f;}
+
+    private function nestedUploadBag(
+        array $files,
+        string $group,
+        string|int $key
+    ):array
+    {
+        $root=$files[$group]??null;
+
+        if(
+            !is_array($root) ||
+            !isset($root['name']) ||
+            !array_key_exists($key,$root['name'])
+        ){
+            return [];
+        }
+
+        return [
+            'name'=>(array)($root['name'][$key]??[]),
+            'error'=>(array)($root['error'][$key]??[]),
+            'tmp_name'=>(array)($root['tmp_name'][$key]??[]),
+            'size'=>(array)($root['size'][$key]??[]),
+            'type'=>(array)($root['type'][$key]??[])
+        ];
+    }
 
     private function validateUploads(array $files,string $mode):array
     {

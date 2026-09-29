@@ -37,11 +37,24 @@ final class CollabService
         $now ??= new \DateTimeImmutable('now');
         $start = new \DateTimeImmutable($collab['sale_starts_at']);
         $close = new \DateTimeImmutable($collab['sale_close_date'].' 23:59:59');
-        return $collab['status'] === 'ready'
+        $available = $collab['status'] === 'ready'
             && !empty($collab['snapshot_at'])
             && !empty($collab['final_zip_path'])
             && in_array($collab['ip_risk_state'], ['clear','approved'], true)
             && $now >= $start && $now <= $close;
+
+        if (!$available) return false;
+
+        if (!empty($collab['quantity_limit'])) {
+            $sold = (int)(DB::row(
+                'select count(*) c from order_items oi join orders o on o.id=oi.order_id where oi.collab_id=? and o.payment_status in ("paid","partially_refunded")',
+                [(int)$collab['id']]
+            )['c'] ?? 0);
+
+            if ($sold >= (int)$collab['quantity_limit']) return false;
+        }
+
+        return true;
     }
 
     public function processDue(?int $onlyId = null): array
@@ -81,8 +94,15 @@ final class CollabService
 
     public function finalize(int $id): void
     {
+        $scan = (new CollabIpRiskWorkflow())->scan($id);
+
+        if (!in_array((string)$scan['state'], ['clear','approved'], true)) {
+            return;
+        }
+
         $this->snapshotOnce($id);
         $this->buildZip($id);
+        $this->generateCover($id);
     }
 
     private function snapshotOnce(int $id): void
@@ -95,13 +115,42 @@ final class CollabService
             if ($collab['snapshot_at'] !== null) { if ($ownsTransaction) DB::commit(); return; }
             if (strtotime($collab['upload_deadline']) > time()) throw new DomainException('Upload deadline has not passed.');
             $participants = DB::rows(
-                'select cp.*,sum(f.file_kind="contribution") contribution_count,sum(f.file_kind="terms") terms_count from collab_participants cp left join collab_files f on f.participant_id=cp.id where cp.collab_id=? and cp.membership_status in ("host","accepted") group by cp.id order by cp.designer_id',
+                'select cp.*,
+                        sum(f.file_kind="contribution") contribution_count,
+                        sum(
+                            f.file_kind="contribution"
+                            and f.category_id is null
+                        ) uncategorized_contribution_count,
+                        sum(f.file_kind="terms") terms_count,
+                        sum(f.file_kind="mockup") mockup_count
+                 from collab_participants cp
+                 left join collab_files f on f.participant_id=cp.id
+                 where cp.collab_id=?
+                   and cp.membership_status in ("host","accepted")
+                 group by cp.id
+                 order by cp.designer_id',
                 [$id]
             );
             $eligible = [];
             foreach ($participants as $participant) {
                 $count = (int)$participant['contribution_count'];
-                $reason = $count < (int)$collab['minimum_file_count'] ? 'minimum_contribution_not_met' : ((int)$participant['terms_count'] < 1 ? 'missing_terms_file' : null);
+                $reason =
+                    $count < (int)$collab['minimum_file_count']
+                        ? 'minimum_contribution_not_met'
+                        : (
+                            (int)$participant['uncategorized_contribution_count'] > 0
+                                ? 'missing_contribution_category'
+                                : (
+                                    (int)$participant['terms_count'] < 1
+                                        ? 'missing_terms_file'
+                                        : (
+                                            !empty($collab['require_mockup'])
+                                            && (int)$participant['mockup_count'] < 1
+                                                ? 'missing_mockup_file'
+                                                : null
+                                        )
+                                )
+                        );
                 $isEligible = $reason === null;
                 DB::exec('update collab_participants set eligibility=?,qualifying_file_count=?,exclusion_reason=?,eligibility_snapshotted_at=now() where id=?', [$isEligible?'eligible':'excluded',$count,$reason,$participant['id']]);
                 if ($isEligible) $eligible[] = (int)$participant['id'];
@@ -117,7 +166,15 @@ final class CollabService
             if ($ownsTransaction) DB::commit();
             foreach ($participants as $participant) {
                 if (!in_array((int)$participant['id'], $eligible, true)) {
-                    $reason = (int)$participant['contribution_count'] < (int)$collab['minimum_file_count'] ? 'minimum_contribution_not_met' : 'missing_terms_file';
+                    if ((int)$participant['contribution_count'] < (int)$collab['minimum_file_count']) {
+                        $reason = 'minimum_contribution_not_met';
+                    } elseif ((int)$participant['uncategorized_contribution_count'] > 0) {
+                        $reason = 'missing_contribution_category';
+                    } elseif ((int)$participant['terms_count'] < 1) {
+                        $reason = 'missing_terms_file';
+                    } else {
+                        $reason = 'missing_mockup_file';
+                    }
                     $this->notifyParticipant((int)$participant['designer_id'], $id, $reason);
                 }
             }
@@ -159,7 +216,11 @@ final class CollabService
             $this->notifyHost($id, 'collab_zip_ready', 'Collab bundle ready', 'The final protected ZIP is ready.', 'zip-ready');
             return;
         }
-        if (is_file($target)) @unlink($target);
+        /*
+         * Keep the currently downloadable ZIP in place while the
+         * replacement archive is built. rename() happens only after
+         * the new ZIP has completed successfully.
+         */
         $temporary = $target.'.'.bin2hex(random_bytes(6)).'.tmp';
         $zip = new ZipArchive();
         if ($zip->open($temporary, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) throw new DomainException('Final archive could not be opened.');
@@ -169,7 +230,15 @@ final class CollabService
                 if (!$real || !hash_equals((string)$file['sha256'], hash_file('sha256', $real))) throw new DomainException('A snapshotted contribution failed its integrity check.');
                 if (!$zip->addFile($real, $file['store_slug'].'/'.self::safeArchiveName($file['original_name'],(int)$file['id']))) throw new DomainException('A contribution could not be archived.');
             }
-            if (!$zip->addFromString('_creative-moth-snapshot.json', $manifest)) throw new DomainException('The archive snapshot manifest could not be written.');
+            $snapshotFingerprint =
+                'creative-moth-snapshot-sha256:'.
+                hash('sha256', $manifest);
+
+            if (!$zip->setArchiveComment($snapshotFingerprint)) {
+                throw new DomainException(
+                    'The archive snapshot fingerprint could not be written.'
+                );
+            }
             if (!$zip->close()) throw new DomainException('Final archive could not be closed.');
             if (!rename($temporary, $target)) throw new DomainException('Final archive could not be committed.');
             $hash = hash_file('sha256', $target);
@@ -178,6 +247,470 @@ final class CollabService
         } catch (Throwable $error) {
             $zip->close(); @unlink($temporary); throw $error;
         }
+    }
+
+
+    public function generateCover(int $id): ?string
+    {
+        if (!extension_loaded('gd')) {
+            return null;
+        }
+
+        $collab = DB::row(
+            'select id,title,snapshot_at
+             from collab_events
+             where id=?',
+            [$id]
+        );
+
+        if (!$collab || empty($collab['snapshot_at'])) {
+            return null;
+        }
+
+        $rows = DB::rows(
+            'select
+                f.id,
+                f.designer_id,
+                f.storage_path,
+                f.mime_type,
+                f.sha256
+             from collab_files f
+             where f.collab_id=?
+               and f.file_kind="mockup"
+               and f.included_in_snapshot=1
+             order by
+                f.designer_id,
+                f.id',
+            [$id]
+        );
+
+        /*
+         * Round-robin mockups by designer so one seller does not
+         * dominate the first preview image when several designers
+         * supplied mockups.
+         */
+        $byDesigner = [];
+
+        foreach ($rows as $row) {
+            $byDesigner[(int)$row['designer_id']][] = $row;
+        }
+
+        $ordered = [];
+
+        while ($byDesigner) {
+            foreach (array_keys($byDesigner) as $designerId) {
+                if (!$byDesigner[$designerId]) {
+                    unset($byDesigner[$designerId]);
+                    continue;
+                }
+
+                $ordered[] = array_shift(
+                    $byDesigner[$designerId]
+                );
+
+                if (!$byDesigner[$designerId]) {
+                    unset($byDesigner[$designerId]);
+                }
+            }
+        }
+
+        $usable = [];
+
+        foreach ($ordered as $row) {
+            $real = $this->protectedRealPath(
+                (string)$row['storage_path']
+            );
+
+            if (
+                !$real ||
+                !is_file($real) ||
+                !hash_equals(
+                    (string)$row['sha256'],
+                    (string)hash_file('sha256',$real)
+                )
+            ) {
+                continue;
+            }
+
+            $info = @getimagesize($real);
+
+            if (!$info) {
+                continue;
+            }
+
+            $usable[] = [
+                'path' => $real,
+                'type' => (int)$info[2],
+            ];
+        }
+
+        /*
+         * No mockups: keep the generic single-cover fallback.
+         */
+        if (!$usable) {
+            $usable = [
+                [
+                    'path' => null,
+                    'type' => null,
+                ],
+            ];
+        }
+
+        $groups = array_chunk(
+            $usable,
+            4
+        );
+
+        $directory = app_path(
+            'public/uploads/collab-covers'
+        );
+
+        if (
+            !is_dir($directory) &&
+            !mkdir(
+                $directory,
+                0755,
+                true
+            ) &&
+            !is_dir($directory)
+        ) {
+            return null;
+        }
+
+        $generated = [];
+
+        foreach ($groups as $pageIndex => $group) {
+            $size = 800;
+
+            $canvas = imagecreatetruecolor(
+                $size,
+                $size
+            );
+
+            if (!$canvas) {
+                return null;
+            }
+
+            $background = imagecolorallocate(
+                $canvas,
+                247,
+                243,
+                252
+            );
+
+            imagefilledrectangle(
+                $canvas,
+                0,
+                0,
+                $size,
+                $size,
+                $background
+            );
+
+            $realImages = array_values(
+                array_filter(
+                    $group,
+                    static fn(array $item): bool =>
+                        $item['path'] !== null
+                )
+            );
+
+            if ($realImages) {
+                $layouts = match (count($realImages)) {
+                    1 => [
+                        [0,0,800,800],
+                    ],
+
+                    2 => [
+                        [0,0,400,800],
+                        [400,0,400,800],
+                    ],
+
+                    3 => [
+                        [0,0,400,800],
+                        [400,0,400,400],
+                        [400,400,400,400],
+                    ],
+
+                    default => [
+                        [0,0,400,400],
+                        [400,0,400,400],
+                        [0,400,400,400],
+                        [400,400,400,400],
+                    ],
+                };
+
+                foreach ($realImages as $index => $item) {
+                    $source = match ($item['type']) {
+                        IMAGETYPE_JPEG =>
+                            @imagecreatefromjpeg($item['path']),
+
+                        IMAGETYPE_PNG =>
+                            @imagecreatefrompng($item['path']),
+
+                        IMAGETYPE_WEBP =>
+                            function_exists('imagecreatefromwebp')
+                                ? @imagecreatefromwebp($item['path'])
+                                : false,
+
+                        default => false,
+                    };
+
+                    if (!$source) {
+                        continue;
+                    }
+
+                    [
+                        $destX,
+                        $destY,
+                        $destW,
+                        $destH
+                    ] = $layouts[$index];
+
+                    $srcW = imagesx($source);
+                    $srcH = imagesy($source);
+
+                    $destRatio = $destW / $destH;
+                    $srcRatio = $srcW / $srcH;
+
+                    if ($srcRatio > $destRatio) {
+                        $cropH = $srcH;
+                        $cropW = (int)round(
+                            $srcH * $destRatio
+                        );
+
+                        $srcX = (int)round(
+                            ($srcW - $cropW) / 2
+                        );
+
+                        $srcY = 0;
+                    } else {
+                        $cropW = $srcW;
+
+                        $cropH = (int)round(
+                            $srcW / $destRatio
+                        );
+
+                        $srcX = 0;
+
+                        $srcY = (int)round(
+                            ($srcH - $cropH) / 2
+                        );
+                    }
+
+                    imagecopyresampled(
+                        $canvas,
+                        $source,
+                        $destX,
+                        $destY,
+                        $srcX,
+                        $srcY,
+                        $destW,
+                        $destH,
+                        $cropW,
+                        $cropH
+                    );
+
+                    imagedestroy($source);
+                }
+            } else {
+                $purple = imagecolorallocate(
+                    $canvas,
+                    118,
+                    51,
+                    214
+                );
+
+                $ink = imagecolorallocate(
+                    $canvas,
+                    35,
+                    25,
+                    66
+                );
+
+                imagefilledrectangle(
+                    $canvas,
+                    0,
+                    0,
+                    $size,
+                    130,
+                    $purple
+                );
+
+                imagestring(
+                    $canvas,
+                    5,
+                    40,
+                    45,
+                    'CREATIVE MOTH COLLAB BUNDLE',
+                    imagecolorallocate(
+                        $canvas,
+                        255,
+                        255,
+                        255
+                    )
+                );
+
+                imagestring(
+                    $canvas,
+                    5,
+                    40,
+                    370,
+                    mb_substr(
+                        (string)$collab['title'],
+                        0,
+                        55
+                    ),
+                    $ink
+                );
+            }
+
+            /*
+             * Page 1 keeps the existing filename because the homepage
+             * and storefront cards already use it.
+             */
+            $filename =
+                $pageIndex === 0
+                    ? 'collab-'.$id.'.jpg'
+                    : 'collab-'.$id.'-'.($pageIndex + 1).'.jpg';
+
+            $destination =
+                $directory.
+                '/'.
+                $filename;
+
+            $temporary =
+                $destination.
+                '.'.
+                bin2hex(random_bytes(6)).
+                '.tmp';
+
+            $saved = imagejpeg(
+                $canvas,
+                $temporary,
+                84
+            );
+
+            imagedestroy($canvas);
+
+            if (!$saved) {
+                @unlink($temporary);
+                return null;
+            }
+
+            $watermarkTemporary =
+                $destination.
+                '.watermarked.'.
+                bin2hex(random_bytes(6)).
+                '.jpg';
+
+            $watermarkResult =
+                \App\Services\WatermarkService::createProtectedImagePreview(
+                    $temporary,
+                    $watermarkTemporary,
+                    false,
+                    null,
+                    null
+                );
+
+            if (empty($watermarkResult['ok'])) {
+                @unlink($temporary);
+                @unlink($watermarkTemporary);
+                return null;
+            }
+
+            @unlink($temporary);
+
+            if (!@rename(
+                $watermarkTemporary,
+                $destination
+            )) {
+                @unlink($watermarkTemporary);
+                return null;
+            }
+
+            @chmod(
+                $destination,
+                0644
+            );
+
+            $generated[] = $destination;
+        }
+
+        /*
+         * Remove stale extra preview pages if the collab now has fewer
+         * mockups than a previous generation.
+         */
+        foreach (
+            glob(
+                $directory.
+                '/collab-'.
+                $id.
+                '-*.jpg'
+            ) ?: []
+            as $existing
+        ) {
+            if (
+                !in_array(
+                    $existing,
+                    $generated,
+                    true
+                )
+            ) {
+                @unlink($existing);
+            }
+        }
+
+        return
+            '/uploads/collab-covers/collab-'.
+            $id.
+            '.jpg';
+    }
+
+    public static function coverUrl(int $id): string
+    {
+        return
+            '/uploads/collab-covers/collab-'.
+            $id.
+            '.jpg';
+    }
+
+    public static function coverUrls(int $id): array
+    {
+        $urls = [];
+
+        $primary = app_path(
+            'public/uploads/collab-covers/collab-'.
+            $id.
+            '.jpg'
+        );
+
+        if (is_file($primary)) {
+            $urls[] =
+                '/uploads/collab-covers/collab-'.
+                $id.
+                '.jpg';
+        }
+
+        $extras = glob(
+            app_path(
+                'public/uploads/collab-covers/collab-'.
+                $id.
+                '-*.jpg'
+            )
+        ) ?: [];
+
+        natsort($extras);
+
+        foreach ($extras as $path) {
+            $urls[] =
+                '/uploads/collab-covers/'.
+                basename($path);
+        }
+
+        return array_values(
+            array_unique($urls)
+        );
     }
 
     public function protectedRealPath(string $storagePath): ?string
@@ -201,7 +734,13 @@ final class CollabService
             if (!$real || !hash_equals((string)$file['sha256'], hash_file('sha256',$real))) {
                 throw new DomainException('A snapshotted contribution failed its integrity check.');
             }
-            $snapshot['files'][] = ['id'=>(int)$file['id'], 'designer_id'=>(int)$file['designer_id'], 'kind'=>$file['file_kind'], 'sha256'=>$file['sha256']];
+            $snapshot['files'][] = [
+                'id'=>(int)$file['id'],
+                'designer_id'=>(int)$file['designer_id'],
+                'kind'=>$file['file_kind'],
+                'category_id'=>$file['category_id']!==null?(int)$file['category_id']:null,
+                'sha256'=>$file['sha256']
+            ];
         }
         return json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
@@ -209,11 +748,21 @@ final class CollabService
     public function archiveMatchesSnapshot(string $path, string $expectedManifest): bool
     {
         if (!is_file($path) || !class_exists(ZipArchive::class)) return false;
+
         $zip = new ZipArchive();
+
         if ($zip->open($path) !== true) return false;
-        $actual = $zip->getFromName('_creative-moth-snapshot.json');
+
+        $actual = $zip->getArchiveComment();
         $zip->close();
-        return is_string($actual) && hash_equals($expectedManifest, $actual);
+
+        $expected =
+            'creative-moth-snapshot-sha256:'.
+            hash('sha256', $expectedManifest);
+
+        return
+            is_string($actual) &&
+            hash_equals($expected, $actual);
     }
 
     public static function itemDownloadable(string $orderStatus, int $totalCents, int $refundedCents): bool
@@ -226,7 +775,16 @@ final class CollabService
     private function notifyParticipant(int $designerId, int $collabId, string $reason): void
     {
         $user = DB::row('select user_id from designers where id=?', [$designerId]);
-        $message = $reason === 'missing_terms_file' ? 'You were excluded because your Terms/license file was missing.' : 'You were excluded because the minimum contribution count was not met.';
+        $message = match ($reason) {
+            'missing_contribution_category' =>
+                'You were excluded because one or more contribution files did not have a required marketplace category.',
+            'missing_terms_file' =>
+                'You were excluded because your Terms & Conditions & About Me files were missing.',
+            'missing_mockup_file' =>
+                'You were excluded because this collab required a mockup and none was uploaded.',
+            default =>
+                'You were excluded because the minimum contribution count was not met.',
+        };
         try { NotificationService::create((int)$user['user_id'], 'collab_excluded', 'designer', 'Excluded from collab', $message, 'collab:'.$collabId.':excluded:'.$designerId, '/seller/collabs/'.$collabId); } catch (Throwable $error) { NotificationService::reportFailure('collab_exclusion', $error); }
     }
 

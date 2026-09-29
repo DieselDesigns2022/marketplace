@@ -33,7 +33,28 @@ final class AdminCollabController
         H::requireAdminPermission('ip_risk.manage');
         H::verifyCsrf();
         try {
-            (new CollabIpRiskWorkflow())->review((int)$id,(int)H::user()['id'],(string)($_POST['decision']??''),(string)($_POST['fingerprint']??''),(string)($_POST['notes']??''));
+            $decision = (string)($_POST['decision'] ?? '');
+            $fingerprint = (string)($_POST['fingerprint'] ?? '');
+
+            (new CollabIpRiskWorkflow())->review(
+                (int)$id,
+                (int)H::user()['id'],
+                $decision,
+                $fingerprint,
+                (string)($_POST['notes'] ?? '')
+            );
+
+            (new \App\Services\CollabFileUpdateService())
+                ->afterAdminReview(
+                    (int)$id,
+                    $fingerprint,
+                    $decision
+                );
+
+            if ($decision === 'approved') {
+                (new CollabService())->processDue((int)$id);
+            }
+
             H::flash('success','Collab IP review saved.');
         } catch (\DomainException|\InvalidArgumentException $error) {
             H::flash('error',$error->getMessage());

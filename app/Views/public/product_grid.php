@@ -57,7 +57,7 @@ $listingUrl = $listingType === 'custom'
 
             <?php if(!empty($p['turnaround_days'])):?>
                 <span class="badge">
-                    <?=H::e((string)$p['turnaround_days'])?> day turnaround
+                    <?=H::e(\App\Services\CustomDesignService::turnaroundLabel($p))?> turnaround
                 </span>
             <?php endif;?>
 

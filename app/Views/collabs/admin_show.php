@@ -2,6 +2,39 @@
 <p>Host <?=H::e($collab['host_name'])?> · <?=H::e($collab['participation_type'])?> · upload deadline <?=H::e($collab['upload_deadline'])?> · sale <?=H::e($collab['sale_starts_at'])?> through <?=H::e($collab['sale_close_date'])?> · ZIP <?=H::e($collab['status'])?></p>
 <?php if($collab['zip_error']):?><p class="notice warning"><?=H::e($collab['zip_error'])?></p><?php endif;?>
 <?php if($collab['status']==='failed'):?><form method="post" action="/admin/collabs/<?=$collab['id']?>/retry"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Retry ZIP</button></form><?php endif;?>
+<?php
+$fileUpdateIpReview = \App\Core\Database::row(
+    'select
+        r.original_name proposed_name,
+        f.original_name current_name,
+        d.display_name
+     from collab_file_update_requests r
+     join collab_files f
+       on f.id=r.collab_file_id
+     join designers d
+       on d.id=r.designer_id
+     where r.collab_id=?
+       and r.status="ip_review"
+       and r.candidate_fingerprint=?
+     order by r.id
+     limit 1',
+    [
+        (int)$collab['id'],
+        (string)($collab['ip_content_fingerprint'] ?? '')
+    ]
+);
+?>
+
+<?php if($fileUpdateIpReview):?>
+<div class="notice warning">
+    <strong>Proposed collab file replacement</strong><br>
+    Seller: <?=H::e($fileUpdateIpReview['display_name'])?><br>
+    Current file: <?=H::e($fileUpdateIpReview['current_name'])?><br>
+    Proposed file: <?=H::e($fileUpdateIpReview['proposed_name'])?><br>
+    The existing bundle remains unchanged until this review is approved.
+</div>
+<?php endif;?>
+
 <h2>IP-risk review</h2><p>State: <?=H::e($collab['ip_risk_state'])?></p><?php foreach($detections as$d):?><p><?=H::e($d['matched_term'])?> in <?=H::e($d['source_field'])?></p><?php endforeach;?>
 <?php if($collab['ip_risk_state']==='review_required'):?><form method="post" action="/admin/collabs/<?=$collab['id']?>/ip-review"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="fingerprint" value="<?=H::e($collab['ip_content_fingerprint'])?>"><textarea name="notes" placeholder="Review notes"></textarea><button name="decision" value="approved">Approve</button><button name="decision" value="rejected">Reject</button></form><?php endif;?>
 <h2>Participants</h2><?php foreach($participants as$p):?><p><?=H::e($p['display_name'])?> — <?=H::e($p['membership_status'])?> / <?=H::e($p['eligibility'])?> (<?=intval($p['qualifying_file_count']??0)?> contribution files) <?=H::e($p['exclusion_reason']??'')?></p><?php endforeach;?>

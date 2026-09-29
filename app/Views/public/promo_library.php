@@ -13,7 +13,7 @@ $absoluteImageUrl=
     str_starts_with($imageUrl,'http://')||
     str_starts_with($imageUrl,'https://')
         ? $imageUrl
-        : 'https://marketplace.dieseldesigns.co'.$imageUrl;
+        : 'https://creativemoth.com'.$imageUrl;
 $promoDestination='https://creativemoth.com/';
 $promoCaption=(string)($graphic['suggested_caption']??'');
 
