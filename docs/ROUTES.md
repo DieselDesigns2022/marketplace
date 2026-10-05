@@ -64,6 +64,8 @@ Routes are registered in `public/index.php`.
 |---|---|---|---|
 | GET/POST | `/apply` | `SellerController::apply` | Logged-in application workflow |
 | GET | `/seller` | `SellerController::home` | Seller/admin protected |
+| GET | `/seller/analytics` | `AnalyticsController::seller` | Approved seller required; authenticated seller scope only |
+| GET | `/seller/analytics.csv` | `AnalyticsController::sellerCsv` | Approved seller required; same seller scope and filters as analytics report |
 | GET/POST | `/seller/store` | `SellerController::storeSettings` | Seller/admin protected |
 | GET | `/seller/products` | `SellerController::products` | Seller/admin protected |
 | POST | `/seller/products/bulk-delete` | `SellerController::bulkDeleteProducts` | Seller/admin protected, ownership-scoped, CSRF |
@@ -81,6 +83,8 @@ Routes are registered in `public/index.php`.
 | Method | Route | Controller | Protection |
 |---|---|---|---|
 | GET | `/admin` | `AdminController::home` | Admin protected |
+| GET | `/admin/analytics` | `AnalyticsController::admin` | Requires `dashboard.view` |
+| GET | `/admin/analytics.csv` | `AnalyticsController::adminCsv` | Requires `dashboard.view`; same report filters/calculations as admin analytics |
 | GET/POST | `/admin/users` | `AdminController::users` | Admin protected |
 | GET/POST | `/admin/applications` | `AdminController::applications` | Admin protected |
 | GET/POST | `/admin/applications/{id}` | `AdminController::applications` | Admin protected |

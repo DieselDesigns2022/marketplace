@@ -1,5 +1,13 @@
 # Testing
 
+## Phase 15 analytics and reporting
+
+Run `php tests/Phase15AnalyticsReportingTest.php` for date validation, equivalent-prior and year-over-year comparisons (including leap-day handling), zero-baseline percentages, seller isolation/refund qualification, traffic-source classification and validated referral behavior, completely fail-open search tracking, search privacy/schema assertions, weekday insights, CSV escaping/formula neutralization, permissions/routes, and migration/schema consistency.
+
+Directly affected fast regressions are `php tests/Phase127MarketplaceFeeModelTest.php`, `php tests/Phase127RefundRecoveryWorkflowTest.php`, `php tests/Phase14CollabBundlesTest.php`, and `php tests/Phase106DashboardUsabilityTest.php`. Database integration remains environment-gated: `Phase105DatabaseIntegrationTest.php` requires its disposable-database opt-in, and `Phase14DatabaseIntegrationTest.php` requires `APP_ENV=test`. These skips are not evidence that a Phase 15 migration was applied successfully. Apply `database/migrations/2026_10_05_phase_15_analytics_foundation.sql` to a disposable migrated MariaDB database before live-like verification.
+
+Manual verification should use authenticated approved-seller and `dashboard.view` Admin accounts to check both analytics pages and CSV downloads with identical date/comparison filters. Confirm old orders appear as Unknown / Unattributed, new attributed orders use only supported source buckets, search writes cannot interrupt public search, and no organic view or conversion metric is displayed.
+
 ## Phase 12.7 marketplace fee checks
 The fast tests `php tests/Phase127MarketplaceFeeModelTest.php` and `php tests/Phase127RefundRecoveryWorkflowTest.php` cover pure integer-cent fee, outstanding-refund, exact-allocation, seller-isolation, recovery growth/closure, and recovery-planning functions. They do not claim database/webhook integration. Run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase127DatabaseIntegrationTest.php` with disposable MariaDB credentials for migration-backed resumable observations, review repair, allocation/tax validation, seller/recognition/referral isolation, partial-payout planning, recovery baselines, reservation competition, retry/zero-transfer idempotency, and legacy snapshots. Live Stripe and HTTP webhook validation remain separate staging checks.
 
