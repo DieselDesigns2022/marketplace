@@ -10,7 +10,7 @@ class Helpers
     public static function baseUrl(): string
     {
         $url = trim($_ENV['APP_URL'] ?? '');
-        return rtrim($url !== '' ? $url : 'https://marketplace.dieseldesigns.co', '/');
+        return rtrim($url !== '' ? $url : 'https://creativemoth.com', '/');
 
     }
 

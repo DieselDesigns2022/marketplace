@@ -1,0 +1,1 @@
+<h1>Collab Events</h1><?php foreach($collabs as$c):?><article class="card"><a href="/admin/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a> — <?=H::e($c['host_name'])?> / <?=H::e($c['status'])?> / IP <?=H::e($c['ip_risk_state'])?></article><?php endforeach;?>

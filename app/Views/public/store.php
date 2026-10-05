@@ -98,6 +98,22 @@
     <?php endif; ?>
 </section>
 <?php if(H::user() && !$isOwner):?><form method="post" action="/messages/start/store/<?=$d['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn secondary">Message seller</button></form><?php endif;?>
+<?php if(!empty($collabs)):?>
+<section id="collab-bundles" class="page-section">
+    <h2>Active Collab Bundles</h2>
+
+    <div class="grid products">
+        <?php foreach($collabs as $c):?>
+            <?php
+            $collabStorefrontId = (int)$d['id'];
+            include app_path(
+                'app/Views/public/collab_card.php'
+            );
+            ?>
+        <?php endforeach;?>
+    </div>
+</section>
+<?php endif;?>
 <section id="custom-designs">
     <h2>Custom Designs</h2>
     <?php if(empty($customServices)): ?>
@@ -133,7 +149,7 @@
 
                 <?php if(!empty($s['turnaround_days'])):?>
                     <span class="badge">
-                        <?=(int)$s['turnaround_days']?> day turnaround
+                        <?=H::e(\App\Services\CustomDesignService::turnaroundLabel($s))?> turnaround
                     </span>
                 <?php endif;?>
             </div>

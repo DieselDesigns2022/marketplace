@@ -40,10 +40,29 @@ final class SellerReferralCommissionService
     public function accrueOrder(int $orderId, int $designerId): int
     {
         $referral = DB::row(
-            'select r.* from referrals r join designers d on d.user_id=r.referred_user_id
-             where d.id=? and r.seller_reward_type="lifetime_commission" and r.commission_ended_at is null',
+            'select r.*,d.user_id referred_user_id,d.status referred_designer_status,d.last_qualifying_sale_at,u.status referred_user_status
+               from referrals r
+               join designers d on d.user_id=r.referred_user_id
+               join users u on u.id=r.referred_user_id
+              where d.id=?
+                and r.seller_reward_type="lifetime_commission"
+                and r.commission_ended_at is null',
             [$designerId]
         );
+
+        if ($referral) {
+            $lastSale = $referral['last_qualifying_sale_at'] ?? null;
+
+            if ($lastSale && strtotime($lastSale . ' UTC') <= time() - (90 * 86400)) {
+                $this->permanentlyStop((int)$referral['referred_user_id'], 'store_inactive');
+                return 0;
+            }
+
+            if (($referral['referred_designer_status'] ?? '') !== 'approved'
+                || ($referral['referred_user_status'] ?? '') !== 'active') {
+                return 0;
+            }
+        }
         $order = DB::row(
             'select id from orders where id=? and payment_status="paid" and status not in ("failed","cancelled","refunded","partially_refunded")
              and coalesce(manual_review_required,0)=0 and refunded_at is null and partially_refunded_at is null',
@@ -105,9 +124,33 @@ final class SellerReferralCommissionService
         }
     }
 
+    public function processInactiveReferrals(): int
+    {
+        $rows = DB::rows(
+            'select r.referred_user_id
+               from referrals r
+               join designers d on d.user_id=r.referred_user_id
+              where r.seller_reward_type="lifetime_commission"
+                and r.commission_ended_at is null
+                and d.last_qualifying_sale_at is not null
+                and d.last_qualifying_sale_at <= utc_timestamp() - interval 90 day'
+        );
+
+        $ended = 0;
+
+        foreach ($rows as $row) {
+            if ($this->permanentlyStop((int)$row['referred_user_id'], 'store_inactive')) {
+                $ended++;
+                $this->notifyPermanentStop((int)$row['referred_user_id']);
+            }
+        }
+
+        return $ended;
+    }
+
     public function permanentlyStop(int $referredUserId, string $reason): bool
     {
-        if (!in_array($reason, ['store_disabled', 'store_inactive', 'store_deleted'], true)) {
+        if (!in_array($reason, ['store_inactive', 'store_deleted'], true)) {
             throw new DomainException('Invalid permanent commission stop reason.');
         }
         $statement = DB::pdo()->prepare(

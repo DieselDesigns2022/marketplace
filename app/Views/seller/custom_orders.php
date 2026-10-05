@@ -86,8 +86,9 @@
                         <div>
                             <span class="custom-order-detail-label">Turnaround</span>
                             <strong>
-                                <?=(int)$o['turnaround_days']?>
-                                <?=((int)$o['turnaround_days'] === 1) ? 'day' : 'days'?>
+                                <?=H::e(
+                                    \App\Services\CustomDesignService::turnaroundLabel($o)
+                                )?>
                             </strong>
                         </div>
 

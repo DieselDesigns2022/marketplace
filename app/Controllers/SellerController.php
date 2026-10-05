@@ -678,6 +678,22 @@ class SellerController
     private function savePreviewImages(int $productId, array &$errors): array
     {
         $createdImageIds = [];
+
+        $store = DB::row(
+            'select d.store_slug
+             from products p
+             join designers d on d.id=p.designer_id
+             where p.id=?',
+            [$productId]
+        );
+
+        $storeSlug =
+            trim((string)($store['store_slug'] ?? ''));
+
+        $storeUrl = $storeSlug !== ''
+            ? 'creativemoth.com/store/'.$storeSlug
+            : null;
+
         if (empty($_FILES['preview_images']['name'][0])) return $createdImageIds;
         foreach ($_FILES['preview_images']['name'] as $idx => $original) {
             if (($_FILES['preview_images']['error'][$idx] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
@@ -692,7 +708,8 @@ class SellerController
                 $file,
                 'product_previews',
                 $errors,
-                isset($_POST['extra_protection_watermark'])
+                isset($_POST['extra_protection_watermark']),
+                $storeUrl
             );
             if ($saved) {
                 $alt = trim($_POST['preview_alt'][$idx] ?? pathinfo((string)$original, PATHINFO_FILENAME));
@@ -757,9 +774,10 @@ class SellerController
     private function regeneratePreviewImage(int $imageId, int $productId): void
     {
         $product = DB::row(
-            'select extra_protection_watermark
-             from products
-             where id=?',
+            'select p.extra_protection_watermark,d.store_slug
+             from products p
+             join designers d on d.id=p.designer_id
+             where p.id=?',
             [$productId]
         );
 
@@ -777,9 +795,14 @@ class SellerController
             return;
         }
 
+        $storeUrl = trim((string)($product['store_slug'] ?? '')) !== ''
+            ? 'creativemoth.com/store/' . trim((string)$product['store_slug'])
+            : null;
+
         $result = $this->regenerateProductPreviewRow(
             $img,
-            !empty($product['extra_protection_watermark'])
+            !empty($product['extra_protection_watermark']),
+            $storeUrl
         );
 
         DB::exec(
@@ -808,13 +831,15 @@ class SellerController
 
     private function regenerateProductPreviewRow(
         array $img,
-        bool $extraProtection
+        bool $extraProtection,
+        ?string $storeUrl = null
     ): array {
         if (!empty($img['original_image_path'])) {
             return WatermarkService::regenerate(
                 $img['original_image_path'],
                 $img['image_path'],
-                $extraProtection
+                $extraProtection,
+                $storeUrl
             );
         }
 
@@ -837,7 +862,8 @@ class SellerController
             return WatermarkService::regenerateImportedRemotePreview(
                 $download['path'],
                 $img['image_path'],
-                $extraProtection
+                $extraProtection,
+                $storeUrl
             );
 
         } catch (Throwable $e) {
@@ -871,12 +897,25 @@ class SellerController
             [$productId]
         );
 
+        $store = DB::row(
+            'select d.store_slug
+             from products p
+             join designers d on d.id=p.designer_id
+             where p.id=?',
+            [$productId]
+        );
+
+        $storeUrl = trim((string)($store['store_slug'] ?? '')) !== ''
+            ? 'creativemoth.com/store/' . trim((string)$store['store_slug'])
+            : null;
+
         $failures = 0;
 
         foreach ($rows as $img) {
             $result = $this->regenerateProductPreviewRow(
                 $img,
-                $extraProtection
+                $extraProtection,
+                $storeUrl
             );
 
             DB::exec(
@@ -2448,7 +2487,11 @@ class SellerController
     {
         $this->requireOnboardingComplete();
         H::requireSeller();
-        H::view('seller/sales', [ 'sales' => DB::rows( 'select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$this->d()['id']] ), ]);
+        $designerId = (int)$this->d()['id'];
+        H::view('seller/sales', [
+            'sales' => DB::rows('select oi.*,o.status order_status,o.payment_status,u.email,sp.payout_status,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.designer_id=? and oi.collab_id is null and o.payment_status in ("paid","partially_refunded") order by oi.created_at desc', [$designerId]),
+            'collabSales' => DB::rows('select a.*,c.title,o.payment_status,o.created_at,u.email,sp.payout_status,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id from collab_order_allocations a join collab_events c on c.id=a.collab_id join orders o on o.id=a.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=a.order_id and sp.designer_id=a.designer_id where a.designer_id=? and o.payment_status in ("paid","partially_refunded") order by o.created_at desc', [$designerId]),
+        ]);
 
     }
 

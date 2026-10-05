@@ -24,7 +24,7 @@ class WatermarkService
         );
     }
 
-    public static function applyUploadedPreview(array $file, string $folder, array &$errors, bool $extraProtection = false): ?array
+    public static function applyUploadedPreview(array $file, string $folder, array &$errors, bool $extraProtection = false, ?string $storeUrl = null): ?array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             $errors[] = 'Preview image upload failed.';
@@ -41,7 +41,15 @@ class WatermarkService
             return null;
         }
 
-        return self::storeValidatedPreview($tmp, $ext, $folder, $errors, true, $extraProtection);
+        return self::storeValidatedPreview(
+            $tmp,
+            $ext,
+            $folder,
+            $errors,
+            true,
+            $extraProtection,
+            $storeUrl
+        );
     }
 
     /** Store a validated server-side image through the normal preview pipeline. */
@@ -137,7 +145,7 @@ class WatermarkService
         ];
     }
 
-    private static function storeValidatedPreview(string $tmp, string $ext, string $folder, array &$errors, bool $uploaded, bool $extraProtection = false): ?array
+    private static function storeValidatedPreview(string $tmp, string $ext, string $folder, array &$errors, bool $uploaded, bool $extraProtection = false, ?string $storeUrl = null): ?array
     {
         $name = bin2hex(random_bytes(12)) . '.' . $ext;
         $privateDir = app_path('storage/app/private/product_previews');
@@ -159,7 +167,8 @@ class WatermarkService
             $publicAbs,
             null,
             null,
-            $extraProtection
+            $extraProtection,
+            $storeUrl
         );
         if (!$result['ok']) {
             $fallbackAbs = $publicDir . '/' . $name;
@@ -186,7 +195,12 @@ class WatermarkService
         ];
     }
 
-    public static function regenerate(string $originalRelative, string $currentPublicPath, bool $extraProtection = false): array
+    public static function regenerate(
+        string $originalRelative,
+        string $currentPublicPath,
+        bool $extraProtection = false,
+        ?string $storeUrl = null
+    ): array
     {
         $originalRelative = ltrim(str_replace(['..', '\\'], '', $originalRelative), '/');
         $originalAbs = app_path('storage/app/private/' . $originalRelative);
@@ -221,14 +235,16 @@ class WatermarkService
             $publicAbs,
             null,
             null,
-            $extraProtection
+            $extraProtection,
+            $storeUrl
         );
     }
 
     public static function regenerateImportedRemotePreview(
         string $sourceAbs,
         string $currentPublicPath,
-        bool $extraProtection = false
+        bool $extraProtection = false,
+        ?string $storeUrl = null
     ): array {
         if (!is_file($sourceAbs)) {
             return [
@@ -303,11 +319,12 @@ class WatermarkService
             $publicAbs,
             1200,
             $outputType,
-            $extraProtection
+            $extraProtection,
+            $storeUrl
         );
     }
 
-    public static function storeCustomDesignPreview(array $file, array &$errors, bool $extraProtection = false): ?array
+    public static function storeCustomDesignPreview(array $file, array &$errors, bool $extraProtection = false, ?string $storeUrl = null): ?array
     {
         $ext = strtolower((string)($file['ext'] ?? ''));
         $type = [
@@ -363,7 +380,8 @@ class WatermarkService
             $publicAbs,
             null,
             $type,
-            $extraProtection
+            $extraProtection,
+            $storeUrl
         );
 
         if (!$result['ok']) {
@@ -380,7 +398,11 @@ class WatermarkService
         ];
     }
 
-    public static function regenerateCustomDesignPreview(string $publicPath, bool $extraProtection = false): array
+    public static function regenerateCustomDesignPreview(
+        string $publicPath,
+        bool $extraProtection = false,
+        ?string $storeUrl = null
+    ): array
     {
         $publicRelative = ltrim(str_replace('\\', '/', $publicPath), '/');
 
@@ -435,7 +457,8 @@ class WatermarkService
             $publicAbs,
             null,
             null,
-            $extraProtection
+            $extraProtection,
+            $storeUrl
         );
     }
 
@@ -617,12 +640,185 @@ class WatermarkService
         return ($allowed[$ext] ?? '') === $mime;
     }
 
+    public static function createCollabThumbnail(
+        string $sourceAbs,
+        string $destinationAbs,
+        int $maxDimension = 360
+    ): array
+    {
+        if (!extension_loaded('gd')) {
+            return [
+                'ok' => false,
+                'message' => 'PHP GD extension is not available.',
+            ];
+        }
+
+        $info = @getimagesize($sourceAbs);
+
+        if (!$info) {
+            return [
+                'ok' => false,
+                'message' => 'Source image is invalid.',
+            ];
+        }
+
+        try {
+            $source = self::imageFrom(
+                $sourceAbs,
+                (int)$info[2]
+            );
+
+            if (!$source) {
+                return [
+                    'ok' => false,
+                    'message' => 'Source image type is unsupported.',
+                ];
+            }
+
+            $width = imagesx($source);
+            $height = imagesy($source);
+
+            $scale = min(
+                1,
+                $maxDimension / max($width, $height)
+            );
+
+            $newWidth = max(
+                1,
+                (int)round($width * $scale)
+            );
+
+            $newHeight = max(
+                1,
+                (int)round($height * $scale)
+            );
+
+            $thumb = imagecreatetruecolor(
+                $newWidth,
+                $newHeight
+            );
+
+            if (!$thumb) {
+                imagedestroy($source);
+
+                return [
+                    'ok' => false,
+                    'message' => 'Thumbnail could not be created.',
+                ];
+            }
+
+            if (
+                in_array(
+                    (int)$info[2],
+                    [IMAGETYPE_PNG, IMAGETYPE_WEBP],
+                    true
+                )
+            ) {
+                imagealphablending($thumb, false);
+                imagesavealpha($thumb, true);
+
+                $transparent =
+                    imagecolorallocatealpha(
+                        $thumb,
+                        0,
+                        0,
+                        0,
+                        127
+                    );
+
+                imagefilledrectangle(
+                    $thumb,
+                    0,
+                    0,
+                    $newWidth - 1,
+                    $newHeight - 1,
+                    $transparent
+                );
+            }
+
+            $ok = imagecopyresampled(
+                $thumb,
+                $source,
+                0,
+                0,
+                0,
+                0,
+                $newWidth,
+                $newHeight,
+                $width,
+                $height
+            );
+
+            imagedestroy($source);
+
+            if (!$ok) {
+                imagedestroy($thumb);
+
+                return [
+                    'ok' => false,
+                    'message' => 'Thumbnail resize failed.',
+                ];
+            }
+
+            if (!is_dir(dirname($destinationAbs))) {
+                mkdir(
+                    dirname($destinationAbs),
+                    0750,
+                    true
+                );
+            }
+
+            $saved = self::saveImage(
+                $thumb,
+                $destinationAbs,
+                (int)$info[2]
+            );
+
+            imagedestroy($thumb);
+
+            return $saved
+                ? [
+                    'ok' => true,
+                    'message' => 'Thumbnail created.',
+                ]
+                : [
+                    'ok' => false,
+                    'message' => 'Thumbnail could not be saved.',
+                ];
+
+        } catch (Throwable $e) {
+            return [
+                'ok' => false,
+                'message' => 'Thumbnail creation failed.',
+            ];
+        }
+    }
+
+    public static function createProtectedImagePreview(
+        string $sourceAbs,
+        string $destinationAbs,
+        bool $extraProtection = true,
+        ?string $storeUrl = null,
+        ?int $maxDimension = null
+    ): array
+    {
+        return self::watermarkFile(
+            $sourceAbs,
+            $destinationAbs,
+            $maxDimension,
+            null,
+            $extraProtection,
+            $storeUrl
+        );
+    }
+
     private static function watermarkFile(
         string $sourceAbs,
         string $destinationAbs,
         ?int $maxDimension = null,
         ?int $outputType = null,
-        bool $extraProtection = false
+        bool $extraProtection = false,
+        ?string $storeUrl = null
     ): array
     {
         if (!extension_loaded('gd')) return ['ok' => false, 'message' => 'PHP GD extension is not available.'];
@@ -631,6 +827,16 @@ class WatermarkService
         try {
             $base = self::imageFrom($sourceAbs, (int)$info[2]);
             if (!$base) return ['ok' => false, 'message' => 'Source image type is not supported by GD.'];
+
+            /*
+             * Palette/indexed PNGs can composite transparent overlays
+             * incorrectly in GD. Convert them to true-color before
+             * applying any Creative Moth watermark.
+             */
+            if (!imageistruecolor($base)) {
+                imagepalettetotruecolor($base);
+            }
+
             imagealphablending($base, true);
             imagesavealpha($base, true);
             $bw = imagesx($base); $bh = imagesy($base);
@@ -728,6 +934,8 @@ class WatermarkService
                 $mw,
                 $mh
             );
+            self::drawStoreUrl($base, $storeUrl);
+
             if (!is_dir(dirname($destinationAbs))) mkdir(dirname($destinationAbs), 0755, true);
             $saved = self::saveImage($base, $destinationAbs, $outputType ?? (int)$info[2]);
             imagedestroy($base); imagedestroy($mark);
@@ -735,6 +943,265 @@ class WatermarkService
         } catch (Throwable $e) {
             return ['ok' => false, 'message' => 'Watermark creation failed.'];
         }
+    }
+
+    private static function drawStoreUrl(
+        $image,
+        ?string $storeUrl
+    ): void
+    {
+        $storeUrl = strtoupper(trim((string)$storeUrl));
+
+        if ($storeUrl === '') {
+            return;
+        }
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        if ($width < 120 || $height < 80) {
+            return;
+        }
+
+        $fontCandidates = [
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf',
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        ];
+
+        $fontPath = null;
+
+        foreach ($fontCandidates as $candidate) {
+            if (is_file($candidate)) {
+                $fontPath = $candidate;
+                break;
+            }
+        }
+
+        /*
+         * Real TTF rendering is strongly preferred.
+         * Only fall back to GD's bitmap font if FreeType/font files
+         * are unexpectedly unavailable.
+         */
+        if (
+            $fontPath === null ||
+            !function_exists('imagettftext') ||
+            !function_exists('imagettfbbox')
+        ) {
+            $font = 5;
+
+            $textWidth =
+                imagefontwidth($font) *
+                strlen($storeUrl);
+
+            $x = max(
+                10,
+                (int)round(($width - $textWidth) / 2)
+            );
+
+            $y = max(
+                10,
+                $height -
+                imagefontheight($font) -
+                18
+            );
+
+            $shadow = imagecolorallocatealpha(
+                $image,
+                0,
+                0,
+                0,
+                20
+            );
+
+            $white = imagecolorallocatealpha(
+                $image,
+                255,
+                255,
+                255,
+                0
+            );
+
+            imagestring(
+                $image,
+                $font,
+                $x + 2,
+                $y + 2,
+                $storeUrl,
+                $shadow
+            );
+
+            imagestring(
+                $image,
+                $font,
+                $x,
+                $y,
+                $storeUrl,
+                $white
+            );
+
+            return;
+        }
+
+        /*
+         * Scale text with the image.
+         * Large marketplace previews will normally land
+         * around 24–34px instead of the tiny bitmap text.
+         */
+        $fontSize = max(
+            18,
+            min(
+                32,
+                (int)round($width * 0.021)
+            )
+        );
+
+        $minimumFontSize = 15;
+        $maxTextWidth = max(50, $width - 80);
+
+        while ($fontSize > $minimumFontSize) {
+            $box = imagettfbbox(
+                $fontSize,
+                0,
+                $fontPath,
+                $storeUrl
+            );
+
+            if ($box === false) {
+                return;
+            }
+
+            $textWidth =
+                abs($box[2] - $box[0]);
+
+            if ($textWidth <= $maxTextWidth) {
+                break;
+            }
+
+            $fontSize--;
+        }
+
+        $box = imagettfbbox(
+            $fontSize,
+            0,
+            $fontPath,
+            $storeUrl
+        );
+
+        if ($box === false) {
+            return;
+        }
+
+        $textWidth =
+            abs($box[2] - $box[0]);
+
+        $textHeight =
+            abs($box[7] - $box[1]);
+
+        $paddingX = max(
+            14,
+            (int)round($fontSize * 0.70)
+        );
+
+        $paddingY = max(
+            9,
+            (int)round($fontSize * 0.40)
+        );
+
+        $barWidth = min(
+            $width - 24,
+            $textWidth + ($paddingX * 2)
+        );
+
+        $barHeight =
+            $textHeight +
+            ($paddingY * 2);
+
+        $barX = max(
+            12,
+            (int)round(
+                ($width - $barWidth) / 2
+            )
+        );
+
+        $barY = max(
+            12,
+            $height -
+            $barHeight -
+            max(
+                14,
+                (int)round($height * 0.018)
+            )
+        );
+
+        $background = imagecolorallocatealpha(
+            $image,
+            0,
+            0,
+            0,
+            82
+        );
+
+        imagefilledrectangle(
+            $image,
+            $barX,
+            $barY,
+            $barX + $barWidth,
+            $barY + $barHeight,
+            $background
+        );
+
+        $textX = (int)round(
+            ($width - $textWidth) / 2
+        );
+
+        /*
+         * imagettftext() uses the baseline,
+         * not the top edge of the letters.
+         */
+        $textY =
+            $barY +
+            $paddingY +
+            $textHeight;
+
+        $shadow = imagecolorallocatealpha(
+            $image,
+            0,
+            0,
+            0,
+            58
+        );
+
+        $white = imagecolorallocatealpha(
+            $image,
+            255,
+            255,
+            255,
+            46
+        );
+
+        imagettftext(
+            $image,
+            $fontSize,
+            0,
+            $textX + 2,
+            $textY + 2,
+            $shadow,
+            $fontPath,
+            $storeUrl
+        );
+
+        imagettftext(
+            $image,
+            $fontSize,
+            0,
+            $textX,
+            $textY,
+            $white,
+            $fontPath,
+            $storeUrl
+        );
     }
 
     private static function imageFrom(string $path, int $type)
@@ -862,8 +1329,37 @@ class WatermarkService
                 $w = max(1, (int)round(imagesx($img) * $scale));
                 $h = max(1, (int)round(imagesy($img) * $scale));
                 $resized = imagecreatetruecolor($w, $h);
-                imagealphablending($resized, false); imagesavealpha($resized, true);
-                imagecopyresampled($resized, $img, 0, 0, 0, 0, $w, $h, imagesx($img), imagesy($img));
+
+                imagealphablending($resized, false);
+                imagesavealpha($resized, true);
+
+                $transparent = imagecolorallocatealpha(
+                    $resized,
+                    0,
+                    0,
+                    0,
+                    127
+                );
+
+                imagefill(
+                    $resized,
+                    0,
+                    0,
+                    $transparent
+                );
+
+                imagecopyresampled(
+                    $resized,
+                    $img,
+                    0,
+                    0,
+                    0,
+                    0,
+                    $w,
+                    $h,
+                    imagesx($img),
+                    imagesy($img)
+                );
                 imagedestroy($img);
                 return $resized;
             }

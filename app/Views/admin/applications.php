@@ -1,10 +1,48 @@
+<style>
+.application-filter-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 24px;
+}
+
+.application-filter-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 16px;
+    border: 1px solid #ddd6ea;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #2e2350;
+    font-weight: 600;
+    text-decoration: none;
+    line-height: 1.2;
+}
+
+.application-filter-tab:hover {
+    background: #f5efff;
+    border-color: #b89adb;
+    color: #2e2350;
+    text-decoration: none;
+}
+
+.application-filter-tab.active {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+}
+</style>
+
 <h1>Designer Applications</h1>
 <p class="muted">Filter applications by status and open each detail page before approving or denying a designer.</p>
-<nav class="tabs">
-    <a class="badge <?=$status==='pending'?'ok':''?>" href="/admin/applications?status=pending">Pending</a>
-    <a class="badge <?=$status==='approved'?'ok':''?>" href="/admin/applications?status=approved">Approved</a>
-    <a class="badge <?=$status==='denied'?'ok':''?>" href="/admin/applications?status=denied">Denied</a>
-    <a class="badge <?=$status==='all'?'ok':''?>" href="/admin/applications?status=all">All</a>
+
+<nav class="application-filter-tabs" aria-label="Application status filters">
+    <a class="application-filter-tab <?=$status==='pending'?'active':''?>" href="/admin/applications?status=pending">Pending</a>
+    <a class="application-filter-tab <?=$status==='approved'?'active':''?>" href="/admin/applications?status=approved">Approved</a>
+    <a class="application-filter-tab <?=$status==='denied'?'active':''?>" href="/admin/applications?status=denied">Denied</a>
+    <a class="application-filter-tab <?=$status==='all'?'active':''?>" href="/admin/applications?status=all">All</a>
 </nav>
 <div class="application-list">
     <?php foreach($apps as $a): ?>

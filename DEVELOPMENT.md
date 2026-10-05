@@ -278,3 +278,7 @@ The recognition CLI separates write-free `--dry-run`, silent historical `--apply
 
 ### Phase 13.1 local workflow
 Use only a disposable MariaDB database for `Phase131DatabaseIntegrationTest.php`. The merge CLI defaults to read-only `check`; `execute` requires a verified interactive no-echo terminal and must never receive a password through arguments or fixtures. Admin route work must add server-side `AdminPermissionService` enforcement and matching permission-aware navigation. Restricted Admins may enter `/admin` and are redirected to their first allowed section; unavailable Admin sections remain visible but disabled, while direct unauthorized routes still return 403.
+
+## Phase 14 local workflow
+Install PHP `zip`, apply `database/migrations/2026_09_23_phase_14_collab_bundles.sql`, and run `php scripts/process_collab_deadlines.php`. Use `APP_ENV=test RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase14DatabaseIntegrationTest.php` only against an isolated migrated database.
+`php tests/Phase14CollabBundlesTest.php` is the fast local suite and has been rerun successfully after the host-timezone close-boundary correction. Live Phase 14 buyer/seller verification has covered checkout/payment, protected ZIP delivery, storefront attribution, seller collab reporting, cart preservation on Stripe back-out, gross-sales display, Creative Moth fee display, and the production deadline worker. The guarded MariaDB suite remains separate persistence verification; `SKIP/UNEXECUTED` is not a pass.

@@ -1,4 +1,4 @@
-<section><h1>Custom order #<?=$order['id']?></h1><p><strong>Status:</strong> <?=H::e(str_replace('_',' ',$order['status']))?> · <strong>Payment:</strong> <?=H::e($order['payment_status'])?> · <strong>Agreed price:</strong> <?=H::money($order['agreed_price'])?></p><p><?=$order['turnaround_days']?> day turnaround · <?=$order['revisions_used']?> of <?=$order['included_revisions']?> included revisions used<?php if($order['revisions_used']>$order['included_revisions']):?> <strong>(included amount exceeded; no automatic charge)</strong><?php endif?></p><?php
+<section><h1>Custom order #<?=$order['id']?></h1><p><strong>Status:</strong> <?=H::e(str_replace('_',' ',$order['status']))?> · <strong>Payment:</strong> <?=H::e($order['payment_status'])?> · <strong>Agreed price:</strong> <?=H::money($order['agreed_price'])?></p><p><?=H::e(\App\Services\CustomDesignService::turnaroundLabel($order))?> turnaround · <?=$order['revisions_used']?> of <?=$order['included_revisions']?> included revisions used<?php if($order['revisions_used']>$order['included_revisions']):?> <strong>(included amount exceeded; no automatic charge)</strong><?php endif?></p><?php
 $licenseRows=json_decode(
     (string)($order['license_snapshot']??'[]'),
     true
@@ -42,7 +42,29 @@ if(is_array($licenseRows)&&array_is_list($licenseRows)&&$licenseRows):
 </p>
 <?php endif; ?>
 
-<h2>Saved buyer brief</h2><?php foreach($brief as $key=>$value):if($key==='answers'):foreach($value as $a):?><p><strong><?=H::e($a['question'])?><?=$a['required']?' *':''?>:</strong> <?=nl2br(H::e($a['answer']))?></p><?php endforeach;else:?><p><strong><?=H::e(ucwords(str_replace('_',' ',$key)))?>:</strong> <?=nl2br(H::e($value))?></p><?php endif;endforeach?><h2>Protected files</h2><?php foreach($files as $f):?><p><?=H::e(ucfirst($f['file_kind']))?>: <?php if($f['file_kind']==='final'&&$order['payment_status']==='refunded'):?><?=H::e($f['original_name'])?> — refunded, download unavailable<?php else:?><a href="/custom-order-files/<?=$f['id']?>"><?=H::e($f['original_name'])?></a><?php endif?></p><?php endforeach?><?php if(in_array($order['payment_status'],['paid','partially_refunded'],true)):?><form method="post" action="/messages/start/custom-order/<?=$order['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Open order messages</button></form><?php elseif($conversation):?><p><a href="/<?=str_contains($view,'seller/')?'seller':'buyer'?>/messages/<?=$conversation['id']?>">Open retained order conversation</a></p><?php else:?><p class="muted">Order messages become available after eligible payment.</p><?php endif?><h2>Workflow</h2><form method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><?php $sellerView=str_contains($view,'seller/');if($sellerView&&$order['status']==='new'):?><button name="action" value="start">Start work</button><?php elseif($sellerView&&$order['status']==='revision_requested'):?><button name="action" value="start_revision">Start revision</button><?php elseif($sellerView&&$order['status']==='in_progress'):?><label>Proof<input type="file" name="proof[]" multiple></label><button name="action" value="proof">Send proof</button><label>Final files<input type="file" name="final[]" multiple></label><button name="action" value="final">Deliver final</button><?php elseif(!$sellerView&&$order['status']==='proof_review'):?><button name="action" value="approve">Approve proof</button><label>Revision notes<textarea name="note"></textarea></label><button name="action" value="revision">Request revision</button><?php elseif(!$sellerView&&$order['status']==='new'):?>
+<h2>Saved buyer brief</h2><?php foreach($brief as $key=>$value):if($key==='answers'):foreach($value as $a):?><p><strong><?=H::e($a['question'])?><?=$a['required']?' *':''?>:</strong> <?=nl2br(H::e($a['answer']))?></p><?php endforeach;else:?><p><strong><?=H::e(ucwords(str_replace('_',' ',$key)))?>:</strong> <?=nl2br(H::e($value))?></p><?php endif;endforeach?><h2>Protected files</h2><?php foreach($files as $f):?>
+<p>
+    <?=H::e(ucfirst($f['file_kind']))?>:
+
+    <?php if(
+        $f['file_kind']==='reference' &&
+        !empty($f['reference_context_label'])
+    ):?>
+        <strong><?=H::e($f['reference_context_label'])?> —</strong>
+    <?php endif;?>
+
+    <?php if(
+        $f['file_kind']==='final' &&
+        $order['payment_status']==='refunded'
+    ):?>
+        <?=H::e($f['original_name'])?> — refunded, download unavailable
+    <?php else:?>
+        <a href="/custom-order-files/<?=$f['id']?>">
+            <?=H::e($f['original_name'])?>
+        </a>
+    <?php endif?>
+</p>
+<?php endforeach?><?php if(in_array($order['payment_status'],['paid','partially_refunded'],true)):?><form method="post" action="/messages/start/custom-order/<?=$order['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Open order messages</button></form><?php elseif($conversation):?><p><a href="/<?=str_contains($view,'seller/')?'seller':'buyer'?>/messages/<?=$conversation['id']?>">Open retained order conversation</a></p><?php else:?><p class="muted">Order messages become available after eligible payment.</p><?php endif?><h2>Workflow</h2><form method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><?php $sellerView=str_contains($view,'seller/');if($sellerView&&$order['status']==='new'):?><button name="action" value="start">Start work</button><?php elseif($sellerView&&$order['status']==='revision_requested'):?><button name="action" value="start_revision">Start revision</button><?php elseif($sellerView&&$order['status']==='in_progress'):?><label>Proof<input type="file" name="proof[]" multiple></label><button name="action" value="proof">Send proof</button><label>Final files<input type="file" name="final[]" multiple></label><button name="action" value="final">Deliver final</button><?php elseif(!$sellerView&&$order['status']==='proof_review'):?><button name="action" value="approve">Approve proof</button><label>Revision notes<textarea name="note"></textarea></label><button name="action" value="revision">Request revision</button><?php elseif(!$sellerView&&$order['status']==='new'):?>
 <p class="notice">
     Your order has been received. Waiting for the seller to begin work.
 </p>

@@ -23,7 +23,7 @@
                 <p>
                     by <?=H::e($s['display_name'])?>
                     · <?=H::money($s['price'])?>
-                    · <?=$s['turnaround_days']?> days
+                    · <?=H::e(\App\Services\CustomDesignService::turnaroundLabel($s))?>
                 </p>
             </article>
         <?php endforeach; ?>

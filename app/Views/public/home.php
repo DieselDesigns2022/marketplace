@@ -17,6 +17,33 @@
         <?php if(empty($cats)):?><div class="card empty-state"><h3>Categories are being prepared</h3><p>Marketplace categories will appear here as the catalog is organized.</p></div><?php endif;?>
     </div>
 </section>
+
+<?php if(!empty($collabs)):?>
+<section class="page-section collabs-home-section">
+    <div class="section-heading-row">
+        <div>
+            <h2>Collabs</h2>
+            <p class="muted">
+                Limited-time bundles created together by Creative Moth designers.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid products">
+        <?php foreach($collabs as $c):?>
+            <?php
+            $collabStorefrontId =
+                (int)$c['host_designer_id'];
+
+            include app_path(
+                'app/Views/public/collab_card.php'
+            );
+            ?>
+        <?php endforeach;?>
+    </div>
+</section>
+<?php endif;?>
+
 <?php $featuredProducts = $products ?? []; ?>
 <section class="page-section featured-products-section">
     <h2>Featured products</h2>

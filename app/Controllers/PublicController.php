@@ -95,8 +95,52 @@ class PublicController
              order by hf.sort_order,hf.id
              limit 6'
         );
+
+        $collabs = DB::rows(
+            'select
+                c.id,
+                c.title,
+                c.slug,
+                c.price_cents,
+                c.sale_close_date,
+                c.host_designer_id,
+                d.display_name host_name,
+                d.store_slug host_store_slug,
+                (
+                    select count(*)
+                    from collab_participants cp
+                    where cp.collab_id=c.id
+                      and cp.eligibility="eligible"
+                ) designer_count
+             from collab_events c
+             join designers d
+               on d.id=c.host_designer_id
+             where c.status="ready"
+               and c.snapshot_at is not null
+               and c.final_zip_path is not null
+               and c.ip_risk_state in (
+                   "clear",
+                   "approved"
+               )
+               and c.sale_starts_at<=now()
+               and c.sale_close_date>=current_date
+               and d.status="approved"
+             order by
+                c.ready_at desc,
+                c.id desc
+             limit 8'
+        );
+
+        foreach ($collabs as &$collab) {
+            $collab['cover_url'] =
+                \App\Services\CollabService::coverUrl(
+                    (int)$collab['id']
+                );
+        }
+        unset($collab);
+
         $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Creative Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
-        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'homepagePromo'=>PromoService::chooseWebsite('homepage'), 'meta'=>$this->pageMeta('Creative Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
+        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'collabs'=>$collabs, 'homepagePromo'=>PromoService::chooseWebsite('homepage'), 'meta'=>$this->pageMeta('Creative Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
     }
 
     private function searchTerms(string $query): array
@@ -230,6 +274,7 @@ class PublicController
                 d.review_count,
                 c.name category_name,
                 c.slug category_slug,
+                null turnaround_min_days,
                 null turnaround_days,
                 null included_revisions,
                 (".$productRelevance.") relevance,
@@ -426,6 +471,7 @@ class PublicController
                     d.review_count,
                     'Customs / Personalized' category_name,
                     'customs-personalized' category_slug,
+                    s.turnaround_min_days,
                     s.turnaround_days,
                     s.included_revisions,
                     (".$customRelevance.") relevance,
@@ -600,7 +646,51 @@ class PublicController
         $d = DB::row('select * from designers where store_slug=? and status="approved"', [$slug]) ?? H::abort(404);
         $products = DB::rows('select p.*,d.display_name,d.store_slug,d.average_rating,d.review_count,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" order by p.created_at desc', [$d['id']]);
         $customServices = DB::rows('select s.*,(select image_path from custom_service_images csi where csi.custom_service_id=s.id order by csi.sort_order,csi.id limit 1) preview_image from custom_design_services s where s.designer_id=? and s.is_active=1 order by s.created_at desc,s.id desc', [$d['id']]);
+        $collabs = (new \App\Repositories\CollabRepository())->publicForDesigner((int)$d['id']);
+
+        foreach ($collabs as &$collab) {
+            $meta = DB::row(
+                'select
+                    c.host_designer_id,
+                    hd.display_name host_name,
+                    hd.store_slug host_store_slug,
+                    (
+                        select count(*)
+                        from collab_participants cp
+                        where cp.collab_id=c.id
+                          and cp.eligibility="eligible"
+                    ) designer_count
+                 from collab_events c
+                 join designers hd
+                   on hd.id=c.host_designer_id
+                 where c.id=?',
+                [(int)$collab['id']]
+            );
+
+            if ($meta) {
+                $collab = array_merge(
+                    $collab,
+                    $meta
+                );
+            }
+
+            $collab['cover_url'] =
+                \App\Services\CollabService::coverUrl(
+                    (int)$collab['id']
+                );
+        }
+        unset($collab);
         $followerCount = DB::row('select count(*) c from follows where designer_id=?', [$d['id']])['c'] ?? 0;
+
+        $salesCount = DB::row(
+            'select count(*) c
+             from order_items oi
+             join orders o on o.id=oi.order_id
+             where oi.designer_id=?
+               and o.payment_status in ("paid","partially_refunded")',
+            [(int)$d['id']]
+        )['c'] ?? 0;
+
         DB::exec('update designers set follower_count=? where id=?', [$followerCount, $d['id']]);
         $isFollowing = H::user() ? (bool)DB::row('select id from follows where user_id=? and designer_id=?', [H::user()['id'], $d['id']]) : false;
         $isOwner = H::user() ? (int)$d['user_id'] === (int)H::user()['id'] : false;
@@ -611,7 +701,7 @@ class PublicController
         if ($image) $schema['image'] = H::assetUrl($image);
         $socialLinks = $this->designerSocialLinks($d);
         $reviews = DB::rows('select sr.*,rr.reply_text,rr.created_at reply_created_at,rr.updated_at reply_updated_at,rr.moderation_status reply_moderation_status from seller_reviews sr left join seller_review_replies rr on rr.review_id=sr.id where sr.designer_id=? and sr.moderation_status="published" order by sr.reviewed_at desc',[$d['id']]);
-        H::view('public/store', ['reviews'=>$reviews,'d'=>$d,'socialLinks'=>$socialLinks,'products'=>$products,'customServices'=>$customServices,'followers'=>$followerCount,'isFollowing'=>$isFollowing,'isOwner'=>$isOwner,'productCount'=>count($products),'salesCount'=>$d['sales_count']??array_sum(array_column($products,'sales_count')),'meta'=>$this->pageMeta($title, $description, '/store/'.$d['store_slug'], $schema, ['og_image'=>$image,'twitter_image'=>$image])]);
+        H::view('public/store', ['reviews'=>$reviews,'d'=>$d,'socialLinks'=>$socialLinks,'products'=>$products,'customServices'=>$customServices,'collabs'=>$collabs,'followers'=>$followerCount,'isFollowing'=>$isFollowing,'isOwner'=>$isOwner,'productCount'=>count($products),'salesCount'=>$salesCount,'meta'=>$this->pageMeta($title, $description, '/store/'.$d['store_slug'], $schema, ['og_image'=>$image,'twitter_image'=>$image])]);
     }
 
 

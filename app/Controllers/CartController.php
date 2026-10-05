@@ -333,7 +333,6 @@ class CartController
                 if (CreditService::parseCents($total) === 0) {
                     $finalizer = new OrderFinalizationService();
                     $finalizer->finalize((int)$order, 'internal-credit-order:' . $order, true);
-                    DB::exec('delete from cart_items where user_id=?', [H::user()['id']]);
                     unset($_SESSION['coupon_code']);
                     DB::commit();
                     $finalizer->communicate((int)$order);
@@ -341,7 +340,6 @@ class CartController
                 }
                 $session = (new CheckoutOrderService)->checkout($createdOrder, $createdItems);
                 DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?', [$session['id'] ?? null, $order]);
-                DB::exec('delete from cart_items where user_id=?',[H::user()['id']]);
                 unset($_SESSION['coupon_code']);
                 DB::commit();
                 header('Location: ' . $session['url'], true, 303);

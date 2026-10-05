@@ -1010,7 +1010,8 @@ CREATE TABLE waitlist_entries (
 );
 CREATE TABLE email_campaigns (
  id BIGINT PRIMARY KEY AUTO_INCREMENT, campaign_type ENUM('promotional','launch_invite') NOT NULL,
- audience VARCHAR(80) NOT NULL, subject VARCHAR(190) NOT NULL, body TEXT NOT NULL, cta_label VARCHAR(80) NULL,
+ audience VARCHAR(80) NOT NULL, subject VARCHAR(190) NOT NULL, body TEXT NOT NULL,
+ body_format ENUM('plain','rich_html') NOT NULL DEFAULT 'plain', cta_label VARCHAR(80) NULL,
  cta_url VARCHAR(500) NULL, status ENUM('draft','queued','sending','sent','completed','partially_failed','failed','cancelled') NOT NULL DEFAULT 'draft',
  created_by BIGINT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, queued_at TIMESTAMP NULL,
  sent_at TIMESTAMP NULL, completed_at TIMESTAMP NULL, cancelled_at TIMESTAMP NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1142,6 +1143,7 @@ CREATE TABLE message_conversations (id BIGINT PRIMARY KEY AUTO_INCREMENT,buyer_u
 CREATE TABLE custom_design_services (
  id BIGINT PRIMARY KEY AUTO_INCREMENT, designer_id BIGINT NOT NULL, slug VARCHAR(220) NOT NULL,
  title VARCHAR(190) NOT NULL, description TEXT NOT NULL, price DECIMAL(10,2) NOT NULL,
+ turnaround_min_days SMALLINT UNSIGNED NOT NULL DEFAULT 1,
  turnaround_days SMALLINT UNSIGNED NOT NULL, included_revisions SMALLINT UNSIGNED NOT NULL DEFAULT 0,
  buyer_instructions TEXT NULL, is_active TINYINT(1) NOT NULL DEFAULT 1,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1178,6 +1180,7 @@ CREATE TABLE custom_orders (
  buyer_user_id BIGINT NOT NULL, designer_id BIGINT NOT NULL,
  status ENUM('new','in_progress','proof_review','revision_requested','completed','cancelled','refunded') NOT NULL DEFAULT 'new',
  service_snapshot JSON NOT NULL, brief_snapshot JSON NOT NULL, agreed_price DECIMAL(10,2) NOT NULL,
+ turnaround_min_days SMALLINT UNSIGNED NOT NULL DEFAULT 1,
  turnaround_days SMALLINT UNSIGNED NOT NULL, included_revisions SMALLINT UNSIGNED NOT NULL DEFAULT 0,
  revisions_used SMALLINT UNSIGNED NOT NULL DEFAULT 0, completed_at TIMESTAMP NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1430,4 +1433,134 @@ CREATE TABLE social_post_logs (
   CONSTRAINT social_post_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT,
   CONSTRAINT social_post_connection_fk FOREIGN KEY(connection_id) REFERENCES seller_social_connections(id) ON DELETE SET NULL,
   CONSTRAINT social_post_retry_fk FOREIGN KEY(retry_of_id) REFERENCES social_post_logs(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Phase 14: seller-hosted collaborative bundle events. Timestamps use the established marketplace database timezone.
+CREATE TABLE collab_events (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, host_designer_id BIGINT NOT NULL, title VARCHAR(190) NOT NULL,
+ slug VARCHAR(190) NOT NULL, description TEXT NOT NULL, price_cents INT UNSIGNED NOT NULL,
+ quantity_limit INT UNSIGNED NULL,
+ participation_type ENUM('open','closed') NOT NULL, minimum_file_count INT UNSIGNED NOT NULL,
+ require_mockup TINYINT(1) NOT NULL DEFAULT 0,
+ host_timezone VARCHAR(64) NOT NULL DEFAULT 'America/New_York',
+ upload_deadline DATETIME NOT NULL, sale_starts_at DATETIME NOT NULL, sale_close_date DATE NOT NULL,
+ invite_token_hash CHAR(64) NULL, invite_expires_at DATETIME NULL,
+ status ENUM('draft','collecting','processing','ready','ended','failed','ineligible') NOT NULL DEFAULT 'collecting',
+ ip_risk_state ENUM('clear','review_required','approved','rejected') NOT NULL DEFAULT 'clear',
+ ip_content_fingerprint CHAR(64) NULL, snapshot_at DATETIME NULL, eligible_count INT UNSIGNED NULL,
+ final_zip_path VARCHAR(500) NULL, final_zip_sha256 CHAR(64) NULL, zip_error VARCHAR(500) NULL,
+ zip_attempts INT UNSIGNED NOT NULL DEFAULT 0, ready_at DATETIME NULL, ended_at DATETIME NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY collab_events_slug_unique(slug), UNIQUE KEY collab_events_invite_unique(invite_token_hash),
+ KEY collab_events_deadline(upload_deadline,status), KEY collab_events_public(status,sale_starts_at,sale_close_date),
+ CONSTRAINT collab_events_host_fk FOREIGN KEY(host_designer_id) REFERENCES designers(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE collab_participants (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, collab_id BIGINT NOT NULL, designer_id BIGINT NOT NULL,
+ membership_status ENUM('host','invited','requested','accepted','denied','left','removed') NOT NULL,
+ eligibility ENUM('pending','eligible','excluded') NOT NULL DEFAULT 'pending', qualifying_file_count INT UNSIGNED NULL,
+ exclusion_reason VARCHAR(190) NULL, eligibility_snapshotted_at DATETIME NULL, invited_email VARCHAR(190) NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY collab_participant_unique(collab_id,designer_id), KEY collab_participant_eligibility(collab_id,eligibility),
+ CONSTRAINT collab_participant_event_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_participant_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE collab_invitations (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, collab_id BIGINT NOT NULL, email VARCHAR(190) NOT NULL, token_hash CHAR(64) NOT NULL,
+ invited_by_designer_id BIGINT NOT NULL, accepted_designer_id BIGINT NULL, expires_at DATETIME NOT NULL, accepted_at DATETIME NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY collab_invitation_token(token_hash),
+ UNIQUE KEY collab_invitation_email(collab_id,email),
+ CONSTRAINT collab_invitation_event_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_invitation_inviter_fk FOREIGN KEY(invited_by_designer_id) REFERENCES designers(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_invitation_acceptor_fk FOREIGN KEY(accepted_designer_id) REFERENCES designers(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE collab_files (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, collab_id BIGINT NOT NULL, participant_id BIGINT NOT NULL, designer_id BIGINT NOT NULL,
+ file_kind ENUM('contribution','terms','mockup') NOT NULL, category_id BIGINT NULL, original_name VARCHAR(255) NOT NULL, stored_name VARCHAR(190) NOT NULL,
+ storage_path VARCHAR(500) NOT NULL, mime_type VARCHAR(120) NOT NULL, byte_size BIGINT UNSIGNED NOT NULL, sha256 CHAR(64) NOT NULL,
+ included_in_snapshot TINYINT(1) NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY collab_file_stored(stored_name), KEY collab_file_owner(collab_id,designer_id,file_kind),
+ KEY collab_file_category_idx(category_id),
+ CONSTRAINT collab_file_category_fk FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_file_event_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_file_participant_fk FOREIGN KEY(participant_id) REFERENCES collab_participants(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_file_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE collab_file_update_requests (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ collab_id BIGINT NOT NULL,
+ collab_file_id BIGINT NOT NULL,
+ base_sha256 CHAR(64) NOT NULL,
+ designer_id BIGINT NOT NULL,
+ reason VARCHAR(1000) NULL,
+ original_name VARCHAR(255) NOT NULL,
+ stored_name VARCHAR(190) NOT NULL,
+ storage_path VARCHAR(500) NOT NULL,
+ mime_type VARCHAR(120) NOT NULL,
+ byte_size BIGINT UNSIGNED NOT NULL,
+ sha256 CHAR(64) NOT NULL,
+ candidate_fingerprint CHAR(64) NULL,
+ previous_ip_state VARCHAR(30) NULL,
+ previous_ip_fingerprint CHAR(64) NULL,
+ previous_storage_path VARCHAR(500) NULL,
+ status ENUM('pending','approved','ip_review','applied','denied','cancelled') NOT NULL DEFAULT 'pending',
+ reviewed_by_designer_id BIGINT NULL,
+ reviewed_at TIMESTAMP NULL,
+ applied_at TIMESTAMP NULL,
+ buyer_notified_at TIMESTAMP NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY collab_update_request_collab_status(collab_id,status),
+ KEY collab_update_request_file(collab_file_id),
+ KEY collab_update_request_designer(designer_id),
+ CONSTRAINT collab_update_request_collab_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_update_request_file_fk FOREIGN KEY(collab_file_id) REFERENCES collab_files(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_update_request_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_update_request_reviewer_fk FOREIGN KEY(reviewed_by_designer_id) REFERENCES designers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE collab_ip_risk_detections (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, collab_id BIGINT NOT NULL, risk_term_id BIGINT NOT NULL,
+ matched_term VARCHAR(190) NOT NULL, matched_alias VARCHAR(190) NULL, source_field VARCHAR(40) NOT NULL,
+ content_fingerprint CHAR(64) NOT NULL, is_active TINYINT(1) NOT NULL DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ KEY collab_ip_current(collab_id,is_active),
+ CONSTRAINT collab_ip_event_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_ip_term_fk FOREIGN KEY(risk_term_id) REFERENCES ip_risk_terms(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE collab_ip_risk_reviews (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, collab_id BIGINT NOT NULL, admin_user_id BIGINT NOT NULL,
+ decision ENUM('approved','rejected') NOT NULL, content_fingerprint CHAR(64) NOT NULL, notes VARCHAR(1000) NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT collab_review_event_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_review_admin_fk FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE order_items MODIFY product_id BIGINT NULL, ADD COLUMN collab_id BIGINT NULL AFTER custom_service_id,
+ ADD COLUMN collab_storefront_designer_id BIGINT NULL AFTER collab_id,
+ ADD KEY order_items_collab(collab_id), ADD CONSTRAINT order_items_collab_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ ADD CONSTRAINT order_items_collab_storefront_fk FOREIGN KEY(collab_storefront_designer_id) REFERENCES designers(id) ON DELETE SET NULL,
+ ADD CONSTRAINT order_items_purchase_identity_chk CHECK (
+  (product_id IS NOT NULL AND custom_service_id IS NULL AND collab_id IS NULL) OR
+  (product_id IS NULL AND custom_service_id IS NOT NULL AND collab_id IS NULL) OR
+  (product_id IS NULL AND custom_service_id IS NULL AND collab_id IS NOT NULL));
+ALTER TABLE downloads MODIFY product_id BIGINT NULL, MODIFY product_file_id BIGINT NULL,
+ ADD COLUMN collab_id BIGINT NULL AFTER product_file_id, ADD KEY downloads_collab(collab_id),
+ ADD CONSTRAINT downloads_collab_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ ADD CONSTRAINT downloads_identity_chk CHECK ((product_file_id IS NOT NULL AND collab_id IS NULL) OR (product_file_id IS NULL AND collab_id IS NOT NULL));
+ALTER TABLE seller_earnings MODIFY product_id BIGINT NULL, ADD COLUMN collab_id BIGINT NULL AFTER product_id,
+ ADD COLUMN order_item_id BIGINT NULL AFTER order_id, ADD KEY seller_earnings_collab(collab_id),
+ ADD CONSTRAINT seller_earnings_collab_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT;
+ALTER TABLE platform_commissions ADD COLUMN collab_id BIGINT NULL AFTER custom_service_id,
+ ADD KEY platform_commissions_collab(collab_id), ADD CONSTRAINT platform_commissions_collab_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT;
+CREATE TABLE collab_order_allocations (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, collab_id BIGINT NOT NULL, order_id BIGINT NOT NULL, order_item_id BIGINT NOT NULL,
+ designer_id BIGINT NOT NULL, qualifying_file_count INT UNSIGNED NOT NULL, eligible_count_snapshot INT UNSIGNED NOT NULL,
+ gross_basis_cents INT UNSIGNED NOT NULL, marketplace_fee_cents INT UNSIGNED NOT NULL, contributor_pool_cents INT UNSIGNED NOT NULL,
+ allocation_cents INT UNSIGNED NOT NULL, refunded_allocation_cents INT UNSIGNED NOT NULL DEFAULT 0,
+ storefront_designer_id BIGINT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY collab_allocation_once(order_item_id,designer_id), KEY collab_allocation_event(collab_id,order_id),
+ CONSTRAINT collab_allocation_event_fk FOREIGN KEY(collab_id) REFERENCES collab_events(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_allocation_order_fk FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_allocation_item_fk FOREIGN KEY(order_item_id) REFERENCES order_items(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_allocation_designer_fk FOREIGN KEY(designer_id) REFERENCES designers(id) ON DELETE RESTRICT,
+ CONSTRAINT collab_allocation_storefront_fk FOREIGN KEY(storefront_designer_id) REFERENCES designers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
