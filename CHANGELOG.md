@@ -394,3 +394,10 @@ Intentionally postponed:
 - Made material IP rescans fail closed, serialized ZIP builds and buyer/collab checkout attempts, and bound protected ZIP authorization and logging to the exact successfully delivered order item.
 - Live Phase 14 testing verified buyer checkout/downloads and seller collab reporting. Live fixes preserved carts when leaving Stripe before payment, clarified purchased-through storefront attribution, and added seller-facing collab gross-sales and Creative Moth fee totals/details.
 - During the Phase 14 live-fix cycle, seller-referral commission rules were updated separately: disabled referred stores pause commission, while 90 consecutive days without a qualifying completed, non-refunded sale or permanent deletion ends new commission permanently.
+# Phase 15 — Analytics, reporting, and admin insights
+
+- Added date-filtered admin marketplace reporting for stored financial ledgers, growth, rankings, coupons, promos, referrals, collaborative bundles, payment/webhook issues, and recorded marketplace-health indicators.
+- Added seller-isolated sales, product, returning-customer, coupon, promotion, referral, bundle, and upcoming collaborative-drop reporting.
+- Added permission-scoped CSV exports that reuse the same report calculations and date filters as each dashboard.
+- Added equivalent-prior-period comparisons and deterministic plain-English insights based only on recorded metrics.
+- Added future-facing order traffic attribution and privacy-conscious marketplace search-event tracking; historical orders remain Unknown / Unattributed and pre-migration search history is unavailable.
