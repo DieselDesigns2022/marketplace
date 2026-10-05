@@ -1,0 +1,56 @@
+<?php
+require dirname(__DIR__).'/app/bootstrap.php';
+use App\Services\AnalyticsService;
+use App\Services\TrafficAttributionService;
+use App\Services\SearchAnalyticsService;
+
+function phase15Check(bool $condition,string $message):void { if(!$condition)throw new RuntimeException($message); }
+$service=new AnalyticsService();
+$filters=$service->filters(['from'=>'2026-09-01','to'=>'2026-09-30']);
+phase15Check($filters===['from'=>'2026-09-01','to'=>'2026-09-30','comparison'=>'previous','previous_from'=>'2026-08-02','previous_to'=>'2026-08-31'],'explicit and equivalent prior report dates are stable');
+$year=$service->filters(['from'=>'2024-02-29','to'=>'2024-03-02','comparison'=>'year_over_year']);
+phase15Check($year['previous_from']==='2023-02-28'&&$year['previous_to']==='2023-03-02','year-over-year comparison safely clamps leap day');
+foreach([['from'=>'bad','to'=>'2026-09-01'],['from'=>'2026-10-01','to'=>'2026-09-01'],['from'=>'2024-01-01','to'=>'2026-09-01']] as $bad){try{$service->filters($bad);phase15Check(false,'invalid period rejected');}catch(DomainException){}}
+$comparisons=AnalyticsService::comparisons(['gross_sales'=>150,'orders'=>3],['gross_sales'=>100,'orders'=>0]);
+phase15Check($comparisons['gross_sales']['difference']===50.0&&$comparisons['gross_sales']['percent']===50.0,'date comparison calculates difference and percent');
+phase15Check($comparisons['orders']['percent']===null,'zero prior period does not manufacture a percentage');
+$csv=AnalyticsService::csv(['comparisons'=>$comparisons,'products'=>[['title'=>'=DANGEROUS','display_name'=>'Creator','units'=>2,'gross_sales'=>'12.34']],'customers'=>[['name'=>'+Buyer','order_count'=>2,'last_order_at'=>'2026-09-02']],'returning_customers'=>[['name'=>'@Repeat','order_count'=>2,'last_order_at'=>'2026-09-02']],'sales_by_weekday'=>[['weekday_name'=>'Friday','orders'=>2]],'traffic_sources'=>[['traffic_source'=>'Unknown / Unattributed','orders'=>1,'net_revenue'=>'12.34']],'searches'=>[['normalized_query'=>'-cmd','searches'=>3,'successful_searches'=>2,'zero_result_searches'=>1]],'search_trends'=>[['search_date'=>'2026-09-02','searches'=>3,'successful_searches'=>2,'zero_result_searches'=>1]]]);
+phase15Check(str_contains($csv,"'=DANGEROUS")&&str_contains($csv,"'+Buyer")&&str_contains($csv,"'@Repeat")&&str_contains($csv,"'-cmd"),'CSV formula-like text is neutralized');
+phase15Check(substr_count($csv,"\n")>=8,'CSV contains headings and report sections');
+phase15Check(str_contains($csv,'Unknown / Unattributed')&&str_contains($csv,'Zero-result searches'),'expanded CSV matches source and search reports');
+phase15Check(TrafficAttributionService::classify('facebook',null,'creativemoth.test')==='Facebook','explicit Facebook attribution groups truthfully');
+phase15Check(TrafficAttributionService::classify('instagram',null,'creativemoth.test')==='Instagram','Instagram attribution is recognized');
+phase15Check(TrafficAttributionService::classify('',null,'creativemoth.test')==='Direct','a landing without a referrer is direct');
+phase15Check(TrafficAttributionService::classify('newsletter',null,'creativemoth.test')==='Other / Unknown','unsupported explicit sources are not guessed');
+phase15Check(TrafficAttributionService::classify('',null,'creativemoth.test',true)==='Referral','an explicit referral link is attributable');
+phase15Check(TrafficAttributionService::classify('',null,'creativemoth.test',false)!=='Referral','an invalid or unvalidated ref parameter is not referral attribution');
+$insights=AnalyticsService::insights(['comparisons'=>['gross_sales'=>['previous'=>100,'current'=>125,'difference'=>25,'percent'=>25]],'financials'=>['orders'=>10,'gross_sales'=>125,'refunds'=>5],'customers'=>[['order_count'=>2]],'products'=>[['title'=>'Bundle','gross_sales'=>80]],'searches'=>[['normalized_query'=>'foil','zero_result_searches'=>2]],'sales_by_weekday'=>[['weekday_number'=>4,'orders'=>2],['weekday_number'=>5,'orders'=>2],['weekday_number'=>6,'orders'=>2],['weekday_number'=>1,'orders'=>4]]],true);
+phase15Check(str_contains(implode(' ',$insights),'increased by 25.0%')&&str_contains(implode(' ',$insights),'zero results 2')&&str_contains(implode(' ',$insights),'60.0% of qualifying sales'),'rule-based insights cite recorded comparison, search, and weekday values');
+$neutral=AnalyticsService::insights(['comparisons'=>[],'financials'=>['orders'=>0,'gross_sales'=>0,'refunds'=>0],'customers'=>[],'products'=>[],'searches'=>[]],false);
+phase15Check(count($neutral)===1&&str_contains($neutral[0],'not enough recorded activity')&&!str_contains(strtolower($neutral[0]),'conversion'),'insights stay neutral and never invent conversion metrics');
+$repo=file_get_contents(dirname(__DIR__).'/app/Repositories/AnalyticsRepository.php');
+$controller=file_get_contents(dirname(__DIR__).'/app/Controllers/AnalyticsController.php');
+$routes=file_get_contents(dirname(__DIR__).'/public/index.php');
+phase15Check(str_contains($repo,'sp.original_gross_amount')&&str_contains($repo,'sp.original_seller_payout_amount'),'financial reports use stored ledger snapshots');
+phase15Check(str_contains($repo,'greatest(0,coalesce(sp.original_gross_amount,sp.gross_amount)-sp.gross_amount)'),'refunds use the existing adjusted payout ledger');
+phase15Check(str_contains($repo,'where sp.order_id=o.id and sp.designer_id=?'),'returning customers are seller-isolated');
+phase15Check(str_contains($repo,'sp.designer_id=? and sp.gross_amount>0'),'fully refunded seller participation is excluded from qualifying customer orders');
+phase15Check(str_contains($repo,"sp.designer_id=?")&&str_contains($repo,"coalesce(nullif(o.traffic_source,''),'Unknown / Unattributed')"),'source revenue preserves unknown attribution and seller isolation');
+phase15Check(str_contains($repo,'order by order_count desc'),'returning customers rank by qualifying order count');
+phase15Check(str_contains($repo,'c.sale_starts_at>now()')&&str_contains($repo,'group by date(c.sale_starts_at)'),'scheduled drops use existing collab sale dates');
+phase15Check(str_contains($controller,"requireAdminPermission('dashboard.view')")&&substr_count($controller,'H::requireSeller()')===2,'screen and CSV permissions are enforced');
+phase15Check(str_contains($routes,"'/admin/analytics.csv'")&&str_contains($routes,"'/seller/analytics.csv'"),'CSV routes are registered');
+phase15Check(!str_contains(file_get_contents(dirname(__DIR__).'/app/Views/admin/analytics.php'),"H::e(\$row['processing_error'])"),'raw webhook errors are not rendered');
+$public=file_get_contents(dirname(__DIR__).'/app/Controllers/PublicController.php');
+phase15Check(str_contains($public,'SearchAnalyticsService::record')&&str_contains($public,"(\$state['page']??1)!==1"),'future search tracking records result counts once');
+phase15Check(SearchAnalyticsService::record('will fail',0,fn()=>throw new RuntimeException('test write failure'),fn()=>throw new RuntimeException('reporter failure'))===false,'search writes and failure reporters are both swallowed so public search is completely fail open');
+$migration=file_get_contents(dirname(__DIR__).'/database/migrations/2026_10_05_phase_15_analytics_foundation.sql');
+phase15Check(str_contains($migration,'traffic_source')&&str_contains($migration,'CREATE TABLE search_events'),'migration installs both future-only analytics foundations');
+$schema=file_get_contents(dirname(__DIR__).'/database/schema.sql');phase15Check(str_contains($migration,'orders_traffic_source_paid(traffic_source,paid_at)')&&str_contains($schema,'orders_traffic_source_paid(traffic_source,paid_at)'),'migration and canonical schema use the same traffic index');
+phase15Check(!preg_match('/search_events[\s\S]*?(user_id|session_id|ip_address)/i',$migration),'search tracking stores no unnecessary visitor identity');
+$checkout=file_get_contents(dirname(__DIR__).'/app/Services/CheckoutOrderService.php');
+phase15Check(str_contains($checkout,'TrafficAttributionService::snapshot()')&&str_contains($checkout,'traffic_attributed_at'),'future orders snapshot session attribution at creation');
+$traffic=file_get_contents(dirname(__DIR__).'/app/Services/TrafficAttributionService.php');phase15Check(str_contains($traffic,'ReferralService::validFormat')&&str_contains($traffic,'->referrer($code)'),'ref parameters require existing referral validation');
+$_SESSION['traffic_attribution']=['source'=>'Google','at'=>date('Y-m-d H:i:s')];TrafficAttributionService::capture(['ref'=>'RANDOMCODE'],null,'creativemoth.test',fn()=>false);phase15Check($_SESSION['traffic_attribution']['source']==='Google','an invalid ref parameter does not wipe existing attribution');
+TrafficAttributionService::capture(['ref'=>'VALIDCODE'],null,'creativemoth.test',fn()=>true);phase15Check($_SESSION['traffic_attribution']['source']==='Referral','a validated referral can replace existing attribution');
+echo "Phase 15 analytics reporting tests passed\n";
