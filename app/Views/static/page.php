@@ -519,6 +519,34 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
     <p>For details on license language, review <a href="/licensing-help">Licensing Help</a>.</p>
 </section>
 <section class="card page-section">
+    <h2>Seller referrals</h2>
+
+    <h3>How does the seller referral program work?</h3>
+    <p>Approved Creative Moth sellers can refer new sellers using their seller referral link. Once attached, the referred account keeps that original referrer and cannot switch to a different referrer later.</p>
+
+    <h3>When does the 1% referral commission start?</h3>
+    <p>If the referring seller is approved when the referred seller reaches their first qualifying completed, non-refunded sale, the referrer begins earning 1% of that referred seller's net seller earnings after Creative Moth's marketplace fee.</p>
+
+    <h3>Does the commission reduce the referred seller's payout?</h3>
+    <p>No. The referral commission is funded by Creative Moth and is not deducted from the referred seller's payout.</p>
+
+    <h3>What happens after 90 days without a qualifying sale?</h3>
+    <p>Each qualifying completed, non-refunded sale resets the 90-day activity period. If 90 consecutive days pass without another qualifying sale, the referral commission permanently ends and does not restart.</p>
+
+    <h3>What if the referred seller's store is disabled?</h3>
+    <p>Disabling a store temporarily pauses new referral commission. It does not automatically end the referral relationship. The 90-day inactivity period continues, and commission can resume if the store is restored before that period expires.</p>
+
+    <h3>What if the referred seller deletes their store or account?</h3>
+    <p>Permanent deletion permanently ends new referral commission. Commission already earned remains payable.</p>
+
+    <h3>What happens with refunds?</h3>
+    <p>Refunds and reversals reduce or reverse the related referral commission.</p>
+
+    <h3>How are referral commissions paid?</h3>
+    <p>Referral commissions are paid through the referring seller's connected Stripe payout account using Creative Moth's existing payout system.</p>
+</section>
+
+<section class="card page-section">
     <h2>Refunds, responsibilities, and support</h2>
     <h3>How are refunds and cancellations handled?</h3>
     <p>Digital purchases are generally final once files are accessed or made available, but Creative Moth may review issues such as duplicate purchases, missing files, inaccessible downloads, incorrect uploads, or listings that materially differ from what was promised. Refunds, disputes, chargebacks, or adjustments may affect seller earnings.</p>

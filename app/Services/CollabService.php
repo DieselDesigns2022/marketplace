@@ -34,9 +34,21 @@ final class CollabService
 
     public function canSell(array $collab, ?\DateTimeImmutable $now = null): bool
     {
-        $now ??= new \DateTimeImmutable('now');
-        $start = new \DateTimeImmutable($collab['sale_starts_at']);
-        $close = new \DateTimeImmutable($collab['sale_close_date'].' 23:59:59');
+        $utc = new \DateTimeZone('UTC');
+        $hostTimezoneName = trim((string)($collab['host_timezone'] ?? '')) ?: 'America/New_York';
+
+        try {
+            $hostTimezone = new \DateTimeZone($hostTimezoneName);
+        } catch (\Throwable) {
+            $hostTimezone = new \DateTimeZone('America/New_York');
+        }
+
+        $now ??= new \DateTimeImmutable('now', $utc);
+        $start = new \DateTimeImmutable((string)$collab['sale_starts_at'], $utc);
+        $close = new \DateTimeImmutable(
+            (string)$collab['sale_close_date'].' 23:59:59',
+            $hostTimezone
+        );
         $available = $collab['status'] === 'ready'
             && !empty($collab['snapshot_at'])
             && !empty($collab['final_zip_path'])
@@ -86,9 +98,44 @@ final class CollabService
                 $this->notifyHost($id, 'collab_zip_failed', 'Collab ZIP needs attention', 'The final bundle could not be built and will be retried.', 'zip-failed');
             }
         }
-        $ended = DB::rows('select id from collab_events where status="ready" and sale_close_date<current_date');
-        DB::exec('update collab_events set status="ended",ended_at=coalesce(ended_at,now()) where status="ready" and sale_close_date<current_date');
-        foreach ($ended as $row) $this->notifyHost((int)$row['id'], 'collab_ended', 'Collab ended', 'Your collab sale period has ended.', 'ended');
+        $ready = DB::rows(
+            'select id,sale_close_date,host_timezone from collab_events where status="ready"'
+        );
+
+        foreach ($ready as $row) {
+            $hostTimezoneName =
+                trim((string)($row['host_timezone'] ?? ''))
+                    ?: 'America/New_York';
+
+            try {
+                $hostTimezone = new \DateTimeZone($hostTimezoneName);
+            } catch (\Throwable) {
+                $hostTimezone = new \DateTimeZone('America/New_York');
+            }
+
+            $nowLocal = new \DateTimeImmutable('now', $hostTimezone);
+            $closeLocal = new \DateTimeImmutable(
+                (string)$row['sale_close_date'].' 23:59:59',
+                $hostTimezone
+            );
+
+            if ($nowLocal <= $closeLocal) {
+                continue;
+            }
+
+            DB::exec(
+                'update collab_events set status="ended",ended_at=coalesce(ended_at,now()) where id=? and status="ready"',
+                [(int)$row['id']]
+            );
+
+            $this->notifyHost(
+                (int)$row['id'],
+                'collab_ended',
+                'Collab ended',
+                'Your collab sale period has ended.',
+                'ended'
+            );
+        }
         return $results;
     }
 

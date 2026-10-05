@@ -40,6 +40,20 @@ final class OrderFinalizationService
             }
             DB::exec('update orders set status="paid",payment_status="paid",manual_review_required=0,credit_payment_status=case when credits_applied>0 then "finalized" else "none" end,internally_completed=?,payment_provider=?,payment_processor=?,payment_mode=?,finalization_key=?,finalized_at=now(),paid_at=coalesce(paid_at,now()) where id=?', [$internal ? 1 : 0, $internal ? 'store_credit' : 'stripe', $internal ? 'internal' : 'stripe', $internal ? 'credit' : 'checkout', $eventKey, $orderId]);
             DB::exec('update order_items set paid_at=coalesce(paid_at,now()),payout_ready_at=coalesce(payout_ready_at,now()),manual_delivery_status=case when fulfillment_type="google_drive" and manual_delivery_status in ("pending_delivery","buyer_email_needed") then "ready_for_seller_delivery" else manual_delivery_status end where order_id=?', [$orderId]);
+
+            // Cart remains intact while payment is pending. Once payment is
+            // successfully finalized, remove only products purchased in this order.
+            DB::exec(
+                'delete ci
+                   from cart_items ci
+                   join order_items oi
+                     on oi.product_id=ci.product_id
+                    and oi.order_id=?
+                  where ci.user_id=?
+                    and oi.product_id is not null',
+                [$orderId, (int)$order['user_id']]
+            );
+
             DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$orderId]);
             CouponService::recordUsage($orderId);
             $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $internal);

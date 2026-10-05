@@ -14,7 +14,7 @@ $check=function(bool $ok,string $message)use(&$failures){echo($ok?'PASS: ':'FAIL
 $paths=[];
 try {
     $pdo->beginTransaction();
-    foreach (['collab_events','collab_participants','collab_invitations','collab_files','collab_ip_risk_detections','collab_ip_risk_reviews','collab_order_allocations'] as $table) $check((bool)DB::row('show tables like ?',[$table]),'migrated table '.$table.' exists');
+    foreach (['collab_events','collab_participants','collab_invitations','collab_files','collab_ip_risk_detections','collab_ip_risk_reviews','collab_order_allocations'] as $table) $check((bool)DB::row('select table_name from information_schema.tables where table_schema=database() and table_name=?',[$table]),'migrated table '.$table.' exists');
     $token=bin2hex(random_bytes(5));
     foreach ([['Host','host','approved'],['Eligible','eligible','approved'],['Below minimum','below','approved'],['Missing terms','missing','approved'],['Pending','pending','pending']] as [$name,$suffix,$status]) {
         DB::exec('insert into users(name,email,password_hash,role,status) values(?,?,"x","designer","active")',[$name,'p14-'.$suffix.'-'.$token.'@test']);$user=(int)DB::id();

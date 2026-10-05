@@ -169,7 +169,11 @@ The disposable suite requires `proc_open`, permission to create/drop randomized 
 
 
 Codex could not connect to MariaDB or execute live Stripe test-mode requests during the Phase 11 audit. A `SKIP` from the fixture suite and unexecuted Stripe API verification are deployment blockers, not passes.
-# Monthly seller-referral commissions (Phase 11)
+# Seller-referral commissions (Phase 11)
+
+Run `php scripts/process_seller_referral_inactivity.php` daily. Production currently schedules this worker daily. It permanently ends an active 1% referral commission relationship after 90 consecutive days without a qualifying completed, non-refunded sale. A disabled store is paused and is not permanently ended merely because it is disabled.
+
+## Monthly referral commission payouts
 
 After applying `2026_08_01_phase_11_seller_referral_lifetime_commission.sql`, run the
 following once per month for the prior closed UTC month (the optional argument is
@@ -315,6 +319,6 @@ None of these live migration, merge, or verification steps are claimed complete 
 ## Phase 14 deadline worker
 Apply `database/migrations/2026_09_23_phase_14_collab_bundles.sql`, ensure PHP `zip` is installed, and create a writable non-public `storage/protected_uploads/collabs` directory. Run `php scripts/process_collab_deadlines.php` every minute from cron. The worker locks/snapshots each due event once, creates one content-addressed archive, records failures for admin retry, and idempotently ends expired events.
 Phase 14 uses the application and database timezone already configured by the deployment; it does not override global PHP or MariaDB timezone settings. The worker retries failed/processing ZIP builds against the immutable snapshot; temporary archives are removed, source hashes are verified, and ready status is written only after the final archive hash succeeds. A per-collab MariaDB advisory mutex serializes cron and Admin builds without blocking unrelated collabs, and is released on every success or failure path.
-Collab date/time values follow the marketplace's existing PHP/database timezone configuration. Phase 14 does not set a global timezone. Keep the PHP and MariaDB deployment timezones aligned so host-entered deadlines, worker comparisons, and the close-date 11:59:59 boundary use the same established marketplace clock.
+Phase 14 does not change the deployment's global PHP or MariaDB timezone. Each collab stores its own IANA `host_timezone`. File Upload Deadline and Sale Start are entered in the host time zone and converted to UTC for storage and worker comparisons. `sale_close_date` remains the host-local calendar date and the sale stays available through 11:59:59 PM in that host time zone; close-state processing must evaluate that boundary using the stored `host_timezone` rather than the server calendar date.
 The lifecycle is: join/upload period → File Upload Deadline → immutable participant/file eligibility snapshot → final protected ZIP → Sale Start/ready publication → sale through 11:59:59 PM on the Close Date → removal from every public storefront after close while seller/Admin/order history remains. A missing minimum or Terms/license excludes the participant and all their files. A valid deterministic archive left by a filesystem/DB split can be adopted only when its embedded snapshot manifest matches; zero eligible contributors produce terminal `ineligible`, not an endlessly retried ZIP failure.
 Deployment of the migration, scheduler, protected-directory permissions, live Stripe/Stripe Connect, and live email delivery remains to be verified in the production-equivalent workflow; the local guarded database skip is not evidence of production readiness.

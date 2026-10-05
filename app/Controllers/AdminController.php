@@ -191,7 +191,7 @@ class AdminController
                 if($action==='save_admin'){
                     $permissions->configureAdmin($userId,(array)($_POST['permissions']??[]),($_POST['full_access']??'')==='1',$actor);if($target['role']!=='admin')$this->log('promoted_admin','user',$userId,['previous_role'=>$target['role']]);H::flash('success','Admin access updated.');
                 }else{
-                    $status=($_POST['status']??'')==='active'?'active':'disabled';if($target['role']==='admin')$permissions->requireFullAccess($actor);if($permissions->isCanonicalOwner($userId)&&$status!=='active')throw new \DomainException('The canonical owner cannot be disabled.');DB::begin();$commissionStopped=$status==='disabled'&&(new SellerReferralCommissionService())->permanentlyStop($userId,'store_disabled');DB::exec('update users set status=? where id=?',[$status,$userId]);$this->log('changed_user_status','user',$userId,['status'=>$status]);DB::commit();if($commissionStopped)(new SellerReferralCommissionService())->notifyPermanentStop($userId);H::flash('success','Account status updated.');
+                    $status=($_POST['status']??'')==='active'?'active':'disabled';if($target['role']==='admin')$permissions->requireFullAccess($actor);if($permissions->isCanonicalOwner($userId)&&$status!=='active')throw new \DomainException('The canonical owner cannot be disabled.');DB::begin();DB::exec('update users set status=? where id=?',[$status,$userId]);$this->log('changed_user_status','user',$userId,['status'=>$status]);DB::commit();H::flash('success','Account status updated.');
                 }
             } catch(Throwable $error){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$error instanceof \DomainException?$error->getMessage():'Account access was not changed.');}
         }
@@ -297,7 +297,30 @@ class AdminController
         }
         if($id)
         {
-           H::view('admin/application_detail',['app'=>$this->applicationById($id)??H::abort(404)]);
+            $app = $this->applicationById($id) ?? H::abort(404);
+
+            $referral = DB::row(
+                'select
+                    r.status referral_status,
+                    r.referral_type,
+                    r.seller_status,
+                    r.seller_intent,
+                    u.name referrer_name,
+                    u.email referrer_email,
+                    d.display_name referrer_store_name,
+                    d.store_slug referrer_store_slug
+                 from referrals r
+                 join users u on u.id=r.referrer_user_id
+                 left join designers d on d.user_id=r.referrer_user_id
+                 where r.referred_user_id=?
+                 limit 1',
+                [(int)$app['user_id']]
+            );
+
+            H::view('admin/application_detail',[
+                'app'=>$app,
+                'referral'=>$referral,
+            ]);
             return;
 
         }
@@ -327,19 +350,26 @@ class AdminController
             } elseif (in_array($action, ['disable', 'inactive', 'delete'], true)) {
                 $owner = DB::row('select user_id from designers where id=?', [$id]);
                 $status = ['disable' => 'disabled', 'inactive' => 'inactive', 'delete' => 'deleted'][$action];
-                $reason = ['disable' => 'store_disabled', 'inactive' => 'store_inactive', 'delete' => 'store_deleted'][$action];
+                $reason = ['disable' => null, 'inactive' => 'store_inactive', 'delete' => 'store_deleted'][$action];
                 DB::begin();
                 try {
                     if (!$owner) {
                         throw new \DomainException('Seller was not found.');
                     }
-                    $commissionStopped = (new SellerReferralCommissionService())->permanentlyStop((int)$owner['user_id'], $reason);
+                    $commissionStopped = $reason !== null
+                        ? (new SellerReferralCommissionService())->permanentlyStop((int)$owner['user_id'], $reason)
+                        : false;
                     DB::exec('update designers set status=?, updated_at=now() where id=?', [$status, $id]);
                     DB::commit();
                     if ($commissionStopped) {
                         (new SellerReferralCommissionService())->notifyPermanentStop((int)$owner['user_id']);
                     }
-                    H::flash('success', 'Seller status updated. Referral commission cannot restart.');
+                    H::flash(
+                        'success',
+                        $action === 'disable'
+                            ? 'Seller status updated. Referral commission is paused while the store is disabled.'
+                            : 'Seller status updated. Referral commission cannot restart.'
+                    );
                 } catch (Throwable $error) {
                     DB::rollBack();
                     H::flash('error', 'Seller status was not changed.');

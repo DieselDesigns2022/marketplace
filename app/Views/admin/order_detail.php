@@ -48,7 +48,30 @@
            <?=H::money($i['seller_payout_amount'] ?? $i['seller_earning'] ?? ($i['total_price']-($i['total_price']*$i['commission_rate'])))?>
            </td>
            <td><?=H::e(str_replace('_', ' ', $i['ledger_payout_status'] ?? $i['seller_payout_status'] ?? 'pending_payment'))?><?php if(!empty($i['ledger_transfer_error']) || !empty($i['stripe_transfer_error'])):?><br><span class="badge no">transfer failed</span><br><span class="muted"><?=H::e($i['ledger_transfer_error'] ?? $i['stripe_transfer_error'])?></span><?php endif;?><br><span class="muted">Stripe: <?=H::e($i['stripe_account_status'] ?? 'not_connected')?> / <?=(!empty($i['stripe_details_submitted']) && !empty($i['stripe_payouts_enabled'])) ? 'payout-ready' : 'not payout-ready / onboarding incomplete'?></span><?php if(($i['ledger_payout_status'] ?? '') === 'platform_credit_hold' && !empty($i['seller_payout_id'])):?><?php if(H::canAdmin('payouts.manage')):?><form method="post" action="/admin/platform-credit-payouts/<?=(int)$i['seller_payout_id']?>/settle"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button type="submit">Transfer from platform balance</button></form><?php endif;?><?php elseif(!empty($i['platform_credit_settled_at'])):?><br><span class="muted">Settled <?=H::e($i['platform_credit_settled_at'])?></span><?php endif;?></td>
-           <td><?=H::e($i['fulfillment_type'] ?? 'downloadable')?><?php if(($i['fulfillment_type'] ?? '')==='google_drive'):?><br>Email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?><br>Status: <?=H::e(str_replace('_',' ', $i['manual_delivery_status']))?><?php endif;?></td>
+           <td>
+<?php if(($i['fulfillment_type'] ?? 'downloadable') === 'downloadable'): ?>
+
+    <?php if(in_array(($order['payment_status'] ?? ''), ['paid','partially_refunded'], true)): ?>
+        Downloadable
+        <br><span class="badge ok">ACCESS ACTIVE</span>
+    <?php else: ?>
+        <span class="badge no">
+            LOCKED — PAYMENT <?=H::e(strtoupper(str_replace('_',' ', $order['payment_status'] ?? 'NOT PAID')))?>
+        </span>
+    <?php endif; ?>
+
+<?php elseif(($i['fulfillment_type'] ?? '') === 'google_drive'): ?>
+
+    Google Drive / Manual Delivery
+    <br>Email: <?=H::e($i['buyer_google_drive_email'] ?: 'Needed')?>
+    <br>Status: <?=H::e(str_replace('_',' ', $i['manual_delivery_status']))?>
+
+<?php else: ?>
+
+    <?=H::e($i['fulfillment_type'] ?? 'Unknown')?>
+
+<?php endif; ?>
+</td>
            <td><?php if(($i['fulfillment_type'] ?? '')==='google_drive'):?><?php if(H::canAdmin('orders.manage')):?><form method="post"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="override_fulfillment"><input type="hidden" name="order_item_id" value="<?=$i['id']?>"><select name="manual_delivery_status"><?php foreach(['pending_delivery','buyer_email_needed','ready_for_seller_delivery','delivered','cancelled_refunded'] as $st):?><option value="<?=$st?>" <?=$i['manual_delivery_status']===$st?'selected':''?>><?=H::e(str_replace('_',' ',$st))?></option><?php endforeach;?></select><input name="delivery_notes" value="<?=H::e($i['delivery_notes'] ?? '')?>"><button>Update</button></form><?php endif;?><?php endif;?></td>
         </tr>
     <?php endforeach;?>

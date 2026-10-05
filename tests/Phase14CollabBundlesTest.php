@@ -32,10 +32,10 @@ foreach ([[1000,120,5],[777,100,3],[1,1,4],[0,0,2]] as [$gross,$fee,$count]) {
 }
 phase14Check(CollabService::safeArchiveName('../../evil.php',4)==='000004-evil.php','path traversal removed');
 phase14Check(CollabService::safeArchiveName('same.zip',4)!==CollabService::safeArchiveName('same.zip',5),'collisions prevented');
-$collab=['status'=>'ready','snapshot_at'=>'2026-09-01','final_zip_path'=>'collabs/final/a.zip','ip_risk_state'=>'clear','sale_starts_at'=>'2026-09-02 00:00:00','sale_close_date'=>'2026-09-03'];
+$collab=['status'=>'ready','snapshot_at'=>'2026-09-01','final_zip_path'=>'collabs/final/a.zip','ip_risk_state'=>'clear','sale_starts_at'=>'2026-09-02 00:00:00','sale_close_date'=>'2026-09-03','host_timezone'=>'America/New_York'];
 $service=new CollabService();
-phase14Check($service->canSell($collab,new DateTimeImmutable('2026-09-03 23:59:59')),'close date inclusive');
-phase14Check(!$service->canSell($collab,new DateTimeImmutable('2026-09-04 00:00:00')),'close date expires immediately');
+phase14Check($service->canSell($collab,new DateTimeImmutable('2026-09-04 03:59:59 UTC')),'close date remains inclusive through 11:59:59 PM host time');
+phase14Check(!$service->canSell($collab,new DateTimeImmutable('2026-09-04 04:00:00 UTC')),'close date expires immediately after host-local midnight');
 $collab['final_zip_path']=null;
 phase14Check(!$service->canSell($collab,new DateTimeImmutable('2026-09-03')),'zip gates sale');
 try { CollabService::validateDates('2026-09-03 00:00:00','2026-09-02 00:00:00','2026-09-04'); phase14Check(false,'invalid sequence rejected'); } catch (DomainException) {}
@@ -87,8 +87,14 @@ phase14Check(str_contains($adminControllerSource,'oi.collab_id is null')&&str_co
 phase14Check(str_contains($adminControllerSource,'pc.collab_id=oi.collab_id'),'Admin item reporting identifies the shared collab platform commission explicitly');
 phase14Check(str_contains($adminControllerSource,'sp.order_id=oi.order_id')&&str_contains($adminControllerSource,'sp.designer_id=oi.designer_id'),'ordinary Product/Custom Design payout joins remain available');
 if(class_exists(ZipArchive::class)) {
-    $path=tempnam(sys_get_temp_dir(),'p14zip');$zip=new ZipArchive();$zip->open($path,ZipArchive::CREATE|ZipArchive::OVERWRITE);$zip->addFromString('_creative-moth-snapshot.json','manifest');$zip->close();
+    $path=tempnam(sys_get_temp_dir(),'p14zip');
+    $zip=new ZipArchive();
+    $zip->open($path,ZipArchive::CREATE|ZipArchive::OVERWRITE);
+    $zip->addFromString('test.txt','test');
+    $zip->setArchiveComment('creative-moth-snapshot-sha256:'.hash('sha256','manifest'));
+    $zip->close();
     phase14Check($service->archiveMatchesSnapshot($path,'manifest'),'deterministic existing archive can be adopted');
-    phase14Check(!$service->archiveMatchesSnapshot($path,'other'),'mismatched archive is rejected');unlink($path);
+    phase14Check(!$service->archiveMatchesSnapshot($path,'other'),'mismatched archive is rejected');
+    unlink($path);
 }
 echo "Phase 14 collab bundle tests passed\n";

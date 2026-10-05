@@ -26,6 +26,7 @@ use App\Controllers\PublicCollabController;
 use App\Controllers\AdminCollabController;
  $router = new Router();
  $router->get('/', [PublicController::class, 'home']);
+ $router->get('/tester-home', [PublicController::class, 'home']);
  $router->get('/browse', [PublicController::class, 'browse']);
  $router->get('/sell', [PublicController::class, 'sell']);
  $router->get('/promo-library', [PromoLibraryController::class, 'index']);
