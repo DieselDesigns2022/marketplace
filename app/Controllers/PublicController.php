@@ -584,11 +584,18 @@ class PublicController
         return [$where, $params];
     }
 
+    private function recordSearch(array $state,array $result):void
+    {
+        if (($state['page']??1)!==1) return;
+        \App\Services\SearchAnalyticsService::record((string)($state['filters']['q']??''),(int)($result['total']??0));
+    }
+
     public function browse(): void
     {
         $this->redirectLegacyBrowseCategory();
         $state = $this->browseState();
         $result = $this->browseQuery($state['filters'], $state['terms'], $state['sort'], $state['page']);
+        $this->recordSearch($state,$result);
         $cats = $this->visibleCategories();
         $creators = DB::rows('select id,display_name,store_slug from designers where status="approved" order by display_name limit 100');
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
@@ -603,6 +610,7 @@ class PublicController
         $cat = DB::row('select * from categories where slug=? and is_active=1', [$slug]) ?? H::abort(404);
         $state = $this->browseState($slug);
         $result = $this->browseQuery($state['filters'], $state['terms'], $state['sort'], $state['page']);
+        $this->recordSearch($state,$result);
         $cats = $this->visibleCategories();
         $creators = DB::rows('select id,display_name,store_slug from designers where status="approved" order by display_name limit 100');
         $fileTypes = DB::rows('select distinct p.file_types from products p join designers d on d.id=p.designer_id where p.status="approved" and d.status="approved" and p.file_types is not null and p.file_types<>"" order by p.file_types limit 100');
