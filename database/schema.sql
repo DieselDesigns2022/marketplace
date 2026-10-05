@@ -507,6 +507,8 @@ CREATE TABLE orders
     status ENUM('pending','paid','completed','failed','refunded') DEFAULT 'pending',
     payment_processor VARCHAR(40) DEFAULT 'mock',
     payment_mode VARCHAR(40),
+    traffic_source VARCHAR(40) NULL,
+    traffic_attributed_at TIMESTAMP NULL,
     subtotal DECIMAL(10,2),
     tax_amount DECIMAL(10,2) DEFAULT 0.00,
     tax_provider VARCHAR(60) DEFAULT 'stripe_tax',
@@ -534,8 +536,19 @@ CREATE TABLE orders
     manual_review_reason TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY orders_finalization_key_unique(finalization_key)
+    UNIQUE KEY orders_finalization_key_unique(finalization_key),
+    KEY orders_traffic_source(traffic_source)
 );
+
+-- Phase 15 search analytics intentionally omit user, session, IP, and referrer identifiers.
+CREATE TABLE search_events (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    normalized_query VARCHAR(190) NOT NULL,
+    result_count INT UNSIGNED NOT NULL,
+    searched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY search_events_period(searched_at),
+    KEY search_events_query_period(normalized_query,searched_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- order_items retain selected license snapshots; license_price is 0.00 for included/free permissions and stores selected paid add-on prices where applicable.
 CREATE TABLE order_items
