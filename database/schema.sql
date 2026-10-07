@@ -61,6 +61,7 @@ CREATE TABLE designer_applications
 
 CREATE TABLE designers
 (
+    timezone VARCHAR(64) NULL,
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT UNIQUE NOT NULL,
     display_name VARCHAR(120),
@@ -143,9 +144,15 @@ CREATE TABLE products
     digital_resale_prohibited BOOLEAN DEFAULT 1,
     ai_disclosure ENUM('No AI Used','AI Assisted','AI Generated') NOT NULL,
     is_hand_drawn BOOLEAN NOT NULL DEFAULT 0,
+    extra_protection_watermark BOOLEAN NOT NULL DEFAULT 0,
     seo_title VARCHAR(70),
     seo_description VARCHAR(170),
-    status ENUM('draft','pending_review','approved','published','rejected','disabled','archived','deleted') DEFAULT 'draft',
+    scheduled_publish_at DATETIME NULL COMMENT 'UTC publication instant',
+    publication_timezone VARCHAR(64) NULL,
+    schedule_checked_at DATETIME NULL COMMENT 'UTC last eligibility check',
+    schedule_error VARCHAR(1000) NULL,
+    KEY products_schedule_due_idx(status,scheduled_publish_at,id),
+    status ENUM('draft','pending_review','scheduled','approved','published','rejected','disabled','archived','deleted') DEFAULT 'draft',
     rejection_reason TEXT,
     is_featured BOOLEAN DEFAULT 0,
     sales_count INT DEFAULT 0,

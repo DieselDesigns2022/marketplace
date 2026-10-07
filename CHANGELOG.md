@@ -1,5 +1,12 @@
 # Changelog
 
+## Phase 15.2 — Etsy Import Fix and Scheduled Listings
+
+- Fixed Etsy listing exports without IDs/SKUs, common header variations, numbered image URLs and RFC CSV quoting; retained manual mapping and conservative re-import protection.
+- Repaired the missing existing product preview-protection column in fresh/older schemas that prevented final editor saves; import creation failures now log diagnostic context and provide a seller correction path.
+- Added seller timezone preference, UTC ordinary-product schedules, private Scheduled status, reschedule/cancel/immediate controls and eligibility checks in a bounded cron worker. Normal and IP moderation preserve schedules.
+- Added realistic Etsy fixtures, real HTTP upload/review/editor and public-route tests, timezone/DST tests and MariaDB migration/publication checks; repaired stale import regression fixtures and source assertions.
+
 ## Phase 13.6 — Social Publishing for Products and Custom Designs
 - Added encrypted Facebook Page, Instagram professional-account, and Pinterest connections with seller-controlled manual posting for eligible Products and active Custom Designs, plus Product publication and Custom Design activation automatic posting.
 - Added durable mixed-listing history and retry with `listing_title` snapshots, exactly-one Product/Custom Design identity, retained deletion-safe numeric references, and type-specific retry eligibility.

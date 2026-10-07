@@ -179,8 +179,32 @@ $handDrawnChecked = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
     <?php endif; ?>
 </section>
 <?php endif; ?>
-<button name="action" value="draft">Save Draft</button>
-<button class="btn" name="action" value="review">Publish Product</button>
+<?php
+$scheduleZone=$_POST['publication_timezone']??$p['publication_timezone']??$d['timezone']??'';
+$scheduleLocal=$_POST['scheduled_local']??'';
+if($scheduleLocal===''&&!empty($p['scheduled_publish_at'])&&$scheduleZone){
+    $scheduleLocal=(new \DateTimeImmutable($p['scheduled_publish_at'],new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone($scheduleZone))->format('Y-m-d\TH:i');
+}
+$publishMode=$_POST['publish_mode']??(!empty($p['scheduled_publish_at'])?'scheduled':'immediate');
+?>
+<h2>Publication</h2>
+<?php if(!empty($p['schedule_error'])):?><div class="notice warning">Publication needs attention: <?=H::e($p['schedule_error'])?></div><?php endif;?>
+<label>Publication option<select name="publish_mode">
+<option value="immediate" <?=$publishMode==='immediate'?'selected':''?>>Publish immediately</option>
+<option value="scheduled" <?=$publishMode==='scheduled'?'selected':''?>>Schedule publication</option>
+<?php if(!empty($p['scheduled_publish_at'])):?><option value="cancel" <?=$publishMode==='cancel'?'selected':''?>>Cancel schedule and keep as draft</option><?php endif;?>
+</select></label>
+<label>Your publication timezone<select name="publication_timezone" id="publication-timezone">
+<option value="">Choose your timezone</option>
+<?php foreach(\DateTimeZone::listIdentifiers() as $zone):?><option value="<?=H::e($zone)?>" <?=$scheduleZone===$zone?'selected':''?>><?=H::e($zone)?></option><?php endforeach;?>
+</select></label>
+<label>Publication date/time in the selected timezone<input type="datetime-local" name="scheduled_local" value="<?=H::e($scheduleLocal)?>"></label>
+<p class="help-text">The timezone above is saved as your preference. Choose a future date/time to schedule. Saving a draft does not submit a new listing. Publication requires all product and IP reviews to be complete.</p>
+<script>
+(() => { const select=document.getElementById('publication-timezone'); if(!select.value){const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;if([...select.options].some(o=>o.value===zone))select.value=zone;} })();
+</script>
+<button name="action" value="draft">Save Product / Draft</button>
+<button class="btn" name="action" value="review">Publish / Schedule Product</button>
 </form>
 
 <?php require __DIR__.'/../partials/license_help_modal.php'; ?>

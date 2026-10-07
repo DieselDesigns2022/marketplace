@@ -1,5 +1,13 @@
 # Creative Moth
 
+## Phase 15.2 — Etsy imports and ordinary product schedules
+
+Etsy listing CSVs support ordinary uppercase headers, listing-header variations, optional SKUs, numbered image columns, quoted commas and multiline descriptions. Manual mapping remains available. Listing IDs, URLs or SKUs identify re-imports when present; otherwise an exact-title fingerprint provides conservative duplicate protection, with a warning about renamed listings. Ambiguous repeated titles without stable identity are rejected for correction. SKU and source materials remain import metadata because Creative Moth has no ordinary product SKU/material fields. Only available HTTP(S) image URLs are queued; the existing remote-image security checks still apply. Imports create drafts requiring explicit AI, license and fulfillment review and seller-provided protected files for downloadable products.
+
+Ordinary product editors offer immediate publication, a future schedule, rescheduling and cancellation to a draft. Sellers explicitly choose the displayed IANA timezone; the browser suggests its timezone when no preference exists. The selected timezone becomes the seller preference. Publication instants use UTC, and invalid, past, nonexistent or ambiguous daylight-saving times are rejected. Pending review remains pending; approved scheduled listings remain private until the worker rechecks eligibility. Seller product lists and dashboard distinguish Scheduled from Published.
+
+Apply `database/migrations/2026_10_07_phase_15_2_product_schedules.sql` before deploying this code and run `php scripts/publish_scheduled_products.php` every minute. Scheduled listings become public on a successful worker run at or after their due time. Missing files, incomplete import review, seller eligibility or new IP risks block publication and show a correction message. Collaboration-event scheduling is unchanged. See `docs/DEPLOYMENT.md` and `docs/TESTING.md`.
+
 ## Project Overview
 
 Creative Moth is a custom PHP marketplace application for selling digital design products such as SVG cut files, fonts, and Canva templates. The current implementation includes public browsing, buyer accounts, designer applications, seller storefronts, product management, cart checkout, orders, protected downloads, and admin moderation.

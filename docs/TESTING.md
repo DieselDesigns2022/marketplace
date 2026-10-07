@@ -1,5 +1,13 @@
 # Testing
 
+## Phase 15.2 — Etsy imports and ordinary publication schedules
+
+Run `php tests/Phase152EtsyImportTest.php` for realistic Etsy fixtures, optional columns, aliases, quoted/multiline text, SKU/tags/prices, manual mapping, duplicate ambiguity, invalid image URLs, malformed/wrong exports, timezone conversion and past/nonexistent/ambiguous-date rejection.
+
+Run `RUN_DISPOSABLE_DB_TESTS=1 php tests/Phase152DatabaseIntegrationTest.php` against a disposable MariaDB server with CREATE/DROP DATABASE privileges and PHP cURL/GD. It creates and drops its own fixture database, tests the migration against the previous schema, starts a loopback PHP server and sends real multipart CSV and product-file/image uploads through controller workflows. Checks cover preview/confirmation/processing/summary, duplicate re-imports, manual mapping, final import review, seller timezone preference, private home/browse/search/category/storefront/sitemap/direct product routes, rescheduling/cancellation/immediate publication, exact due-time publication, idempotency, missing-file/IP/review restrictions and normal/IP admin moderation. Uploaded fixtures are cleaned up. The HTTP probe is test-only, outside the public directory, and requires the disposable-test flag and fixture database name.
+
+Relevant regressions: `Phase124CsvProductImportTest.php`, `Phase124RemoteImageImportTest.php`, guarded `Phase124DatabaseIntegrationTest.php`, `Phase122BulkProductBatchTest.php`, `Phase106DashboardUsabilityTest.php`, `Phase121DigitalProductLicenseTest.php`, `Phase136SocialPublishingTest.php`, `Phase14CollabBundlesTest.php` and `Phase15AnalyticsReportingTest.php`. The Phase 12.4 fixture now includes current authentication/editor prerequisites and the Phase 15.2 migration. These checks are automated/local evidence, not live provider or production verification.
+
 ## Phase 15 analytics and reporting
 
 Run `php tests/Phase15AnalyticsReportingTest.php` for date validation, equivalent-prior and year-over-year comparisons (including leap-day handling), zero-baseline percentages, seller isolation/refund qualification, traffic-source classification and validated referral behavior, completely fail-open search tracking, search privacy/schema assertions, weekday insights, CSV escaping/formula neutralization, permissions/routes, and migration/schema consistency.

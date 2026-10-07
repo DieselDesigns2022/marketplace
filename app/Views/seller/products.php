@@ -2,7 +2,7 @@
 <p><a class="btn" href="/seller/product/new">Create Product</a> <a class="btn" href="/seller/product-batches">Bulk Upload / Create Multiple Products</a> <a class="btn" href="/seller/products/import">Import Products</a></p>
 <p class="muted">Archive hides a product from public browsing while preserving order history. Permanent delete is only available for draft/test products with no completed orders.</p>
 <nav class="tabs">
-    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label): ?>
+    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','scheduled'=>'Scheduled','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label): ?>
     <a class="<?=($status??'all')===$key?'active':''?>" href="/seller/products<?=$key==='all'?'':'?status='.$key?>"><?=H::e($label)?></a>
 <?php endforeach; ?>
 </nav>
@@ -47,7 +47,7 @@
                <td><input class="bulk-product-pick" type="checkbox" name="product_ids[]" value="<?=(int)$p['id']?>" form="bulk-product-form" aria-label="Select <?=H::e($p['title'])?>"></td>
                <td><?php if($p['thumbnail']):?><img class="thumb" src="<?=H::e($p['thumbnail'])?>" alt="<?=H::e($p['title'])?> thumbnail"><?php else:?><span class="thumb">No image</span><?php endif;?></td>
                <td><?=H::e($p['title'])?><?php if($p['rejection_reason']):?><br><small>Rejected: <?=H::e($p['rejection_reason'])?></small><?php endif;?><?php if((int)($p['completed_order_count'] ?? 0)>0):?><br><small class="muted">Cannot be permanently deleted because completed orders reference it.</small><?php endif;?></td>
-               <td><span class="badge"><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></span></td>
+               <td><span class="badge"><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></span><?php if(!empty($p['scheduled_publish_at'])):?><br><small><?=H::e((new \DateTimeImmutable($p['scheduled_publish_at'],new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone($p['publication_timezone']?:'UTC'))->format('Y-m-d H:i T'))?></small><?php endif;?><?php if(!empty($p['schedule_error'])):?><br><small class="notice warning"><?=H::e($p['schedule_error'])?></small><?php endif;?></td>
                <td><?= (int)($p['completed_order_count'] ?? 0) ?></td>
                <td><?=$p['price']===null?'Needs review':H::money($p['price'])?></td>
                <td><?=H::e($p['category_name']??'Uncategorized')?></td>
@@ -63,7 +63,7 @@
                    <?php if(in_array($p['status'], ['archived','deleted'], true)):?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/restore" onsubmit="return confirm('Restore this product as a draft? It must be reviewed before publishing again.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Restore as Draft</button></form>
                    <?php endif;?>
-                   <?php if(!in_array($p['status'], ['approved','published','archived','deleted'], true)):?><form method="post" action="/seller/product/<?=$p['id']?>/submit"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Submit For Review</button></form><?php endif;?>
+                   <?php if(!in_array($p['status'], ['approved','scheduled','published','archived','deleted'], true)):?><form method="post" action="/seller/product/<?=$p['id']?>/submit"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Submit For Review</button></form><?php endif;?>
                    <?php if($safeDelete):?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/delete" onsubmit="return confirm('Permanently delete this product? This cannot be undone.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Permanent Delete</button></form>
                    <?php else:?><small class="muted">Permanent delete unavailable; archive instead.</small><?php endif;?>

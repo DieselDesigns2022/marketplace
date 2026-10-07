@@ -17,7 +17,7 @@ foreach($cases as $source=>[$csv,$count]){$path="$tmp/$source.csv";file_put_cont
 $shop=$service->parse("$tmp/shopify.csv",'shopify')['records'][0];
 $check(count($shop['images'])===2&&str_contains($shop['description'],"Line two"),'CSV supports quoted commas, multiline cells, CRLF, variants, and images');
 $square=$service->parse("$tmp/square.csv",'square')['records'][0];
-$check(!str_contains($square['description'],'<script>')&&in_array('Variants have different prices; review and enter the Asset Moth price.',$square['warnings'],true),'HTML is converted to text and conflicting variants require review');
+$check(!str_contains($square['description'],'<script>')&&in_array('Variants have different prices; review and enter the Creative Moth price.',$square['warnings'],true),'HTML is converted to text and conflicting variants require review');
 $manual="$tmp/manual.csv";file_put_contents($manual,"My Key,My Name,Cost\na,Manual,2.00\n");$needs=$service->parse($manual,'payhip');$mapped=$service->parse($manual,'payhip',['source_id'=>'My Key','title'=>'My Name','price'=>'Cost']);
 $check($needs['needs_mapping']&&!$mapped['needs_mapping'],'Payhip and changed headers use manual column mapping');
 $override=$service->parse($manual,'payhip',['source_id'=>'my key','title'=>'my name','price'=>'']);$check(!$override['needs_mapping']&&$override['records'][0]['price']===null,'optional mapping override can choose Do not import without duplicate mappings');

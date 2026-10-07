@@ -1,5 +1,17 @@
 # Deployment
 
+## Phase 15.2 — scheduled ordinary products
+
+Apply `database/migrations/2026_10_07_phase_15_2_product_schedules.sql` once after existing migrations and before deploying the matching code. Back up first. This migration also safely repairs a missing existing product `extra_protection_watermark` field; it does not replace the existing Custom Design preview-protection migration.
+
+Install a minute cron under the application account (adjust PHP/repository/log paths to the deployment):
+
+```cron
+* * * * * cd /var/www/marketplace.dieseldesigns.co && /usr/bin/php scripts/publish_scheduled_products.php >> storage/logs/scheduled-products.log 2>&1
+```
+
+Create the log directory with application-account write access if needed. A run checks at most 100 due products, locks each publication transition and rotates blocked listings using last eligibility-check ordering. Missing requirements keep listings private and expose correction messages in seller screens. Monitor worker exit status/logs. Publication occurs on the next successful run at or after the UTC instant, so cron downtime or a backlog can delay release without exposing it early. Continue the existing collaboration-event cron unchanged. Deploying the code alone does not configure cron.
+
 ## Phase 12.7 marketplace fees
 Apply `database/migrations/2026_09_15_phase_12_7_marketplace_fee_model.sql` before deploying Phase 12.7 code, then set `PLATFORM_COMMISSION_PERCENT=9` and `PLATFORM_COMMISSION_FIXED_CENTS=30`. Do not enable a Stripe application fee or Stripe Platform Pricing fee; that would double-charge the marketplace fee. The migration labels existing orders as legacy and does not update historical financial values.
 

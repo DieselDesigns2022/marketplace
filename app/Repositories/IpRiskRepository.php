@@ -222,7 +222,7 @@ class IpRiskRepository
 
         try {
             DB::begin();
-            $product = DB::row('select id,status,rejection_reason from products where id=? for update', [$productId]);
+            $product = DB::row('select * from products where id=? for update', [$productId]);
             if (!$product) {
                 throw new \InvalidArgumentException('Product not found.');
             }
@@ -254,11 +254,11 @@ class IpRiskRepository
             if ($requestedAction === 'approve') {
                 // IP approval preserves normal product status.
             } elseif ($requestedAction === 'published_flagged') {
-                if (in_array($previousProductStatus, ['approved', 'published'], true)) {
+                if (in_array($previousProductStatus, ['approved', 'scheduled', 'published'], true)) {
                     // Preserve current published status.
                 } elseif ($previousProductStatus === 'pending_review') {
-                    $productStatusUpdate = 'approved';
-                    $newProductStatus = 'approved';
+                    $productStatusUpdate = \App\Services\ProductScheduleService::approvedStatus($product);
+                    $newProductStatus = $productStatusUpdate;
                 } else {
                     throw new \InvalidArgumentException('Only published products or pending products being approved can be left published while flagged.');
                 }
@@ -312,11 +312,11 @@ class IpRiskRepository
     private function validateProductStatusForIpAction(string $action, string $productStatus): void
     {
         $allowed = [
-            'pending' => ['draft', 'pending_review', 'approved', 'published'],
-            'approve' => ['draft', 'pending_review', 'approved', 'published'],
-            'published_flagged' => ['pending_review', 'approved', 'published'],
-            'reject' => ['draft', 'pending_review', 'approved', 'published'],
-            'archive' => ['draft', 'pending_review', 'approved', 'published', 'rejected', 'disabled'],
+            'pending' => ['draft', 'pending_review', 'scheduled', 'approved', 'published'],
+            'approve' => ['draft', 'pending_review', 'scheduled', 'approved', 'published'],
+            'published_flagged' => ['pending_review', 'scheduled', 'approved', 'published'],
+            'reject' => ['draft', 'pending_review', 'scheduled', 'approved', 'published'],
+            'archive' => ['draft', 'pending_review', 'scheduled', 'approved', 'published', 'rejected', 'disabled'],
         ];
         if (!in_array($productStatus, $allowed[$action] ?? [], true)) {
             throw new \InvalidArgumentException('This product status cannot use the requested IP review action. Use the normal product recovery workflow first if needed.');
