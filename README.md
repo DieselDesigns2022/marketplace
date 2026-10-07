@@ -7,7 +7,7 @@ Creative Moth is a custom PHP marketplace application for selling digital design
 ## Current Project Status
 
 - Development Status: active documentation and marketplace feature development.
-- Current repository implementation: Phase 13.5 — Public Promotional Graphics Library, building on the Phase 13.2 Seller Ratings + Reviews and Phase 13.1 unified-account foundation. Environment-dependent Phase 13.5 live verification remains documented in `docs/TESTING.md`.
+- Current repository implementation: Phase 15 — Analytics, Reporting & Admin Insights, building on the Phase 14 collaborative-bundle system. Environment-dependent database and browser verification remains documented in `docs/TESTING.md`.
 - Default Branch: `main`.
 - Source of Truth: GitHub.
 - Current build/test URL: `https://marketplace.dieseldesigns.co`.
@@ -36,6 +36,7 @@ These features represent current implemented functionality in the codebase; phas
 - Phase 13.2 provides download-gated verified-buyer reviews with required 1–5 star ratings, optional written feedback, buyer editing, seller replies and reporting, permissioned Admin moderation, and public seller rating/review displays.
 - Phase 13.5 provides the public Creative Moth Promo Graphics library at `/promo-library`, grouped automatically by platform and detected image size. Permissioned Admins can bulk-upload graphics, add per-image categories, accessibility descriptions, and suggested captions on a review screen, control public visibility, edit existing records, and archive graphics. Public users can download graphics, click a caption box to copy the full suggested caption, and use Pinterest, Facebook, or Instagram sharing actions.
 - Phase 13.6 provides seller-controlled Facebook, Instagram, and Pinterest publishing for eligible Products and active Custom Designs, including manual posting, one-time publication/activation posting, durable mixed-listing history, and explicit retry of eligible failed attempts.
+- Phase 15 provides permission-scoped admin and seller analytics at `/admin/analytics` and `/seller/analytics`, equivalent-prior-period and year-over-year comparisons, deterministic rule-based insights, CSV exports, future order-source attribution, and privacy-conscious future search-event reporting. Historical orders without attribution remain Unknown / Unattributed, and search history begins only after the Phase 15 migration.
 - Phase 12.3 provides independent Weekly Emails, Monthly Emails, and Favorite/Followed-Shop Emails preferences managed at `/account`; signed category-specific unsubscribe links; weekly and monthly queue producers; and marketplace-generated favorite-shop updates. Durable per-user/product claims apply favorite-shop → weekly → monthly precedence for overlapping periods. Admin visibility is aggregate-only, sellers receive no subscriber email addresses, and transactional email remains independent. Producers use the existing durable queue; `MAIL_TRANSPORT=log` remains available locally and `MAIL_TRANSPORT=resend` enables production delivery.
 
 ### Planned / Future Phase
@@ -45,7 +46,7 @@ These features represent current implemented functionality in the codebase; phas
 - Advanced search, filtering, and recommendations.
 - Advanced SEO iteration after launch data is available.
 - Phase 10.5 implements the durable email queue, log transport, escaped templates, consent controls, promotional campaign foundation, waitlist workflows, and in-app notification center. Resend production-provider authentication and request delivery are implemented; live production verification, sender verification, bounce/suppression handling, and advanced production email operations still require testing or future work as applicable.
-- More complete ad campaign management and analytics.
+- More complete ad campaign management and attribution beyond the recorded Phase 15 source buckets; organic product/store views and view-to-purchase conversion are not currently recorded.
 
 
 ### Phase 7 launch polish

@@ -51,7 +51,11 @@ Stores buyer cart entries by user, product, normalized selected license keys, qu
 
 ### `orders`
 
-Stores buyer order and payment snapshots. Phase 11 adds reserved/redeemed credit, Stripe-paid amount, normalized billing address, Stripe Tax Calculation/Transaction identifiers and states, internal-completion marker, and finalization key. Captured Stripe payments remain non-deliverable in `captured_pending_finalization` or `manual_review` until atomic finalization succeeds.
+Stores buyer order and payment snapshots. Phase 11 adds reserved/redeemed credit, Stripe-paid amount, normalized billing address, Stripe Tax Calculation/Transaction identifiers and states, internal-completion marker, and finalization key. Phase 15 adds nullable `traffic_source` and `traffic_attributed_at` snapshots for orders created after attribution tracking; older orders remain unattributed. Captured Stripe payments remain non-deliverable in `captured_pending_finalization` or `manual_review` until atomic finalization succeeds.
+
+### `search_events`
+
+Stores Phase 15 marketplace-search analytics from the first results page only: a lowercased/whitespace-normalized query (maximum 190 characters), result count, and search timestamp. It deliberately stores no user, session, IP-address, or referrer identifier. There is no pre-Phase-15 search history and no search-to-click or search-to-order relationship. Search-event persistence is secondary and fail-open.
 
 ### `order_items`
 
@@ -137,6 +141,8 @@ Stores admin actions with entity type/id and JSON metadata.
 Product images are public preview assets. Product files are protected downloadable assets and should be served only through authorized download routes.
 
 ## Orders, earnings, and commissions
+
+Phase 15 migration `database/migrations/2026_10_05_phase_15_analytics_foundation.sql` adds the nullable order attribution snapshot, the `orders_traffic_source_paid(traffic_source, paid_at)` reporting index, and `search_events` period/query indexes. The canonical definitions are also present in `database/schema.sql`. No historical attribution or search events are backfilled.
 
 Phase 12.7 marks new orders with `marketplace_fee_model=percentage_plus_fixed`. Order items store allocated percentage and fixed portions alongside total commission and seller payout. `seller_payouts` is the seller/order authority and snapshots seller gross, model, rate, configured fixed cents, percentage fee, fixed fee, total fee, original/current entitlement, reserved/applied recovery, exact net transfer, completed economic value, and a leased execution state. Existing rows default to `legacy_percentage`; their already-stored gross and payout are copied into new baseline columns without repricing or changing historical financial values. `marketplace_refund_observations` stores each Stripe event, cumulative total, new delta, merchandise/tax split, and resumable `needs_allocation`/`allocated`/`reconciled` state; `marketplace_refund_allocations` identifies the observation and refunded items. Ambiguous refunds require an exact admin allocation and never silently prorate sellers. Recovery adjustments are incremental audit tranches, so waived obligations remain waived while later refund growth opens only a new delta. `seller_recovery_applications` distinguishes reserved from applied deductions; transfer retries reuse the durable amount/key plan and stale execution leases can be reclaimed.
 
