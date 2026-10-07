@@ -74,6 +74,10 @@ try {
     $later=(new DateTimeImmutable($future,new DateTimeZone('America/Detroit')))->modify('+1 day')->format('Y-m-d\TH:i');
     $request('edit',array_replace($post,['scheduled_local'=>$later,'action'=>'draft']),['id'=>$id]);$p=DB::row('select * from products where id=?',[$id]);
     $check($p['status']==='scheduled'&&$p['scheduled_publish_at']===ProductScheduleService::toUtc($later,'America/Detroit'),'seller can reschedule an approved private listing');
+    $request('edit',array_replace($post,['publish_mode'=>'immediate','action'=>'draft']),['id'=>$id]);$p=DB::row('select * from products where id=?',[$id]);
+    [$code]=$request('product',[],['slug'=>$p['slug']]);
+    $check($p['status']==='draft'&&$p['scheduled_publish_at']===null&&$code===404,'scheduled listing saved as draft with immediate selected clears its schedule and stays private');
+    $request('edit',$post,['id'=>$id]);
     $request('edit',array_replace($post,['publish_mode'=>'cancel','action'=>'draft']),['id'=>$id]);$p=DB::row('select * from products where id=?',[$id]);
     $check($p['status']==='draft'&&$p['scheduled_publish_at']===null,'cancelling scheduling keeps the listing as a private draft');
     $request('edit',$post,['id'=>$id]);

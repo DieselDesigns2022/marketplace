@@ -2033,6 +2033,8 @@ class SellerController
 
                 $previousStatus = $p['status'] ?? null;
                 $status = $this->productStatusForSave($p, $values);
+                // Removing a private schedule on a draft save is not a publication request.
+                if($previousStatus==='scheduled'&&$publishMode==='immediate'&&($_POST['action']??'draft')!=='review')$status='draft';
                 if($publishMode==='cancel'&&!empty($p['scheduled_publish_at'])&&in_array($p['status'],['draft','pending_review','scheduled'],true))$status='draft';
                 $values['slug'] = $p ? (string)$p['slug'] : $this->uniqueProductSlug($values['title']);
                 $fileTypes = implode(',', $values['file_types']);
