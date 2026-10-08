@@ -32,12 +32,12 @@ $check(
 );
 
 $check(
-    substr_count($controller,'new ProductSubmissionService()')===2,
+    substr_count($controller,'(new ProductSubmissionService())->submit(')===2,
     'SOURCE: single and batch paths call the same submission service'
 );
 
 $check(
-    str_contains($submission,"'pending_review' : 'approved'"),
+    str_contains($submission,"'pending_review' : ProductScheduleService::approvedStatus(\$product)"),
     'SOURCE: shared submission service retains normal clean/IP-review status choice'
 );
 

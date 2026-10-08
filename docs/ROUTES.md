@@ -1,5 +1,11 @@
 # Routes
 
+## Phase 15.2 — ordinary product scheduling
+
+Existing `GET|POST /seller/product/new` and `/seller/product/{id}` handle `publish_mode` (`immediate`, `scheduled`, `cancel`), `publication_timezone` (IANA identifier) and `scheduled_local` (`YYYY-MM-DDTHH:MM`). The editor saves timezone preference and a UTC instant; publication still requires submission and review. Cancellation keeps an unpublished scheduled request as a draft. Existing product-list and dashboard routes display Scheduled; public product URLs and all listing queries exclude it. There is no public scheduling endpoint. The CLI worker is `scripts/publish_scheduled_products.php`.
+
+Etsy uses the existing import upload, mapping, preview, confirmation, processing and summary routes. Ordinary exports without stable identity receive a conservative title-fingerprint warning; invalid/ambiguous records remain unselected until corrected in the source CSV.
+
 ## Phase 12.4 seller CSV import
 - `GET|POST /seller/products/import` — choose a source, upload a UTF-8 product CSV, and optionally review automatic mapping.
 - `POST /seller/products/import/map` — apply fallback column mapping.

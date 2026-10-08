@@ -11,6 +11,24 @@ class ProductSubmissionService
     {
         $product=DB::row('select * from products where id=? and designer_id=?',[$productId,$designerId]);
         if(!$product)return ['ok'=>false,'status'=>'draft','error'=>'Product was not found.'];
+        $errors=$this->validationErrors($product);
+        if($errors)return ['ok'=>false,'status'=>'draft','error'=>implode(' ',$errors)];
+        $workflow = new ProductIpRiskWorkflow();
+        $risk = $workflow->scanProduct($productId, $sellerUserId);
+        if ($risk['requires_confirmation'] && !$confirmRights) {
+            return ['ok'=>false, 'status'=>'draft', 'error'=>'Open this product and confirm your legal right to sell before submission.'];
+        }
+        if ($risk['requires_confirmation']) {
+            $workflow->recordConfirmationForScan($productId, $sellerUserId, (int)$risk['scan_id']);
+        }
+        $requiresIpReview = !empty($risk['matches']) && !in_array($risk['state']['review_status'] ?? '', ['approved','published_flagged'], true);
+        $status = $requiresIpReview ? 'pending_review' : ProductScheduleService::approvedStatus($product);
+        DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$status,$productId,$designerId]);
+        return ['ok'=>true, 'status'=>$status, 'previous_status'=>$product['status'], 'auto_post_required'=>ProductPublicationTransitionService::shouldDispatch($product['status'],$status), 'error'=>null];
+    }
+    public function validationErrors(array $product): array
+    {
+        $productId=(int)$product['id'];
         $errors=[];
         if(trim((string)$product['title'])===''||mb_strlen((string)$product['title'])>190)$errors[]='Enter a valid product title.';
         if(trim((string)$product['description'])==='')$errors[]='Full Description is required.';
@@ -22,18 +40,6 @@ class ProductSubmissionService
         if(($product['fulfillment_type']??'downloadable')==='google_drive'&&mb_strlen(trim((string)($product['manual_delivery_instructions']??'')))<5)$errors[]='Manual delivery instructions are required.';
         $reviewErrors=(new ProductImportReviewService())->errors($productId);
         $errors=array_values(array_unique(array_merge($errors,$reviewErrors)));
-        if($errors)return ['ok'=>false,'status'=>'draft','error'=>implode(' ',$errors)];
-        $workflow = new ProductIpRiskWorkflow();
-        $risk = $workflow->scanProduct($productId, $sellerUserId);
-        if ($risk['requires_confirmation'] && !$confirmRights) {
-            return ['ok'=>false, 'status'=>'draft', 'error'=>'Open this product and confirm your legal right to sell before submission.'];
-        }
-        if ($risk['requires_confirmation']) {
-            $workflow->recordConfirmationForScan($productId, $sellerUserId, (int)$risk['scan_id']);
-        }
-        $requiresIpReview = !empty($risk['matches']) && !in_array($risk['state']['review_status'] ?? '', ['approved','published_flagged'], true);
-        $status = $requiresIpReview ? 'pending_review' : 'approved';
-        DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$status,$productId,$designerId]);
-        return ['ok'=>true, 'status'=>$status, 'previous_status'=>$product['status'], 'auto_post_required'=>ProductPublicationTransitionService::shouldDispatch($product['status'],$status), 'error'=>null];
+        return $errors;
     }
 }

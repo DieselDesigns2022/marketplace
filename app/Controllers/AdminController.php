@@ -468,7 +468,8 @@ class AdminController
             return false;
 
         }
-        $before=DB::row('select status,rejection_reason from products where id=?',[$id]);
+        $before=DB::row('select * from products where id=?',[$id]);
+        if($status==='approved')$status=\App\Services\ProductScheduleService::approvedStatus($before??[]);
         DB::exec('update products set status=?, rejection_reason=?, updated_at=now() where id=?',[$status,$status==='rejected'?$reason:null,$id]);
         $transitionId=$this->log($status.'_product','product',$id,['status'=>$status]);
         $meaningfulTransition=($before['status']??null)!==$status||($status==='rejected'&&($before['rejection_reason']??'')!==$reason);

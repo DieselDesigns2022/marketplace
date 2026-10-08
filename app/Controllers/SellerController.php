@@ -239,7 +239,7 @@ class SellerController
 
     private function readiness(array $d): array
     {
-        $products = (int)(DB::row('select count(*) c from products where designer_id=? and status in ("draft","pending_review","approved")', [$d['id']])['c'] ?? 0);
+        $products = (int)(DB::row('select count(*) c from products where designer_id=? and status in ("draft","pending_review","scheduled","approved")', [$d['id']])['c'] ?? 0);
         return [
             'profile' => trim((string)($d['display_name'] ?? '')) !== '' && trim((string)($d['bio'] ?? '')) !== '',
             'stripe' => !empty($d['stripe_connect_account_id']) && !empty($d['stripe_details_submitted']) && !empty($d['stripe_payouts_enabled']),
@@ -280,6 +280,7 @@ class SellerController
         $productId = $p['id'] ?? 0;
         H::view('seller/edit_product', [
             'p' => $p,
+            'd' => $d,
             'errors' => $errors,
             'cats' => $this->productCategoryRows(),
             'images' => $productId ? DB::rows('select * from product_images where product_id=? order by sort_order,id', [$productId]) : [],
@@ -445,7 +446,7 @@ class SellerController
             return;
         }
         $id=(int)$d['id']; $userId=(int)H::user()['id'];
-        $stats=DB::row('select count(*) total_products,sum(status="draft") draft_products,sum(status="pending_review") pending_products,sum(status in ("approved","published")) published_products,sum(status="rejected") rejected_products,sum(status="archived") archived_products from products where designer_id=? and status<>"deleted"',[$id]);
+        $stats=DB::row('select count(*) total_products,sum(status="draft") draft_products,sum(status="pending_review") pending_products,sum(status="scheduled") scheduled_products,sum(status in ("approved","published")) published_products,sum(status="rejected") rejected_products,sum(status="archived") archived_products from products where designer_id=? and status<>"deleted"',[$id]);
         $stats=array_merge($stats??[],DB::row('select count(distinct se.order_id) sales_count,coalesce(sum(se.gross_sale),0) gross_sales,coalesce(sum(se.seller_earning),0) seller_earnings from seller_earnings se join orders o on o.id=se.order_id where se.designer_id=? and o.payment_status in ("paid","partially_refunded","refunded") and o.paid_at is not null',[$id])??[],DB::row('select sum(review_status in ("pending_review","published_flagged")) flagged_products from product_ip_risk_states s join products p on p.id=s.product_id where p.designer_id=?',[$id])??[]);
         $refunds=$this->refundSummary($id);$stats['gross_sales']=max(0,(float)$stats['gross_sales']-$refunds['gross_refund_cents']/100);$stats['seller_earnings']=max(0,(float)$stats['seller_earnings']-$refunds['seller_refund_cents']/100);$stats['refund_adjustments']=$refunds['seller_refund_cents']/100;
         $stats['pending_payouts']=0.0;$stats['transferred_payouts']=0.0;$stats['legacy_transfer_amounts_unavailable']=0;$stats['payout_issues']=0;
@@ -1044,7 +1045,7 @@ class SellerController
             return $existing['status'];
 
         }
-        if ($existing['status'] === 'approved')
+        if (in_array($existing['status'], ['approved','scheduled'], true))
         {
             if ($this->productReviewContentChanged($existing, $values))
            {
@@ -1064,6 +1065,7 @@ class SellerController
     }
     private function flashMessageForProductStatus(string $status): string
     {
+        if($status==='scheduled')return 'Product scheduled for publication.';
         if ($status === 'pending_review')
         {
             return 'Product submitted for review.';
@@ -1088,7 +1090,7 @@ class SellerController
         H::requireSeller();
         $d = $this->d();
         $status = $_GET['status'] ?? 'all';
-        $allowed = ['draft', 'pending_review', 'approved', 'published', 'rejected', 'disabled', 'archived'];
+        $allowed = ['draft', 'pending_review', 'scheduled', 'approved', 'published', 'rejected', 'disabled', 'archived'];
         $params = [$d['id']];
         $where = 'where p.designer_id=? and p.status<>"deleted"';
         if (in_array($status, $allowed, true))
@@ -1243,7 +1245,7 @@ class SellerController
             DB::exec('insert into product_batch_items (batch_id,product_id,sort_order,validation_errors) values (?,?,(select count(*)+1 from product_import_items where import_run_id=? and product_id is not null),null)',[$run['batch_id'],$productId,$run['id']]);
             foreach(array_values((array)$record['images']) as $sort=>$url)DB::exec('insert into product_import_images (import_item_id,source_url,sort_order,status) values (?,?,?,"queued")',[$item['id'],$url,$sort]);
             DB::exec('update product_import_items set product_id=?,result_status=? where id=? and import_run_id=? and result_status="processing"',[$productId,empty($record['images'])?'imported':'processing',$item['id'],$run['id']]);DB::commit();return true;
-        }catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();$driverCode=$e instanceof \PDOException?(int)($e->errorInfo[1]??0):0;if($e instanceof \PDOException&&($e->getCode()==='40001'||in_array($driverCode,[1205,1213],true)))return true;if(isset($item))DB::exec('update product_import_items set result_status="failed",error_message=? where id=? and import_run_id=? and result_status="queued"',['This product could not be created safely.',$item['id'],$run['id']]);return true;}
+        }catch(Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();$driverCode=$e instanceof \PDOException?(int)($e->errorInfo[1]??0):0;if($e instanceof \PDOException&&($e->getCode()==='40001'||in_array($driverCode,[1205,1213],true)))return true;error_log('CSV draft creation failed: '.$e->getMessage());if(isset($item))DB::exec('update product_import_items set result_status="failed",error_message=? where id=? and import_run_id=? and result_status="queued"',['This draft could not be created. Ask support to check the CSV import migrations and server error log, then retry the upload.',$item['id'],$run['id']]);return true;}
     }
 
     /** Lease and process at most one remote image. Other requests cannot share an active lease. */
@@ -1980,15 +1982,25 @@ class SellerController
             if(in_array('price',$openImportKeys,true)&&$values['price']==='')$values['price']=null;
             if(in_array('ai',$openImportKeys,true)&&$values['ai_disclosure']==='')$values['ai_disclosure']=null;
             $errors = $this->validateProduct($values, $p ? (int) $p['id'] : null);
+            $scheduleAt=$p['scheduled_publish_at']??null;
+            $scheduleZone=$p['publication_timezone']??$d['timezone']??null;
+            $publishMode=$_POST['publish_mode']??($scheduleAt?'scheduled':'immediate');
+            try {
+                if(!in_array($publishMode,['immediate','scheduled','cancel'],true))throw new \DomainException('Choose a valid publication option.');
+                if($publishMode==='scheduled'){
+                    $scheduleZone=trim((string)($_POST['publication_timezone']??$scheduleZone??''));
+                    $scheduleAt=\App\Services\ProductScheduleService::toUtc((string)($_POST['scheduled_local']??''),$scheduleZone);
+                } else { $scheduleAt=null; }
+            } catch (\DomainException $e) { $errors[]=$e->getMessage(); }
             if(in_array('price',$openImportKeys,true)&&$values['price']===null)$errors=array_values(array_diff($errors,['Base Price must be a valid amount.']));
             if(in_array('ai',$openImportKeys,true)&&$values['ai_disclosure']===null)$errors=array_values(array_diff($errors,['AI Disclosure is required.']));
             [$postedLicenses, $licenseErrors] = LicenseService::normalizePosted($values, $_POST);
             $errors = array_merge($errors, $licenseErrors);
             $this->uploadedPreviewFilesValid($errors);
-            if (!$errors && $p && in_array($p['status'], ['pending_review','approved','published'], true)) {
+            if (!$errors && $p && in_array($p['status'], ['pending_review','scheduled','approved','published'], true)) {
                 $preRisk = $this->submittedIpRiskPreview((int)$p['id'], $values);
                 $wantsReview = ($_POST['action'] ?? 'draft') === 'review';
-                $publicationSensitive = $wantsReview || in_array($p['status'], ['approved','published'], true);
+                $publicationSensitive = $wantsReview || in_array($p['status'], ['approved','scheduled','published'], true);
                 if ($publicationSensitive && $preRisk['requires_confirmation'] && empty($_POST['ip_rights_confirmation'])) {
                     $errors[] = 'Please confirm your legal right to sell this design before submitting or saving risk-bearing changes.';
                     $this->renderProductForm($p, $errors, $d, $preRisk);
@@ -2021,10 +2033,13 @@ class SellerController
 
                 $previousStatus = $p['status'] ?? null;
                 $status = $this->productStatusForSave($p, $values);
+                // Removing a private schedule on a draft save is not a publication request.
+                if($previousStatus==='scheduled'&&$publishMode==='immediate'&&($_POST['action']??'draft')!=='review')$status='draft';
+                if($publishMode==='cancel'&&!empty($p['scheduled_publish_at'])&&in_array($p['status'],['draft','pending_review','scheduled'],true))$status='draft';
                 $values['slug'] = $p ? (string)$p['slug'] : $this->uniqueProductSlug($values['title']);
                 $fileTypes = implode(',', $values['file_types']);
                 $ipWorkflow = new ProductIpRiskWorkflow();
-                $publicationSensitive = $status === 'pending_review' || ($p && in_array($p['status'], ['approved','published'], true));
+                $publicationSensitive = $status === 'pending_review' || ($p && in_array($p['status'], ['approved','scheduled','published'], true));
                 $protectionChanged =
                     $p &&
                     (int)($p['extra_protection_watermark'] ?? 0)
@@ -2037,6 +2052,8 @@ class SellerController
                     try {
                         DB::begin();
                         DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,is_hand_drawn=?,extra_protection_watermark=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['is_hand_drawn'], $values['extra_protection_watermark'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
+                        DB::exec('update products set scheduled_publish_at=?,publication_timezone=?,schedule_error=null,schedule_checked_at=null where id=?',[$scheduleAt,$scheduleZone,$productId]);
+                        if($scheduleZone)DB::exec('update designers set timezone=? where id=?',[$scheduleZone,$d['id']]);
                         $this->syncTags($productId, $values['tags']);
                         LicenseService::syncProductLicenses($productId, $postedLicenses);
                         (new ProductImportReviewService())->clearAfterExplicitSave($productId,$this->explicitImportReviewKeys($values));
@@ -2055,10 +2072,17 @@ class SellerController
                             $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
                         }
                         $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
+                        if(($scheduleAt||$previousStatus==='scheduled')&&$requiresIpReview&&in_array($status,['approved','scheduled'],true)){$status='pending_review';DB::exec('update products set status=? where id=?',[$status,$productId]);}
                         if ($status === 'pending_review' && !$requiresIpReview) {
-                            $status = 'approved';
-                            DB::exec('update products set status="approved",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']]);
+                            $status = $scheduleAt?'scheduled':'approved';
+                            DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$status,$productId, $d['id']]);
                         }
+                        if($status==='approved'&&$scheduleAt){$status='scheduled';DB::exec('update products set status=? where id=?',[$status,$productId]);}
+                        if(($scheduleAt||$previousStatus==='scheduled')&&in_array($status,['approved','scheduled'],true)){
+                            $scheduleErrors=(new ProductSubmissionService())->validationErrors(DB::row('select * from products where id=?',[$productId]));
+                            if($scheduleErrors){$status='draft';DB::exec('update products set status="draft",schedule_error=? where id=?',[mb_substr(implode(' ',$scheduleErrors),0,1000),$productId]);}
+                        }
+
                         DB::commit();
                     } catch (Throwable $e) {
                         if (DB::pdo()->inTransaction()) {
@@ -2082,6 +2106,8 @@ class SellerController
                     try {
                         DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,is_hand_drawn,extra_protection_watermark,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['is_hand_drawn'], $values['extra_protection_watermark'], $values['seo_title'], $values['seo_description'], $status, ] );
                         $productId = (int)DB::id();
+                        DB::exec('update products set scheduled_publish_at=?,publication_timezone=?,schedule_error=null,schedule_checked_at=null where id=?',[$scheduleAt,$scheduleZone,$productId]);
+                        if($scheduleZone)DB::exec('update designers set timezone=? where id=?',[$scheduleZone,$d['id']]);
                         $this->syncTags($productId, $values['tags']);
                         LicenseService::syncProductLicenses($productId, $postedLicenses);
                         $createdPreviewIds = $this->savePreviewImages($productId, $errors);
@@ -2110,9 +2136,14 @@ class SellerController
                             $ipWorkflow->recordConfirmationForScan($productId, (int)H::user()['id'], (int)$ipRiskResult['scan_id']);
                         }
                         $requiresIpReview = !empty($ipRiskResult['matches']) && !in_array($ipRiskResult['state']['review_status'] ?? '', ['approved','published_flagged'], true);
+                        if(($scheduleAt||$previousStatus==='scheduled')&&$requiresIpReview&&in_array($status,['approved','scheduled'],true)){$status='pending_review';DB::exec('update products set status=? where id=?',[$status,$productId]);}
                         if ($status === 'pending_review' && !$requiresIpReview) {
-                            $status = 'approved';
-                            DB::exec('update products set status="approved",rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$productId, $d['id']]);
+                            $status = $scheduleAt?'scheduled':'approved';
+                            DB::exec('update products set status=?,rejection_reason=null,updated_at=now() where id=? and designer_id=?', [$status,$productId, $d['id']]);
+                        }
+                        if(($scheduleAt||$previousStatus==='scheduled')&&in_array($status,['approved','scheduled'],true)){
+                            $scheduleErrors=(new ProductSubmissionService())->validationErrors(DB::row('select * from products where id=?',[$productId]));
+                            if($scheduleErrors){$status='draft';DB::exec('update products set status="draft",schedule_error=? where id=?',[mb_substr(implode(' ',$scheduleErrors),0,1000),$productId]);}
                         }
                     } catch (Throwable $e) {
                         error_log(
@@ -2471,7 +2502,7 @@ class SellerController
             H::redirect('/seller/product/'.$productId);
         }
 
-        H::flash('success', $nextStatus === 'approved' ? 'Product published.' : 'Product flagged and submitted for IP review.');
+        H::flash('success', $nextStatus === 'approved' ? 'Product published.' : ($nextStatus==='scheduled'?'Product scheduled for publication.':'Product flagged and submitted for IP review.'));
         H::redirect('/seller/products');
     }
 
