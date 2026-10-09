@@ -108,7 +108,7 @@ $globalLicenseTerms = str_replace(
     <aside class="card custom-design-summary">
 
         <p>
-            by <strong><?=H::e($service['display_name'])?></strong>
+            by <strong><a href="/store/<?=H::e($service['store_slug'])?>"><?=H::e($service['display_name'])?></a></strong>
         </p>
 
         <p>

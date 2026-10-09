@@ -21,7 +21,7 @@
                 </h3>
 
                 <p>
-                    by <?=H::e($s['display_name'])?>
+                    by <a href="/store/<?=H::e($s['store_slug'])?>"><?=H::e($s['display_name'])?></a>
                     · <?=H::money($s['price'])?>
                     · <?=H::e(\App\Services\CustomDesignService::turnaroundLabel($s))?>
                 </p>

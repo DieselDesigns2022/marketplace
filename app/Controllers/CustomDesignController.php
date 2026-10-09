@@ -2,7 +2,7 @@
 namespace App\Controllers;
 use App\Core\Database as DB; use App\Core\Helpers as H; use App\Services\CustomDesignService; use App\Services\LicenseService; use App\Services\SellerReviewService;
 final class CustomDesignController {
- public function index():void{$services=DB::rows('select s.*,d.display_name,(select image_path from custom_service_images where custom_service_id=s.id order by sort_order,id limit 1) preview_image from custom_design_services s join designers d on d.id=s.designer_id where s.is_active=1 and d.status="approved" order by s.created_at desc');H::view('public/custom_services',['services'=>$services]);}
+ public function index():void{$services=DB::rows('select s.*,d.display_name,d.store_slug,(select image_path from custom_service_images where custom_service_id=s.id order by sort_order,id limit 1) preview_image from custom_design_services s join designers d on d.id=s.designer_id where s.is_active=1 and d.status="approved" order by s.created_at desc');H::view('public/custom_services',['services'=>$services]);}
  public function detail($slug):void{$service=$this->publicService($slug);$this->detailView($service,[]);}
  public function purchase($slug):void
  {
@@ -166,7 +166,7 @@ final class CustomDesignController {
      );
  }
 
- private function publicService(string $slug):array{return DB::row('select s.*,d.display_name,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.slug=? and s.is_active=1 and d.status="approved"',[$slug])??H::abort(404);}
+ private function publicService(string $slug):array{return DB::row('select s.*,d.display_name,d.store_slug,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.slug=? and s.is_active=1 and d.status="approved"',[$slug])??H::abort(404);}
  private function detailView(array $s,array $errors):void{$api=new CustomDesignService;$balances=H::user()?(new \App\Services\CreditService)->balances((int)H::user()['id']):['available'=>'0.00'];H::view('public/custom_service',['service'=>$s,'questions'=>DB::rows('select * from custom_service_questions where custom_service_id=? order by sort_order,id',[$s['id']]),'images'=>DB::rows('select * from custom_service_images where custom_service_id=? order by sort_order,id',[$s['id']]),'balances'=>$balances,'licenses'=>$api->serviceLicenses((int)$s['id']),'errors'=>$errors]);}
  public function sellerList():void{H::requireSeller();$d=(new CustomDesignService)->seller((int)H::user()['id']);H::view('seller/custom_services',['services'=>DB::rows('select * from custom_design_services where designer_id=? order by updated_at desc',[$d['id']])]);}
  public function sellerDuplicate($id):void
