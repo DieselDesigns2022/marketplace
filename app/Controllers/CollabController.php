@@ -563,6 +563,268 @@ final class CollabController
         H::redirect('/seller/collabs/'.$id);
     }
 
+    public function extendSale($id): void
+    {
+        $designer = $this->seller();
+        H::verifyCsrf();
+
+        $collab = $this->event((int)$id);
+        $this->requireHost($collab, $designer);
+
+        try {
+            if (empty($collab['snapshot_at'])) {
+                throw new \DomainException(
+                    'Use Edit settings to change sale dates before the collab is finalized.'
+                );
+            }
+
+            $rawClose = trim(
+                (string)($_POST['sale_close_date'] ?? '')
+            );
+
+            if ($rawClose === '') {
+                throw new \DomainException(
+                    'Choose a new Sales Close Date.'
+                );
+            }
+
+            $hostTimezone = new \DateTimeZone(
+                (string)(
+                    $collab['host_timezone']
+                    ?: 'America/New_York'
+                )
+            );
+
+            $newClose = \DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $rawClose,
+                $hostTimezone
+            );
+
+            if (!$newClose) {
+                throw new \DomainException(
+                    'Choose a valid Sales Close Date.'
+                );
+            }
+
+            $newClose = $newClose->setTime(23, 59, 59);
+
+            DB::begin();
+
+            $locked = DB::row(
+                'select *
+                 from collab_events
+                 where id=?
+                 for update',
+                [(int)$id]
+            ) ?? throw new \DomainException(
+                'Collab not found.'
+            );
+
+            $currentClose = new \DateTimeImmutable(
+                (string)$locked['sale_close_date'].' 23:59:59',
+                $hostTimezone
+            );
+
+            $nowLocal = new \DateTimeImmutable(
+                'now',
+                $hostTimezone
+            );
+
+            if ($newClose <= $currentClose) {
+                throw new \DomainException(
+                    'The new Sales Close Date must be later than the current close date.'
+                );
+            }
+
+            if ($newClose <= $nowLocal) {
+                throw new \DomainException(
+                    'The new Sales Close Date must be in the future.'
+                );
+            }
+
+            $wasEnded =
+                (string)$locked['status'] === 'ended';
+
+            DB::exec(
+                'update collab_events
+                 set sale_close_date=?,
+                     ended_at=null,
+                     status=case
+                         when status="ended"
+                         then "processing"
+                         else status
+                     end
+                 where id=?',
+                [
+                    $newClose->format('Y-m-d'),
+                    (int)$id
+                ]
+            );
+
+            DB::commit();
+
+            if ($wasEnded) {
+                try {
+                    (new CollabService())->finalize(
+                        (int)$id
+                    );
+                } catch (\Throwable $error) {
+                    H::flash(
+                        'warning',
+                        'The sale date was extended, but the collab ZIP is still rebuilding. Please check the collab status shortly.'
+                    );
+                    H::redirect(
+                        '/seller/collabs/'.$id
+                    );
+                }
+            }
+
+            H::flash(
+                'success',
+                'Sales Close Date extended to '.
+                $newClose->format('F j, Y').
+                '.'
+            );
+
+        } catch (\Throwable $error) {
+            if (DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
+            H::flash(
+                'warning',
+                $error instanceof \DomainException
+                    ? $error->getMessage()
+                    : 'The Sales Close Date could not be extended.'
+            );
+        }
+
+        H::redirect('/seller/collabs/'.$id);
+    }
+
+    public function restock($id): void
+    {
+        $designer = $this->seller();
+        H::verifyCsrf();
+
+        $collab = $this->event((int)$id);
+        $this->requireHost($collab, $designer);
+
+        try {
+            if (empty($collab['snapshot_at'])) {
+                throw new \DomainException(
+                    'Use Edit settings to change quantity before the collab is finalized.'
+                );
+            }
+
+            if ($collab['quantity_limit'] === null) {
+                throw new \DomainException(
+                    'This collab already has unlimited copies.'
+                );
+            }
+
+            $rawQuantity = trim(
+                (string)($_POST['quantity_limit'] ?? '')
+            );
+
+            if (
+                $rawQuantity === ''
+                || !ctype_digit($rawQuantity)
+                || (int)$rawQuantity < 1
+            ) {
+                throw new \DomainException(
+                    'Enter a valid new quantity.'
+                );
+            }
+
+            $newQuantity = (int)$rawQuantity;
+
+            DB::begin();
+
+            $locked = DB::row(
+                'select *
+                 from collab_events
+                 where id=?
+                 for update',
+                [(int)$id]
+            ) ?? throw new \DomainException(
+                'Collab not found.'
+            );
+
+            if ($locked['quantity_limit'] === null) {
+                throw new \DomainException(
+                    'This collab already has unlimited copies.'
+                );
+            }
+
+            $currentQuantity =
+                (int)$locked['quantity_limit'];
+
+            $soldCount = (int)(
+                DB::row(
+                    'select count(*) c
+                     from order_items oi
+                     join orders o
+                       on o.id=oi.order_id
+                     where oi.collab_id=?
+                       and o.payment_status in (
+                           "paid",
+                           "partially_refunded"
+                       )',
+                    [(int)$id]
+                )['c'] ?? 0
+            );
+
+            if ($newQuantity <= $currentQuantity) {
+                throw new \DomainException(
+                    'The new quantity must be greater than the current quantity of '.
+                    $currentQuantity.
+                    '.'
+                );
+            }
+
+            if ($newQuantity < $soldCount) {
+                throw new \DomainException(
+                    'The quantity cannot be lower than the number already sold.'
+                );
+            }
+
+            DB::exec(
+                'update collab_events
+                 set quantity_limit=?
+                 where id=?',
+                [
+                    $newQuantity,
+                    (int)$id
+                ]
+            );
+
+            DB::commit();
+
+            H::flash(
+                'success',
+                'Collab quantity increased to '.
+                $newQuantity.
+                ' copies.'
+            );
+
+        } catch (\Throwable $error) {
+            if (DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
+            H::flash(
+                'warning',
+                $error instanceof \DomainException
+                    ? $error->getMessage()
+                    : 'The collab quantity could not be updated.'
+            );
+        }
+
+        H::redirect('/seller/collabs/'.$id);
+    }
+
     public function show($id): void
     {
         $designer=$this->seller(); $collab=$this->event((int)$id); $participant=$this->repo->participant((int)$id,(int)$designer['id']);

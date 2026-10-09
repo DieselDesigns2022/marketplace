@@ -336,6 +336,143 @@ if (!empty($collab['snapshot_at'])) {
     <?php endif;?>
 
 
+    <?php if(!empty($collab['snapshot_at'])):?>
+        <div style="
+            margin-bottom:18px;
+            padding:16px;
+            border:1px solid #ddd4e8;
+            border-radius:12px;
+            background:#faf8ff;
+        ">
+            <h3 style="margin-top:0">Sale Controls</h3>
+
+            <div style="
+                display:grid;
+                grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+                gap:18px;
+            ">
+                <div>
+                    <div style="font-weight:700;margin-bottom:5px">
+                        Extend Sales End Date
+                    </div>
+
+                    <div style="
+                        font-size:13px;
+                        opacity:.75;
+                        margin-bottom:8px;
+                    ">
+                        Current close date:
+                        <strong><?=H::e($collab['sale_close_date'])?></strong>
+                    </div>
+
+                    <form
+                        method="post"
+                        action="/seller/collabs/<?=$collab['id']?>/extend-sale"
+                        style="
+                            display:flex;
+                            gap:8px;
+                            flex-wrap:wrap;
+                            align-items:center;
+                            margin:0;
+                        "
+                    >
+                        <input
+                            type="hidden"
+                            name="_csrf"
+                            value="<?=H::csrf()?>"
+                        >
+
+                        <input
+                            type="date"
+                            name="sale_close_date"
+                            required
+                            style="
+                                flex:1 1 170px;
+                                min-width:0;
+                                margin:0;
+                            "
+                        >
+
+                        <button
+                            type="submit"
+                            class="btn small"
+                        >
+                            Extend Sale
+                        </button>
+                    </form>
+                </div>
+
+                <div>
+                    <div style="font-weight:700;margin-bottom:5px">
+                        Copies / Restock
+                    </div>
+
+                    <?php if($collab['quantity_limit'] !== null):?>
+                        <?php
+                        $minimumRestockQuantity = max(
+                            ((int)$collab['quantity_limit']) + 1,
+                            $soldCount + 1
+                        );
+                        ?>
+
+                        <div style="
+                            font-size:13px;
+                            opacity:.75;
+                            margin-bottom:8px;
+                        ">
+                            <?=$soldCount?> /
+                            <?=intval($collab['quantity_limit'])?>
+                            sold
+                        </div>
+
+                        <form
+                            method="post"
+                            action="/seller/collabs/<?=$collab['id']?>/restock"
+                            style="
+                                display:flex;
+                                gap:8px;
+                                flex-wrap:wrap;
+                                align-items:center;
+                                margin:0;
+                            "
+                        >
+                            <input
+                                type="hidden"
+                                name="_csrf"
+                                value="<?=H::csrf()?>"
+                            >
+
+                            <input
+                                type="number"
+                                name="quantity_limit"
+                                min="<?=$minimumRestockQuantity?>"
+                                step="1"
+                                required
+                                placeholder="New total quantity"
+                                style="
+                                    flex:1 1 170px;
+                                    min-width:0;
+                                    margin:0;
+                                "
+                            >
+
+                            <button
+                                type="submit"
+                                class="btn small"
+                            >
+                                Add More Copies
+                            </button>
+                        </form>
+                    <?php else:?>
+                        <div style="font-size:13px;opacity:.75">
+                            This collab has unlimited copies.
+                        </div>
+                    <?php endif;?>
+                </div>
+            </div>
+        </div>
+    <?php endif;?>
+
     <div style="
         display:grid;
         grid-template-columns:repeat(auto-fit,minmax(300px,1fr));

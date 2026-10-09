@@ -44,6 +44,29 @@ final class PublicCollabController
             )
         );
 
+        $soldCount = (int)(
+            DB::row(
+                'select count(*) c
+                 from order_items oi
+                 join orders o
+                   on o.id=oi.order_id
+                 where oi.collab_id=?
+                   and o.payment_status in (
+                       "paid",
+                       "partially_refunded"
+                   )',
+                [(int)$collab['id']]
+            )['c'] ?? 0
+        );
+
+        $remainingCount =
+            $collab['quantity_limit'] !== null
+                ? max(
+                    0,
+                    (int)$collab['quantity_limit'] - $soldCount
+                )
+                : null;
+
         $utc = new \DateTimeZone('UTC');
 
         $hostTimezoneName =
@@ -81,6 +104,8 @@ final class PublicCollabController
             'participants'=>array_values(array_filter($repository->participants((int)$collab['id']), fn($participant) => $participant['eligibility'] === 'eligible')),
             'contributionCounts'=>$contributionCounts,
             'totalContributionFiles'=>$totalContributionFiles,
+            'soldCount'=>$soldCount,
+            'remainingCount'=>$remainingCount,
             'saleStartsDisplay'=>$saleStartsDisplay,
             'saleCloseDisplay'=>$saleCloseDisplay,
         ]);

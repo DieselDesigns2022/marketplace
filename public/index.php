@@ -119,6 +119,8 @@ use App\Controllers\AnalyticsController;
  $router->get('/seller/collabs/{id}', [CollabController::class, 'show']);
  $router->match(['GET','POST'], '/seller/collabs/{id}/edit', [CollabController::class, 'edit']);
 $router->post('/seller/collabs/{id}/extend-deadline', [CollabController::class, 'extendDeadline']);
+$router->post('/seller/collabs/{id}/extend-sale', [CollabController::class, 'extendSale']);
+$router->post('/seller/collabs/{id}/restock', [CollabController::class, 'restock']);
 $router->post('/seller/collabs/{id}/close-submissions', [CollabController::class, 'closeSubmissions']);
  $router->post('/seller/collabs/{id}/request', [CollabController::class, 'request']);
  $router->post('/seller/collabs/{id}/participants/{participant}', [CollabController::class, 'decide']);

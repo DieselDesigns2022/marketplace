@@ -31,6 +31,21 @@
         <strong><?=H::e($saleCloseDisplay)?></strong>
     </p>
 
+    <?php if($collab['quantity_limit'] !== null):?>
+        <p>
+            <strong>
+                <?=number_format((int)$soldCount)?> /
+                <?=number_format((int)$collab['quantity_limit'])?>
+                sold
+            </strong>
+            ·
+            <strong>
+                <?=number_format((int)$remainingCount)?>
+                remaining
+            </strong>
+        </p>
+    <?php endif;?>
+
     <section class="collab-included-files">
         <h2>What's Included</h2>
 
