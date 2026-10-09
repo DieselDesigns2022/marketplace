@@ -119,8 +119,44 @@ final class PublicCollabController
         $row = DB::row('select c.*,oi.id order_item_id,oi.order_id,oi.total_price,o.payment_status,coalesce((select sum(a.merchandise_refund_cents) from marketplace_refund_allocations a where a.order_item_id=oi.id),0) refunded_cents from order_items oi join collab_events c on c.id=oi.collab_id join orders o on o.id=oi.order_id where oi.id=? and o.user_id=? limit 1', [(int)$item,H::user()['id']]);
         if (!$row) H::abort(403);
         if (!CollabService::itemDownloadable((string)$row['payment_status'], \App\Services\CreditService::parseCents((string)$row['total_price'], false), (int)$row['refunded_cents'])) H::abort(403);
-        $real = (new CollabService())->protectedRealPath((string)$row['final_zip_path']);
-        if (!$real || !hash_equals((string)$row['final_zip_sha256'], hash_file('sha256',$real))) H::abort(404);
+        $service = new CollabService();
+        $real = $service->protectedRealPath(
+            (string)$row['final_zip_path']
+        );
+        $temporaryArchive = null;
+
+        if (
+            !$real
+            || !hash_equals(
+                (string)$row['final_zip_sha256'],
+                hash_file('sha256', $real)
+            )
+        ) {
+            if (($row['status'] ?? '') !== 'ended') {
+                H::abort(404);
+            }
+
+            try {
+                $temporaryArchive =
+                    $service->buildTemporaryDownloadArchive(
+                        (int)$row['id']
+                    );
+                $real = $temporaryArchive;
+            } catch (\Throwable $error) {
+                H::abort(404);
+            }
+        }
+
+        if ($temporaryArchive !== null) {
+            register_shutdown_function(
+                static function () use ($temporaryArchive): void {
+                    if (is_file($temporaryArchive)) {
+                        @unlink($temporaryArchive);
+                    }
+                }
+            );
+        }
+
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="'.H::slug($row['title']).'.zip"');
         header('Content-Length: '.filesize($real));

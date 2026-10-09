@@ -99,7 +99,7 @@ final class CollabService
             }
         }
         $ready = DB::rows(
-            'select id,sale_close_date,host_timezone from collab_events where status="ready"'
+            'select id,sale_close_date,host_timezone,final_zip_path from collab_events where status="ready"'
         );
 
         foreach ($ready as $row) {
@@ -127,6 +127,14 @@ final class CollabService
                 'update collab_events set status="ended",ended_at=coalesce(ended_at,now()) where id=? and status="ready"',
                 [(int)$row['id']]
             );
+
+            $finalZip = $this->protectedRealPath(
+                (string)($row['final_zip_path'] ?? '')
+            );
+
+            if ($finalZip && is_file($finalZip)) {
+                @unlink($finalZip);
+            }
 
             $this->notifyHost(
                 (int)$row['id'],
@@ -765,6 +773,147 @@ final class CollabService
         $base = realpath(app_path('storage/protected_uploads/collabs'));
         $real = realpath(app_path('storage/protected_uploads/'.ltrim($storagePath, '/')));
         return $base && $real && str_starts_with($real, $base.DIRECTORY_SEPARATOR) && is_file($real) ? $real : null;
+    }
+
+    public function buildTemporaryDownloadArchive(int $id): string
+    {
+        if (!class_exists(ZipArchive::class)) {
+            throw new DomainException(
+                'PHP ZipArchive extension is required.'
+            );
+        }
+
+        $collab = $this->repo->event($id)
+            ?? throw new DomainException('Collab not found.');
+
+        if (empty($collab['snapshot_at'])) {
+            throw new DomainException(
+                'Eligibility snapshot is required.'
+            );
+        }
+
+        $files = DB::rows(
+            'select f.*,d.store_slug
+             from collab_files f
+             join designers d on d.id=f.designer_id
+             where f.collab_id=?
+               and f.included_in_snapshot=1
+             order by f.designer_id,f.id',
+            [$id]
+        );
+
+        if (!$files) {
+            throw new DomainException(
+                'No collab files are available.'
+            );
+        }
+
+        $directory = app_path(
+            'storage/protected_uploads/collabs/temp-downloads'
+        );
+
+        if (
+            !is_dir($directory)
+            && !mkdir($directory, 0750, true)
+            && !is_dir($directory)
+        ) {
+            throw new DomainException(
+                'Temporary collab archive directory could not be created.'
+            );
+        }
+
+        foreach (
+            glob($directory.'/collab-'.$id.'-*.zip') ?: []
+            as $old
+        ) {
+            if (
+                is_file($old)
+                && filemtime($old) !== false
+                && filemtime($old) < time() - 3600
+            ) {
+                @unlink($old);
+            }
+        }
+
+        $temporary =
+            $directory.
+            '/collab-'.
+            $id.
+            '-'.
+            bin2hex(random_bytes(12)).
+            '.zip';
+
+        $zip = new ZipArchive();
+
+        if (
+            $zip->open(
+                $temporary,
+                ZipArchive::CREATE | ZipArchive::OVERWRITE
+            ) !== true
+        ) {
+            throw new DomainException(
+                'Temporary collab archive could not be opened.'
+            );
+        }
+
+        try {
+            foreach ($files as $file) {
+                $real = $this->protectedRealPath(
+                    (string)$file['storage_path']
+                );
+
+                if (
+                    !$real
+                    || !hash_equals(
+                        (string)$file['sha256'],
+                        hash_file('sha256', $real)
+                    )
+                ) {
+                    throw new DomainException(
+                        'A collab contribution failed its integrity check.'
+                    );
+                }
+
+                if (
+                    !$zip->addFile(
+                        $real,
+                        $file['store_slug'].
+                        '/'.
+                        self::safeArchiveName(
+                            $file['original_name'],
+                            (int)$file['id']
+                        )
+                    )
+                ) {
+                    throw new DomainException(
+                        'A collab contribution could not be archived.'
+                    );
+                }
+            }
+
+            $manifest = $this->snapshotManifest(
+                $collab,
+                $files
+            );
+
+            $zip->setArchiveComment(
+                'creative-moth-snapshot-sha256:'.
+                hash('sha256', $manifest)
+            );
+
+            if (!$zip->close()) {
+                throw new DomainException(
+                    'Temporary collab archive could not be closed.'
+                );
+            }
+
+            return $temporary;
+
+        } catch (Throwable $error) {
+            $zip->close();
+            @unlink($temporary);
+            throw $error;
+        }
     }
 
     private function validExistingArchive(array $collab): bool
