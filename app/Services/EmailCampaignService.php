@@ -35,8 +35,16 @@ final class EmailCampaignService
         $aud=(string)($in['audience']??'');
         $format=(string)($in['body_format']??'plain');
         $label=trim((string)($in['cta_label']??''));
+        $preheader=trim((string)($in['preheader']??''));
         $originalUrl=(string)($in['cta_url']??'');
         $urlIsEmpty=trim($originalUrl)==='';
+
+        if(
+            mb_strlen($preheader)>255 ||
+            preg_match('/[\r\n]/',$preheader)
+        ){
+            $e[]='Preheader must be one line and 255 characters maximum.';
+        }
 
         if(
             $subject==='' ||
@@ -377,8 +385,10 @@ final class EmailCampaignService
         DB::exec(
             'insert into email_campaigns (
                 campaign_type,
+                newsletter_type,
                 audience,
                 subject,
+                preheader,
                 body,
                 body_format,
                 cta_label,
@@ -386,11 +396,13 @@ final class EmailCampaignService
                 created_by
              ) values (
                 "promotional",
-                ?,?,?,?,?,?,?
+                "one_off",
+                ?,?,?,?,?,?,?,?
              )',
             [
                 $in['audience'],
                 trim((string)$in['subject']),
+                trim((string)($in['preheader']??'')) ?: null,
                 $body,
                 $format,
                 trim(
@@ -404,6 +416,178 @@ final class EmailCampaignService
         );
 
         return (int)DB::id();
+    }
+
+    public static function updateEditable(int $id,array $in): bool
+    {
+        $campaign=DB::row(
+            'select id,status from email_campaigns where id=?',
+            [$id]
+        );
+
+        if(
+            !$campaign ||
+            !in_array(
+                $campaign['status'],
+                ['draft','scheduled'],
+                true
+            )
+        ){
+            return false;
+        }
+
+        $errors=self::validate($in);
+
+        if($errors){
+            throw new \InvalidArgumentException(
+                implode(' ',$errors)
+            );
+        }
+
+        $format=(string)($in['body_format']??'plain');
+
+        $body=$format==='rich_html'
+            ? self::sanitizeRichBody(
+                (string)$in['body']
+            )
+            : trim((string)$in['body']);
+
+        DB::exec(
+            'update email_campaigns
+             set audience=?,
+                 subject=?,
+                 preheader=?,
+                 body=?,
+                 body_format=?,
+                 cta_label=?,
+                 cta_url=?
+             where id=?
+               and status in ("draft","scheduled")',
+            [
+                $in['audience'],
+                trim((string)$in['subject']),
+                trim((string)($in['preheader']??'')) ?: null,
+                $body,
+                $format,
+                trim(
+                    (string)($in['cta_label']??'')
+                ) ?: null,
+                self::safeCta(
+                    $in['cta_url']??null
+                ),
+                $id
+            ]
+        );
+
+        return true;
+    }
+
+    public static function validateSchedule(
+        string $localDateTime,
+        string $timezone
+    ): array {
+        $errors=[];
+        $localDateTime=trim($localDateTime);
+        $timezone=trim($timezone);
+
+        if(
+            !in_array(
+                $timezone,
+                \DateTimeZone::listIdentifiers(),
+                true
+            )
+        ){
+            return ['Choose a valid scheduling timezone.'];
+        }
+
+        $zone=new \DateTimeZone($timezone);
+        $scheduled=\DateTimeImmutable::createFromFormat(
+            '!Y-m-d\TH:i',
+            $localDateTime,
+            $zone
+        );
+
+        $parseErrors=\DateTimeImmutable::getLastErrors();
+
+        if(
+            !$scheduled ||
+            (
+                is_array($parseErrors) &&
+                (
+                    ($parseErrors['warning_count']??0)>0 ||
+                    ($parseErrors['error_count']??0)>0
+                )
+            ) ||
+            $scheduled->format('Y-m-d\TH:i')!==$localDateTime
+        ){
+            $errors[]='Choose a valid future date and time.';
+            return $errors;
+        }
+
+        $now=new \DateTimeImmutable('now',new \DateTimeZone('UTC'));
+
+        if(
+            $scheduled
+                ->setTimezone(new \DateTimeZone('UTC'))
+                <= $now
+        ){
+            $errors[]='Scheduled send time must be in the future.';
+        }
+
+        return $errors;
+    }
+
+    public static function schedule(
+        int $id,
+        string $localDateTime,
+        string $timezone
+    ): bool {
+        $errors=self::validateSchedule(
+            $localDateTime,
+            $timezone
+        );
+
+        if($errors){
+            throw new \InvalidArgumentException(
+                implode(' ',$errors)
+            );
+        }
+
+        $zone=new \DateTimeZone($timezone);
+        $utc=new \DateTimeZone('UTC');
+
+        $scheduled=\DateTimeImmutable::createFromFormat(
+            '!Y-m-d\TH:i',
+            trim($localDateTime),
+            $zone
+        )->setTimezone($utc);
+
+        return DB::exec(
+            'update email_campaigns
+             set status="scheduled",
+                 scheduled_for=?,
+                 schedule_timezone=?
+             where id=?
+               and status in ("draft","scheduled")',
+            [
+                $scheduled->format('Y-m-d H:i:s'),
+                $timezone,
+                $id
+            ]
+        );
+    }
+
+    public static function unschedule(int $id): bool
+    {
+        return DB::exec(
+            'update email_campaigns
+             set status="draft",
+                 scheduled_for=null,
+                 schedule_timezone=null
+             where id=?
+               and status="scheduled"',
+            [$id]
+        );
     }
     public static function queue(int $id): int { $c=DB::row('select * from email_campaigns where id=? and status="draft"',[$id]);if(!$c)return 0; DB::begin(); try { $rows=self::audience($c['audience']); if(!$rows){DB::exec('update email_campaigns set status="completed",completed_at=now() where id=?',[$id]);DB::commit();return 0;} $queuedCount=0; foreach($rows as $r) DB::exec('insert ignore into email_campaign_recipients (campaign_id,waitlist_entry_id,user_id,email,name,status) values (?,?,?,?,?,"pending")',[$id,$r['waitlist_entry_id']??null,$r['user_id']??null,$r['email'],$r['name']??null]); foreach(DB::rows('select * from email_campaign_recipients where campaign_id=? and status="pending"',[$id]) as $r){ $data=['name'=>$r['name'],'body'=>$c['body'],'body_format'=>$c['body_format']??'plain','cta_label'=>$c['cta_label'],'cta_url'=>$c['cta_url'],'user_id'=>$r['user_id']]; $queued=EmailQueueService::queue('marketing',$r['email'],$c['subject'],'campaign',$data,"campaign:$id:recipient:".$r['id'],['campaign_id'=>$id,'campaign_recipient_id'=>$r['id'],'waitlist_entry_id'=>$r['waitlist_entry_id']]);if($queued)$queuedCount++; DB::exec('update email_campaign_recipients set status=?,last_error=? where id=?',[$queued?'queued':'suppressed',$queued?null:'Consent or unsubscribe authorization unavailable',$r['id']]); } DB::exec('update email_campaigns set status="queued",queued_at=now() where id=?',[$id]);DB::commit();if($queuedCount===0)self::recalculate($id); }catch(\Throwable $e){DB::rollBack();throw $e;} return count($rows); }
     private static function audience(string $aud): array

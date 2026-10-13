@@ -295,6 +295,165 @@ final class AdminEmailCampaignController
         );
     }
 
+    public function edit($id): void
+    {
+        $this->admin(true);
+
+        if(!ctype_digit((string)$id)){
+            H::abort(404);
+        }
+
+        $campaign=DB::row(
+            'select * from email_campaigns where id=?',
+            [(int)$id]
+        ) ?? H::abort(404);
+
+        if(
+            !in_array(
+                $campaign['status'],
+                ['draft','scheduled'],
+                true
+            )
+        ){
+            H::flash(
+                'warning',
+                'Only draft or scheduled newsletters can be edited.'
+            );
+
+            H::redirect('/admin/email-campaigns/'.$id);
+        }
+
+        $errors=[];
+        $preview=false;
+
+        if($_SERVER['REQUEST_METHOD']==='POST'){
+            $action=(string)($_POST['action']??'');
+
+            if(
+                !in_array(
+                    $action,
+                    [
+                        'preview',
+                        'save',
+                        'schedule',
+                        'unschedule'
+                    ],
+                    true
+                )
+            ){
+                $errors[]=
+                    'Choose Preview, Save changes, Schedule, or Unschedule.';
+            }
+
+            if($action==='unschedule'){
+                if(
+                    $campaign['status']!=='scheduled' ||
+                    !EmailCampaignService::unschedule((int)$id)
+                ){
+                    H::flash(
+                        'warning',
+                        'This newsletter could not be unscheduled.'
+                    );
+                } else {
+                    H::flash(
+                        'success',
+                        'Newsletter moved back to draft.'
+                    );
+                }
+
+                H::redirect('/admin/email-campaigns/'.$id.'/edit');
+            }
+
+            $errors=array_merge(
+                $errors,
+                EmailCampaignService::validate($_POST)
+            );
+
+            if($action==='schedule'){
+                $errors=array_merge(
+                    $errors,
+                    EmailCampaignService::validateSchedule(
+                        (string)($_POST['scheduled_local']??''),
+                        (string)($_POST['schedule_timezone']??'')
+                    )
+                );
+            }
+
+            if(!$errors){
+                if($action==='preview'){
+                    $campaign=array_merge(
+                        $campaign,
+                        $_POST
+                    );
+
+                    if(
+                        ($campaign['body_format']??'plain')
+                        ==='rich_html'
+                    ){
+                        $campaign['body']=
+                            EmailCampaignService::sanitizeRichBody(
+                                (string)($campaign['body']??'')
+                            );
+                    }
+
+                    $preview=true;
+                } elseif($action==='schedule'){
+                    EmailCampaignService::updateEditable(
+                        (int)$id,
+                        $_POST
+                    );
+
+                    EmailCampaignService::schedule(
+                        (int)$id,
+                        (string)$_POST['scheduled_local'],
+                        (string)$_POST['schedule_timezone']
+                    );
+
+                    H::flash(
+                        'success',
+                        'Newsletter scheduled successfully.'
+                    );
+
+                    H::redirect(
+                        '/admin/email-campaigns/'.$id
+                    );
+                } else {
+                    EmailCampaignService::updateEditable(
+                        (int)$id,
+                        $_POST
+                    );
+
+                    H::flash(
+                        'success',
+                        'Newsletter changes saved.'
+                    );
+
+                    H::redirect(
+                        '/admin/email-campaigns/'.$id.'/edit'
+                    );
+                }
+            }
+
+            if($errors){
+                $campaign=array_merge(
+                    $campaign,
+                    $_POST
+                );
+            }
+        }
+
+        H::view(
+            'admin/email_campaigns/form',
+            compact(
+                'errors',
+                'campaign',
+                'preview'
+            ) + [
+                'editing'=>true
+            ]
+        );
+    }
+
     public function show($id):void
     {
         $this->admin($_SERVER['REQUEST_METHOD']==='POST');if(!ctype_digit((string)$id))H::abort(404);$campaign=DB::row('select * from email_campaigns where id=?',[(int)$id])??H::abort(404);
