@@ -7,7 +7,7 @@ final class EmailDigestClaimService
 {
     private const PRIORITY=['favorite_shop'=>1,'weekly'=>2,'monthly'=>3];
 
-    public static function queue(string $category,array $user,array $products,string $start,string $end,string $subject,string $template,array $data,string $dedupe): bool
+    public static function queue(string $category,array $user,array $products,string $start,string $end,string $subject,string $template,array $data,string $dedupe,array $links=[]): bool
     {
         if(!isset(self::PRIORITY[$category])||(!$products&&empty($data['paid_promos'])))return false;
         DB::begin();
@@ -17,13 +17,48 @@ final class EmailDigestClaimService
             foreach($products as $product)if(self::claimable((int)$user['id'],(int)$product['id'],$category,$start,$end))$assigned[]=$product;
             if(!$assigned&&empty($data['paid_promos'])){DB::commit();return false;}
             $data['products']=$assigned;
-            $queued=EmailQueueService::queue('marketing',$user['email'],$subject,$template,$data,$dedupe);
+            $queued=EmailQueueService::queue(
+                'marketing',
+                $user['email'],
+                $subject,
+                $template,
+                $data,
+                $dedupe,
+                $links
+            );
             $inserted=$queued&&(int)(DB::row('select row_count() inserted')['inserted']??0)===1;
             if(!$inserted){DB::rollBack();return false;}
             $message=DB::row('select id from email_messages where deduplication_key=?',[$dedupe]);
             if(!$message){DB::rollBack();return false;}
-            foreach($assigned as $product)DB::exec('insert ignore into email_digest_content_claims (user_id,product_id,preference_category,period_start,period_end,email_message_id) values (?,?,?,?,?,?)',[(int)$user['id'],(int)$product['id'],$category,$start,$end,(int)$message['id']]);
-            DB::commit();return true;
+            foreach($assigned as $product){
+                DB::exec(
+                    'insert ignore into email_digest_content_claims
+                     (user_id,product_id,preference_category,period_start,period_end,email_message_id)
+                     values (?,?,?,?,?,?)',
+                    [
+                        (int)$user['id'],
+                        (int)$product['id'],
+                        $category,
+                        $start,
+                        $end,
+                        (int)$message['id']
+                    ]
+                );
+            }
+
+            if(!empty($links['campaign_recipient_id'])){
+                DB::exec(
+                    'update email_campaign_recipients
+                     set status="queued",
+                         last_error=null
+                     where id=?
+                       and status="pending"',
+                    [(int)$links['campaign_recipient_id']]
+                );
+            }
+
+            DB::commit();
+            return true;
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
     }
 

@@ -55,6 +55,207 @@ final class EmailDigestService
         return $count;
     }
 
+    public static function queueCampaign(int $campaignId): int
+    {
+        $campaign=DB::row(
+            'select *
+             from email_campaigns
+             where id=?
+               and recurring_definition_id is not null
+               and newsletter_type in ("weekly","monthly")
+               and status="scheduled"
+               and scheduled_for<=now()',
+            [$campaignId]
+        );
+
+        if(!$campaign){
+            return 0;
+        }
+
+        $frequency=(string)$campaign['newsletter_type'];
+
+        $ending=substr(
+            (string)$campaign['scheduled_for'],
+            0,
+            10
+        );
+
+        [$start,$end]=self::period(
+            $frequency,
+            $ending
+        );
+
+        $paidPromos=
+            $frequency==='weekly'
+                ? PromoService::weekly($start,$end)
+                : [];
+
+        $products=
+            $frequency==='weekly'
+                ? self::weeklyProducts($paidPromos)
+                : self::products($start,$end);
+
+        if(!$products && !$paidPromos){
+            DB::exec(
+                'update email_campaigns
+                 set status="completed",
+                     queued_at=coalesce(queued_at,now()),
+                     completed_at=coalesce(completed_at,now())
+                 where id=?
+                   and status="scheduled"',
+                [$campaignId]
+            );
+
+            return 0;
+        }
+
+        $column=
+            EmailPreferenceService::column(
+                $frequency
+            );
+
+        $users=DB::rows(
+            "select
+                u.id,
+                u.email,
+                u.name
+             from users u
+             join email_preferences ep
+               on ep.user_id=u.id
+             where u.status=\"active\"
+               and ep.$column=1"
+        );
+
+        $queuedCount=0;
+        $endingChecked=false;
+
+        foreach($users as $user){
+            DB::exec(
+                'insert ignore into email_campaign_recipients
+                 (
+                    campaign_id,
+                    user_id,
+                    email,
+                    name,
+                    status
+                 )
+                 values (?, ?, ?, ?, "pending")',
+                [
+                    $campaignId,
+                    (int)$user['id'],
+                    $user['email'],
+                    $user['name']
+                ]
+            );
+
+            $recipient=DB::row(
+                'select *
+                 from email_campaign_recipients
+                 where campaign_id=?
+                   and email=?',
+                [
+                    $campaignId,
+                    $user['email']
+                ]
+            );
+
+            if(
+                !$recipient ||
+                $recipient['status']!=='pending'
+            ){
+                continue;
+            }
+
+            $data=[
+                'user_id'=>(int)$user['id'],
+                'name'=>$user['name'],
+                'frequency'=>$frequency,
+                'period_start'=>$start,
+                'period_end'=>$end,
+                'marketing_preference'=>$frequency,
+                'manage_preferences_url'=>self::manageUrl(),
+                'paid_promos'=>$paidPromos,
+                'newsletter_subject'=>$campaign['subject'],
+                'preheader'=>$campaign['preheader'],
+                'newsletter_body'=>$campaign['body'],
+                'newsletter_body_format'=>$campaign['body_format'],
+                'cta_label'=>$campaign['cta_label'],
+                'cta_url'=>$campaign['cta_url']
+            ];
+
+            $queued=
+                EmailDigestClaimService::queue(
+                    $frequency,
+                    $user,
+                    $products,
+                    $start,
+                    $end,
+                    (string)$campaign['subject'],
+                    'marketplace_digest',
+                    $data,
+                    'recurring-campaign:'.
+                        $campaignId.
+                        ':user:'.
+                        (int)$user['id'],
+                    [
+                        'campaign_id'=>$campaignId,
+                        'campaign_recipient_id'=>
+                            (int)$recipient['id']
+                    ]
+                );
+
+            if($queued){
+                $queuedCount++;
+
+                if(
+                    $frequency==='weekly' &&
+                    !$endingChecked &&
+                    $paidPromos
+                ){
+                    PromoService::
+                        notifyWeeklyEndingForQueuedIssue(
+                            $paidPromos,
+                            $start,
+                            $end
+                        );
+
+                    $endingChecked=true;
+                }
+
+                continue;
+            }
+
+            DB::exec(
+                'update email_campaign_recipients
+                 set status="suppressed",
+                     last_error=?
+                 where id=?
+                   and status="pending"',
+                [
+                    'No eligible digest content or email preference unavailable',
+                    (int)$recipient['id']
+                ]
+            );
+        }
+
+        DB::exec(
+            'update email_campaigns
+             set status="queued",
+                 queued_at=coalesce(queued_at,now())
+             where id=?
+               and status="scheduled"',
+            [$campaignId]
+        );
+
+        if($queuedCount===0){
+            EmailCampaignService::recalculate(
+                $campaignId
+            );
+        }
+
+        return $queuedCount;
+    }
+
     public static function queueFavoriteShops(?string $ending=null): int
     {
         [$start,$end]=self::period('weekly',$ending);

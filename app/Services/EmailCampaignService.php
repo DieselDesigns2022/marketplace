@@ -589,7 +589,152 @@ final class EmailCampaignService
             [$id]
         );
     }
-    public static function queue(int $id): int { $c=DB::row('select * from email_campaigns where id=? and status="draft"',[$id]);if(!$c)return 0; DB::begin(); try { $rows=self::audience($c['audience']); if(!$rows){DB::exec('update email_campaigns set status="completed",completed_at=now() where id=?',[$id]);DB::commit();return 0;} $queuedCount=0; foreach($rows as $r) DB::exec('insert ignore into email_campaign_recipients (campaign_id,waitlist_entry_id,user_id,email,name,status) values (?,?,?,?,?,"pending")',[$id,$r['waitlist_entry_id']??null,$r['user_id']??null,$r['email'],$r['name']??null]); foreach(DB::rows('select * from email_campaign_recipients where campaign_id=? and status="pending"',[$id]) as $r){ $data=['name'=>$r['name'],'body'=>$c['body'],'body_format'=>$c['body_format']??'plain','cta_label'=>$c['cta_label'],'cta_url'=>$c['cta_url'],'user_id'=>$r['user_id']]; $queued=EmailQueueService::queue('marketing',$r['email'],$c['subject'],'campaign',$data,"campaign:$id:recipient:".$r['id'],['campaign_id'=>$id,'campaign_recipient_id'=>$r['id'],'waitlist_entry_id'=>$r['waitlist_entry_id']]);if($queued)$queuedCount++; DB::exec('update email_campaign_recipients set status=?,last_error=? where id=?',[$queued?'queued':'suppressed',$queued?null:'Consent or unsubscribe authorization unavailable',$r['id']]); } DB::exec('update email_campaigns set status="queued",queued_at=now() where id=?',[$id]);DB::commit();if($queuedCount===0)self::recalculate($id); }catch(\Throwable $e){DB::rollBack();throw $e;} return count($rows); }
+    public static function queue(int $id): int
+    {
+        DB::begin();
+
+        try {
+            $c=DB::row(
+                'select *
+                 from email_campaigns
+                 where id=?
+                   and (
+                        status="draft"
+                        or (
+                            status="scheduled"
+                            and scheduled_for<=now()
+                            and recurring_definition_id is null
+                        )
+                   )
+                 for update',
+                [$id]
+            );
+
+            if(!$c){
+                DB::commit();
+                return 0;
+            }
+
+            $rows=self::audience(
+                $c['audience']
+            );
+
+            if(!$rows){
+                DB::exec(
+                    'update email_campaigns
+                     set status="completed",
+                         queued_at=coalesce(queued_at,now()),
+                         completed_at=coalesce(completed_at,now())
+                     where id=?',
+                    [$id]
+                );
+
+                DB::commit();
+                return 0;
+            }
+
+            $queuedCount=0;
+
+            foreach($rows as $r){
+                DB::exec(
+                    'insert ignore into email_campaign_recipients
+                     (
+                        campaign_id,
+                        waitlist_entry_id,
+                        user_id,
+                        email,
+                        name,
+                        status
+                     )
+                     values (?,?,?,?,?,"pending")',
+                    [
+                        $id,
+                        $r['waitlist_entry_id']??null,
+                        $r['user_id']??null,
+                        $r['email'],
+                        $r['name']??null
+                    ]
+                );
+            }
+
+            foreach(
+                DB::rows(
+                    'select *
+                     from email_campaign_recipients
+                     where campaign_id=?
+                       and status="pending"',
+                    [$id]
+                )
+                as $r
+            ){
+                $data=[
+                    'name'=>$r['name'],
+                    'body'=>$c['body'],
+                    'body_format'=>$c['body_format']??'plain',
+                    'preheader'=>$c['preheader']??null,
+                    'cta_label'=>$c['cta_label'],
+                    'cta_url'=>$c['cta_url'],
+                    'user_id'=>$r['user_id']
+                ];
+
+                $queued=
+                    EmailQueueService::queue(
+                        'marketing',
+                        $r['email'],
+                        $c['subject'],
+                        'campaign',
+                        $data,
+                        "campaign:$id:recipient:".$r['id'],
+                        [
+                            'campaign_id'=>$id,
+                            'campaign_recipient_id'=>$r['id'],
+                            'waitlist_entry_id'=>$r['waitlist_entry_id']
+                        ]
+                    );
+
+                if($queued){
+                    $queuedCount++;
+                }
+
+                DB::exec(
+                    'update email_campaign_recipients
+                     set status=?,
+                         last_error=?
+                     where id=?',
+                    [
+                        $queued ? 'queued' : 'suppressed',
+                        $queued
+                            ? null
+                            : 'Consent or unsubscribe authorization unavailable',
+                        $r['id']
+                    ]
+                );
+            }
+
+            DB::exec(
+                'update email_campaigns
+                 set status="queued",
+                     queued_at=coalesce(queued_at,now())
+                 where id=?',
+                [$id]
+            );
+
+            DB::commit();
+
+            if($queuedCount===0){
+                self::recalculate($id);
+            }
+
+            return count($rows);
+        } catch(\Throwable $e) {
+            if(DB::pdo()->inTransaction()){
+                DB::rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
     private static function audience(string $aud): array
     {
         if($aud==='users_opted_in'){

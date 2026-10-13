@@ -1,5 +1,10 @@
 <?php use App\Core\Helpers as H;$marketing=!empty($data['marketing_preference']);?><!doctype html>
 <html lang="en"><body style="margin:0;padding:0;background:#fff7fb;font-family:Arial,Helvetica,sans-serif;color:#231942;">
+<?php if(!empty($data['preheader'])): ?>
+<div style="display:none!important;font-size:1px;color:#fff7fb;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">
+<?=H::e((string)$data['preheader'])?>
+</div>
+<?php endif; ?>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#fff7fb;"><tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #eeeeee;">
 <tr><td style="padding:18px 28px;background:#ffffff;text-align:center;border-top:6px solid #ff6b9f;border-bottom:1px solid #eeeeee;">
