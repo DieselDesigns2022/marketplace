@@ -709,6 +709,31 @@ if(!empty($definition['next_run_at'])){
 
         <div
             style="
+                padding:16px;
+                border:1px solid #ddd;
+                border-radius:10px;
+            "
+        >
+            <label>
+                Send Test Email
+
+                <input
+                    type="email"
+                    name="test_email"
+                    placeholder="Active admin email address"
+                    value="<?=H::e(
+                        $_POST['test_email']??''
+                    )?>"
+                >
+            </label>
+
+            <small class="muted">
+                Test emails are sent only to an active Creative Moth administrator.
+            </small>
+        </div>
+
+        <div
+            style="
                 display:flex;
                 flex-wrap:wrap;
                 gap:10px;
@@ -720,6 +745,14 @@ if(!empty($definition['next_run_at'])){
                 value="preview"
             >
                 Preview Email
+            </button>
+
+            <button
+                type="submit"
+                name="action"
+                value="test"
+            >
+                Send Test Email
             </button>
 
             <button

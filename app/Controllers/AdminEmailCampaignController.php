@@ -504,12 +504,16 @@ final class AdminEmailCampaignController
 
         $errors=[];
         $preview=false;
+        $previewContent=[
+            'products'=>[],
+            'paid_promos'=>[]
+        ];
 
         if($_SERVER['REQUEST_METHOD']==='POST'){
             $action=(string)($_POST['action']??'');
 
-            if(!in_array($action,['preview','save'],true)){
-                $errors[]='Choose Preview or Save Changes.';
+            if(!in_array($action,['preview','test','save'],true)){
+                $errors[]='Choose Preview, Send Test Email, or Save Changes.';
             }
 
             $_POST['frequency']=$frequency;
@@ -527,7 +531,7 @@ final class AdminEmailCampaignController
             );
 
             if(!$errors){
-                if($action==='preview'){
+                if(in_array($action,['preview','test'],true)){
                     $definition=array_merge(
                         $definition,
                         $_POST
@@ -544,7 +548,110 @@ final class AdminEmailCampaignController
                         );
 
                     $preview=true;
-                } else {
+                }
+
+                if($action==='test'){
+                    $email=strtolower(
+                        trim(
+                            (string)($_POST['test_email']??'')
+                        )
+                    );
+
+                    $admin=
+                        filter_var(
+                            $email,
+                            FILTER_VALIDATE_EMAIL
+                        )
+                        ? DB::row(
+                            'select id,email,name,role,status
+                             from users
+                             where role="admin"
+                               and status="active"
+                               and lower(email)=?',
+                            [$email]
+                        )
+                        : null;
+
+                    if(!$admin){
+                        $errors[]=
+                            'Test email must belong to an active administrator.';
+                    } else {
+                        $pref=DB::row(
+                            'select user_id
+                             from email_preferences
+                             where user_id=?',
+                            [(int)$admin['id']]
+                        );
+
+                        if(!$pref){
+                            DB::exec(
+                                'insert into email_preferences(
+                                    user_id,
+                                    marketing_opt_in,
+                                    unsubscribe_nonce
+                                 ) values (?,0,?)',
+                                [
+                                    (int)$admin['id'],
+                                    bin2hex(random_bytes(32))
+                                ]
+                            );
+                        }
+
+                        $testData=[
+                            'user_id'=>(int)$admin['id'],
+                            'name'=>$admin['name'] ?: 'Admin',
+                            'frequency'=>$frequency,
+                            'period_start'=>
+                                $previewContent['period_start']??'',
+                            'period_end'=>
+                                $previewContent['period_end']??'',
+                            'products'=>
+                                $previewContent['products']??[],
+                            'paid_promos'=>
+                                $previewContent['paid_promos']??[],
+                            'newsletter_subject'=>
+                                trim((string)$_POST['subject']),
+                            'preheader'=>
+                                trim((string)($_POST['preheader']??'')),
+                            'newsletter_body'=>
+                                $definition['body'],
+                            'newsletter_body_format'=>
+                                'rich_html',
+                            'cta_label'=>
+                                trim((string)($_POST['cta_label']??'')) ?: null,
+                            'cta_url'=>
+                                EmailCampaignService::safeCta(
+                                    $_POST['cta_url']??null
+                                )
+                        ];
+
+                        $ok=EmailQueueService::queue(
+                            'marketing',
+                            $email,
+                            '[TEST — NOT A LIVE SEND] '.
+                                trim((string)$_POST['subject']),
+                            'marketplace_digest',
+                            $testData,
+                            'recurring-newsletter-test:'.
+                                $frequency.':'.
+                                hash(
+                                    'sha256',
+                                    $email.':'.
+                                    microtime(true)
+                                ),
+                            [
+                                'admin_test'=>true
+                            ]
+                        );
+
+                        H::flash(
+                            $ok?'success':'warning',
+                            $ok
+                                ? 'Test newsletter queued only for '.$email.'.'
+                                : 'The test newsletter could not be queued.'
+                        );
+                    }
+                } elseif($action==='save'){
                     EmailNewsletterRecurringService::save(
                         $_POST,
                         (int)H::user()['id']
