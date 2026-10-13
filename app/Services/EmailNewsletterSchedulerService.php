@@ -154,7 +154,11 @@ final class EmailNewsletterSchedulerService
         int $limit=20
     ): int {
         $rows=DB::rows(
-            'select id
+            'select
+                id,
+                newsletter_type,
+                scheduled_for,
+                schedule_timezone
              from email_campaigns
              where status="scheduled"
                and recurring_definition_id is not null
@@ -166,6 +170,26 @@ final class EmailNewsletterSchedulerService
         $queued=0;
 
         foreach($rows as $row){
+            if($row['newsletter_type']==='weekly'){
+                $timezone=
+                    $row['schedule_timezone']
+                    ?: 'America/Detroit';
+
+                $ending=
+                    (new \DateTimeImmutable(
+                        $row['scheduled_for'],
+                        new \DateTimeZone('UTC')
+                    ))
+                    ->setTimezone(
+                        new \DateTimeZone($timezone)
+                    )
+                    ->format('Y-m-d');
+
+                EmailDigestService::queueFavoriteShops(
+                    $ending
+                );
+            }
+
             $queued+=
                 EmailDigestService::queueCampaign(
                     (int)$row['id']
