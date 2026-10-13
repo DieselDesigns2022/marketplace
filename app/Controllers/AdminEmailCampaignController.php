@@ -5,6 +5,8 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\EmailCampaignService;
 use App\Services\EmailQueueService;
+use App\Services\EmailNewsletterRecurringService;
+use App\Services\EmailDigestService;
 
 final class AdminEmailCampaignController
 {
@@ -325,6 +327,10 @@ final class AdminEmailCampaignController
 
         $errors=[];
         $preview=false;
+        $previewContent=[
+            'products'=>[],
+            'paid_promos'=>[]
+        ];
 
         if($_SERVER['REQUEST_METHOD']==='POST'){
             $action=(string)($_POST['action']??'');
@@ -451,6 +457,129 @@ final class AdminEmailCampaignController
             ) + [
                 'editing'=>true
             ]
+        );
+    }
+
+    public function recurring(string $frequency): void
+    {
+        $this->admin(true);
+
+        if(
+            !in_array(
+                $frequency,
+                EmailNewsletterRecurringService::FREQUENCIES,
+                true
+            )
+        ){
+            H::abort(404);
+        }
+
+        $definition=
+            EmailNewsletterRecurringService::get($frequency);
+
+        if(!$definition){
+            $definition=[
+                'frequency'=>$frequency,
+                'name'=>$frequency==='weekly'
+                    ? 'Creative Moth Weekly'
+                    : 'Creative Moth Monthly',
+                'audience'=>$frequency==='weekly'
+                    ? 'users_weekly'
+                    : 'users_monthly',
+                'subject'=>'',
+                'preheader'=>'',
+                'body'=>'',
+                'body_format'=>'rich_html',
+                'cta_label'=>'Browse Creative Moth',
+                'cta_url'=>'/browse',
+                'timezone'=>'America/Detroit',
+                'send_hour'=>10,
+                'send_minute'=>0,
+                'weekly_day'=>1,
+                'monthly_day'=>1,
+                'enabled'=>0,
+                'next_run_at'=>null
+            ];
+        }
+
+        $errors=[];
+        $preview=false;
+
+        if($_SERVER['REQUEST_METHOD']==='POST'){
+            $action=(string)($_POST['action']??'');
+
+            if(!in_array($action,['preview','save'],true)){
+                $errors[]='Choose Preview or Save Changes.';
+            }
+
+            $_POST['frequency']=$frequency;
+
+            $_POST['audience']=
+                $frequency==='weekly'
+                    ? 'users_weekly'
+                    : 'users_monthly';
+
+            $_POST['body_format']='rich_html';
+
+            $errors=array_merge(
+                $errors,
+                EmailNewsletterRecurringService::validate($_POST)
+            );
+
+            if(!$errors){
+                if($action==='preview'){
+                    $definition=array_merge(
+                        $definition,
+                        $_POST
+                    );
+
+                    $definition['body']=
+                        EmailCampaignService::sanitizeRichBody(
+                            (string)($_POST['body']??'')
+                        );
+
+                    $previewContent=
+                        EmailDigestService::previewContent(
+                            $frequency
+                        );
+
+                    $preview=true;
+                } else {
+                    EmailNewsletterRecurringService::save(
+                        $_POST,
+                        (int)H::user()['id']
+                    );
+
+                    H::flash(
+                        'success',
+                        ucfirst($frequency).
+                        ' newsletter settings saved.'
+                    );
+
+                    H::redirect(
+                        '/admin/email-campaigns/recurring/'.
+                        $frequency
+                    );
+                }
+            }
+
+            if($errors){
+                $definition=array_merge(
+                    $definition,
+                    $_POST
+                );
+            }
+        }
+
+        H::view(
+            'admin/email_campaigns/recurring',
+            compact(
+                'frequency',
+                'definition',
+                'errors',
+                'preview',
+                'previewContent'
+            )
         );
     }
 

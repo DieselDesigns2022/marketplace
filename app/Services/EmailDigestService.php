@@ -15,6 +15,30 @@ final class EmailDigestService
         return [$start->format('Y-m-d'),$end->format('Y-m-d')];
     }
 
+    public static function previewContent(string $frequency): array
+    {
+        [$start,$end]=self::period($frequency);
+
+        $paidPromos=
+            $frequency==='weekly'
+                ? PromoService::weekly($start,$end)
+                : [];
+
+        $products=
+            $frequency==='weekly'
+                ? self::weeklyProducts($paidPromos)
+                : self::products($start,$end);
+
+        return [
+            'frequency'=>$frequency,
+            'period_start'=>$start,
+            'period_end'=>$end,
+            'marketing_preference'=>$frequency,
+            'paid_promos'=>$paidPromos,
+            'products'=>$products
+        ];
+    }
+
     public static function queueDigest(string $frequency,?string $ending=null): int
     {
         [$start,$end]=self::period($frequency,$ending);

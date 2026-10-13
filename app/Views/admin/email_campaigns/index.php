@@ -46,12 +46,34 @@ function newsletterAdminTypeLabel(string $type): string
         </div>
 
         <?php if(H::canAdmin('email_campaigns.manage')): ?>
-            <a
-                class="btn"
-                href="/admin/email-campaigns/new"
+            <div
+                style="
+                    display:flex;
+                    flex-wrap:wrap;
+                    gap:8px;
+                "
             >
-                Create Newsletter
-            </a>
+                <a
+                    class="btn"
+                    href="/admin/email-campaigns/recurring/weekly"
+                >
+                    Weekly Newsletter
+                </a>
+
+                <a
+                    class="btn"
+                    href="/admin/email-campaigns/recurring/monthly"
+                >
+                    Monthly Newsletter
+                </a>
+
+                <a
+                    class="btn"
+                    href="/admin/email-campaigns/new"
+                >
+                    Create One-Off Newsletter
+                </a>
+            </div>
         <?php endif; ?>
     </div>
 

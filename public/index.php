@@ -217,7 +217,8 @@ $router->post('/seller/collabs/{id}/file-update-requests/{request}/deny', [Colla
  $router->match(['GET','POST'], '/admin/waitlist/email', [AdminEmailCampaignController::class, 'waitlistCompose']);
  $router->get('/admin/email-campaigns', [AdminEmailCampaignController::class, 'index']);
  $router->match(['GET','POST'], '/admin/email-campaigns/new', [AdminEmailCampaignController::class, 'create']);
- $router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCampaignController::class, 'edit']);
+ $router->match(['GET','POST'], '/admin/email-campaigns/recurring/{frequency}', [AdminEmailCampaignController::class, 'recurring']);
+$router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCampaignController::class, 'edit']);
  $router->match(['GET','POST'], '/admin/email-campaigns/{id}', [AdminEmailCampaignController::class, 'show']);
  $router->match(['GET','POST'], '/admin/users', [AdminController::class, 'users']);
  $router->post('/admin/users/{id}/delete', [AdminController::class, 'deleteUser']);
