@@ -1,6 +1,7 @@
 <?php
 
 use App\Core\Helpers as H;
+use App\Services\EmailImageService;
 
 $products = is_array($data['products'] ?? null) ? $data['products'] : [];
 $favoriteShop = ($data['marketing_preference'] ?? '') === 'favorite_shop';
@@ -70,7 +71,9 @@ foreach ($designers as $designer):
                         . '/product/'
                         . rawurlencode((string)$product['slug']);
 
-                    $imageUrl = H::assetUrl($product['preview_image'] ?? null);
+                    $imageUrl = EmailImageService::compatibleUrl(
+                        $product['preview_image'] ?? null
+                    );
 
                     $hasSecureImage =
                         $imageUrl !== ''
