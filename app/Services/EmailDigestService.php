@@ -74,11 +74,19 @@ final class EmailDigestService
 
         $frequency=(string)$campaign['newsletter_type'];
 
-        $ending=substr(
-            (string)$campaign['scheduled_for'],
-            0,
-            10
-        );
+        $timezone=
+            trim((string)($campaign['schedule_timezone']??''))
+            ?: 'America/Detroit';
+
+        $ending=
+            (new \DateTimeImmutable(
+                (string)$campaign['scheduled_for'],
+                new \DateTimeZone('UTC')
+            ))
+            ->setTimezone(
+                new \DateTimeZone($timezone)
+            )
+            ->format('Y-m-d');
 
         [$start,$end]=self::period(
             $frequency,

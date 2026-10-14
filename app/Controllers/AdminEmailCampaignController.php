@@ -708,7 +708,7 @@ final class AdminEmailCampaignController
         $email=strtolower(trim($_POST['test_email']??''));$admin=filter_var($email,FILTER_VALIDATE_EMAIL)?DB::row('select id,email from users where role="admin" and status="active" and lower(email)=?',[$email]):null;
         if(!$admin){H::flash('warning','Test email must belong to an active administrator.');return;}
         $pref=DB::row('select user_id from email_preferences where user_id=?',[$admin['id']]);if(!$pref)DB::exec('insert into email_preferences(user_id,marketing_opt_in,unsubscribe_nonce) values (?,0,?)',[$admin['id'],bin2hex(random_bytes(32))]);
-        $ok=EmailQueueService::queue('marketing',$email,'[TEST — NOT A LIVE CAMPAIGN] '.$campaign['subject'],'campaign',['name'=>'Admin','body'=>$campaign['body'],'body_format'=>$campaign['body_format']??'plain','cta_label'=>$campaign['cta_label'],'cta_url'=>$campaign['cta_url'],'user_id'=>(int)$admin['id']],"campaign:$id:test:".hash('sha256',$email.':'.microtime(true)),['admin_test'=>true]);
+        $ok=EmailQueueService::queue('marketing',$email,'[TEST — NOT A LIVE CAMPAIGN] '.$campaign['subject'],'campaign',['name'=>'Admin','body'=>$campaign['body'],'body_format'=>$campaign['body_format']??'plain','preheader'=>$campaign['preheader']??null,'cta_label'=>$campaign['cta_label'],'cta_url'=>$campaign['cta_url'],'user_id'=>(int)$admin['id']],"campaign:$id:test:".hash('sha256',$email.':'.microtime(true)),['admin_test'=>true]);
         H::flash($ok?'success':'warning',$ok?'Test message queued only for the selected administrator.':'The test message could not be queued.');
     }
 }
