@@ -1,13 +1,32 @@
 <h1>Seller Dashboard → Products</h1>
 <p><a class="btn" href="/seller/product/new">Create Product</a> <a class="btn" href="/seller/product-batches">Bulk Upload / Create Multiple Products</a> <a class="btn" href="/seller/products/import">Import Products</a></p>
 <p class="muted">Archive hides a product from public browsing while preserving order history. Permanent delete is only available for draft/test products with no completed orders.</p>
+<form method="get" action="/seller/products" class="card">
+    <?php if(($status??'all')!=='all'): ?>
+        <input type="hidden" name="status" value="<?=H::e($status)?>">
+    <?php endif; ?>
+    <label>
+        Search your products
+        <input type="search" name="q" value="<?=H::e($q??'')?>" placeholder="Product name">
+    </label>
+    <button class="btn" type="submit">Search</button>
+    <?php if(($q??'')!==''): ?>
+        <a class="btn alt" href="/seller/products<?=($status??'all')==='all'?'':'?status='.rawurlencode($status)?>">Clear Search</a>
+    <?php endif; ?>
+</form>
+
 <nav class="tabs">
-    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','scheduled'=>'Scheduled','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label): ?>
-    <a class="<?=($status??'all')===$key?'active':''?>" href="/seller/products<?=$key==='all'?'':'?status='.$key?>"><?=H::e($label)?></a>
+    <?php foreach(['all'=>'All','draft'=>'Draft','pending_review'=>'Pending Review','scheduled'=>'Scheduled','approved'=>'Published','published'=>'Published Legacy','rejected'=>'Rejected','disabled'=>'Disabled','archived'=>'Archived'] as $key=>$label):
+        $tabParams=[];
+        if($key!=='all')$tabParams['status']=$key;
+        if(($q??'')!=='')$tabParams['q']=$q;
+        $tabUrl='/seller/products'.($tabParams?'?'.http_build_query($tabParams):'');
+    ?>
+    <a class="<?=($status??'all')===$key?'active':''?>" href="<?=H::e($tabUrl)?>"><?=H::e($label)?></a>
 <?php endforeach; ?>
 </nav>
 <?php if(!$products): ?>
-<div class="card empty"><h2>No products found.</h2><p>Create a product draft and submit it for review when it is ready.</p><a class="btn" href="/seller/product/new">Create Product</a></div>
+<div class="card empty"><h2>No products found.</h2><p><?=($q??'')!==''?'No products match your search and selected status filter.':'Create a product draft and submit it for review when it is ready.'?></p><?php if(($q??'')===''):?><a class="btn" href="/seller/product/new">Create Product</a><?php endif;?></div>
 <?php else: ?>
     <form id="bulk-product-form" method="post" action="/seller/products/bulk-delete">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">

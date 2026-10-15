@@ -1091,6 +1091,8 @@ class SellerController
         $d = $this->d();
         $status = $_GET['status'] ?? 'all';
         $allowed = ['draft', 'pending_review', 'scheduled', 'approved', 'published', 'rejected', 'disabled', 'archived'];
+        $q = trim((string)($_GET['q'] ?? ''));
+        if (mb_strlen($q) > 120) $q = mb_substr($q, 0, 120);
         $params = [$d['id']];
         $where = 'where p.designer_id=? and p.status<>"deleted"';
         if (in_array($status, $allowed, true))
@@ -1099,7 +1101,14 @@ class SellerController
             $params[] = $status;
 
         }
-        H::view('seller/products', [ 'status' => $status, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
+        if ($q !== '')
+        {
+            $escaped = addcslashes($q, "\\%_");
+            $where .= " and p.title like ? escape '\\\\'";
+            $params[] = '%'.$escaped.'%';
+
+        }
+        H::view('seller/products', [ 'status' => $status, 'q' => $q, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
 
     }
 
