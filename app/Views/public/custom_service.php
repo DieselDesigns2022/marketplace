@@ -125,6 +125,17 @@ $globalLicenseTerms = str_replace(
             · <?=$service['included_revisions']?> revisions included
         </p>
 
+        <section class="card share-card">
+            <h2>Share this Custom Design</h2>
+            <div class="share-actions icon-actions" aria-label="Custom Design sharing options">
+                <a class="icon-btn social-facebook" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/sharer/sharer.php?u=<?=H::e(rawurlencode($shareUrl))?>" aria-label="Share on Facebook" title="Share on Facebook"><span aria-hidden="true">f</span><span class="sr-only">Facebook</span></a>
+                <a class="icon-btn social-x" target="_blank" rel="noopener noreferrer" href="https://twitter.com/intent/tweet?url=<?=H::e(rawurlencode($shareUrl))?>&text=<?=H::e(rawurlencode($shareText))?>" aria-label="Share on X/Twitter" title="Share on X/Twitter"><span aria-hidden="true">𝕏</span><span class="sr-only">X/Twitter</span></a>
+                <button type="button" class="icon-btn social-copy" data-copy-link="<?=H::e($shareUrl)?>" aria-label="Copy Custom Design link" title="Copy Custom Design link"><span aria-hidden="true">🔗</span><span class="sr-only">Copy link</span></button>
+                <button type="button" class="icon-btn social-instagram" data-copy-link="<?=H::e($shareText . ' ' . $shareUrl)?>" aria-label="Copy Instagram caption" title="Copy for Instagram"><span aria-hidden="true">◎</span><span class="sr-only">Copy for Instagram</span></button>
+            </div>
+            <p class="help-text">Sharing uses the public Custom Design URL and watermarked preview image when available.</p>
+        </section>
+
         <div class="custom-design-contact">
 
             <p>
