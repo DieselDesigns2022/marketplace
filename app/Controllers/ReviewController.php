@@ -34,6 +34,12 @@ final class ReviewController
         $sql='select oi.*,o.created_at purchase_date,coalesce(oi.product_title,p.title,JSON_UNQUOTE(JSON_EXTRACT(co.service_snapshot,"$.title")),"Purchased item") product_title,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,d.store_slug,coalesce((select image_path from product_images pi where pi.product_id=oi.product_id order by pi.sort_order,pi.id limit 1),(select image_path from custom_service_images csi where csi.custom_service_id=oi.custom_service_id order by csi.sort_order,csi.id limit 1)) preview_image from order_items oi join orders o on o.id=oi.order_id left join products p on p.id=oi.product_id left join custom_orders co on co.order_item_id=oi.id left join designers d on d.id=oi.designer_id where oi.id=? and o.user_id=?';
         $item=$review?DB::row($sql,[$review['order_item_id'],$uid]):DB::row($sql.' and ((oi.custom_service_id is null and o.payment_status="paid") or (oi.custom_service_id is not null and o.payment_status in ("paid","partially_refunded"))) and oi.review_eligible_at is not null',[(int)$id,$uid]);if(!$item)H::abort(404);
         if($review){$item['product_title']=$review['product_title_snapshot'];$item['seller_name']=$review['seller_name_snapshot'];}
+        $editing=$review&&($_SERVER['REQUEST_METHOD']==='POST'||($_GET['edit']??'')==='1');
+        if($review&&!$editing){
+            $reply=DB::row('select reply_text,created_at,updated_at,moderation_status from seller_review_replies where review_id=?',[$review['id']]);
+            H::view('buyer/review_view',['review'=>$review,'item'=>$item,'reply'=>$reply]);
+            return;
+        }
         if($_SERVER['REQUEST_METHOD']==='POST'){H::verifyCsrf();try{if($review){$this->service->edit($uid,(int)$review['id'],$_POST['rating']??'',$_POST['review_text']??'');H::flash('success','Review updated.');H::redirect('/dashboard/reviews/'.$review['id']);}else{$id=$this->service->create($uid,(int)$item['id'],$_POST['rating']??'',$_POST['review_text']??'');H::flash('success','Review published.');H::redirect('/dashboard/reviews');}}catch(Throwable $e){$error=$this->safeMessage($e,'buyer review save');}}
         H::view('buyer/review_form',['review'=>$review,'item'=>$item,'error'=>$error??null]);
     }
