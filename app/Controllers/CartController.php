@@ -295,7 +295,7 @@ class CartController
                 $creditCents = $breakdown['credit_cents'];
                 $credits = CreditService::formatCents($creditCents);
                 $total = CreditService::formatCents(max(0, $grossCents - $creditCents));
-                if ($total <= 0 && $creditCents <= 0) { DB::rollBack();H::flash('error','Coupon-only free checkout is not available.');H::redirect('/cart'); }
+                if ($total <= 0 && $creditCents <= 0 && $couponDiscount > 0) { DB::rollBack();H::flash('error','Coupon-only free checkout is not available.');H::redirect('/cart'); }
                 $commissionRate = StripeService::commissionRate();
                 $feeInput=[];
                 foreach($valid as $idx=>$p)$feeInput[]=['id'=>$idx+1,'seller_id'=>(int)$p['designer_id'],'gross_cents'=>max(0,CreditService::parseCents((string)$p['line_total'])-CreditService::parseCents((string)($allocations[$idx]??'0.00')))];
