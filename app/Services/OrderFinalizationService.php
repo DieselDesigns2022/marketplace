@@ -103,9 +103,11 @@ final class OrderFinalizationService
             $gross = round((float)$row['gross'], 2);
             $commission = round((float)$row['commission'], 2);
             $payout = max(0, round((float)$row['payout'], 2));
-            $status = $platformFunded
-                ? 'platform_credit_hold'
-                : (!empty($row['stripe_connect_account_id']) && !empty($row['stripe_details_submitted']) && !empty($row['stripe_payouts_enabled']) ? 'pending_transfer' : 'pending_stripe_onboarding');
+            $status = $payout <= 0
+                ? 'no_payout_required'
+                : ($platformFunded
+                    ? 'platform_credit_hold'
+                    : (!empty($row['stripe_connect_account_id']) && !empty($row['stripe_details_submitted']) && !empty($row['stripe_payouts_enabled']) ? 'pending_transfer' : 'pending_stripe_onboarding'));
             $rate=$row['marketplace_fee_model']==='percentage_plus_fixed'?((int)$row['marketplace_fee_basis_points']/10000):(float)$row['legacy_rate'];$fixed=$row['marketplace_fee_model']==='percentage_plus_fixed'?(int)$row['marketplace_fixed_fee_cents']:0;
             DB::exec('insert into seller_payouts (order_id,designer_id,gross_amount,fee_model,commission_rate_snapshot,fixed_fee_cents_snapshot,marketplace_percentage_fee_amount,marketplace_fixed_fee_amount,original_gross_amount,original_seller_payout_amount,platform_commission_amount,seller_payout_amount,currency,payout_status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end', [$orderId,$row['designer_id'],$gross,$row['marketplace_fee_model'],$rate,$fixed,$row['percentage_fee'],$row['fixed_fee'],$gross,$payout,$commission,$payout,$currency,$status]);
             DB::exec('update order_items set seller_payout_status=case when seller_payout_status="transferred" then seller_payout_status else ? end where order_id=? and designer_id=?', [$status, $orderId, $row['designer_id']]);
@@ -138,7 +140,9 @@ final class OrderFinalizationService
                 DB::exec('insert into collab_order_allocations(collab_id,order_id,order_item_id,designer_id,qualifying_file_count,eligible_count_snapshot,gross_basis_cents,marketplace_fee_cents,contributor_pool_cents,allocation_cents,storefront_designer_id) values(?,?,?,?,?,?,?,?,?,?,?)', [$item['collab_id'],$orderId,$item['id'],$designerId,$byDesigner[$designerId]['qualifying_file_count'],count($ids),$gross,$fee,array_sum($payoutSplit),$allocation,$item['collab_storefront_designer_id']]);
                 DB::exec('insert into seller_earnings(order_id,order_item_id,product_id,collab_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) select ?,?,null,?,?,o.user_id,?,?,?,"paid_pending_payout" from orders o where o.id=?', [$orderId,$item['id'],$item['collab_id'],$designerId,CreditService::formatCents($grossBasis),CreditService::formatCents($allocatedFee),CreditService::formatCents($allocation),$orderId]);
                 $designer = DB::row('select stripe_connect_account_id,stripe_details_submitted,stripe_payouts_enabled from designers where id=?', [$designerId]);
-                $status = $platformFunded ? 'platform_credit_hold' : (!empty($designer['stripe_connect_account_id']) && !empty($designer['stripe_details_submitted']) && !empty($designer['stripe_payouts_enabled']) ? 'pending_transfer' : 'pending_stripe_onboarding');
+                $status = $allocation <= 0
+                    ? 'no_payout_required'
+                    : ($platformFunded ? 'platform_credit_hold' : (!empty($designer['stripe_connect_account_id']) && !empty($designer['stripe_details_submitted']) && !empty($designer['stripe_payouts_enabled']) ? 'pending_transfer' : 'pending_stripe_onboarding'));
                 DB::exec('insert into seller_payouts(order_id,designer_id,gross_amount,fee_model,commission_rate_snapshot,fixed_fee_cents_snapshot,marketplace_percentage_fee_amount,marketplace_fixed_fee_amount,original_gross_amount,original_seller_payout_amount,platform_commission_amount,seller_payout_amount,currency,payout_status) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update payout_status=case when payout_status="transferred" then payout_status else values(payout_status) end', [$orderId,$designerId,CreditService::formatCents($grossBasis),'percentage_plus_fixed',(int)$item['marketplace_fee_basis_points']/10000,(int)$item['marketplace_fixed_fee_cents'],CreditService::formatCents($percentageFee),CreditService::formatCents($fixedFee),CreditService::formatCents($grossBasis),CreditService::formatCents($allocation),CreditService::formatCents($allocatedFee),CreditService::formatCents($allocation),$currency,$status]);
             }
             DB::exec('update order_items set seller_payout_status="allocated" where id=?', [$item['id']]);
