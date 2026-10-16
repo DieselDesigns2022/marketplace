@@ -56,8 +56,9 @@ final class OrderFinalizationService
 
             DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$orderId]);
             CouponService::recordUsage($orderId);
-            $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $internal);
-            $this->prepareCollabFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $internal);
+            $platformFunded = $internal || CreditService::parseCents((string)$order['credits_applied']) > 0;
+            $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
+            $this->prepareCollabFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->referrals->qualifyBuyer($orderId, $eventKey . ':buyer');
             foreach (DB::rows('select designer_id from order_items where order_id=? and collab_id is null union select designer_id from collab_order_allocations where order_id=?', [$orderId,$orderId]) as $seller) {
                 $this->referrals->qualifySeller($orderId, (int)$seller['designer_id'], $eventKey . ':seller:' . $seller['designer_id']);
