@@ -148,6 +148,31 @@
     <p>Creative Moth reviews support emails as soon as possible. Some requests may take longer if they involve order details, download access, product review, seller applications, licensing questions, or technical issues.</p>
     <p>Creative Moth sells digital products only. We do not offer shipping support for physical items.</p>
 </section>
+<?php elseif($page === 'data-deletion'): ?>
+
+<section class="page-hero">
+    <p class="eyebrow">Creative Moth Privacy</p>
+    <h1>Data Deletion Instructions</h1>
+    <p>You may request deletion of personal information and social-media connection data associated with your Creative Moth account.</p>
+</section>
+
+<section class="page-section card policy-content">
+    <h2>Request deletion of your data</h2>
+    <p>To request deletion, visit our <a href="/contact">Contact Creative Moth</a> page and submit a request stating that you want your Creative Moth account data deleted.</p>
+
+    <p>Please include the email address associated with your Creative Moth account so we can locate the correct account. We may need to verify your identity before completing the request.</p>
+
+    <h2>Facebook and Instagram connection data</h2>
+    <p>If you connected Facebook or Instagram to Creative Moth, your deletion request may also include information Creative Moth stored for that social-media connection.</p>
+
+    <p>You may also disconnect your Facebook or Instagram connection from Creative Moth. Disconnecting the integration prevents Creative Moth from using that connection for future social publishing.</p>
+
+    <h2>Information we may need to retain</h2>
+    <p>Some records may need to be retained when required for legal, tax, accounting, fraud-prevention, payment, dispute, security, or marketplace compliance purposes. Information that is not required to be retained will be deleted or anonymized as appropriate.</p>
+
+    <p>For additional information, review our <a href="/privacy">Privacy Policy</a>.</p>
+</section>
+
 <?php elseif($page === 'terms'): ?>
 
 <section class="page-hero terms-hero">

@@ -49,7 +49,7 @@ use App\Controllers\AnalyticsController;
  $router->match(['GET','POST'], '/collab/{slug}/checkout', [PublicCollabController::class, 'checkout']);
  $router->get('/collab-download/{item}', [PublicCollabController::class, 'download']);
  $router->post('/store/{id}/follow', [BuyerController::class, 'toggleFollow']);
- foreach (['about','contact','terms','privacy','licensing-help','seller-faq','buyer-faq'] as $page) $router->get('/'.$page, [PublicController::class, 'static']);
+ foreach (['about','contact','terms','privacy','data-deletion','licensing-help','seller-faq','buyer-faq'] as $page) $router->get('/'.$page, [PublicController::class, 'static']);
  $router->match(['GET','POST'], '/register', [AuthController::class, 'register']);
  $router->match(['GET','POST'], '/login', [AuthController::class, 'login']);
  $router->post('/logout', [AuthController::class, 'logout']);

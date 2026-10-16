@@ -14,6 +14,7 @@ class PublicController
         'contact' => ['Contact Creative Moth', 'Find general support, buyer support, seller support, account help, order guidance, download help, and marketplace contact information for Creative Moth.', 'ContactPage'],
         'terms' => ['Terms & Conditions', 'Read the rules for using Creative Moth, including accounts, digital purchases, downloads, licensing, seller responsibilities, refunds, and marketplace content.', 'WebPage'],
         'privacy' => ['Privacy Policy', 'Learn how Creative Moth collects, uses, protects, and stores marketplace account, buyer, seller, order, upload, and download information.', 'PrivacyPolicy'],
+        'data-deletion' => ['Data Deletion Instructions', 'Learn how to request deletion of Creative Moth account and social connection data.', 'WebPage'],
         'licensing-help' => ['Digital Product Licensing Help', 'Understand Creative Moth personal, basic, commercial, digital product, POD, wholesale, fabric, VA, reseller, and extended commercial license permissions.', 'WebPage'],
         'buyer-faq' => ['Buyer FAQ', 'Answers for buyers about finding products, accounts, purchases, downloads, licenses, POD use, refunds, and support.', 'FAQPage'],
         'seller-faq' => ['Seller FAQ', 'Answers for sellers about applying, storefronts, product review, SEO fields, licensing, AI disclosure, uploads, and support.', 'FAQPage'],
@@ -736,7 +737,7 @@ class PublicController
     public function sitemap(): never
     {
         header('Content-Type: application/xml; charset=utf-8');
-        $urls = ['/', '/browse', '/custom-designs', '/sell', '/about', '/contact', '/terms', '/privacy', '/licensing-help', '/buyer-faq', '/seller-faq'];
+        $urls = ['/', '/browse', '/custom-designs', '/sell', '/about', '/contact', '/terms', '/privacy', '/data-deletion', '/licensing-help', '/buyer-faq', '/seller-faq'];
         foreach ($this->visibleCategories() as $c) $urls[] = '/category/'.$c['slug'];
         foreach (DB::rows('select slug from products where status="approved" order by updated_at desc') as $p) $urls[] = '/product/'.$p['slug'];
         foreach (DB::rows('select s.slug from custom_design_services s join designers d on d.id=s.designer_id where s.is_active=1 and d.status="approved" order by s.updated_at desc') as $s) $urls[] = '/custom-design/'.$s['slug'];
