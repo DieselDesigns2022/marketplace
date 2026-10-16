@@ -122,7 +122,9 @@ final class FeedbackController
 
                 H::flash(
                     'success',
-                    'Thanks! Your feedback was received.'
+                    $type==='suggestion'
+                        ? 'Thanks! Your suggestion was received.'
+                        : 'Thanks! Your feedback was received.'
                 );
 
                 H::redirect('/feedback');
