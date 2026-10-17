@@ -65,9 +65,14 @@ final class CustomDesignService
     public function serviceLicenses(int $serviceId):array
     {
         $rows=DB::rows(
-            'select c.*,lt.name platform_name,lt.description platform_description
+            'select c.*,lt.name platform_name,lt.description platform_description,
+                    slp.description seller_description
              from custom_service_license_options c
+             join custom_design_services s on s.id=c.custom_service_id
              left join license_types lt on lt.id=c.license_type_id
+             left join seller_license_presets slp
+               on slp.designer_id=s.designer_id
+              and slp.license_type_id=c.license_type_id
              where c.custom_service_id=?
                and (c.license_type_id is null or lt.is_active=1)
              order by c.sort_order,c.id',
@@ -77,19 +82,23 @@ final class CustomDesignService
         return array_map(static function(array $row):array{
             $customName=trim((string)($row['custom_name']??''));
             $description=trim((string)($row['description']??''));
+            $sellerDescription=trim((string)($row['seller_description']??''));
+            $isCustom=$row['license_type_id']===null;
 
             return [
                 'id'=>(int)$row['id'],
-                'license_type_id'=>$row['license_type_id']===null
+                'license_type_id'=>$isCustom
                     ? null
                     : (int)$row['license_type_id'],
                 'license_key'=>(string)$row['license_key'],
                 'name'=>$customName!==''
                     ? $customName
                     : (string)($row['platform_name']??'Custom License'),
-                'description'=>$description!==''
+                'description'=>$isCustom
                     ? $description
-                    : (string)($row['platform_description']??''),
+                    : ($sellerDescription!==''
+                        ? $sellerDescription
+                        : (string)($row['platform_description']??'')),
                 'price'=>(float)$row['price'],
                 'is_default'=>!empty($row['is_default']),
                 'sort_order'=>(int)$row['sort_order'],

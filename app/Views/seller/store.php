@@ -76,7 +76,7 @@
 </form>
 <section class="card page-section">
     <h2>Default License Presets</h2>
-    <p class="help-text">Optional defaults can prefill license settings when you create a new product. Existing products are not changed, and each product can still be edited individually.</p>
+    <p class="help-text">License descriptions entered here override the Creative Moth default descriptions across all of your listings. License availability and prices are still set per listing, with these settings used as defaults for new listings.</p>
     <?php $presetMap=[]; foreach(($licensePresets??[]) as $preset) $presetMap[$preset['license_key']]=$preset; ?>
     <form method="post" class="form">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">

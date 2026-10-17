@@ -107,7 +107,7 @@
             <tr>
                 <td><label><input type="checkbox" name="license_enabled[<?=H::e($key)?>]" value="1" <?=$enabled?'checked':''?> <?=$key==='personal'?'checked disabled':''?>> <?=$key==='personal'?'Always included':'Enable'?></label><?php if($key==='personal'):?><input type="hidden" name="license_enabled[personal]" value="1"><?php endif;?></td>
                 <td><strong><?=H::e($type['name'])?></strong><?php if($description):?><span class="license-help" role="button" tabindex="0" aria-label="<?=H::e($type['name'])?> license details"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($description)?></span></span><?php endif;?><br><span class="muted"><?=H::e($key)?><?=$key==='personal'?' · included/free':' · optional add-on'?></span></td>
-                <td><?php if($key==='personal'):?><span class="muted">$0.00 included</span><input type="hidden" name="license_price[personal]" value="0.00"><?php else:?><input type="number" step="0.01" min="0" name="license_price[<?=H::e($key)?>]" value="<?=H::e($price)?>"><?php endif;?><input type="hidden" name="license_description[<?=H::e($key)?>]" value="<?=H::e($description)?>"></td>
+                <td><?php if($key==='personal'):?><span class="muted">$0.00 included</span><input type="hidden" name="license_price[personal]" value="0.00"><?php else:?><input type="number" step="0.01" min="0" name="license_price[<?=H::e($key)?>]" value="<?=H::e($price)?>"><?php endif;?><input type="hidden" name="license_description[<?=H::e($key)?>]" value=""></td>
             </tr>
         <?php endforeach;?>
     </table>

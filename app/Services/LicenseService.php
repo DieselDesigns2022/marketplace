@@ -57,12 +57,37 @@ class LicenseService
     public static function productLicenses(array $product): array
     {
         try {
-            $rows = DB::rows('select plt.*,lt.license_key,lt.name platform_name,lt.description platform_description from product_license_types plt join license_types lt on lt.id=plt.license_type_id where plt.product_id=? and plt.is_enabled=1 and lt.is_active=1 order by plt.sort_order,lt.sort_order,lt.name', [(int)$product['id']]);
+            $rows = DB::rows(
+                'select plt.*,lt.license_key,lt.name platform_name,lt.description platform_description,
+                        slp.description seller_description
+                 from product_license_types plt
+                 join license_types lt on lt.id=plt.license_type_id
+                 left join seller_license_presets slp
+                   on slp.designer_id=?
+                  and slp.license_type_id=plt.license_type_id
+                 where plt.product_id=?
+                   and plt.is_enabled=1
+                   and lt.is_active=1
+                 order by plt.sort_order,lt.sort_order,lt.name',
+                [(int)($product['designer_id'] ?? 0), (int)$product['id']]
+            );
         } catch (Throwable $e) {
             if (!self::missingTable($e)) throw $e;
             $rows = [];
         }
         $personal = self::personalIncludedLicense();
+        $sellerPresetMap = [];
+        foreach (self::sellerPresets((int)($product['designer_id'] ?? 0)) as $preset) {
+            $sellerPresetMap[(string)$preset['license_key']] = $preset;
+        }
+        if (isset($sellerPresetMap[self::PERSONAL_KEY])) {
+            $presetDescription = trim((string)($sellerPresetMap[self::PERSONAL_KEY]['description'] ?? ''));
+            if ($presetDescription !== '') {
+                $personal['description'] = $presetDescription;
+            } elseif (!empty($sellerPresetMap[self::PERSONAL_KEY]['platform_description'])) {
+                $personal['description'] = $sellerPresetMap[self::PERSONAL_KEY]['platform_description'];
+            }
+        }
         if ($rows) {
             $licenses = array_map(function ($row) {
                 return [
@@ -70,7 +95,9 @@ class LicenseService
                     'license_type_id' => (int)$row['license_type_id'],
                     'license_key' => $row['license_key'],
                     'name' => $row['custom_name'] ?: $row['platform_name'],
-                    'description' => $row['description'] ?: $row['platform_description'],
+                    'description' => trim((string)($row['seller_description'] ?? '')) !== ''
+                        ? $row['seller_description']
+                        : $row['platform_description'],
                     'price' => $row['license_key'] === self::PERSONAL_KEY ? 0.00 : (float)$row['price'],
                     'is_default' => $row['license_key'] === self::PERSONAL_KEY,
                     'sort_order' => (int)$row['sort_order'],
@@ -96,7 +123,12 @@ class LicenseService
                 'license_type_id' => 0,
                 'license_key' => 'commercial',
                 'name' => 'Commercial',
-                'description' => 'Commercial use is allowed under this product license. Digital resale, sharing, and redistribution are prohibited.',
+                'description' => (
+                    trim((string)($sellerPresetMap['commercial']['description'] ?? '')) !== ''
+                        ? $sellerPresetMap['commercial']['description']
+                        : ($sellerPresetMap['commercial']['platform_description']
+                            ?? 'Commercial use is allowed under this product license. Digital resale, sharing, and redistribution are prohibited.')
+                ),
                 'price' => (float)($product['commercial_license_price'] ?? 0),
                 'is_default' => false,
                 'sort_order' => 20,

@@ -301,7 +301,7 @@ $licenseMap = $configuredLicenses ?? [];
                     <input
                         type="hidden"
                         name="license_description[<?=H::e($key)?>]"
-                        value="<?=H::e((string)$description)?>"
+                        value=""
                     >
                 </td>
             </tr>
