@@ -22,7 +22,7 @@ final class SocialPublishingService
         $this->assertPlatform($platform);
         $redirect = $this->redirectUri($platform);
         if ($platform === 'pinterest') {
-            return 'https://www.pinterest.com/oauth/?'.http_build_query(['response_type'=>'code','client_id'=>$this->env('PINTEREST_APP_ID'),'redirect_uri'=>$redirect,'scope'=>'boards:read,pins:read,pins:write','state'=>$state]);
+            return 'https://www.pinterest.com/oauth/?'.http_build_query(['response_type'=>'code','client_id'=>$this->env('PINTEREST_APP_ID'),'redirect_uri'=>$redirect,'scope'=>'user_accounts:read,boards:read,boards:write,pins:read,pins:write','state'=>$state]);
         }
         $scopes = $platform === 'facebook' ? 'pages_show_list,pages_read_engagement,pages_manage_posts' : 'pages_show_list,instagram_basic,instagram_content_publish';
         return 'https://www.facebook.com/'.$this->metaVersion().'/dialog/oauth?'.http_build_query(['client_id'=>$this->env('META_APP_ID'),'redirect_uri'=>$redirect,'scope'=>$scopes,'state'=>$state,'response_type'=>'code']);
