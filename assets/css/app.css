@@ -989,6 +989,14 @@ body.license-modal-open {
 }
 
 
+.instagram-share-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+
 /* Phase 8.75 sidebar share spacing */
 .product-aside .share-card,
 aside .share-card {
