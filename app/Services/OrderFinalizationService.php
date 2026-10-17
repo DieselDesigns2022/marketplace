@@ -35,10 +35,17 @@ final class OrderFinalizationService
                 throw new DomainException('Internal completion requires a zero total and completed tax calculation.');
             }
             $this->createTaxTransaction($order);
-            if (CreditService::parseCents((string)$order['credits_applied']) > 0) {
+            $creditCents = CreditService::parseCents((string)$order['credits_applied']);
+            if ($creditCents > 0) {
                 $this->credits->finalizeReservation((int)$order['user_id'], $orderId, 'order:' . $orderId . ':credit:finalize');
             }
-            DB::exec('update orders set status="paid",payment_status="paid",manual_review_required=0,credit_payment_status=case when credits_applied>0 then "finalized" else "none" end,internally_completed=?,payment_provider=?,payment_processor=?,payment_mode=?,finalization_key=?,finalized_at=now(),paid_at=coalesce(paid_at,now()) where id=?', [$internal ? 1 : 0, $internal ? 'store_credit' : 'stripe', $internal ? 'internal' : 'stripe', $internal ? 'credit' : 'checkout', $eventKey, $orderId]);
+
+            $internalUsesCredit = $internal && $creditCents > 0;
+            $paymentProvider = $internal ? ($internalUsesCredit ? 'store_credit' : 'internal') : 'stripe';
+            $paymentProcessor = $internal ? 'internal' : 'stripe';
+            $paymentMode = $internal ? ($internalUsesCredit ? 'credit' : 'free') : 'checkout';
+
+            DB::exec('update orders set status="paid",payment_status="paid",manual_review_required=0,credit_payment_status=case when credits_applied>0 then "finalized" else "none" end,internally_completed=?,payment_provider=?,payment_processor=?,payment_mode=?,finalization_key=?,finalized_at=now(),paid_at=coalesce(paid_at,now()) where id=?', [$internal ? 1 : 0, $paymentProvider, $paymentProcessor, $paymentMode, $eventKey, $orderId]);
             DB::exec('update order_items set paid_at=coalesce(paid_at,now()),payout_ready_at=coalesce(payout_ready_at,now()),manual_delivery_status=case when fulfillment_type="google_drive" and manual_delivery_status in ("pending_delivery","buyer_email_needed") then "ready_for_seller_delivery" else manual_delivery_status end where order_id=?', [$orderId]);
 
             // Cart remains intact while payment is pending. Once payment is
@@ -56,7 +63,7 @@ final class OrderFinalizationService
 
             DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$orderId]);
             CouponService::recordUsage($orderId);
-            $platformFunded = $internal || CreditService::parseCents((string)$order['credits_applied']) > 0;
+            $platformFunded = $internal || $creditCents > 0;
             $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->prepareCollabFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->referrals->qualifyBuyer($orderId, $eventKey . ':buyer');
