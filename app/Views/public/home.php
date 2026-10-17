@@ -13,8 +13,8 @@
     <h2>Explore marketplace categories</h2>
     <p class="muted">Browse by creative use case, then narrow results by category, AI disclosure, POD permission, or sort order on the browse page.</p>
     <div class="grid">
-        <?php foreach($cats as $c):?><a class="card" href="/category/<?=H::e($c['slug'])?>"><h3><?=H::e($c['name'])?></h3><p><?=H::e($c['description'] ?: 'Browse approved downloadable products in this category.')?></p></a><?php endforeach;?>
-        <?php if(empty($cats)):?><div class="card empty-state"><h3>Categories are being prepared</h3><p>Marketplace categories will appear here as the catalog is organized.</p></div><?php endif;?>
+        <?php foreach($cats as $c):?><a class="card" href="/category/<?=H::e($c['slug'])?>"><h3><?=H::e($c['name'])?></h3><p><?=H::e($c['description'] ?: 'Browse downloadable products in this category.')?></p></a><?php endforeach;?>
+        <?php if(empty($cats)):?><div class="card empty-state"><h3>No categories available right now</h3><p>Check back as new marketplace categories are added.</p></div><?php endif;?>
     </div>
 </section>
 
@@ -47,8 +47,8 @@
 <?php $featuredProducts = $products ?? []; ?>
 <section class="page-section featured-products-section">
     <h2>Featured products</h2>
-    <p class="muted">Reviewed public listings appear here when products are featured for launch.</p>
-    <?php if(empty($products)):?><div class="card empty-state"><h3>No featured products yet</h3><p>Featured products will appear after designers submit approved listings.</p><a class="btn" href="/browse">Browse Digital Designs</a></div><?php else: include app_path('app/Views/public/product_grid.php'); endif;?>
+    <p class="muted">Discover handpicked digital products from Creative Moth designers.</p>
+    <?php if(empty($products)):?><div class="card empty-state"><h3>No featured products right now</h3><p>Browse the marketplace to discover available digital designs.</p><a class="btn" href="/browse">Browse Digital Designs</a></div><?php else: include app_path('app/Views/public/product_grid.php'); endif;?>
 </section>
 <section class="page-section featured-designers-section">
     <div class="section-heading-row">
@@ -60,8 +60,8 @@
 
     <?php if(empty($designers)): ?>
         <div class="card empty-state">
-            <h3>No featured designers yet</h3>
-            <p>Designer storefronts will appear after applications and stores are approved.</p>
+            <h3>No featured designers right now</h3>
+            <p>Browse the marketplace as more independent designers are featured.</p>
             <a class="btn alt" href="/sell">Apply to Sell</a>
         </div>
     <?php else: ?>
@@ -118,7 +118,7 @@
                             <?=H::e(
                                 $bio !== ''
                                     ? $bio
-                                    : 'Browse this designer’s approved digital products and creative resources.'
+                                    : 'Browse this designer’s digital products and creative resources.'
                             )?>
                         </p>
 
@@ -151,8 +151,8 @@
 
 <section class="page-section">
     <h2>Recently added</h2>
-    <p class="muted">Newest approved products from reviewed creators, shown with real marketplace data only.</p>
-    <?php $products = $recentProducts ?? []; if(empty($products)):?><div class="card empty-state"><h3>No recent products yet</h3><p>Recently approved products will appear here after marketplace review.</p></div><?php else: include app_path('app/Views/public/product_grid.php'); endif; $products = $featuredProducts; ?>
+    <p class="muted">Fresh digital products from Creative Moth designers.</p>
+    <?php $products = $recentProducts ?? []; if(empty($products)):?><div class="card empty-state"><h3>No recent products right now</h3><p>Check back as designers add new products to the marketplace.</p></div><?php else: include app_path('app/Views/public/product_grid.php'); endif; $products = $featuredProducts; ?>
 </section>
 <section class="card page-section">
     <h2>Built for buyers and designers</h2>

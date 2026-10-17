@@ -12,7 +12,7 @@
 <section class="page-section card">
     <h2>Why Creative Moth exists</h2>
     <p>Digital designers deserve a marketplace that understands digital products. Too many platforms treat digital files like an afterthought, forcing designers to squeeze their work into systems that were not really built for SVGs, PNGs, templates, brushes, fonts, or downloadable creative files.</p>
-    <p>Creative Moth was created to be different. The goal is to build a marketplace where digital designers can have their own storefront, share their style, sell their products, gain followers, participate in future bundle events, and grow inside a platform made specifically for digital design.</p>
+    <p>Creative Moth was created to be different. Creative Moth gives digital designers a place to have their own storefront, share their style, sell their products, gain followers, participate in bundle events, and grow inside a platform made specifically for digital design.</p>
 </section>
 
 <section class="page-section">
@@ -37,7 +37,7 @@
 
 <section class="page-section card">
     <h2>Clear licensing and transparent product details</h2>
-    <p>Digital product licensing can be confusing, so Creative Moth is being built with clearer product information from the start. Every product includes personal use by default. Some products may also offer additional license options depending on the designer’s settings.</p>
+    <p>Digital product licensing can be confusing, so Creative Moth uses clear product information to help buyers understand what they are purchasing. Every product includes personal use by default. Some products may also offer additional license options depending on the designer’s settings.</p>
     <p>Product pages can show whether print-on-demand use is allowed, whether a commercial license is available, and whether the product is hand drawn, digitally created, AI assisted, or AI generated.</p>
     <p>Creative Moth does not support digital resale, file sharing, redistribution, or claiming another designer’s work as your own.</p>
 </section>
@@ -248,7 +248,7 @@
 
     <h3>14. Buyer credits and referrals</h3>
     <p>One user account may be attached to only one immutable referrer. The referrer and new buyer each earn $1.50 after the buyer’s first completed order with a positive payment after credits. Fully credit-funded, refunded, failed, cancelled, unpaid, and unresolved review orders do not qualify; an order legitimately approved and completed after review may qualify.</p>
-    <p>Creative Moth may offer buyer referral links, marketplace credits, rewards, discounts, or promotional credits. Credits never expire, may only be used on Creative Moth, and may not be transferred, sold, exchanged for cash, or used outside the marketplace. Credits redeemed on an order are not automatically restored after a refund during this launch version. Self-referrals, duplicate accounts, fraud, and abuse are forbidden. Creative Moth may reverse fraudulently awarded credit with an auditable adjustment; existing ledger history is never rewritten.</p>
+    <p>Creative Moth may offer buyer referral links, marketplace credits, rewards, discounts, or promotional credits. Credits never expire, may only be used on Creative Moth, and may not be transferred, sold, exchanged for cash, or used outside the marketplace. Credits redeemed on an order are not automatically restored after a refund. Self-referrals, duplicate accounts, fraud, and abuse are forbidden. Creative Moth may reverse fraudulently awarded credit with an auditable adjustment; existing ledger history is never rewritten.</p>
 
     <h2>Seller and designer terms</h2>
 
@@ -297,7 +297,7 @@
     <p>If a buyer receives a refund, dispute, chargeback, payment reversal, or order adjustment, seller earnings may be reduced, reversed, held, or deducted.</p>
 
     <h3>28. Taxes</h3>
-    <p>Sellers are responsible for understanding and handling their own income taxes, business taxes, records, and tax obligations outside Creative Moth checkout. For Creative Moth marketplace checkout at US launch, applicable sales tax is handled through Creative Moth’s Stripe Tax configuration. Creative Moth does not provide tax advice.</p>
+    <p>Sellers are responsible for understanding and handling their own income taxes, business taxes, records, and tax obligations outside Creative Moth checkout. For Creative Moth marketplace checkout in the United States, applicable sales tax is handled through Creative Moth’s Stripe Tax configuration. Creative Moth does not provide tax advice.</p>
 
     <h3>29. Seller referrals</h3>
     <p>A buyer who later becomes a seller keeps the same original referrer. That referrer and the approved seller each earn $5.00 only after the seller’s first completed, non-refunded sale. Application or approval alone does not qualify.</p>
@@ -373,7 +373,7 @@
     <p>If you use Creative Moth as a buyer, we may collect marketplace activity such as products viewed, products wishlisted, designers followed, cart activity, purchase history, download history, selected license details, marketplace credit activity, and support requests.</p>
 
     <h2>3. Designer and seller information</h2>
-    <p>If you apply to become a designer or sell products on Creative Moth, we may collect application details, display name, desired store name or store URL name, bio, portfolio links, social links, website link, product types, AI usage details, storefront images, store announcements, product listings, preview images, protected digital product files, pricing, license settings, POD permission settings, AI disclosure labels, sales records, referral activity, and future creator rank progress.</p>
+    <p>If you apply to become a designer or sell products on Creative Moth, we may collect application details, display name, desired store name or store URL name, bio, portfolio links, social links, website link, product types, AI usage details, storefront images, store announcements, product listings, preview images, protected digital product files, pricing, license settings, POD permission settings, AI disclosure labels, sales records, referral activity, and creator rank progress.</p>
     <p>Some designer information may be shown publicly on storefronts, product pages, search results, category pages, and other public marketplace pages.</p>
 
     <h2>4. Product and upload information</h2>

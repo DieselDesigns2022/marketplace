@@ -3,7 +3,7 @@
 <p class="eyebrow">Spread the word</p><h1>Creative Moth Promotional Graphics</h1>
 <p>Download ready-to-share graphics for your social posts, website, email, or profile. Use the suggested captions as-is or make them your own.</p>
 </section>
-<?php if(!$groups):?><div class="card promo-empty"><h2>Graphics are coming soon</h2><p>Check back for new Creative Moth graphics.</p></div><?php endif;?>
+<?php if(!$groups):?><div class="card promo-empty"><h2>No promotional graphics available right now</h2><p>Check back for new Creative Moth graphics.</p></div><?php endif;?>
 <?php foreach($platforms as $key=>$label):if(empty($groups[$key]))continue;$sizeGroups=[];foreach($groups[$key] as $graphic)$sizeGroups[$graphic['size_label']][]=$graphic;?>
 <section class="promo-library-section" aria-labelledby="promo-<?=H::e($key)?>"><h2 id="promo-<?=H::e($key)?>"><?=H::e($label)?></h2>
 <?php foreach($sizeGroups as $sizeLabel=>$graphics):$sizeId='promo-'.$key.'-'.substr(hash('sha256',$sizeLabel),0,12);?>
