@@ -19,7 +19,7 @@
     <div class="split-grid">
         <div class="card">
             <h2>Built for buyers</h2>
-            <p>Buying digital files should be easy. Creative Moth is being built to help buyers quickly find the files they need by browsing categories, searching keywords, checking POD permission, reviewing AI disclosure, and seeing whether additional license options are available.</p>
+            <p>Buying digital files should be easy. Creative Moth helps buyers quickly find the files they need by browsing categories, searching keywords, checking POD permission, reviewing AI disclosure, and seeing whether additional license options are available.</p>
             <p>Whether you are making shirts, tumblers, stickers, websites, social media graphics, small business branding, printables, or craft projects, Creative Moth is designed to help you find creative files faster.</p>
         </div>
         <div class="card">
@@ -44,7 +44,7 @@
 
 <section class="page-section card">
     <h2>What makes Creative Moth different</h2>
-    <p>Creative Moth is being built specifically for digital design files. That means the marketplace is focused on the things digital buyers and designers actually need: clear product pages, designer storefronts, search and filters made for digital files, POD permission labels, license options, AI disclosure transparency, protected digital downloads, SEO-friendly product pages, category pages, and storefront pages.</p>
+    <p>Creative Moth is built specifically for digital design files. The marketplace focuses on the things digital buyers and designers actually need: clear product pages, designer storefronts, search and filters made for digital files, POD permission labels, license options, AI disclosure transparency, protected digital downloads, SEO-friendly product pages, category pages, and storefront pages.</p>
 </section>
 
 <section class="page-section card">
