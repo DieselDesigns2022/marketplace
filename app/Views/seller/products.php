@@ -7,7 +7,7 @@
     <?php endif; ?>
     <label>
         Search your products
-        <input type="search" name="q" value="<?=H::e($q??'')?>" placeholder="Product name">
+        <input type="search" name="q" value="<?=H::e($q??'')?>" placeholder="Search products or tags">
     </label>
     <button class="btn" type="submit">Search</button>
     <?php if(($q??'')!==''): ?>

@@ -1104,7 +1104,14 @@ class SellerController
         if ($q !== '')
         {
             $escaped = addcslashes($q, "\\%_");
-            $where .= " and p.title like ? escape '\\\\'";
+            $where .= " and (p.title like ? escape '\\\\' or exists (
+                select 1
+                from product_tags pts
+                join tags ts on ts.id=pts.tag_id
+                where pts.product_id=p.id
+                  and ts.name like ? escape '\\\\'
+            ))";
+            $params[] = '%'.$escaped.'%';
             $params[] = '%'.$escaped.'%';
 
         }
