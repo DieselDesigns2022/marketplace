@@ -22,11 +22,28 @@ final class SellerReviewService
         return $this->markEligible((int)$item['id'],$buyerId);
     }
 
+    public function markCustomCompleted(int $customOrderId): bool
+    {
+        $item=DB::row(
+            'select oi.id,oi.product_id,co.buyer_user_id
+             from custom_orders co
+             join orders o on o.id=co.order_id
+             join order_items oi on oi.id=co.order_item_id
+             where co.id=?
+               and co.status="completed"
+               and o.user_id=co.buyer_user_id
+               and o.payment_status in ("paid","partially_refunded")',
+            [$customOrderId]
+        );
+        if(!$item) throw new DomainException('This Custom Design is not review eligible.');
+        return $this->markEligible((int)$item['id'],(int)$item['buyer_user_id'],$item);
+    }
+
     public function create(int $buyerId,int $itemId,mixed $rating,string $text): int
     {
         [$rating,$text]=$this->validateContent($rating,$text);
         $item=DB::row('select oi.id,oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id,oi.review_eligible_at,o.user_id buyer_id,o.payment_status,u.name buyer_name,coalesce(oi.product_title,p.title,"Purchased item") product_title,coalesce(oi.seller_name,d.display_name,"Seller") seller_name,d.user_id seller_user_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id join designers d on d.id=oi.designer_id left join products p on p.id=oi.product_id where oi.id=? and o.user_id=?',[$itemId,$buyerId]);
-        if(!$item||(!($item['payment_status']==='paid'||($item['custom_service_id']!==null&&$item['payment_status']==='partially_refunded')))||empty($item['review_eligible_at'])) throw new DomainException('A successful authorized download is required before reviewing.');
+        if(!$item||(!($item['payment_status']==='paid'||($item['custom_service_id']!==null&&$item['payment_status']==='partially_refunded')))||empty($item['review_eligible_at'])) throw new DomainException('This purchase is not yet eligible for review.');
         if((int)$item['seller_user_id']===$buyerId) throw new DomainException('You cannot review your own store.');
         if(DB::row('select id from seller_reviews where order_item_id=?',[$itemId])) throw new DomainException('This purchased item already has a review.');
         $id=$this->atomic(function()use($buyerId,$item,$rating,$text){

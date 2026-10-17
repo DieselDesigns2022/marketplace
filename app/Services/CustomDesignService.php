@@ -2000,6 +2000,12 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                 );
             }DB::commit();
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $path)@unlink($path);throw$e;}
+        if($action==='final'){
+            self::containCommunicationFailure(
+                fn()=>(new SellerReviewService())->markCustomCompleted((int)$current['id']),
+                static fn(\Throwable $e)=>NotificationService::reportFailure('custom_order_review_eligibility_'.$current['id'],$e)
+            );
+        }
         $recipient=$userId===(int)$current['seller_user_id']?(int)$current['buyer_user_id']:(int)$current['seller_user_id'];$audience=$recipient===(int)$current['buyer_user_id']?'buyer':'designer';$title=['proof'=>'Proof available','revision'=>'Revision requested','approve'=>'Proof approved','final'=>'Final file available'][$action]??'Custom-order status changed';self::containCommunicationFailure(fn()=>NotificationService::create($recipient,$action==='final'?'custom_final_available':'custom_order_status',$audience,$title,'Custom order #'.$current['id'].' is now '.str_replace('_',' ',$next).'.','custom-order-history:'.$historyId.':recipient:'.$recipient,$audience==='buyer'?'/buyer/custom-orders/'.$current['id']:'/seller/custom-orders/'.$current['id']),static fn(\Throwable $e)=>NotificationService::reportFailure('custom_order_notification_'.$historyId,$e));if($action==='final')self::containCommunicationFailure(fn()=>EmailQueueService::customFinalAvailable((int)$current['id'],$historyId),static fn(\Throwable $e)=>NotificationService::reportFailure('custom_order_final_email_'.$historyId,$e));
     }
 

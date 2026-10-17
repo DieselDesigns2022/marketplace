@@ -167,7 +167,40 @@ final class CustomDesignController {
  }
 
  private function publicService(string $slug):array{return DB::row('select s.*,d.display_name,d.store_slug,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.slug=? and s.is_active=1 and d.status="approved"',[$slug])??H::abort(404);}
- private function detailView(array $s,array $errors):void{$api=new CustomDesignService;$balances=H::user()?(new \App\Services\CreditService)->balances((int)H::user()['id']):['available'=>'0.00'];$shareUrl=H::baseUrl().'/custom-design/'.$s['slug'];$shareText=$s['title'].' on Creative Moth';H::view('public/custom_service',['service'=>$s,'questions'=>DB::rows('select * from custom_service_questions where custom_service_id=? order by sort_order,id',[$s['id']]),'images'=>DB::rows('select * from custom_service_images where custom_service_id=? order by sort_order,id',[$s['id']]),'balances'=>$balances,'licenses'=>$api->serviceLicenses((int)$s['id']),'errors'=>$errors,'shareUrl'=>$shareUrl,'shareText'=>$shareText]);}
+ private function detailView(array $s,array $errors):void{
+     $api=new CustomDesignService;
+     $balances=H::user()?(new \App\Services\CreditService)->balances((int)H::user()['id']):['available'=>'0.00'];
+     $shareUrl=H::baseUrl().'/custom-design/'.$s['slug'];
+     $shareText=$s['title'].' on Creative Moth';
+     $images=DB::rows('select * from custom_service_images where custom_service_id=? order by sort_order,id',[$s['id']]);
+     $preview=$images[0]['image_path']??'';
+     $description=mb_substr(trim(strip_tags((string)($s['description']??''))),0,160);
+     if($description==='')$description='Custom Design by '.$s['display_name'].' on Creative Moth.';
+     $meta=[
+         'title'=>$s['title'].' | '.H::SITE_NAME,
+         'description'=>$description,
+         'canonical'=>$shareUrl,
+         'og_title'=>$s['title'].' | '.H::SITE_NAME,
+         'og_description'=>$description,
+         'og_type'=>'product',
+         'og_image'=>$preview,
+         'twitter_card'=>$preview?'summary_large_image':'summary',
+         'twitter_title'=>$s['title'].' | '.H::SITE_NAME,
+         'twitter_description'=>$description,
+         'twitter_image'=>$preview
+     ];
+     H::view('public/custom_service',[
+         'service'=>$s,
+         'questions'=>DB::rows('select * from custom_service_questions where custom_service_id=? order by sort_order,id',[$s['id']]),
+         'images'=>$images,
+         'balances'=>$balances,
+         'licenses'=>$api->serviceLicenses((int)$s['id']),
+         'errors'=>$errors,
+         'shareUrl'=>$shareUrl,
+         'shareText'=>$shareText,
+         'meta'=>$meta
+     ]);
+ }
  public function sellerList():void{H::requireSeller();$d=(new CustomDesignService)->seller((int)H::user()['id']);H::view('seller/custom_services',['services'=>DB::rows('select * from custom_design_services where designer_id=? order by updated_at desc',[$d['id']])]);}
  public function sellerDuplicate($id):void
  {
@@ -306,7 +339,7 @@ final class CustomDesignController {
  public function buyerOrders():void{H::requireLogin();H::view('buyer/custom_orders',['orders'=>DB::rows('select co.*,o.payment_status,d.display_name,JSON_UNQUOTE(JSON_EXTRACT(co.service_snapshot,"$.title")) title from custom_orders co join orders o on o.id=co.order_id join designers d on d.id=co.designer_id where co.buyer_user_id=? order by co.created_at desc',[H::user()['id']])]);}
  public function buyerOrder($id):void{$this->orderForSide('buyer',(int)$id);}
  public function sellerOrder($id):void{$this->orderForSide('seller',(int)$id);}
- private function orderForSide(string $side,int $id):void{H::requireLogin();$api=new CustomDesignService;$o=$api->order($id,(int)H::user()['id'],$side);if($_SERVER['REQUEST_METHOD']==='POST'){H::verifyCsrf();try{$api->transition($o,(int)H::user()['id'],$_POST['action']??'',$_FILES);H::flash('success','Custom order updated.');H::redirect('/'.$side.'/custom-orders/'.$id);}catch(\Throwable $e){H::flash('error',$e->getMessage());}}$conversation=DB::row('select id from message_conversations where custom_order_id=?',[$id]);H::view($side.'/custom_order',['order'=>$o,'brief'=>json_decode($o['brief_snapshot'],true)?:[],'files'=>DB::rows('select * from custom_order_files where custom_order_id=? order by created_at,id',[$id]),'history'=>DB::rows('select h.*,u.name actor_name from custom_order_status_history h left join users u on u.id=h.actor_user_id where h.custom_order_id=? order by h.created_at desc,h.id desc',[$id]),'conversation'=>$conversation]);}
+ private function orderForSide(string $side,int $id):void{H::requireLogin();$api=new CustomDesignService;$o=$api->order($id,(int)H::user()['id'],$side);if($_SERVER['REQUEST_METHOD']==='POST'){H::verifyCsrf();try{$api->transition($o,(int)H::user()['id'],$_POST['action']??'',$_FILES);H::flash('success','Custom order updated.');H::redirect('/'.$side.'/custom-orders/'.$id);}catch(\Throwable $e){H::flash('error',$e->getMessage());}}$conversation=DB::row('select id from message_conversations where custom_order_id=?',[$id]);$review=DB::row('select oi.id order_item_id,oi.review_eligible_at,(select sr.id from seller_reviews sr where sr.order_item_id=oi.id limit 1) review_id from custom_orders co join order_items oi on oi.id=co.order_item_id where co.id=?',[$id]);H::view($side.'/custom_order',['order'=>$o,'brief'=>json_decode($o['brief_snapshot'],true)?:[],'files'=>DB::rows('select * from custom_order_files where custom_order_id=? order by created_at,id',[$id]),'history'=>DB::rows('select h.*,u.name actor_name from custom_order_status_history h left join users u on u.id=h.actor_user_id where h.custom_order_id=? order by h.created_at desc,h.id desc',[$id]),'conversation'=>$conversation,'review'=>$review]);}
  public function file($id):void{H::requireLogin();$f=(new CustomDesignService)->file((int)$id,(int)H::user()['id']);$base=realpath(app_path('storage/protected_uploads/custom_designs'));$real=realpath(app_path('storage/protected_uploads/'.ltrim($f['storage_path'],'/')));if(!$base||!$real||!str_starts_with($real,$base.DIRECTORY_SEPARATOR)||!is_file($real)||!is_readable($real))H::abort(404);header('Content-Type: application/octet-stream');header('Content-Length: '.filesize($real));header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($f['original_name']));header('X-Content-Type-Options: nosniff');header('Cache-Control: private, no-store');$delivered=readfile($real);if($delivered!==false&&(int)H::user()['id']===(int)$f['buyer_user_id']&&$f['file_kind']==='final'){try{(new SellerReviewService)->markCustomFinalDownloaded((int)$f['id'],(int)H::user()['id']);}catch(\Throwable $e){\App\Services\NotificationService::reportFailure('post-download custom review eligibility',$e);}}exit;}
  public function adminOrders():void{H::requireAdminPermission('custom_orders.view');H::view('admin/custom_orders',['orders'=>DB::rows('select co.*,o.payment_status,o.total,u.name buyer_name,d.display_name,JSON_UNQUOTE(JSON_EXTRACT(co.service_snapshot,"$.title")) title,(select count(*) from custom_order_files f where f.custom_order_id=co.id and f.file_kind="final") final_count from custom_orders co join orders o on o.id=co.order_id join users u on u.id=co.buyer_user_id join designers d on d.id=co.designer_id order by co.created_at desc')]);}
  public function adminOrder($id):void

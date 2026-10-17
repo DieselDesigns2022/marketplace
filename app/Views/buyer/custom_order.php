@@ -91,6 +91,11 @@ foreach($files as $file){
 <p class="notice success">
     Your final design has been delivered. Download it above under Protected files.
 </p>
+<?php if(!empty($review['review_id'])):?>
+<p><a class="btn" href="/dashboard/reviews/<?=(int)$review['review_id']?>">View/Edit Review</a></p>
+<?php elseif(!empty($review['review_eligible_at'])):?>
+<p><a class="btn" href="/dashboard/reviews/new/<?=(int)$review['order_item_id']?>">Leave a Review</a></p>
+<?php endif;?>
 <?php elseif(in_array($order['status'],['cancelled','refunded'],true)):?>
 <p class="notice warning">
     This custom order is <?=H::e(str_replace('_',' ',$order['status']))?>.
