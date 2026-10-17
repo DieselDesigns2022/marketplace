@@ -335,6 +335,7 @@ class CartController
                     $finalizer->finalize((int)$order, 'internal-credit-order:' . $order, true);
                     unset($_SESSION['coupon_code']);
                     DB::commit();
+                    $finalizer->settlePlatformCreditPayoutsAfterCommit((int)$order);
                     $finalizer->communicate((int)$order);
                     H::redirect('/dashboard/order/' . (int)$order);
                 }

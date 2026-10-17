@@ -392,7 +392,9 @@ class StripeController
             if (!$locked) throw new \RuntimeException('Order disappeared during payment finalization.');
             if (!empty($locked['finalization_key'])) {
                 DB::commit();
+                $finalizer->settlePlatformCreditPayoutsAfterCommit((int)$locked['id']);
                 $finalizer->communicate((int)$locked['id']);
+                $this->attemptPendingTransfers((int)$locked['id'], $currency);
                 return;
             }
             $expected = CreditService::parseCents((string)$locked['total']);
@@ -413,6 +415,7 @@ class StripeController
             }
             $finalizer->finalize((int)$locked['id'], 'stripe:' . $eventId, false);
             DB::commit();
+            $finalizer->settlePlatformCreditPayoutsAfterCommit((int)$locked['id']);
             $finalizer->communicate((int)$locked['id']);
             $this->attemptPendingTransfers((int)$locked['id'], $currency);
         } catch (Throwable $error) {

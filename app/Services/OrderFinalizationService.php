@@ -150,6 +150,50 @@ final class OrderFinalizationService
         }
     }
 
+    public function settlePlatformCreditPayoutsAfterCommit(int $orderId): array
+    {
+        $summary = ['attempted' => 0, 'settled' => 0, 'failed' => 0];
+
+        if (DB::pdo()->inTransaction()) {
+            throw new DomainException('Platform-credit settlement must run after the order transaction commits.');
+        }
+
+        try {
+            $adminId = (new AdminPermissionService())->canonicalOwnerUserId();
+
+            if (!$adminId) {
+                throw new DomainException('Canonical Admin owner is unavailable for automatic platform-credit settlement.');
+            }
+
+            $payouts = DB::rows(
+                'select id from seller_payouts where order_id=? and payout_status in ("platform_credit_hold","platform_credit_processing") order by id',
+                [$orderId]
+            );
+
+            foreach ($payouts as $payout) {
+                $summary['attempted']++;
+
+                try {
+                    $result = (new PlatformCreditPayoutService())->settle((int)$payout['id'], $adminId);
+
+                    if (!empty($result['ok'])) {
+                        $summary['settled']++;
+                    } else {
+                        $summary['failed']++;
+                    }
+                } catch (Throwable $error) {
+                    $summary['failed']++;
+                    NotificationService::reportFailure('automatic_platform_credit_payout', $error);
+                }
+            }
+        } catch (Throwable $error) {
+            $summary['failed']++;
+            NotificationService::reportFailure('automatic_platform_credit_payout_setup', $error);
+        }
+
+        return $summary;
+    }
+
     public function communicate(int $orderId): void
     {
         foreach(DB::rows('select designer_id from order_items where order_id=? and collab_id is null union select designer_id from collab_order_allocations where order_id=?',[$orderId,$orderId]) as $seller){$designerId=(int)$seller['designer_id'];$this->communicationAttempt('creator_recognition_payment',fn()=>(new CreatorRecognitionService)->recalculate($designerId,false,true,'payment',null,'recognition:paid:order:'.$orderId.':seller:'.$designerId));}

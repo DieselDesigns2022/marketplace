@@ -6,6 +6,11 @@ if ($db === '') {
 }
 
 require dirname(__DIR__, 2) . '/app/bootstrap.php';
+foreach (['DB_HOST','DB_USER','DB_PASS'] as $key) {
+    $value = getenv('PHASE127_' . $key);
+    if ($value !== false) $_ENV[$key] = $value;
+}
+
 
 // bootstrap.php loads the repository .env file. Select the disposable database
 // afterwards so a configured DB_NAME can never redirect a worker.

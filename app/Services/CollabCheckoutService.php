@@ -109,6 +109,7 @@ final class CollabCheckoutService
                 $finalizer = new OrderFinalizationService();
                 $finalizer->finalize($orderId, 'internal-credit-order:'.$orderId, true);
                 DB::commit();
+                $finalizer->settlePlatformCreditPayoutsAfterCommit($orderId);
                 $finalizer->communicate($orderId);
                 return ['order_id'=>$orderId,'url'=>'/dashboard/order/'.$orderId,'internal'=>true];
             }
