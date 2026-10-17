@@ -176,7 +176,7 @@ class SellerController
     }
     private function applicationValues(): array
     {
-        return [ 'display_name' => trim($_POST['display_name'] ?? ''), 'desired_slug' => trim($_POST['desired_slug'] ?? ''), 'bio' => trim($_POST['bio'] ?? ''), 'portfolio_url' => trim($_POST['portfolio_url'] ?? ''), 'social_links' => trim($_POST['social_links'] ?? ''), 'design_types' => trim($_POST['design_types'] ?? ''), 'uses_ai' => trim($_POST['uses_ai'] ?? ''), 'agreement' => isset($_POST['agreement']), ];
+        return [ 'display_name' => trim($_POST['display_name'] ?? ''), 'desired_slug' => trim($_POST['desired_slug'] ?? ''), 'bio' => trim($_POST['bio'] ?? ''), 'portfolio_url' => $this->normalizeUrl((string)($_POST['portfolio_url'] ?? '')), 'social_links' => trim($_POST['social_links'] ?? ''), 'design_types' => trim($_POST['design_types'] ?? ''), 'uses_ai' => trim($_POST['uses_ai'] ?? ''), 'agreement' => isset($_POST['agreement']), ];
 
     }
     private function validateApplication(array $v, ?int $ignoreApplicationId = null): array
@@ -205,6 +205,11 @@ class SellerController
         if (mb_strlen($v['bio']) < 25)
         {
             $errors[] = 'Bio must be at least 25 characters.';
+
+        }
+        if ($v['portfolio_url'] !== '' && (!filter_var($v['portfolio_url'], FILTER_VALIDATE_URL) || !in_array(strtolower(parse_url($v['portfolio_url'], PHP_URL_SCHEME) ?: ''), ['http','https'], true)))
+        {
+            $errors[] = 'Portfolio URL must be a valid website or social media link.';
 
         }
         if ($v['design_types'] === '')

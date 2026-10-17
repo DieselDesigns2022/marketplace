@@ -75,7 +75,7 @@
     </textarea>
     </label>
     <label>Portfolio URL <small>Website, Etsy, Shopify, Facebook group, Instagram, or other portfolio link.</small>
-    <input name="portfolio_url" type="url" value="<?=H::e($values['portfolio_url']??'')?>">
+    <input name="portfolio_url" type="text" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="example.com or https://example.com" value="<?=H::e($values['portfolio_url']??'')?>">
     </label>
     <label>Social Links <small>Paste multiple links if you want.</small>
     <textarea name="social_links">
