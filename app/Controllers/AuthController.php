@@ -56,7 +56,7 @@ class AuthController
                     (new ReferralService)->attach($id, $referralCode, 'buyer');
                 }
                 DB::commit();unset($_SESSION['registration_referral']);
-                session_regenerate_id(true);
+                session_regenerate_id(false);
                 $_SESSION['user'] = DB::row('select id,name,email,role,referral_code from users where id=?', [$id]);
                 H::redirect($this->afterLoginRedirect());
             } catch (\Throwable $e) {
@@ -77,7 +77,7 @@ class AuthController
             $email = AccountSecurityService::normalizeEmail((string)($_POST['email'] ?? ''));
             $u = DB::row('select * from users where email=? and status="active"', [$email]);
             if ($u && password_verify($_POST['password'], $u['password_hash'])) {
-                session_regenerate_id(true);
+                session_regenerate_id(false);
                 $_SESSION['user'] = ['id'=>$u['id'], 'name'=>$u['name'], 'email'=>$u['email'], 'role'=>$u['role']];
                 H::redirect($this->afterLoginRedirect());
             }
