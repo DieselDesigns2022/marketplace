@@ -112,7 +112,24 @@ class StripeController
     {
         H::requireLogin();
         $order = $this->buyerOrder((int)($_GET['order_id'] ?? 0));
-        H::view('buyer/payment_success', ['order' => $order]);
+        $prizeWheelUnlocks=[];
+
+        if(($order['payment_status']??'')==='paid'){
+            $prizeWheelUnlocks=
+                (new \App\Services\PrizeWheelService())
+                    ->unlockedStoresForOrder(
+                        (int)$order['id'],
+                        (int)H::user()['id']
+                    );
+        }
+
+        H::view(
+            'buyer/payment_success',
+            [
+                'order'=>$order,
+                'prizeWheelUnlocks'=>$prizeWheelUnlocks,
+            ]
+        );
     }
 
     public function cancel(): void

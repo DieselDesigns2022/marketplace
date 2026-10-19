@@ -1954,3 +1954,12 @@ ALTER TABLE prize_wheel_spins
         BIGINT NULL AFTER storefront_designer_id;
 
 -- The live migration creates the unique/index/FK constraints.
+
+-- Prize Wheel: one qualifying order may unlock one spin per participating seller.
+ALTER TABLE prize_wheel_spins
+    ADD UNIQUE KEY prize_wheel_order_campaign_uq
+    (
+        campaign_key,
+        qualifying_order_id,
+        storefront_designer_id
+    );

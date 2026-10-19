@@ -66,14 +66,9 @@ $check(
     &&
     str_contains(
         $service,
-        'oi.coupon_discount'
-    )
-    &&
-    str_contains(
-        $service,
         'oi.prize_credit_applied'
     ),
-    'qualifying merchandise is calculated after coupon and Prize Credit'
+    'qualifying merchandise uses discounted line total and subtracts Prize Credit'
 );
 
 $check(

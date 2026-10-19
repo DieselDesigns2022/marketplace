@@ -277,10 +277,6 @@ final class PrizeWheelService
                             (
                                 oi.total_price
                                 - coalesce(
-                                    oi.coupon_discount,
-                                    0
-                                )
-                                - coalesce(
                                     oi.prize_credit_applied,
                                     0
                                 )
@@ -294,6 +290,7 @@ final class PrizeWheelService
              left join prize_wheel_spins ws
                on ws.qualifying_order_id=o.id
               and ws.campaign_key=?
+              and ws.storefront_designer_id=?
              where o.user_id=?
                and oi.designer_id=?
                and o.payment_status="paid"
@@ -310,6 +307,7 @@ final class PrizeWheelService
              order by o.id',
             [
                 $campaign,
+                $storefrontDesignerId,
                 $userId,
                 $storefrontDesignerId,
                 $startedAt,
@@ -599,6 +597,8 @@ final class PrizeWheelService
             $idempotency=
                 'prize-wheel:'.
                 $campaign.
+                ':store:'.
+                $storefrontDesignerId.
                 ':order:'.
                 $orderId;
 
@@ -617,8 +617,13 @@ final class PrizeWheelService
                     'select id
                      from prize_wheel_spins
                      where campaign_key=?
-                       and qualifying_order_id=?',
-                    [$campaign,$orderId]
+                       and qualifying_order_id=?
+                       and storefront_designer_id=?',
+                    [
+                        $campaign,
+                        $orderId,
+                        $storefrontDesignerId,
+                    ]
                 );
 
                 return $this->resultByAssignment(
@@ -793,6 +798,124 @@ final class PrizeWheelService
                 [$lockName]
             );
         }
+    }
+
+    public function unlockedStoresForOrder(
+        int $orderId,
+        int $userId
+    ): array {
+        $settings=$this->settings();
+
+        if(empty($settings['is_enabled'])){
+            return [];
+        }
+
+        $order=DB::row(
+            'select
+                id,
+                user_id,
+                payment_status,
+                paid_at,
+                finalized_at,
+                created_at
+             from orders
+             where id=?
+               and user_id=?
+             limit 1',
+            [$orderId,$userId]
+        );
+
+        if(
+            !$order
+            || ($order['payment_status']??'')!=='paid'
+        ){
+            return [];
+        }
+
+        $campaign=(string)(
+            $settings['campaign_key']
+            ??''
+        );
+
+        $startedAt=
+            $settings['campaign_started_at']
+            ?: $settings['enabled_at']
+            ?: '1970-01-01 00:00:00';
+
+        $paidAt=
+            $order['paid_at']
+            ?: $order['finalized_at']
+            ?: $order['created_at'];
+
+        if(
+            strtotime((string)$paidAt)
+            < strtotime((string)$startedAt)
+        ){
+            return [];
+        }
+
+        $minimum=$this->qualifyingMinimumCents();
+
+        return DB::rows(
+            'select
+                d.id designer_id,
+                d.display_name,
+                d.store_slug,
+                round(
+                    sum(
+                        greatest(
+                            0,
+                            oi.total_price
+                            - coalesce(
+                                oi.prize_credit_applied,
+                                0
+                            )
+                        )
+                    )*100
+                ) qualifying_cents,
+                coalesce(
+                    (
+                        select sum(pd.quantity_remaining)
+                        from prize_donations pd
+                        where pd.designer_id=d.id
+                          and pd.status="available"
+                          and pd.quantity_remaining>0
+                          and pd.seller_authorized=1
+                          and find_in_set(
+                            "prize_wheel",
+                            pd.usage_designations
+                          )>0
+                    ),
+                    0
+                ) available_prize_units,
+                (
+                    select count(*)
+                    from prize_wheel_spins ws
+                    where ws.campaign_key=?
+                      and ws.qualifying_order_id=?
+                      and ws.storefront_designer_id=d.id
+                ) spin_used
+             from order_items oi
+             join designers d
+               on d.id=oi.designer_id
+             where oi.order_id=?
+               and d.status="approved"
+               and d.prize_wheel_opt_in=1
+             group by
+                d.id,
+                d.display_name,
+                d.store_slug
+             having qualifying_cents>=?
+                and available_prize_units>0
+                and spin_used=0
+             order by d.display_name,d.id',
+            [
+                $campaign,
+                $orderId,
+                $orderId,
+                $minimum,
+            ]
+        );
     }
 
     public function recentSpins(

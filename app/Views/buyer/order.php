@@ -5,6 +5,41 @@
 <p>Credit status: <?=H::e(['none'=>'Not used','reserved'=>'Reserved','finalized'=>'Redeemed','released'=>'Released'][$order['credit_payment_status']??'none']??'Unknown')?> · Completion: <?=!empty($order['internally_completed'])?((float)($order['credits_applied']??0)>0?'Completed internally with store credit':'No payment required'):'Completed through Stripe'?></p></section>
 <p>Status: <?=H::e($order['status'])?> · Payment: <strong><?=H::e($order['payment_status'] ?? $order['status'])?></strong> · Total: <?=H::money($order['total'])?> · Date: <?=$order['created_at']?>
 </p>
+
+<?php if(!empty($prizeWheelUnlocks)): ?>
+<section class="card page-section">
+    <h2>🎡 Prize Wheel Spin Unlocked!</h2>
+
+    <?php foreach($prizeWheelUnlocks as $unlock): ?>
+        <div
+            style="
+                padding:14px 0;
+                border-bottom:1px solid rgba(128,128,128,.25);
+            "
+        >
+            <p>
+                Your qualifying purchase from
+                <strong>
+                    <?=H::e($unlock['display_name'])?>
+                </strong>
+                earned you one spin on that seller's Prize Wheel.
+            </p>
+
+            <p>
+                <a
+                    class="btn"
+                    href="/store/<?=H::e(
+                        $unlock['store_slug']
+                    )?>#creative-moth-prize-wheel"
+                >
+                    🎡 Spin Now
+                </a>
+            </p>
+        </div>
+    <?php endforeach; ?>
+</section>
+<?php endif; ?>
+
 <?php if(!empty($order['coupon_code'])):?><p>Coupon <?=H::e($order['coupon_code'])?> saved <?=H::money($order['coupon_discount'] ?? 0)?>.</p><?php endif;?>
 <?php foreach(($collabItems ?? []) as $collab):?>
 <section class="card">

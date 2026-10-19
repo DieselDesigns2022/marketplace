@@ -45,7 +45,36 @@ class BuyerController
         foreach($collabItems as &$collabItem)$collabItem['download_eligible']=\App\Services\CollabService::itemDownloadable((string)$order['payment_status'],\App\Services\CreditService::parseCents((string)$collabItem['total_price'],false),(int)$collabItem['refunded_cents']);unset($collabItem);
         $customOrder=DB::row('select * from custom_orders where order_id=? and buyer_user_id=?',[$order['id'],H::user()['id']]);
         $customFinals=$customOrder&&$customOrder['status']==='completed'&&in_array($order['payment_status'],['paid','partially_refunded'],true)?DB::rows('select * from custom_order_files where custom_order_id=? and file_kind="final" order by id',[$customOrder['id']]):[];
-        H::view('buyer/order',['order'=>$order,'items'=>$items,'collabItems'=>$collabItems,'sellerGroups'=>SellerReceiptService::groupItemsBySeller(array_values(array_filter($items,fn($item)=>empty($item['collab_id'])))),'customOrder'=>$customOrder,'customFinals'=>$customFinals]);
+        $prizeWheelUnlocks=[];
+
+        if(($order['payment_status']??'')==='paid'){
+            $prizeWheelUnlocks=
+                (new \App\Services\PrizeWheelService())
+                    ->unlockedStoresForOrder(
+                        (int)$order['id'],
+                        (int)H::user()['id']
+                    );
+        }
+
+        H::view(
+            'buyer/order',
+            [
+                'order'=>$order,
+                'items'=>$items,
+                'collabItems'=>$collabItems,
+                'sellerGroups'=>SellerReceiptService::groupItemsBySeller(
+                    array_values(
+                        array_filter(
+                            $items,
+                            fn($item)=>empty($item['collab_id'])
+                        )
+                    )
+                ),
+                'customOrder'=>$customOrder,
+                'customFinals'=>$customFinals,
+                'prizeWheelUnlocks'=>$prizeWheelUnlocks,
+            ]
+        );
 
     }
     public function downloads()
