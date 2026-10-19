@@ -31,6 +31,25 @@ class CouponService
         if ($normalized === '') return ['ok'=>false,'error'=>'Enter a coupon code.'];
         $coupon = DB::row('select * from coupons where code=? limit 1', [$normalized]);
         if (!$coupon) return ['ok'=>false,'error'=>'Coupon code was not found.'];
+
+        $wheelReward=DB::row(
+            'select user_id
+             from prize_wheel_rewards
+             where coupon_id=?
+             limit 1',
+            [$coupon['id']]
+        );
+
+        if(
+            $wheelReward
+            && (int)$wheelReward['user_id'] !== $userId
+        ){
+            return [
+                'ok'=>false,
+                'error'=>'This Prize Wheel coupon belongs to another account.'
+            ];
+        }
+
         if ((int)$coupon['is_active'] !== 1) return ['ok'=>false,'error'=>'Coupon is inactive.'];
         $today = date('Y-m-d');
         $starts = !empty($coupon['starts_at']) ? substr((string)$coupon['starts_at'],0,10) : null;

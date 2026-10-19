@@ -48,41 +48,40 @@ $check(
 $check(
     str_contains(
         $service,
-        'find_in_set('
-    ) &&
+        'prize_wheel_prizes'
+    )
+    &&
     str_contains(
         $service,
-        '"prize_wheel"'
+        'is_active=1'
     ),
-    'Prize Wheel reads comma-separated authorized prize inventory correctly'
+    'Prize Wheel reads active Admin-managed prize inventory'
 );
 
 $check(
+    str_contains(
+        $service,
+        '(int)$prize[\'weight\']'
+    )
+    &&
     str_contains(
         $service,
         'random_int(1,$total)'
-    ) &&
-    str_contains(
-        $service,
-        'quantity_remaining'
     ),
-    'Prize selection is weighted by remaining prize units'
+    'Prize selection is weighted by Admin-configured prize weights'
 );
 
 $check(
     str_contains(
         $service,
-        "'prize_wheel'"
-    ) &&
+        'fulfillReward('
+    )
+    &&
     str_contains(
         $service,
-        '->assign('
-    ) &&
-    str_contains(
-        $service,
-        '->award('
+        'prize_wheel_rewards'
     ),
-    'spin uses existing Prize Donation assignment and award workflow'
+    'spin creates and fulfills Admin-managed wheel rewards'
 );
 
 $check(
@@ -99,14 +98,20 @@ $check(
 
 $check(
     str_contains(
-        $controller,
-        'prize_wheel_result'
-    ) &&
+        $service,
+        'coupon_code'
+    )
+    &&
+    str_contains(
+        $service,
+        'reward_message'
+    )
+    &&
     str_contains(
         $controller,
-        'winnerFile'
+        "You won "
     ),
-    'winner result and protected prize file delivery are wired'
+    'winner result and seller-specific reward fulfillment are wired'
 );
 
 $check(
@@ -140,13 +145,14 @@ $check(
 $check(
     str_contains(
         $routes,
-        "/prize-wheel/spin"
-    ) &&
-    str_contains(
+        "/store/{id}/prize-wheel/spin"
+    )
+    &&
+    !str_contains(
         $routes,
         "/prize-wheel/spins/{id}/file"
     ),
-    'public spin and winner file routes are registered'
+    'public Prize Wheel exposes spin route without obsolete prize-file route'
 );
 
 $check(

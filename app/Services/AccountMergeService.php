@@ -22,6 +22,9 @@ class AccountMergeService
         'product_ip_risk_scans' => 'seller_id', 'product_ip_rights_confirmations' => 'seller_id',
         'prize_assignments' => 'winner_user_id',
         'prize_wheel_spins' => 'user_id',
+        'prize_wheel_rewards' => 'user_id',
+        'prize_wheel_bonus_spins' => 'user_id',
+        'grand_opening_giveaway_entries' => 'user_id',
     ];
 
     /** User references which are historical/administrative rather than source-owned identity. */
@@ -31,6 +34,7 @@ class AccountMergeService
         'credit_transactions.admin_user_id', 'advertising_credit_transactions.admin_user_id',
         'advertising_credit_recurring_grants.created_by_admin_id',
         'prize_donations.approved_by_admin_id',
+        'prize_wheel_prizes.created_by',
         'prize_assignments.assigned_by_admin_id',
         'prize_assignments.awarded_by_admin_id',
         'prize_assignments.fulfilled_by_admin_id',

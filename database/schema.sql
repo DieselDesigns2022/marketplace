@@ -1963,3 +1963,74 @@ ALTER TABLE prize_wheel_spins
         qualifying_order_id,
         storefront_designer_id
     );
+
+-- Admin-controlled Prize Wheel prizes and seller-specific rewards.
+CREATE TABLE prize_wheel_prizes (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(190) NOT NULL,
+    prize_type ENUM(
+        'seller_fixed_coupon',
+        'seller_percent_coupon',
+        'spin_again',
+        'grand_opening_entry'
+    ) NOT NULL,
+    prize_value DECIMAL(10,2) NULL,
+    weight INT UNSIGNED NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by BIGINT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE prize_wheel_rewards (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    spin_id BIGINT NULL,
+    wheel_prize_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    storefront_designer_id BIGINT NOT NULL,
+    reward_type ENUM(
+        'seller_fixed_coupon',
+        'seller_percent_coupon',
+        'spin_again',
+        'grand_opening_entry'
+    ) NOT NULL,
+    coupon_id BIGINT NULL,
+    reward_value DECIMAL(10,2) NULL,
+    fulfillment_status ENUM(
+        'awarded',
+        'fulfilled',
+        'consumed'
+    ) NOT NULL DEFAULT 'awarded',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE prize_wheel_bonus_spins (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    campaign_key VARCHAR(64) NOT NULL,
+    user_id BIGINT NOT NULL,
+    storefront_designer_id BIGINT NOT NULL,
+    source_spin_id BIGINT NULL,
+    status ENUM('available','consumed') NOT NULL DEFAULT 'available',
+    consumed_spin_id BIGINT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    consumed_at TIMESTAMP NULL
+);
+
+CREATE TABLE grand_opening_giveaway_entries (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    campaign_key VARCHAR(64) NOT NULL,
+    user_id BIGINT NOT NULL,
+    storefront_designer_id BIGINT NOT NULL,
+    source_type ENUM('prize_wheel') NOT NULL DEFAULT 'prize_wheel',
+    source_spin_id BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY grand_opening_entry_spin_unique(source_spin_id)
+);
+
+ALTER TABLE prize_wheel_spins
+    ADD COLUMN wheel_prize_id BIGINT NULL,
+    ADD COLUMN reward_id BIGINT NULL,
+    MODIFY prize_donation_id BIGINT NULL,
+    MODIFY prize_assignment_id BIGINT NULL;

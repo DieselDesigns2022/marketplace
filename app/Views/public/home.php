@@ -44,6 +44,59 @@
 </section>
 <?php endif;?>
 
+<?php if(!empty($partySellers)): ?>
+<section class="page-section grand-opening-party-sellers">
+    <div class="section-heading-row">
+        <div>
+            <h2>🎉 Grand Opening Party Sellers</h2>
+
+            <p class="muted">
+                These Creative Moth sellers are participating in the
+                Grand Opening Prize Wheel. Spend at least $5 on a
+                participating seller's merchandise after all coupons,
+                credits, and discounts to unlock a spin.
+                Sales tax does not count toward the $5 minimum.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid">
+        <?php foreach($partySellers as $seller): ?>
+            <a
+                class="card"
+                href="/store/<?=H::e($seller['store_slug'])?>"
+            >
+                <?php if(!empty($seller['banner_path'])): ?>
+                    <img
+                        src="<?=H::e($seller['banner_path'])?>"
+                        alt="<?=H::e($seller['display_name'])?>"
+                        style="
+                            width:100%;
+                            aspect-ratio:3/1;
+                            object-fit:cover;
+                            border-radius:8px;
+                            margin-bottom:12px;
+                        "
+                    >
+                <?php endif; ?>
+
+                <h3>
+                    <?=H::e($seller['display_name'])?>
+                </h3>
+
+                <p>
+                    🎡 Participating in the Grand Opening Prize Wheel
+                </p>
+
+                <span class="btn">
+                    Visit Store
+                </span>
+            </a>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php endif; ?>
+
 <?php $featuredProducts = $products ?? []; ?>
 <section class="page-section featured-products-section">
     <h2>Featured products</h2>

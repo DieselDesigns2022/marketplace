@@ -40,9 +40,19 @@ $migration=file_get_contents(
 $check(
     str_contains(
         $service,
-        'where d.designer_id=?'
+        '$storefrontDesignerId'
+    )
+    &&
+    str_contains(
+        $service,
+        'seller_fixed_coupon'
+    )
+    &&
+    str_contains(
+        $service,
+        'seller_percent_coupon'
     ),
-    'each seller wheel uses only that seller prize inventory'
+    'each seller wheel fulfills rewards specifically for that storefront'
 );
 
 $check(
@@ -105,22 +115,37 @@ $check(
     &&
     str_contains(
         $admin,
-        'Needs Wheel Prizes'
+        'Active wheel prizes:'
+    )
+    &&
+    str_contains(
+        $admin,
+        'seller-funded'
     ),
-    'admin can see participating sellers and readiness'
+    'admin can see participating sellers and global wheel prize status'
 );
 
 $check(
     str_contains(
         $seller,
-        'your own storefront'
+        'Participate in Creative Moth giveaways'
     )
     &&
     str_contains(
         $seller,
-        'only prizes donated by your store'
+        'will not reimburse me'
+    )
+    &&
+    str_contains(
+        $seller,
+        'You do not need to donate prize inventory for the Prize Wheel'
+    )
+    &&
+    str_contains(
+        $seller,
+        'prize_wheel_opt_in'
     ),
-    'seller participation explains store-specific wheel'
+    'seller participation explains giveaway consent and seller-funded rewards'
 );
 
 $check(

@@ -107,20 +107,6 @@
         <div class="notice success prize-wheel-result">
             <h3>🎉 You won!</h3>
 
-            <?php if(!empty($prizeWheelResult['preview_image_path'])): ?>
-                <p>
-                    <img
-                        src="<?=H::e(
-                            $prizeWheelResult['preview_image_path']
-                        )?>"
-                        alt="<?=H::e(
-                            $prizeWheelResult['title']
-                        )?>"
-                        style="max-width:280px;height:auto;"
-                    >
-                </p>
-            <?php endif; ?>
-
             <p>
                 <strong>
                     <?=H::e($prizeWheelResult['title'])?>
@@ -128,55 +114,25 @@
             </p>
 
             <p>
-                Donated by
+                Prize awarded from
                 <strong>
                     <?=H::e(
                         $prizeWheelResult['seller_name']
-                        ??'Creative Moth seller'
+                        ??'this Creative Moth store'
                     )?>
                 </strong>
             </p>
 
-            <?php if(!empty($prizeWheelResult['description'])): ?>
+            <?php if(!empty($prizeWheelResult['coupon_code'])): ?>
                 <p>
-                    <?=nl2br(
-                        H::e($prizeWheelResult['description'])
-                    )?>
+                    <strong>Your prize code:</strong><br>
+                    <code><?=H::e($prizeWheelResult['coupon_code'])?></code>
                 </p>
             <?php endif; ?>
 
-            <?php if(!empty(
-                $prizeWheelResult['fulfillment_instructions']
-            )): ?>
+            <?php if(!empty($prizeWheelResult['reward_message'])): ?>
                 <p>
-                    <strong>How to claim:</strong><br>
-                    <?=nl2br(
-                        H::e(
-                            $prizeWheelResult[
-                                'fulfillment_instructions'
-                            ]
-                        )
-                    )?>
-                </p>
-            <?php endif; ?>
-
-            <?php if(!empty($prizeWheelResult['restrictions'])): ?>
-                <p class="help-text">
-                    <strong>Restrictions:</strong>
-                    <?=nl2br(
-                        H::e($prizeWheelResult['restrictions'])
-                    )?>
-                </p>
-            <?php endif; ?>
-
-            <?php if(!empty($prizeWheelResult['spin_id'])): ?>
-                <p>
-                    <a
-                        class="btn"
-                        href="/prize-wheel/spins/<?=(int)$prizeWheelResult['spin_id']?>/file"
-                    >
-                        Download / Claim Prize File
-                    </a>
+                    <?=H::e($prizeWheelResult['reward_message'])?>
                 </p>
             <?php endif; ?>
         </div>
@@ -186,7 +142,7 @@
         (int)($prizeWheelState['available_prizes']??0)<1
     ): ?>
         <p class="notice warning">
-            All Prize Wheel prizes have been claimed.
+            Prize Wheel prizes are temporarily unavailable.
         </p>
 
     <?php elseif(!H::user()): ?>
@@ -212,7 +168,9 @@
                     2
                 )?>
             </strong>
-            from this store to unlock a spin.
+            of this store's merchandise after all coupons, credits,
+            and discounts to unlock a spin.
+            Sales tax does not count toward the minimum.
         </p>
 
     <?php else: ?>
@@ -379,13 +337,17 @@
                         2
                     )?>
                 </strong>
-                at this store during the promotion and you'll unlock
+                of this store's merchandise after all coupons,
+                credits, and discounts and you'll unlock
                 <strong>one spin</strong> on this seller's Prize Wheel
                 after your purchase.
             </p>
 
             <p class="help-text">
-                Sales tax does not count toward the minimum purchase.
+                At least $5 of this store's merchandise must still be
+                paid at checkout after coupons, Prize Credit,
+                Marketplace Credit, and other discounts.
+                Sales tax does not count toward the $5 minimum.
             </p>
         <?php endif; ?>
     </div>

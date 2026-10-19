@@ -52,7 +52,6 @@ use App\Controllers\AnalyticsController;
  $router->get('/collab-download/{item}', [PublicCollabController::class, 'download']);
  $router->post('/store/{id}/follow', [BuyerController::class, 'toggleFollow']);
  $router->post('/store/{id}/prize-wheel/spin', [PrizeWheelController::class, 'spin']);
- $router->get('/prize-wheel/spins/{id}/file', [PrizeWheelController::class, 'winnerFile']);
  foreach (['about','contact','terms','privacy','data-deletion','licensing-help','seller-faq','buyer-faq'] as $page) $router->get('/'.$page, [PublicController::class, 'static']);
  $router->match(['GET','POST'], '/register', [AuthController::class, 'register']);
  $router->match(['GET','POST'], '/login', [AuthController::class, 'login']);

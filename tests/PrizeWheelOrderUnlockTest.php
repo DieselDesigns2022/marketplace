@@ -61,10 +61,21 @@ $check(
 );
 
 $check(
-    str_contains($service,"':store:'")
+    str_contains(
+        $migration,
+        'prize_wheel_order_campaign_uq'
+    )
     &&
-    str_contains($service,"':order:'"),
-    'Prize Wheel assignment idempotency includes seller and order'
+    str_contains(
+        $migration,
+        'qualifying_order_id'
+    )
+    &&
+    str_contains(
+        $migration,
+        'storefront_designer_id'
+    ),
+    'Prize Wheel purchase-spin idempotency includes seller and order'
 );
 
 $check(

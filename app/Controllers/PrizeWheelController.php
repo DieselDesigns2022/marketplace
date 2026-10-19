@@ -56,7 +56,34 @@ final class PrizeWheelController
 
                     H::flash(
                         'success',
-                        'A new Prize Wheel giveaway round was started. Previous winner history was preserved.'
+                        'A new Prize Wheel promotion round was started.'
+                    );
+
+                    H::redirect('/admin/prize-wheel');
+                }
+
+                if($action==='save_prize'){
+                    $id=
+                        (int)($_POST['prize_id']??0);
+
+                    $service->savePrize(
+                        $id>0?$id:null,
+                        (string)($_POST['title']??''),
+                        (string)($_POST['prize_type']??''),
+                        isset($_POST['prize_value'])
+                            ? (string)$_POST['prize_value']
+                            : null,
+                        (int)($_POST['weight']??1),
+                        (int)($_POST['sort_order']??0),
+                        isset($_POST['is_active']),
+                        (int)H::user()['id']
+                    );
+
+                    H::flash(
+                        'success',
+                        $id>0
+                            ? 'Prize Wheel prize updated.'
+                            : 'Prize Wheel prize added.'
                     );
 
                     H::redirect('/admin/prize-wheel');
@@ -92,7 +119,16 @@ final class PrizeWheelController
                     && $service->optedInStoreCount()<1
                 ){
                     throw new DomainException(
-                        'At least one approved seller must opt into the Prize Wheel before turning it ON.'
+                        'At least one approved seller must opt into Creative Moth giveaways before turning the Prize Wheel ON.'
+                    );
+                }
+
+                if(
+                    $enabled
+                    && $service->availableWheelPrizeCount()<1
+                ){
+                    throw new DomainException(
+                        'At least one active Prize Wheel prize is required before turning the promotion ON.'
                     );
                 }
 
@@ -126,16 +162,8 @@ final class PrizeWheelController
                         json_encode(
                             [
                                 'is_enabled'=>$enabled,
-                                'minimum_purchase_cents'=>$minimumPurchaseCents,
-                                'heading'=>mb_substr(
-                                    trim(
-                                        (string)(
-                                            $_POST['heading']??''
-                                        )
-                                    ),
-                                    0,
-                                    190
-                                ),
+                                'minimum_purchase_cents'=>
+                                    $minimumPurchaseCents,
                             ],
                             JSON_THROW_ON_ERROR
                         ),
@@ -147,8 +175,8 @@ final class PrizeWheelController
                 H::flash(
                     'success',
                     $enabled
-                        ? 'Prize Wheel is ON. It is live on opted-in seller stores.'
-                        : 'Prize Wheel is OFF. It is hidden from all storefronts.'
+                        ? 'Prize Wheel is ON for sellers who opted into Creative Moth giveaways.'
+                        : 'Prize Wheel is OFF and hidden from all storefronts.'
                 );
 
                 H::redirect('/admin/prize-wheel');
@@ -161,7 +189,7 @@ final class PrizeWheelController
                     'error',
                     $error instanceof DomainException
                         ? $error->getMessage()
-                        : 'Prize Wheel settings could not be updated.'
+                        : 'Prize Wheel could not be updated.'
                 );
 
                 H::redirect('/admin/prize-wheel');
@@ -175,6 +203,7 @@ final class PrizeWheelController
                 'optedInStores'=>$service->optedInStoreCount(),
                 'participatingStores'=>$service->participatingStores(),
                 'availablePrizes'=>$service->availableWheelPrizeCount(),
+                'wheelPrizes'=>$service->prizes(true),
                 'recentSpins'=>$service->recentSpins(),
             ]
         );
@@ -210,9 +239,15 @@ final class PrizeWheelController
                 'result'=>$result,
             ];
 
+            $message='You won '.$result['title'].'!';
+
+            if(!empty($result['reward_message'])){
+                $message.=' '.$result['reward_message'];
+            }
+
             H::flash(
                 'success',
-                'You won '.$result['title'].'!'
+                $message
             );
         }catch(Throwable $error){
             H::flash(
@@ -230,75 +265,5 @@ final class PrizeWheelController
         );
     }
 
-    public function winnerFile($spinId): void
-    {
-        H::requireLogin();
 
-        try{
-            $file=(new PrizeWheelService())->winnerFile(
-                (int)$spinId,
-                (int)H::user()['id']
-            );
-        }catch(Throwable $error){
-            H::abort(404);
-        }
-
-        $base=realpath(
-            app_path(
-                'storage/protected_uploads/prize_donations'
-            )
-        );
-
-        $real=realpath(
-            app_path(
-                'storage/protected_uploads/'.
-                ltrim(
-                    (string)$file['prize_file_storage_path'],
-                    '/'
-                )
-            )
-        );
-
-        if(
-            !$base
-            || !$real
-            || !str_starts_with(
-                $real,
-                $base.DIRECTORY_SEPARATOR
-            )
-            || !is_file($real)
-            || !is_readable($real)
-        ){
-            H::abort(404);
-        }
-
-        $name=
-            trim(
-                (string)$file['prize_file_original_name']
-            ) ?: 'prize-download';
-
-        header(
-            'Content-Type: '.
-            (
-                trim(
-                    (string)$file['prize_file_mime_type']
-                ) ?: 'application/octet-stream'
-            )
-        );
-
-        header(
-            'Content-Length: '.filesize($real)
-        );
-
-        header(
-            "Content-Disposition: attachment; filename*=UTF-8''".
-            rawurlencode($name)
-        );
-
-        header('X-Content-Type-Options: nosniff');
-        header('Cache-Control: private, no-store');
-
-        readfile($real);
-        exit;
-    }
 }

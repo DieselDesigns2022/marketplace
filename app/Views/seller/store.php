@@ -75,24 +75,31 @@
     <button class="btn">Save Store Settings</button>
 </form>
 <section class="card page-section">
-    <h2>Grand Opening Prize Wheel</h2>
+    <h2>Grand Opening Creative Moth Giveaways</h2>
 
     <p>
-        Join the Creative Moth Prize Wheel promotion and have a Prize Wheel
-        appear on your own storefront while the promotion is active.
+        Opt into Creative Moth giveaways, including the Grand Opening
+        Prize Wheel. While the Prize Wheel promotion is active, a wheel
+        will appear on your storefront for qualifying customers.
     </p>
 
     <p class="help-text">
-        Your wheel uses only prizes donated by your store and approved for
-        Prize Wheel use. Customers who make the required minimum purchase
-        from your store receive one spin on your wheel for that qualifying
-        order.
+        Creative Moth controls the Prize Wheel promotion and the global
+        list of available wheel prizes. Every reward is applied in the
+        context of the storefront where the customer spins.
     </p>
 
     <p class="help-text">
-        Creative Moth controls when the overall promotion is turned ON or
-        OFF. Your participation choice remains saved while the promotion
-        is off.
+        Customers must meet the current qualifying purchase requirement
+        at your store after coupons, credits, and discounts before they
+        receive a purchase-earned spin. Sales tax does not count toward
+        the qualifying minimum.
+    </p>
+
+    <p class="help-text">
+        Creative Moth controls when the overall promotion is turned ON
+        or OFF. Your participation choice remains saved while the
+        promotion is off.
     </p>
 
     <form method="post" class="form">
@@ -116,16 +123,25 @@
                 <?=!empty($d['prize_wheel_opt_in'])?'checked':''?>
             >
 
-            Participate in the Prize Wheel promotion on my storefront.
+            Participate in Creative Moth giveaways, including the
+            Grand Opening Prize Wheel.
         </label>
 
         <p class="help-text">
-            Remember: your store needs approved Prize Wheel donations with
-            available inventory before customers can spin your wheel.
+            By opting in, I agree that Creative Moth may award
+            seller-specific store credits, coupons, Prize Wheel rewards,
+            and other promotional prizes redeemable at my store.
+            I understand these promotional discounts are funded by my
+            store and Creative Moth will not reimburse me for their value.
+        </p>
+
+        <p class="help-text">
+            You do not need to donate prize inventory for the Prize Wheel.
+            Creative Moth manages the wheel prize list.
         </p>
 
         <button class="btn">
-            Save Prize Wheel Setting
+            Save Giveaway Participation
         </button>
     </form>
 </section>

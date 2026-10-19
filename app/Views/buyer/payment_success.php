@@ -8,6 +8,13 @@ $paymentStatus=
 
 <?php if($paymentStatus==='paid'): ?>
 
+    <script>
+    window.sessionStorage.removeItem(
+        'creative-moth-payment-confirmation:'+
+        <?=json_encode((string)$order['id'])?>
+    );
+    </script>
+
     <div class="notice success">
         <p>
             <strong>Payment confirmed!</strong>
@@ -89,18 +96,31 @@ $paymentStatus=
 
     <script>
     (() => {
-        const started=Date.now();
+        const key=
+            'creative-moth-payment-confirmation:'+
+            <?=json_encode((string)$order['id'])?>;
+
         const maxWait=30000;
+        const now=Date.now();
 
-        const refresh=()=>{
-            if(Date.now()-started>=maxWait){
-                return;
-            }
+        let started=parseInt(
+            window.sessionStorage.getItem(key) || '0',
+            10
+        );
 
-            window.location.reload();
-        };
+        if(!started){
+            started=now;
+            window.sessionStorage.setItem(
+                key,
+                String(started)
+            );
+        }
 
-        window.setTimeout(refresh,2500);
+        if(now-started<maxWait){
+            window.setTimeout(()=>{
+                window.location.reload();
+            },2500);
+        }
     })();
     </script>
 

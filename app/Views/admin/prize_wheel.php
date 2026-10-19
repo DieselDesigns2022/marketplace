@@ -8,13 +8,12 @@ $minimumCents=(int)(
     ??500
 );
 
-$minimumAmount=
-    number_format(
-        $minimumCents/100,
-        2,
-        '.',
-        ''
-    );
+$minimumAmount=number_format(
+    $minimumCents/100,
+    2,
+    '.',
+    ''
+);
 ?>
 
 <section class="card page-section">
@@ -33,35 +32,29 @@ $minimumAmount=
 
         ·
 
-        <strong>Total available prize units:</strong>
+        <strong>Active wheel prizes:</strong>
         <?=number_format((int)$availablePrizes)?>
 
         ·
 
-        <strong>Minimum store purchase:</strong>
+        <strong>Minimum purchase:</strong>
         $<?=H::e($minimumAmount)?>
     </p>
 
-    <?php if(!empty($settings['is_enabled'])): ?>
-        <p class="notice success">
-            The Prize Wheel promotion is live. Each participating seller
-            has their own wheel and only awards prizes donated by that
-            seller.
-        </p>
-    <?php else: ?>
-        <p class="notice warning">
-            The Prize Wheel promotion is currently hidden from every
-            storefront.
-        </p>
-    <?php endif; ?>
+    <p class="help-text">
+        Sellers are default OPT-OUT. Only sellers who manually agree
+        to participate in Creative Moth giveaways receive the Prize
+        Wheel on their storefront.
+    </p>
 </section>
 
 <section class="card page-section">
     <h2>Participating Sellers</h2>
 
     <p class="help-text">
-        These sellers have opted into the promotion. Each seller's wheel
-        uses only that seller's own approved Prize Wheel donations.
+        These sellers voluntarily opted into Creative Moth giveaways.
+        Giveaway store credits and coupons are seller-funded and
+        Creative Moth does not reimburse the seller for their value.
     </p>
 
     <div class="responsive-table">
@@ -70,18 +63,14 @@ $minimumAmount=
             <tr>
                 <th>Seller</th>
                 <th>Store</th>
-                <th>Wheel prizes</th>
-                <th>Prize units</th>
-                <th>Ready?</th>
+                <th>Status</th>
             </tr>
             </thead>
 
             <tbody>
             <?php foreach(($participatingStores??[]) as $seller): ?>
                 <tr>
-                    <td>
-                        <?=H::e($seller['display_name'])?>
-                    </td>
+                    <td><?=H::e($seller['display_name'])?></td>
 
                     <td>
                         <a
@@ -93,37 +82,18 @@ $minimumAmount=
                     </td>
 
                     <td>
-                        <?=number_format(
-                            (int)$seller['available_prizes']
-                        )?>
-                    </td>
-
-                    <td>
-                        <?=number_format(
-                            (int)$seller['available_prize_units']
-                        )?>
-                    </td>
-
-                    <td>
-                        <?php if(
-                            (int)$seller['available_prize_units']>0
-                        ): ?>
-                            <span class="badge yes">
-                                Ready
-                            </span>
-                        <?php else: ?>
-                            <span class="badge no">
-                                Needs Wheel Prizes
-                            </span>
-                        <?php endif; ?>
+                        <span class="badge yes">
+                            Participating
+                        </span>
                     </td>
                 </tr>
             <?php endforeach; ?>
 
             <?php if(empty($participatingStores)): ?>
                 <tr>
-                    <td colspan="5">
-                        No sellers have opted into the Prize Wheel yet.
+                    <td colspan="3">
+                        No sellers have opted into Creative Moth
+                        giveaways yet.
                     </td>
                 </tr>
             <?php endif; ?>
@@ -133,6 +103,237 @@ $minimumAmount=
 </section>
 
 <?php if(H::canAdmin('prizes.manage')): ?>
+
+<section class="card page-section">
+    <h2>Wheel Prizes</h2>
+
+    <p class="help-text">
+        This single prize list applies to every participating seller.
+        Every prize is fulfilled in the context of the storefront
+        where the buyer spun the wheel.
+    </p>
+
+    <div class="responsive-table">
+        <table>
+            <thead>
+            <tr>
+                <th>Prize</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Weight</th>
+                <th>Order</th>
+                <th>Active</th>
+                <th>Save</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            <?php foreach(($wheelPrizes??[]) as $prize): ?>
+                <tr>
+                    <form method="post">
+                        <input
+                            type="hidden"
+                            name="_csrf"
+                            value="<?=H::csrf()?>"
+                        >
+
+                        <input
+                            type="hidden"
+                            name="action"
+                            value="save_prize"
+                        >
+
+                        <input
+                            type="hidden"
+                            name="prize_id"
+                            value="<?=(int)$prize['id']?>"
+                        >
+
+                        <td>
+                            <input
+                                name="title"
+                                maxlength="190"
+                                required
+                                value="<?=H::e($prize['title'])?>"
+                            >
+                        </td>
+
+                        <td>
+                            <select
+                                name="prize_type"
+                                required
+                            >
+                                <?php
+                                $types=[
+                                    'seller_fixed_coupon'=>
+                                        'Seller Store Credit',
+                                    'seller_percent_coupon'=>
+                                        'Seller % Off Coupon',
+                                    'spin_again'=>
+                                        'Spin Again',
+                                    'grand_opening_entry'=>
+                                        'Grand Opening Giveaway Entry',
+                                ];
+                                ?>
+
+                                <?php foreach($types as $key=>$label): ?>
+                                    <option
+                                        value="<?=H::e($key)?>"
+                                        <?=$prize['prize_type']===$key?'selected':''?>
+                                    >
+                                        <?=H::e($label)?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
+
+                        <td>
+                            <input
+                                type="number"
+                                name="prize_value"
+                                min="0"
+                                step="0.01"
+                                value="<?=H::e(
+                                    $prize['prize_value']??''
+                                )?>"
+                            >
+                        </td>
+
+                        <td>
+                            <input
+                                type="number"
+                                name="weight"
+                                min="1"
+                                max="100000"
+                                required
+                                value="<?=(int)$prize['weight']?>"
+                            >
+                        </td>
+
+                        <td>
+                            <input
+                                type="number"
+                                name="sort_order"
+                                value="<?=(int)$prize['sort_order']?>"
+                            >
+                        </td>
+
+                        <td>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    name="is_active"
+                                    value="1"
+                                    <?=!empty($prize['is_active'])?'checked':''?>
+                                >
+                                Active
+                            </label>
+                        </td>
+
+                        <td>
+                            <button class="btn">
+                                Save
+                            </button>
+                        </td>
+                    </form>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Add Prize</h3>
+
+    <form method="post" class="form">
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::csrf()?>"
+        >
+
+        <input
+            type="hidden"
+            name="action"
+            value="save_prize"
+        >
+
+        <label>
+            Prize name
+            <input
+                name="title"
+                maxlength="190"
+                required
+            >
+        </label>
+
+        <label>
+            Prize type
+            <select name="prize_type" required>
+                <option value="seller_fixed_coupon">
+                    Seller Store Credit
+                </option>
+
+                <option value="seller_percent_coupon">
+                    Seller % Off Coupon
+                </option>
+
+                <option value="spin_again">
+                    Spin Again
+                </option>
+
+                <option value="grand_opening_entry">
+                    Grand Opening Giveaway Entry
+                </option>
+            </select>
+        </label>
+
+        <label>
+            Value
+            <input
+                type="number"
+                name="prize_value"
+                min="0"
+                step="0.01"
+            >
+        </label>
+
+        <label>
+            Weight / odds
+            <input
+                type="number"
+                name="weight"
+                min="1"
+                max="100000"
+                value="1"
+                required
+            >
+        </label>
+
+        <label>
+            Display order
+            <input
+                type="number"
+                name="sort_order"
+                value="100"
+            >
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                name="is_active"
+                value="1"
+                checked
+            >
+            Active
+        </label>
+
+        <button class="btn">
+            Add Wheel Prize
+        </button>
+    </form>
+</section>
+
 <section class="card page-section">
     <h2>Promotion Settings</h2>
 
@@ -169,7 +370,7 @@ $minimumAmount=
         </label>
 
         <label>
-            Minimum purchase required at the participating store
+            Minimum purchase required at participating store
             <input
                 type="number"
                 name="minimum_purchase"
@@ -182,8 +383,11 @@ $minimumAmount=
         </label>
 
         <p class="help-text">
-            One paid qualifying order unlocks one spin for that seller's
-            wheel. Sales tax does not count toward the minimum.
+            One paid qualifying order unlocks one spin for that
+            seller's storefront. The minimum must remain after all
+            coupons, Prize Credit, Marketplace Credit, and other
+            discounts, and must be paid through checkout.
+            Sales tax does not count.
         </p>
 
         <label>
@@ -218,8 +422,8 @@ $minimumAmount=
     <h2>Start Another Promotion Round</h2>
 
     <p>
-        A new round makes only purchases made during the new round
-        eligible. Previous winners and spin history remain saved.
+        A new round makes only purchases made during the new
+        round eligible. Previous spin and giveaway history remains.
     </p>
 
     <?php if(!empty($settings['is_enabled'])): ?>
@@ -246,6 +450,7 @@ $minimumAmount=
         </form>
     <?php endif; ?>
 </section>
+
 <?php endif; ?>
 
 <section class="card page-section">
@@ -256,10 +461,10 @@ $minimumAmount=
             <thead>
             <tr>
                 <th>Winner</th>
-                <th>Seller Wheel</th>
-                <th>Qualifying Order</th>
+                <th>Seller</th>
+                <th>Order</th>
                 <th>Prize</th>
-                <th>Status</th>
+                <th>Prize Code</th>
                 <th>Won</th>
             </tr>
             </thead>
@@ -285,23 +490,20 @@ $minimumAmount=
                     </td>
 
                     <td>
-                        #<?=(int)$spin['qualifying_order_id']?>
-                    </td>
-
-                    <td>
-                        <?=H::e($spin['prize_title'])?>
+                        <?=!empty($spin['qualifying_order_id'])
+                            ? '#'.(int)$spin['qualifying_order_id']
+                            : 'Bonus spin'?>
                     </td>
 
                     <td>
                         <?=H::e(
-                            ucwords(
-                                str_replace(
-                                    '_',
-                                    ' ',
-                                    $spin['assignment_status']
-                                )
-                            )
+                            $spin['prize_title']
+                            ??$spin['result_title']
                         )?>
+                    </td>
+
+                    <td>
+                        <?=H::e($spin['coupon_code']??'—')?>
                     </td>
 
                     <td>

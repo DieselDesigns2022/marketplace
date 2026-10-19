@@ -101,14 +101,14 @@ $check(
 $check(
     str_contains(
         $service,
-        'find_in_set('
+        'prize_wheel_prizes'
     )
     &&
     str_contains(
         $service,
-        '"prize_wheel"'
+        'availableWheelPrizeCount'
     ),
-    'Prize Wheel inventory count recognizes Prize Wheel donations'
+    'Prize Wheel inventory count recognizes Admin-managed wheel prizes'
 );
 
 exit($failures?1:0);

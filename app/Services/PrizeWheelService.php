@@ -12,16 +12,12 @@ final class PrizeWheelService
     public function settings(): array
     {
         return DB::row(
-            'select *
-             from prize_wheel_settings
-             where id=1
-             limit 1'
+            'select * from prize_wheel_settings where id=1 limit 1'
         ) ?? [
             'id'=>1,
             'is_enabled'=>0,
             'heading'=>'Grand Opening Prize Wheel',
-            'description'=>
-                'Spend $5 or more at this participating store to unlock a Prize Wheel spin!',
+            'description'=>'Spend $5 or more at this participating store to unlock a Prize Wheel spin!',
             'campaign_key'=>'grand-opening-2026',
             'minimum_purchase_cents'=>500,
             'campaign_started_at'=>null,
@@ -40,9 +36,7 @@ final class PrizeWheelService
             ($designer['status'] ?? '') === 'approved'
             && !empty($designer['prize_wheel_opt_in'])
             && $this->globallyEnabled()
-            && $this->availableWheelPrizeCount(
-                (int)$designer['id']
-            ) > 0;
+            && $this->availableWheelPrizeCount() > 0;
     }
 
     public function updateSettings(
@@ -71,12 +65,6 @@ final class PrizeWheelService
             );
         }
 
-        $current=$this->settings();
-        $wasEnabled=!empty($current['is_enabled']);
-
-        $heading=mb_substr($heading,0,190);
-        $description=mb_substr($description,0,1000);
-
         DB::exec(
             'update prize_wheel_settings
              set is_enabled=?,
@@ -86,8 +74,7 @@ final class PrizeWheelService
                  updated_by=?,
                  enabled_at=
                     case
-                        when ?=1 and is_enabled=0
-                        then now()
+                        when ?=1 and is_enabled=0 then now()
                         else enabled_at
                     end,
                  campaign_started_at=
@@ -100,16 +87,15 @@ final class PrizeWheelService
                     end,
                  disabled_at=
                     case
-                        when ?=0 and is_enabled=1
-                        then now()
+                        when ?=0 and is_enabled=1 then now()
                         else disabled_at
                     end,
                  updated_at=now()
              where id=1',
             [
                 $enabled?1:0,
-                $heading,
-                $description!==''?$description:null,
+                mb_substr($heading,0,190),
+                $description!==''?mb_substr($description,0,1000):null,
                 $minimumPurchaseCents,
                 $adminId,
                 $enabled?1:0,
@@ -142,10 +128,7 @@ final class PrizeWheelService
                  updated_by=?,
                  updated_at=now()
              where id=1',
-            [
-                $campaign,
-                $adminId,
-            ]
+            [$campaign,$adminId]
         );
 
         return $campaign;
@@ -154,50 +137,10 @@ final class PrizeWheelService
     public function participatingStores(): array
     {
         return DB::rows(
-            'select
-                d.id,
-                d.display_name,
-                d.store_slug,
-                d.prize_wheel_opt_in,
-                coalesce(
-                    sum(
-                        case
-                            when pd.status="available"
-                             and pd.quantity_remaining>0
-                             and pd.seller_authorized=1
-                             and find_in_set(
-                                "prize_wheel",
-                                pd.usage_designations
-                             )>0
-                            then pd.quantity_remaining
-                            else 0
-                        end
-                    ),
-                    0
-                ) available_prize_units,
-                count(
-                    distinct case
-                        when pd.status="available"
-                         and pd.quantity_remaining>0
-                         and pd.seller_authorized=1
-                         and find_in_set(
-                            "prize_wheel",
-                            pd.usage_designations
-                         )>0
-                        then pd.id
-                        else null
-                    end
-                ) available_prizes
+            'select d.*
              from designers d
-             left join prize_donations pd
-               on pd.designer_id=d.id
              where d.status="approved"
                and d.prize_wheel_opt_in=1
-             group by
-                d.id,
-                d.display_name,
-                d.store_slug,
-                d.prize_wheel_opt_in
              order by d.display_name,d.id'
         );
     }
@@ -207,34 +150,151 @@ final class PrizeWheelService
         return count($this->participatingStores());
     }
 
-    public function availableWheelPrizeCount(
-        ?int $designerId=null
-    ): int {
-        $where='
-            status="available"
-            and quantity_remaining>0
-            and seller_authorized=1
-            and find_in_set(
-                "prize_wheel",
-                usage_designations
-            )>0
-        ';
+    public function prizes(bool $includeInactive=true): array
+    {
+        $where=$includeInactive?'':'where is_active=1';
 
-        $args=[];
+        return DB::rows(
+            'select *
+             from prize_wheel_prizes
+             '.$where.'
+             order by sort_order,id'
+        );
+    }
 
-        if($designerId!==null){
-            $where.=' and designer_id=?';
-            $args[]=$designerId;
-        }
-
+    public function availableWheelPrizeCount(?int $designerId=null): int
+    {
         $row=DB::row(
-            'select coalesce(sum(quantity_remaining),0) total
-             from prize_donations
-             where '.$where,
-            $args
+            'select count(*) total
+             from prize_wheel_prizes
+             where is_active=1
+               and weight>0'
         );
 
         return (int)($row['total']??0);
+    }
+
+    public function savePrize(
+        ?int $id,
+        string $title,
+        string $type,
+        ?string $value,
+        int $weight,
+        int $sortOrder,
+        bool $active,
+        int $adminId
+    ): int {
+        $title=trim($title);
+
+        $allowed=[
+            'seller_fixed_coupon',
+            'seller_percent_coupon',
+            'spin_again',
+            'grand_opening_entry',
+        ];
+
+        if($title===''){
+            throw new InvalidArgumentException(
+                'Prize title is required.'
+            );
+        }
+
+        if(!in_array($type,$allowed,true)){
+            throw new InvalidArgumentException(
+                'Prize type is invalid.'
+            );
+        }
+
+        $amount=null;
+
+        if(in_array(
+            $type,
+            ['seller_fixed_coupon','seller_percent_coupon'],
+            true
+        )){
+            $raw=trim((string)$value);
+
+            if(
+                !preg_match(
+                    '/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/',
+                    $raw
+                )
+            ){
+                throw new InvalidArgumentException(
+                    'Enter a valid prize value.'
+                );
+            }
+
+            $amount=(float)$raw;
+
+            if($amount<=0){
+                throw new InvalidArgumentException(
+                    'Prize value must be greater than zero.'
+                );
+            }
+
+            if(
+                $type==='seller_percent_coupon'
+                && $amount>100
+            ){
+                throw new InvalidArgumentException(
+                    'Percentage prizes cannot exceed 100%.'
+                );
+            }
+        }
+
+        $weight=max(1,min(100000,$weight));
+        $sortOrder=max(-100000,min(100000,$sortOrder));
+
+        if($id){
+            DB::exec(
+                'update prize_wheel_prizes
+                 set title=?,
+                     prize_type=?,
+                     prize_value=?,
+                     weight=?,
+                     sort_order=?,
+                     is_active=?,
+                     updated_at=now()
+                 where id=?',
+                [
+                    mb_substr($title,0,190),
+                    $type,
+                    $amount,
+                    $weight,
+                    $sortOrder,
+                    $active?1:0,
+                    $id,
+                ]
+            );
+
+            return $id;
+        }
+
+        DB::exec(
+            'insert into prize_wheel_prizes
+             (
+                title,
+                prize_type,
+                prize_value,
+                weight,
+                sort_order,
+                is_active,
+                created_by
+             )
+             values (?,?,?,?,?,?,?)',
+            [
+                mb_substr($title,0,190),
+                $type,
+                $amount,
+                $weight,
+                $sortOrder,
+                $active?1:0,
+                $adminId,
+            ]
+        );
+
+        return (int)DB::id();
     }
 
     private function qualifyingMinimumCents(): int
@@ -271,10 +331,18 @@ final class PrizeWheelService
                 o.id order_id,
                 o.paid_at,
                 round(
-                    sum(
-                        greatest(
-                            0,
-                            (
+                    greatest(
+                        0,
+                        (
+                            coalesce(o.stripe_paid_amount,0)
+                            - coalesce(o.tax_amount,0)
+                        ) * 100
+                    )
+                    *
+                    (
+                        sum(
+                            greatest(
+                                0,
                                 oi.total_price
                                 - coalesce(
                                     oi.prize_credit_applied,
@@ -282,7 +350,25 @@ final class PrizeWheelService
                                 )
                             )
                         )
-                    )*100
+                        /
+                        nullif(
+                            (
+                                select sum(
+                                    greatest(
+                                        0,
+                                        all_items.total_price
+                                        - coalesce(
+                                            all_items.prize_credit_applied,
+                                            0
+                                        )
+                                    )
+                                )
+                                from order_items all_items
+                                where all_items.order_id=o.id
+                            ),
+                            0
+                        )
+                    )
                 ) qualifying_cents
              from orders o
              join order_items oi
@@ -294,6 +380,7 @@ final class PrizeWheelService
              where o.user_id=?
                and oi.designer_id=?
                and o.payment_status="paid"
+               and coalesce(o.stripe_paid_amount,0)>0
                and coalesce(
                     o.paid_at,
                     o.finalized_at,
@@ -302,7 +389,9 @@ final class PrizeWheelService
                and ws.id is null
              group by
                 o.id,
-                o.paid_at
+                o.paid_at,
+                o.stripe_paid_amount,
+                o.tax_amount
              having qualifying_cents>=?
              order by o.id',
             [
@@ -316,16 +405,59 @@ final class PrizeWheelService
         );
     }
 
+    private function availableBonusSpin(
+        string $campaign,
+        int $storefrontDesignerId,
+        int $userId
+    ): ?array {
+        return DB::row(
+            'select *
+             from prize_wheel_bonus_spins
+             where campaign_key=?
+               and storefront_designer_id=?
+               and user_id=?
+               and status="available"
+             order by id
+             limit 1',
+            [
+                $campaign,
+                $storefrontDesignerId,
+                $userId,
+            ]
+        );
+    }
+
     public function remainingSpins(
         int $storefrontDesignerId,
         int $userId
     ): int {
-        return count(
-            $this->eligibleOrders(
-                $storefrontDesignerId,
-                $userId
-            )
+        $settings=$this->settings();
+        $campaign=(string)($settings['campaign_key']??'');
+
+        $bonus=(int)(
+            DB::row(
+                'select count(*) c
+                 from prize_wheel_bonus_spins
+                 where campaign_key=?
+                   and storefront_designer_id=?
+                   and user_id=?
+                   and status="available"',
+                [
+                    $campaign,
+                    $storefrontDesignerId,
+                    $userId,
+                ]
+            )['c']??0
         );
+
+        return
+            count(
+                $this->eligibleOrders(
+                    $storefrontDesignerId,
+                    $userId
+                )
+            )
+            +$bonus;
     }
 
     public function publicState(
@@ -336,22 +468,15 @@ final class PrizeWheelService
 
         return [
             'visible'=>$this->storefrontVisible($designer),
-
-            'available_prizes'=>
-                $this->availableWheelPrizeCount(
-                    $designerId
-                ),
-
+            'available_prizes'=>$this->availableWheelPrizeCount(),
             'spins_remaining'=>$userId
                 ? $this->remainingSpins(
                     $designerId,
                     $userId
                 )
                 : null,
-
             'minimum_purchase_cents'=>
                 $this->qualifyingMinimumCents(),
-
             'campaign_key'=>
                 (string)(
                     $this->settings()['campaign_key']
@@ -360,62 +485,32 @@ final class PrizeWheelService
         ];
     }
 
-    private function inventory(
-        int $designerId
-    ): array {
-        return DB::rows(
-            'select
-                d.id,
-                d.designer_id,
-                d.title,
-                d.description,
-                d.preview_image_path,
-                d.quantity_remaining,
-                d.prize_type,
-                d.approximate_retail_value,
-                d.fulfillment_instructions,
-                d.restrictions,
-                s.display_name seller_name
-             from prize_donations d
-             join designers s
-               on s.id=d.designer_id
-             where d.designer_id=?
-               and d.status="available"
-               and d.quantity_remaining>0
-               and d.seller_authorized=1
-               and find_in_set(
-                    "prize_wheel",
-                    d.usage_designations
-               )>0
-             order by d.id',
-            [$designerId]
-        );
-    }
-
-    private function choosePrize(array $inventory): array
+    private function choosePrize(): array
     {
+        $inventory=$this->prizes(false);
+
+        if(!$inventory){
+            throw new DomainException(
+                'The Prize Wheel currently has no active prizes.'
+            );
+        }
+
         $total=0;
 
         foreach($inventory as $prize){
-            $total+=max(
-                0,
-                (int)$prize['quantity_remaining']
-            );
+            $total+=max(0,(int)$prize['weight']);
         }
 
         if($total<1){
             throw new DomainException(
-                'This seller currently has no Prize Wheel prizes remaining.'
+                'The Prize Wheel prize weights are invalid.'
             );
         }
 
         $ticket=random_int(1,$total);
 
         foreach($inventory as $prize){
-            $ticket-=max(
-                0,
-                (int)$prize['quantity_remaining']
-            );
+            $ticket-=max(0,(int)$prize['weight']);
 
             if($ticket<=0){
                 return $prize;
@@ -423,55 +518,206 @@ final class PrizeWheelService
         }
 
         throw new DomainException(
-            'Prize Wheel inventory could not be selected.'
+            'Prize Wheel selection failed.'
         );
     }
 
-    private function resultByAssignment(
-        int $assignmentId,
-        int $spinId=0
+    private function uniqueCouponCode(
+        string $campaign,
+        int $spinId
+    ): string {
+        for($attempt=0;$attempt<10;$attempt++){
+            $code=
+                'WHEEL-'.
+                strtoupper(
+                    substr(
+                        preg_replace(
+                            '/[^A-Z0-9]/',
+                            '',
+                            strtoupper($campaign)
+                        ),
+                        -8
+                    )
+                ).
+                '-'.
+                $spinId.
+                '-'.
+                strtoupper(bin2hex(random_bytes(3)));
+
+            if(
+                !DB::row(
+                    'select id from coupons where code=? limit 1',
+                    [$code]
+                )
+            ){
+                return $code;
+            }
+        }
+
+        throw new DomainException(
+            'Prize coupon could not be generated.'
+        );
+    }
+
+    private function fulfillReward(
+        int $spinId,
+        array $prize,
+        int $userId,
+        int $storefrontDesignerId,
+        string $campaign,
+        int $adminId
     ): array {
-        $row=DB::row(
-            'select
-                a.id assignment_id,
-                a.status assignment_status,
-                d.id prize_donation_id,
-                d.designer_id,
-                d.title,
-                d.description,
-                d.preview_image_path,
-                d.prize_type,
-                d.approximate_retail_value,
-                d.fulfillment_instructions,
-                d.restrictions,
-                d.prize_file_original_name,
-                s.display_name seller_name,
-                ws.id spin_id,
-                ws.storefront_designer_id,
-                ws.qualifying_order_id
-             from prize_assignments a
-             join prize_donations d
-               on d.id=a.prize_donation_id
-             join designers s
-               on s.id=d.designer_id
-             left join prize_wheel_spins ws
-               on ws.prize_assignment_id=a.id
-             where a.id=?
-             limit 1',
-            [$assignmentId]
+        $type=(string)$prize['prize_type'];
+        $couponId=null;
+        $message='';
+
+        if(in_array(
+            $type,
+            ['seller_fixed_coupon','seller_percent_coupon'],
+            true
+        )){
+            $code=$this->uniqueCouponCode(
+                $campaign,
+                $spinId
+            );
+
+            $discountType=
+                $type==='seller_fixed_coupon'
+                    ? 'fixed'
+                    : 'percent';
+
+            DB::exec(
+                'insert into coupons
+                 (
+                    code,
+                    scope,
+                    seller_id,
+                    discount_type,
+                    discount_value,
+                    starts_at,
+                    ends_at,
+                    is_active,
+                    min_cart_amount,
+                    usage_limit,
+                    per_user_limit,
+                    created_by
+                 )
+                 values (
+                    ?,
+                    "seller",
+                    ?,
+                    ?,
+                    ?,
+                    curdate(),
+                    null,
+                    1,
+                    0.00,
+                    1,
+                    1,
+                    ?
+                 )',
+                [
+                    $code,
+                    $storefrontDesignerId,
+                    $discountType,
+                    $prize['prize_value'],
+                    $adminId,
+                ]
+            );
+
+            $couponId=(int)DB::id();
+
+            $message=
+                'Your seller-specific prize code is '.
+                $code.
+                '. It may be used one time by your account at this store.';
+        }
+
+        DB::exec(
+            'insert into prize_wheel_rewards
+             (
+                spin_id,
+                wheel_prize_id,
+                user_id,
+                storefront_designer_id,
+                reward_type,
+                coupon_id,
+                reward_value,
+                fulfillment_status
+             )
+             values (?,?,?,?,?,?,?,"awarded")',
+            [
+                $spinId,
+                $prize['id'],
+                $userId,
+                $storefrontDesignerId,
+                $type,
+                $couponId,
+                $prize['prize_value'],
+            ]
         );
 
-        if(!$row){
-            throw new DomainException(
-                'Prize Wheel result was not found.'
+        $rewardId=(int)DB::id();
+
+        if($type==='spin_again'){
+            DB::exec(
+                'insert into prize_wheel_bonus_spins
+                 (
+                    campaign_key,
+                    user_id,
+                    storefront_designer_id,
+                    source_spin_id,
+                    status
+                 )
+                 values (?,?,?,?,"available")',
+                [
+                    $campaign,
+                    $userId,
+                    $storefrontDesignerId,
+                    $spinId,
+                ]
             );
+
+            $message=
+                'You earned another spin on this same seller\'s Prize Wheel.';
         }
 
-        if($spinId>0){
-            $row['spin_id']=$spinId;
+        if($type==='grand_opening_entry'){
+            DB::exec(
+                'insert ignore into grand_opening_giveaway_entries
+                 (
+                    campaign_key,
+                    user_id,
+                    storefront_designer_id,
+                    source_type,
+                    source_spin_id
+                 )
+                 values (?,?,?,"prize_wheel",?)',
+                [
+                    $campaign,
+                    $userId,
+                    $storefrontDesignerId,
+                    $spinId,
+                ]
+            );
+
+            $message=
+                'You received one entry into the main Grand Opening Giveaway.';
         }
 
-        return $row;
+        DB::exec(
+            'update prize_wheel_spins
+             set reward_id=?
+             where id=?',
+            [$rewardId,$spinId]
+        );
+
+        return [
+            'reward_id'=>$rewardId,
+            'coupon_id'=>$couponId,
+            'coupon_code'=>$couponId?$code:null,
+            'reward_message'=>$message,
+        ];
     }
 
     public function spin(
@@ -546,8 +792,6 @@ final class PrizeWheelService
                     'sha256',
                     $campaign.
                     ':'.
-                    $storefrontDesignerId.
-                    ':'.
                     $userId
                 ),
                 0,
@@ -566,23 +810,40 @@ final class PrizeWheelService
         }
 
         try{
+            DB::begin();
+
             $eligible=$this->eligibleOrders(
                 $storefrontDesignerId,
                 $userId
             );
 
-            if(!$eligible){
+            $bonus=$this->availableBonusSpin(
+                $campaign,
+                $storefrontDesignerId,
+                $userId
+            );
+
+            if(!$eligible && !$bonus){
+                DB::rollBack();
+
                 $minimum=
                     $this->qualifyingMinimumCents()/100;
 
                 throw new DomainException(
                     'Spend at least $'.
                     number_format($minimum,2).
-                    ' at this store during the promotion to unlock a spin.'
+                    ' at this store after all coupons, credits, and discounts, excluding sales tax, to unlock a spin.'
                 );
             }
 
-            $orderId=(int)$eligible[0]['order_id'];
+            $usingBonus=
+                !$eligible
+                && !empty($bonus);
+
+            $orderId=
+                $eligible
+                    ? (int)$eligible[0]['order_id']
+                    : null;
 
             $spinNumber=(int)(
                 DB::row(
@@ -594,136 +855,7 @@ final class PrizeWheelService
                 )['used']??0
             )+1;
 
-            $idempotency=
-                'prize-wheel:'.
-                $campaign.
-                ':store:'.
-                $storefrontDesignerId.
-                ':order:'.
-                $orderId;
-
-            $existingAssignment=DB::row(
-                'select id
-                 from prize_assignments
-                 where idempotency_key=?
-                 limit 1',
-                [$idempotency]
-            );
-
-            if($existingAssignment){
-                $assignmentId=(int)$existingAssignment['id'];
-
-                $spin=DB::row(
-                    'select id
-                     from prize_wheel_spins
-                     where campaign_key=?
-                       and qualifying_order_id=?
-                       and storefront_designer_id=?',
-                    [
-                        $campaign,
-                        $orderId,
-                        $storefrontDesignerId,
-                    ]
-                );
-
-                return $this->resultByAssignment(
-                    $assignmentId,
-                    (int)($spin['id']??0)
-                );
-            }
-
-            $donationService=
-                new PrizeDonationService();
-
-            $assignmentId=0;
-
-            for($attempt=1;$attempt<=8;$attempt++){
-                $inventory=$this->inventory(
-                    $storefrontDesignerId
-                );
-
-                if(!$inventory){
-                    throw new DomainException(
-                        'This seller currently has no Prize Wheel prizes remaining.'
-                    );
-                }
-
-                $selected=
-                    $this->choosePrize($inventory);
-
-                if(
-                    (int)$selected['designer_id']
-                    !==$storefrontDesignerId
-                ){
-                    throw new DomainException(
-                        'Prize Wheel seller inventory mismatch.'
-                    );
-                }
-
-                try{
-                    $assignmentId=
-                        $donationService->assign(
-                            (int)$selected['id'],
-                            1,
-                            'prize_wheel',
-                            'wheel:'.
-                                $campaign.
-                                ':store:'.
-                                $storefrontDesignerId.
-                                ':order:'.
-                                $orderId,
-                            $adminId,
-                            $idempotency
-                        );
-
-                    break;
-                }catch(DomainException $error){
-                    $message=$error->getMessage();
-
-                    if(
-                        str_contains(
-                            $message,
-                            'available prize'
-                        )
-                        || str_contains(
-                            $message,
-                            'inventory remains'
-                        )
-                    ){
-                        continue;
-                    }
-
-                    throw $error;
-                }
-            }
-
-            if($assignmentId<1){
-                throw new DomainException(
-                    'Prize inventory changed during the spin. Please try again.'
-                );
-            }
-
-            $donationService->award(
-                $assignmentId,
-                $adminId,
-                $userId,
-                (string)$user['name'],
-                (string)$user['email']
-            );
-
-            $result=
-                $this->resultByAssignment(
-                    $assignmentId
-                );
-
-            if(
-                (int)$result['designer_id']
-                !==$storefrontDesignerId
-            ){
-                throw new DomainException(
-                    'Prize Wheel awarded a prize from the wrong seller.'
-                );
-            }
+            $prize=$this->choosePrize();
 
             DB::exec(
                 'insert into prize_wheel_spins
@@ -732,51 +864,87 @@ final class PrizeWheelService
                     user_id,
                     storefront_designer_id,
                     qualifying_order_id,
+                    wheel_prize_id,
                     prize_donation_id,
                     prize_assignment_id,
                     spin_number,
                     result_title,
                     result_preview_path
                  )
-                 values (?,?,?,?,?,?,?,?,?)',
+                 values (?,?,?,?,?,null,null,?,?,null)',
                 [
                     $campaign,
                     $userId,
                     $storefrontDesignerId,
                     $orderId,
-                    (int)$result[
-                        'prize_donation_id'
-                    ],
-                    $assignmentId,
+                    $prize['id'],
                     $spinNumber,
-                    (string)$result['title'],
-                    $result[
-                        'preview_image_path'
-                    ]?:null,
+                    $prize['title'],
                 ]
             );
 
             $spinId=(int)DB::id();
-            $result['spin_id']=$spinId;
-            $result['qualifying_order_id']=$orderId;
+
+            if($usingBonus){
+                DB::exec(
+                    'update prize_wheel_bonus_spins
+                     set status="consumed",
+                         consumed_spin_id=?,
+                         consumed_at=now()
+                     where id=?
+                       and status="available"',
+                    [
+                        $spinId,
+                        $bonus['id'],
+                    ]
+                );
+            }
+
+            $reward=$this->fulfillReward(
+                $spinId,
+                $prize,
+                $userId,
+                $storefrontDesignerId,
+                $campaign,
+                $adminId
+            );
+
+            DB::commit();
+
+            $result=[
+                'spin_id'=>$spinId,
+                'qualifying_order_id'=>$orderId,
+                'title'=>$prize['title'],
+                'prize_type'=>$prize['prize_type'],
+                'prize_value'=>$prize['prize_value'],
+                'storefront_designer_id'=>$storefrontDesignerId,
+                'seller_name'=>$store['display_name'],
+                'coupon_code'=>$reward['coupon_code'],
+                'reward_message'=>$reward['reward_message'],
+            ];
 
             try{
+                $body=
+                    'You won "'.
+                    mb_substr(
+                        strip_tags((string)$prize['title']),
+                        0,
+                        140
+                    ).
+                    '" from '.
+                    $store['display_name'].
+                    '.';
+
+                if($reward['reward_message']!==''){
+                    $body.=' '.$reward['reward_message'];
+                }
+
                 NotificationService::create(
                     $userId,
                     'prize_wheel_win',
                     'buyer',
                     'You won a Prize Wheel prize!',
-                    'You won "'.
-                        mb_substr(
-                            strip_tags(
-                                (string)$result['title']
-                            ),
-                            0,
-                            140
-                        ).
-                        '" from '.
-                        $store['display_name'].
-                        '.',
+                    $body,
                     'prize-wheel-win:'.$spinId,
                     '/store/'.
                         rawurlencode(
@@ -792,6 +960,12 @@ final class PrizeWheelService
             }
 
             return $result;
+        }catch(Throwable $error){
+            if(DB::pdo()->inTransaction()){
+                DB::rollBack();
+            }
+
+            throw $error;
         }finally{
             DB::row(
                 'select release_lock(?) released',
@@ -817,7 +991,9 @@ final class PrizeWheelService
                 payment_status,
                 paid_at,
                 finalized_at,
-                created_at
+                created_at,
+                stripe_paid_amount,
+                tax_amount
              from orders
              where id=?
                and user_id=?
@@ -828,6 +1004,7 @@ final class PrizeWheelService
         if(
             !$order
             || ($order['payment_status']??'')!=='paid'
+            || (float)($order['stripe_paid_amount']??0)<=0
         ){
             return [];
         }
@@ -862,32 +1039,45 @@ final class PrizeWheelService
                 d.display_name,
                 d.store_slug,
                 round(
-                    sum(
-                        greatest(
-                            0,
-                            oi.total_price
-                            - coalesce(
-                                oi.prize_credit_applied,
-                                0
+                    greatest(
+                        0,
+                        (
+                            coalesce(o.stripe_paid_amount,0)
+                            - coalesce(o.tax_amount,0)
+                        ) * 100
+                    )
+                    *
+                    (
+                        sum(
+                            greatest(
+                                0,
+                                oi.total_price
+                                - coalesce(
+                                    oi.prize_credit_applied,
+                                    0
+                                )
                             )
                         )
-                    )*100
+                        /
+                        nullif(
+                            (
+                                select sum(
+                                    greatest(
+                                        0,
+                                        all_items.total_price
+                                        - coalesce(
+                                            all_items.prize_credit_applied,
+                                            0
+                                        )
+                                    )
+                                )
+                                from order_items all_items
+                                where all_items.order_id=o.id
+                            ),
+                            0
+                        )
+                    )
                 ) qualifying_cents,
-                coalesce(
-                    (
-                        select sum(pd.quantity_remaining)
-                        from prize_donations pd
-                        where pd.designer_id=d.id
-                          and pd.status="available"
-                          and pd.quantity_remaining>0
-                          and pd.seller_authorized=1
-                          and find_in_set(
-                            "prize_wheel",
-                            pd.usage_designations
-                          )>0
-                    ),
-                    0
-                ) available_prize_units,
                 (
                     select count(*)
                     from prize_wheel_spins ws
@@ -895,24 +1085,32 @@ final class PrizeWheelService
                       and ws.qualifying_order_id=?
                       and ws.storefront_designer_id=d.id
                 ) spin_used
-             from order_items oi
+             from orders o
+             join order_items oi
+               on oi.order_id=o.id
              join designers d
                on d.id=oi.designer_id
-             where oi.order_id=?
+             where o.id=?
+               and o.user_id=?
+               and o.payment_status="paid"
+               and coalesce(o.stripe_paid_amount,0)>0
                and d.status="approved"
                and d.prize_wheel_opt_in=1
              group by
                 d.id,
                 d.display_name,
-                d.store_slug
+                d.store_slug,
+                o.id,
+                o.stripe_paid_amount,
+                o.tax_amount
              having qualifying_cents>=?
-                and available_prize_units>0
                 and spin_used=0
              order by d.display_name,d.id',
             [
                 $campaign,
                 $orderId,
                 $orderId,
+                $userId,
                 $minimum,
             ]
         );
@@ -930,61 +1128,26 @@ final class PrizeWheelService
                 u.email winner_email,
                 d.display_name storefront_name,
                 d.store_slug,
-                pd.title prize_title,
-                pd.prize_type,
-                pd.approximate_retail_value,
-                pa.status assignment_status
+                wp.title prize_title,
+                wp.prize_type,
+                wp.prize_value,
+                r.coupon_id,
+                c.code coupon_code
              from prize_wheel_spins ws
              join users u
                on u.id=ws.user_id
              join designers d
                on d.id=ws.storefront_designer_id
-             join prize_donations pd
-               on pd.id=ws.prize_donation_id
-             join prize_assignments pa
-               on pa.id=ws.prize_assignment_id
+             left join prize_wheel_prizes wp
+               on wp.id=ws.wheel_prize_id
+             left join prize_wheel_rewards r
+               on r.id=ws.reward_id
+             left join coupons c
+               on c.id=r.coupon_id
              order by ws.id desc
              limit '.$limit
         );
     }
 
-    public function winnerFile(
-        int $spinId,
-        int $userId
-    ): array {
-        $row=DB::row(
-            'select
-                ws.id spin_id,
-                ws.user_id,
-                ws.prize_assignment_id,
-                pa.status assignment_status,
-                pa.winner_user_id,
-                pd.prize_file_storage_path,
-                pd.prize_file_original_name,
-                pd.prize_file_mime_type,
-                pd.prize_file_size
-             from prize_wheel_spins ws
-             join prize_assignments pa
-               on pa.id=ws.prize_assignment_id
-             join prize_donations pd
-               on pd.id=ws.prize_donation_id
-             where ws.id=?
-               and ws.user_id=?
-               and pa.winner_user_id=?
-               and pa.status in (
-                    "awarded",
-                    "fulfilled"
-               )
-             limit 1',
-            [$spinId,$userId,$userId]
-        );
 
-        if(!$row){
-            throw new DomainException(
-                'Prize file is not available for this account.'
-            );
-        }
-
-        return $row;
-    }
 }

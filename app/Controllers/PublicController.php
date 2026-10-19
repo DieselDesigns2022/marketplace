@@ -140,8 +140,34 @@ class PublicController
         }
         unset($collab);
 
+        $wheelService=
+            new \App\Services\PrizeWheelService();
+
+        $partySellers=
+            $wheelService->globallyEnabled()
+                ? $wheelService->participatingStores()
+                : [];
+
         $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Creative Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
-        H::view('public/home', ['cats'=>$cats, 'products'=>$products, 'recentProducts'=>$recentProducts, 'designers'=>$designers, 'collabs'=>$collabs, 'homepagePromo'=>PromoService::chooseWebsite('homepage'), 'meta'=>$this->pageMeta('Creative Moth', H::DEFAULT_DESCRIPTION, '/', $schema)]);
+
+        H::view(
+            'public/home',
+            [
+                'cats'=>$cats,
+                'products'=>$products,
+                'recentProducts'=>$recentProducts,
+                'designers'=>$designers,
+                'collabs'=>$collabs,
+                'partySellers'=>$partySellers,
+                'homepagePromo'=>PromoService::chooseWebsite('homepage'),
+                'meta'=>$this->pageMeta(
+                    'Creative Moth',
+                    H::DEFAULT_DESCRIPTION,
+                    '/',
+                    $schema
+                ),
+            ]
+        );
     }
 
     private function searchTerms(string $query): array
