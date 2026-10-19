@@ -32,7 +32,7 @@
         store. It is separate from Creative Moth Prize Credit.
     </p>
 
-    <form method="post" action="/seller/prize-donations" enctype="multipart/form-data">
+    <form method="post" action="/seller/prize-donations" enctype="multipart/form-data" class="form prize-donation-form">
         <input
             type="hidden"
             name="_csrf"
@@ -138,6 +138,10 @@
                 value="1"
                 required
             >
+            <small class="help-text">
+                You can donate multiple copies of the same product if you wish.
+                Enter the total number of identical prizes you are donating.
+            </small>
         </label>
 
         <label>
