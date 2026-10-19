@@ -34,6 +34,16 @@ $sellerView=file_get_contents(
     "$root/app/Views/seller/prize_donations.php"
 );
 
+$sellerText=preg_replace(
+    '/\\s+/',
+    ' ',
+    strip_tags($sellerView)
+);
+
+$sellerNav=file_get_contents(
+    "$root/app/Views/partials/dashboard_nav.php"
+);
+
 $adminView=file_get_contents(
     "$root/app/Views/admin/prize_donations.php"
 );
@@ -83,10 +93,19 @@ $check(
 );
 
 $check(
-    str_contains($sellerView,'You may submit as many separate prizes as you want.') &&
+    str_contains($sellerView,'Submitting more than one prize?') &&
+    str_contains($sellerView,'Please submit this form separately for each prize.') &&
+    str_contains($sellerView,'Do not combine') &&
     str_contains($sellerView,'seller_authorized') &&
     str_contains($sellerView,'usage_designations[]'),
-    'seller UI supports unlimited separate donations and explicit authorization'
+    'seller UI clearly requires a separate form for every individual prize'
+);
+
+$check(
+    str_contains($sellerNav,"'Promotions / Ads'") &&
+    str_contains($sellerNav,"'/seller/prize-donations'") &&
+    str_contains($sellerNav,"'Prize Donations'"),
+    'seller main navigation lists Prize Donations under Promotions / Ads'
 );
 
 $check(

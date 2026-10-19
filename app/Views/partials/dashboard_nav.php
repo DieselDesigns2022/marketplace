@@ -184,6 +184,11 @@ if ($area === 'buyer') {
                 'Manage Promotions',
                 ['/seller/promos']
             ],
+            [
+                '/seller/prize-donations',
+                'Prize Donations',
+                ['/seller/prize-donations', '/seller/prize-donations/']
+            ],
             ['/seller/social-publishing', 'Social Publishing', ['/seller/social-publishing', '/seller/social/']],
         ],
 

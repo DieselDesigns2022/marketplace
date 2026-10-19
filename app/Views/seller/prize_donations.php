@@ -19,6 +19,14 @@
         services or other marketplace-compliant digital prizes.
     </p>
 
+    <p class="notice warning">
+        <strong>Submitting more than one prize?</strong>
+        Please submit this form separately for each prize.
+        Do not combine multiple different prizes into one submission.
+        This allows Creative Moth to correctly track each prize's inventory,
+        value, approved uses, restrictions, winner, and fulfillment.
+    </p>
+
     <p class="muted">
         Seller/store credit here means credit or value fulfilled by your
         store. It is separate from Creative Moth Prize Credit.
