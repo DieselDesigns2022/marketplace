@@ -175,6 +175,7 @@ class AdminController
                 'referrals.view'=>'/admin/referrals',
                 'homepage.view'=>'/admin/homepage',
                 'promotions.view'=>'/admin/ads',
+                'prizes.view'=>'/admin/prize-donations',
                 'messages.view'=>'/admin/message-reports',
                 'feedback.view'=>'/admin/feedback',
                 'waitlist.view'=>'/admin/waitlist',

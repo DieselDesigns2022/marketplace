@@ -20,6 +20,7 @@ class AccountMergeService
         'custom_orders' => 'buyer_user_id', 'custom_order_files' => 'uploader_user_id',
         'custom_order_status_history' => 'actor_user_id', 'seller_earnings' => 'buyer_id',
         'product_ip_risk_scans' => 'seller_id', 'product_ip_rights_confirmations' => 'seller_id',
+        'prize_assignments' => 'winner_user_id',
     ];
 
     /** User references which are historical/administrative rather than source-owned identity. */
@@ -28,6 +29,10 @@ class AccountMergeService
         'seller_payouts.platform_credit_settled_by', 'creator_badge_history.admin_user_id',
         'credit_transactions.admin_user_id', 'advertising_credit_transactions.admin_user_id',
         'advertising_credit_recurring_grants.created_by_admin_id',
+        'prize_donations.approved_by_admin_id',
+        'prize_assignments.assigned_by_admin_id',
+        'prize_assignments.awarded_by_admin_id',
+        'prize_assignments.fulfilled_by_admin_id',
         'admin_logs.admin_user_id', 'ip_risk_terms.created_by_admin_id',
         'email_campaigns.created_by', 'seller_referral_admin_audits.admin_user_id',
         'message_reports.moderator_user_id', 'admin_access_profiles.granted_by',
