@@ -87,6 +87,39 @@ class AdminController
             DB::exec('update users set role=case when role="admin" then "admin" else "designer" end,updated_at=now() where id=?',[$a['user_id']]);
             $this->log('approved_designer_application','designer_application',$id,['user_id'=>$a['user_id'],'designer_id'=>$designerId]);
             DB::commit();
+
+            try {
+                NotificationService::create(
+                    (int)$a['user_id'],
+                    'seller_application_approved',
+                    'designer',
+                    'Your seller application was approved!',
+                    'Welcome to Creative Moth! Your seller application has been approved. Finish your seller setup to start adding products and selling.',
+                    'seller-application:'.$id.':approved:notification',
+                    '/seller/onboarding'
+                );
+            } catch(Throwable $e) {
+                NotificationService::reportFailure('seller_application_approved_notification_'.$id,$e);
+            }
+
+            try {
+                EmailQueueService::queue(
+                    'transactional',
+                    (string)$a['user_email'],
+                    'Your Creative Moth seller application was approved! 🦋',
+                    'seller_notification',
+                    [
+                        'name'=>(string)$a['user_name'],
+                        'title'=>'You’re approved! Welcome to Creative Moth 🦋',
+                        'message'=>'Your seller application has been approved! Your next step is to finish your seller setup so you can start adding products and selling on Creative Moth.',
+                        'action_url'=>'/seller/onboarding'
+                    ],
+                    'seller-application:'.$id.':approved:email'
+                );
+            } catch(Throwable $e) {
+                NotificationService::reportFailure('seller_application_approved_email_'.$id,$e);
+            }
+
             H::flash('success','Designer application approved.');
 
         }
