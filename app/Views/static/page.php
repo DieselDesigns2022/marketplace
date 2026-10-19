@@ -501,6 +501,14 @@ $licenseTypes = \App\Core\Database::rows('select license_key,name,description fr
 <section class="page-hero">
     <p class="eyebrow">Seller FAQ</p>
     <h1>Seller FAQ</h1>
+
+<section class="notice error" style="margin:1rem 0 1.5rem;padding:1.25rem;border:3px solid currentColor;">
+    <h2 style="margin-top:0;">Trademark &amp; Copyright Policy</h2>
+    <p><strong>Creative Moth does not allow products containing unauthorized third-party trademarked or copyrighted content.</strong> Protected characters, brands, logos, celebrities, sports teams, movies, television shows, music, artwork, names, phrases, and other protected intellectual property may not be sold without the legal rights required to do so.</p>
+    <p>Repeated attempts to submit prohibited trademarked or copyrighted products may result in the seller's store being <strong>disabled</strong>.</p>
+    <p>Attempting to bypass Creative Moth's trademark/copyright checks by misspelling, abbreviating, disguising, or using alternate names for protected content may also result in the store being <strong>disabled</strong>.</p>
+</section>
+
     <p>Helpful answers for applying to sell, setting up your storefront, adding products, choosing licenses, understanding payouts, and keeping listings clear for buyers.</p>
 </section>
 <section class="card page-section">
