@@ -8,12 +8,6 @@
     <p>Submitting an application confirms that you understand approval may take time.</p>
 </section>
 
-<section class="notice error" style="margin:1rem 0 1.5rem;padding:1.25rem;border:3px solid currentColor;">
-    <h2 style="margin-top:0;">Trademark &amp; Copyright Policy</h2>
-    <p><strong>Creative Moth does not allow products containing unauthorized third-party trademarked or copyrighted content.</strong> This includes protected characters, brands, logos, celebrities, sports teams, movies, television shows, music, artwork, names, phrases, or other protected intellectual property.</p>
-    <p>Stores that repeatedly attempt to submit prohibited trademarked or copyrighted products may be <strong>disabled</strong>.</p>
-    <p><strong>Attempting to bypass Creative Moth's trademark/copyright checks by intentionally misspelling, abbreviating, disguising, or using alternate names for protected content may also result in the store being disabled.</strong></p>
-</section>
 
 <section class="card application-intro">
     <h2>Become a designer on Creative Moth</h2>
