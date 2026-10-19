@@ -46,6 +46,75 @@ final class PromoService
         return DB::row('select * from ads where id=?',[DB::id()]);
     }
 
+    public static function preparePayment(array $campaign,bool $useAdvertisingCredit): array
+    {
+        $id=(int)($campaign['id']??0);
+        if($id<1)throw new \InvalidArgumentException('Promotion campaign is unavailable.');
+
+        DB::begin();
+
+        try {
+            $ad=DB::row(
+                'select a.*,d.user_id
+                 from ads a
+                 join designers d on d.id=a.designer_id
+                 where a.id=?
+                 for update',
+                [$id]
+            );
+
+            if(
+                !$ad ||
+                $ad['payment_status']!=='pending' ||
+                $ad['status']!=='pending_payment'
+            ){
+                throw new \DomainException(
+                    'Promotion payment can no longer be prepared.'
+                );
+            }
+
+            $price=(int)$ad['price_cents'];
+            if($price<1){
+                throw new \DomainException('Promotion price is invalid.');
+            }
+
+            $reserved=0;
+
+            if($useAdvertisingCredit){
+                $reserved=(new AdvertisingCreditService)->reserve(
+                    (int)$ad['user_id'],
+                    $id,
+                    $price,
+                    'promo:'.$id.':advertising-credit:reservation'
+                );
+            }
+
+            $stripeDue=max(0,$price-$reserved);
+
+            DB::exec(
+                'update ads
+                 set advertising_credit_reserved_cents=?,
+                     advertising_credit_applied_cents=0,
+                     stripe_due_cents=?
+                 where id=?',
+                [$reserved,$stripeDue,$id]
+            );
+
+            $fresh=DB::row('select * from ads where id=?',[$id]);
+
+            DB::commit();
+
+            return $fresh
+                ?? throw new \RuntimeException(
+                    'Promotion payment snapshot could not be loaded.'
+                );
+
+        } catch(\Throwable $e){
+            if(DB::pdo()->inTransaction())DB::rollBack();
+            throw $e;
+        }
+    }
+
     public static function storeCheckoutIds(int $id,?string $session,?string $intent=null): void
     { DB::exec('update ads set stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id) where id=?',[$session,$intent,$id]); }
 
@@ -54,11 +123,97 @@ final class PromoService
         DB::begin();try{$ad=DB::row('select a.*,d.user_id from ads a join designers d on d.id=a.designer_id where a.id=? for update',[$id]);
             if(!$ad)throw new \RuntimeException('Promotion campaign not found.');
             if($ad['payment_status']==='paid'){self::storeCheckoutIds($id,$session,$intent);DB::commit();self::notify((int)$ad['user_id'],'promo:'.$id.':active','Your paid promotion is active.');return false;}
-            if($amount!==(int)$ad['price_cents']||strtolower($currency)!==strtolower($ad['currency']))throw new \RuntimeException('Promotion payment does not match its price snapshot.');
+            $stripeDue=$ad['stripe_due_cents']===null
+                ? (int)$ad['price_cents']
+                : (int)$ad['stripe_due_cents'];
+
+            if(
+                $amount!==$stripeDue ||
+                strtolower($currency)!==strtolower($ad['currency'])
+            ){
+                throw new \RuntimeException(
+                    'Promotion payment does not match its price snapshot.'
+                );
+            }
+
+            $reserved=(int)($ad['advertising_credit_reserved_cents']??0);
+            $applied=(int)($ad['advertising_credit_applied_cents']??0);
+            $plannedCredit=max(
+                0,
+                (int)$ad['price_cents']-$stripeDue
+            );
+
+            if(
+                $plannedCredit>0 &&
+                $reserved===0 &&
+                $applied===0
+            ){
+                $paymentReference=(string)(
+                    $intent
+                    ?? $session
+                    ?? 'verified-payment'
+                );
+
+                $recoveryKey=
+                    'promo:'.$id.
+                    ':advertising-credit:late:'.
+                    substr(
+                        hash('sha256',$paymentReference),
+                        0,
+                        24
+                    );
+
+                $reserved=(new AdvertisingCreditService)->reserveExact(
+                    (int)$ad['user_id'],
+                    $id,
+                    $plannedCredit,
+                    $recoveryKey
+                );
+
+                if($reserved!==$plannedCredit){
+                    throw new \RuntimeException(
+                        'Promotion Advertising Credit is no longer fully available; payment requires reconciliation.'
+                    );
+                }
+            }
+
+            if($reserved>0){
+                (new AdvertisingCreditService)->finalizeReservation(
+                    (int)$ad['user_id'],
+                    $id,
+                    'promo:'.$id.':advertising-credit:redemption'
+                );
+            }
+
             $when=$paidAt?:gmdate('Y-m-d H:i:s');$ends=null;$total=null;
             if($ad['placement']==='weekly_email')$total=(int)$ad['duration_value'];
             else $ends=(new \DateTimeImmutable($when,new \DateTimeZone('UTC')))->modify('+'.(int)$ad['duration_value'].' days')->format('Y-m-d H:i:s');
-            DB::exec('update ads set payment_status="paid",status="active",paid_at=?,starts_at=?,ends_at=?,email_total_appearances=?,email_appearances_used=0,stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id) where id=?',[$when,$when,$ends,$total,$session,$intent,$id]);DB::commit();
+            DB::exec(
+                'update ads
+                 set payment_status="paid",
+                     status="active",
+                     paid_at=?,
+                     starts_at=?,
+                     ends_at=?,
+                     email_total_appearances=?,
+                     email_appearances_used=0,
+                     advertising_credit_applied_cents=?,
+                     advertising_credit_reserved_cents=0,
+                     stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),
+                     stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id)
+                 where id=?',
+                [
+                    $when,
+                    $when,
+                    $ends,
+                    $total,
+                    $reserved,
+                    $session,
+                    $intent,
+                    $id
+                ]
+            );
+            DB::commit();
             self::notify((int)$ad['user_id'],'promo:'.$id.':active','Your paid promotion is active.');return true;
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();throw $e;}
     }
@@ -71,8 +226,46 @@ final class PromoService
         DB::begin();
         try {
             $ad=DB::row('select a.*,d.user_id from ads a join designers d on d.id=a.designer_id where a.id=? for update',[$id]);
-            if(!$ad||$ad['payment_status']==='paid'){DB::commit();return;}
-            DB::exec('update ads set payment_status=?,status=?,stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id) where id=?',[$payment,$status,$session,$intent,$id]);
+            if(!$ad||$ad['payment_status']==='paid'){
+                DB::commit();
+                return;
+            }
+
+            $releaseCredit=
+                $payment==='cancelled' ||
+                $payment==='failed' ||
+                $event==='checkout_setup_failed';
+
+            if(
+                $releaseCredit &&
+                (int)($ad['advertising_credit_reserved_cents']??0)>0
+            ){
+                (new AdvertisingCreditService)->releaseReservation(
+                    (int)$ad['user_id'],
+                    $id,
+                    'promo:'.$id.':advertising-credit:release:'.($event??$status)
+                );
+            }
+
+            DB::exec(
+                'update ads
+                 set payment_status=?,
+                     status=?,
+                     advertising_credit_reserved_cents=
+                        case when ? then 0 else advertising_credit_reserved_cents end,
+                     stripe_checkout_session_id=coalesce(?,stripe_checkout_session_id),
+                     stripe_payment_intent_id=coalesce(?,stripe_payment_intent_id)
+                 where id=?',
+                [
+                    $payment,
+                    $status,
+                    $releaseCredit?1:0,
+                    $session,
+                    $intent,
+                    $id
+                ]
+            );
+
             DB::commit();
         } catch(\Throwable $e) { if(DB::pdo()->inTransaction())DB::rollBack();throw $e; }
         self::notify((int)$ad['user_id'],'promo:'.$id.':'.($event??$status),$message??('Your promotion payment is '.$payment.'.'));

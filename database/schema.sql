@@ -785,6 +785,47 @@ CREATE TABLE credit_transactions
     CONSTRAINT phase11_ledger_related_fk FOREIGN KEY(related_transaction_id) REFERENCES credit_transactions(id) ON DELETE RESTRICT
 );
 
+
+-- Permanent seller-only Advertising Credit balance and recurring grants.
+CREATE TABLE advertising_credits (
+    user_id BIGINT NOT NULL,
+    total_balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    reserved_balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id),
+    CONSTRAINT advertising_credits_user_fk
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE advertising_credit_recurring_grants (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    frequency ENUM('monthly') NOT NULL DEFAULT 'monthly',
+    day_of_month TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    starts_at DATETIME NOT NULL,
+    ends_at DATETIME NULL,
+    next_run_at DATETIME NOT NULL,
+    last_granted_at DATETIME NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by_admin_id BIGINT NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY advertising_credit_recurring_due_idx (is_active,next_run_at,id),
+    KEY advertising_credit_recurring_user_idx (user_id,id),
+    CONSTRAINT advertising_credit_recurring_user_fk
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT advertising_credit_recurring_admin_fk
+        FOREIGN KEY (created_by_admin_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT advertising_credit_recurring_day_chk
+        CHECK (day_of_month BETWEEN 1 AND 28),
+    CONSTRAINT advertising_credit_recurring_amount_chk
+        CHECK (amount > 0)
+);
+
 CREATE TABLE seller_earnings
 (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -816,7 +857,44 @@ CREATE TABLE platform_commissions
 CREATE TABLE promo_packages (id BIGINT PRIMARY KEY AUTO_INCREMENT,placement ENUM('marketplace','homepage','category','weekly_email') NOT NULL,duration_value INT UNSIGNED NOT NULL,duration_unit ENUM('day','week') NOT NULL,price_cents INT UNSIGNED NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY promo_package_choice(placement,duration_value,duration_unit));
 INSERT INTO promo_packages(placement,duration_value,duration_unit,price_cents) VALUES ('marketplace',1,'day',300),('marketplace',3,'day',800),('marketplace',7,'day',1500),('marketplace',14,'day',2500),('homepage',1,'day',500),('homepage',3,'day',1200),('homepage',7,'day',2500),('homepage',14,'day',4000),('category',1,'day',400),('category',3,'day',1000),('category',7,'day',2000),('category',14,'day',3500),('weekly_email',1,'week',800),('weekly_email',2,'week',1500),('weekly_email',4,'week',2500),('weekly_email',6,'week',3500);
 
-CREATE TABLE ads (id BIGINT PRIMARY KEY AUTO_INCREMENT,product_id BIGINT NULL,designer_id BIGINT NULL,placement ENUM('marketplace','homepage','category','weekly_email') NOT NULL,target_type ENUM('shop','product') NOT NULL DEFAULT 'product',category_id BIGINT NULL,package_id BIGINT NULL,duration_value INT UNSIGNED NULL,duration_unit ENUM('day','week') NULL,price_cents INT UNSIGNED NULL,currency CHAR(3) NOT NULL DEFAULT 'usd',payment_status ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',stripe_checkout_session_id VARCHAR(255) NULL,stripe_payment_intent_id VARCHAR(255) NULL,paid_at DATETIME NULL,starts_at DATETIME NULL,ends_at DATETIME NULL,paused_at DATETIME NULL,last_served_at DATETIME(6) NULL,email_total_appearances INT UNSIGNED NULL,email_appearances_used INT UNSIGNED NOT NULL DEFAULT 0,click_token CHAR(64) NOT NULL,status ENUM('pending_payment','active','paused','ended','payment_failed','cancelled') NOT NULL DEFAULT 'pending_payment',impressions INT DEFAULT 0,clicks INT DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY ads_click_token_unique(click_token),KEY ads_rotation(placement,category_id,status,payment_status,impressions,last_served_at),CONSTRAINT ads_category_fk FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,CONSTRAINT ads_package_fk FOREIGN KEY(package_id) REFERENCES promo_packages(id) ON DELETE RESTRICT);
+CREATE TABLE ads (id BIGINT PRIMARY KEY AUTO_INCREMENT,product_id BIGINT NULL,designer_id BIGINT NULL,placement ENUM('marketplace','homepage','category','weekly_email') NOT NULL,target_type ENUM('shop','product') NOT NULL DEFAULT 'product',category_id BIGINT NULL,package_id BIGINT NULL,duration_value INT UNSIGNED NULL,duration_unit ENUM('day','week') NULL,price_cents INT UNSIGNED NULL,currency CHAR(3) NOT NULL DEFAULT 'usd',payment_status ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',stripe_checkout_session_id VARCHAR(255) NULL,stripe_payment_intent_id VARCHAR(255) NULL,paid_at DATETIME NULL,starts_at DATETIME NULL,ends_at DATETIME NULL,paused_at DATETIME NULL,last_served_at DATETIME(6) NULL,email_total_appearances INT UNSIGNED NULL,email_appearances_used INT UNSIGNED NOT NULL DEFAULT 0,click_token CHAR(64) NOT NULL,status ENUM('pending_payment','active','paused','ended','payment_failed','cancelled') NOT NULL DEFAULT 'pending_payment',impressions INT DEFAULT 0,clicks INT DEFAULT 0,advertising_credit_reserved_cents INT UNSIGNED NOT NULL DEFAULT 0,advertising_credit_applied_cents INT UNSIGNED NOT NULL DEFAULT 0,stripe_due_cents INT UNSIGNED NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY ads_click_token_unique(click_token),KEY ads_rotation(placement,category_id,status,payment_status,impressions,last_served_at),CONSTRAINT ads_category_fk FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,CONSTRAINT ads_package_fk FOREIGN KEY(package_id) REFERENCES promo_packages(id) ON DELETE RESTRICT);
+
+
+CREATE TABLE advertising_credit_transactions (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    type VARCHAR(40) NOT NULL,
+    status ENUM('reserved','finalized','released') NOT NULL,
+    idempotency_key VARCHAR(190) NOT NULL,
+    ad_id BIGINT NULL,
+    recurring_grant_id BIGINT NULL,
+    admin_user_id BIGINT NULL,
+    related_transaction_id BIGINT NULL,
+    description VARCHAR(500) NULL,
+    finalized_at DATETIME NULL,
+    released_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY advertising_credit_transactions_idempotency_unique (idempotency_key),
+    KEY advertising_credit_transactions_user_created_idx (user_id,created_at),
+    KEY advertising_credit_transactions_ad_idx (ad_id),
+    KEY advertising_credit_transactions_recurring_idx (recurring_grant_id),
+    KEY advertising_credit_transactions_related_idx (related_transaction_id),
+    CONSTRAINT advertising_credit_transactions_user_fk
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT advertising_credit_transactions_ad_fk
+        FOREIGN KEY (ad_id) REFERENCES ads(id) ON DELETE RESTRICT,
+    CONSTRAINT advertising_credit_transactions_recurring_fk
+        FOREIGN KEY (recurring_grant_id)
+        REFERENCES advertising_credit_recurring_grants(id) ON DELETE RESTRICT,
+    CONSTRAINT advertising_credit_transactions_admin_fk
+        FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT advertising_credit_transactions_related_fk
+        FOREIGN KEY (related_transaction_id)
+        REFERENCES advertising_credit_transactions(id) ON DELETE RESTRICT
+);
 CREATE TABLE promo_email_appearances (id BIGINT PRIMARY KEY AUTO_INCREMENT,ad_id BIGINT NOT NULL,period_start DATE NOT NULL,period_end DATE NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY promo_email_period(ad_id,period_start,period_end),CONSTRAINT promo_email_ad_fk FOREIGN KEY(ad_id) REFERENCES ads(id) ON DELETE CASCADE);
 
 CREATE TABLE homepage_features

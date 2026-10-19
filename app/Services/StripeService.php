@@ -165,14 +165,36 @@ class StripeService
     {
         if(!self::configured())throw new \RuntimeException('Stripe is not configured.');
         $currency=strtolower((string)($campaign['currency']??self::currency()));
-        if($currency!==self::currency()||(int)$campaign['price_cents']<1)throw new \RuntimeException('Invalid promotion charge.');
-        $metadata=['payment_kind'=>'promo','promo_campaign_id'=>(string)$campaign['id'],'designer_id'=>(string)$campaign['designer_id']];$base=self::appUrl();
+        $chargeCents=array_key_exists('stripe_due_cents',$campaign)
+            && $campaign['stripe_due_cents']!==null
+            ? (int)$campaign['stripe_due_cents']
+            : (int)$campaign['price_cents'];
+
+        if($currency!==self::currency()||$chargeCents<1){
+            throw new \RuntimeException('Invalid promotion charge.');
+        }
+
+        $metadata=[
+            'payment_kind'=>'promo',
+            'promo_campaign_id'=>(string)$campaign['id'],
+            'designer_id'=>(string)$campaign['designer_id']
+        ];
+        $base=self::appUrl();
         return self::request('POST','/v1/checkout/sessions',[
             'mode'=>'payment','client_reference_id'=>'promo_'.(int)$campaign['id'],
             'success_url'=>$base.'/seller/promos/success?campaign='.(int)$campaign['id'],
             'cancel_url'=>$base.'/seller/promos/cancel?campaign='.(int)$campaign['id'],
             'metadata'=>$metadata,'payment_intent_data'=>['metadata'=>$metadata],
-            'line_items'=>[['quantity'=>1,'price_data'=>['currency'=>$currency,'unit_amount'=>(int)$campaign['price_cents'],'product_data'=>['name'=>'Creative Moth promotion #'.(int)$campaign['id']]]]],
+            'line_items'=>[[
+                'quantity'=>1,
+                'price_data'=>[
+                    'currency'=>$currency,
+                    'unit_amount'=>$chargeCents,
+                    'product_data'=>[
+                        'name'=>'Creative Moth promotion #'.(int)$campaign['id']
+                    ]
+                ]
+            ]],
             'automatic_tax'=>['enabled'=>'false'],
         ],'creative_moth_promo_campaign_'.(int)$campaign['id']);
     }

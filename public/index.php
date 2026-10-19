@@ -253,6 +253,8 @@ $router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCa
  $router->get('/admin/referrals', [AdminCreditController::class, 'index']);
  $router->get('/admin/credits', [AdminCreditController::class, 'index']);
  $router->post('/admin/credits/adjust', [AdminCreditController::class, 'adjust']);
+ $router->post('/admin/credits/advertising-recurring', [AdminCreditController::class, 'createAdvertisingRecurring']);
+ $router->post('/admin/credits/advertising-recurring/{id}/deactivate', [AdminCreditController::class, 'deactivateAdvertisingRecurring']);
  $router->post('/admin/platform-credit-payouts/{id}/settle', [AdminCreditController::class, 'settlePlatformCreditPayout']);
  $router->post('/admin/seller-referral-payouts/{id}/retry', [AdminCreditController::class, 'retrySellerReferralPayout']);
  $router->get('/admin/homepage-preview', [AdminController::class, 'homepagePreview']);

@@ -26,7 +26,9 @@ class AccountMergeService
     private const NON_OWNERSHIP_REFERENCES = [
         'users.merged_into_user_id', 'coupons.created_by', 'seller_payouts.admin_resolved_by',
         'seller_payouts.platform_credit_settled_by', 'creator_badge_history.admin_user_id',
-        'credit_transactions.admin_user_id', 'admin_logs.admin_user_id', 'ip_risk_terms.created_by_admin_id',
+        'credit_transactions.admin_user_id', 'advertising_credit_transactions.admin_user_id',
+        'advertising_credit_recurring_grants.created_by_admin_id',
+        'admin_logs.admin_user_id', 'ip_risk_terms.created_by_admin_id',
         'email_campaigns.created_by', 'seller_referral_admin_audits.admin_user_id',
         'message_reports.moderator_user_id', 'admin_access_profiles.granted_by',
         'designers.rank_override_admin_id', 'designers.founder_override_admin_id',
@@ -56,6 +58,7 @@ class AccountMergeService
         $ids = [(int)$source['id'], (int)$target['id']];
         $this->assertMessagingSafe(...$ids);
         $this->assertCreditSafe(...$ids);
+        $this->assertAdvertisingCreditSafe(...$ids);
         $this->assertReferralsSafe(...$ids);
         $this->assertKnownUserReferences((int)$source['id']);
 
@@ -90,6 +93,12 @@ class AccountMergeService
             $this->moveMessaging($sourceId, $targetId);
             $this->moveReferrals($sourceId, $targetId);
             $reconciliation['credit'] = $this->transferCredit($sourceId, $targetId, $actor);
+            $reconciliation['advertising_credit'] = $this->transferAdvertisingCredit($sourceId, $targetId, $actor);
+
+            DB::exec(
+                'update advertising_credit_recurring_grants set user_id=? where user_id=?',
+                [$targetId,$sourceId]
+            );
 
             DB::exec('update designers set user_id=? where id=?', [$targetId, (int)$plan['designer']['id']]);
             $hash = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -159,6 +168,52 @@ class AccountMergeService
         if ($this->tableExists('orders') && DB::row('select id from orders where user_id=? and credit_payment_status="reserved" and credit_reserved>0 limit 1', [$source])) throw new DomainException('Source account has an order with reserved credit.');
     }
 
+    private function assertAdvertisingCreditSafe(int $source, int $target): void
+    {
+        if (!$this->tableExists('advertising_credits')) return;
+
+        if ($this->tableExists('advertising_credit_transactions')) {
+            $debitKey = "advertising-credit:account-merge:$source:$target:debit";
+            $creditKey = "advertising-credit:account-merge:$source:$target:credit";
+
+            if (DB::row(
+                'select id from advertising_credit_transactions
+                 where idempotency_key in (?,?) limit 1',
+                [$debitKey,$creditKey]
+            )) {
+                throw new DomainException(
+                    'A partial or previous Advertising Credit transfer already exists without a completed merge audit.'
+                );
+            }
+        }
+
+        $credit=DB::row(
+            'select cast(total_balance as char) total_balance,
+                    cast(reserved_balance as char) reserved_balance
+             from advertising_credits
+             where user_id=?',
+            [$source]
+        );
+
+        if (
+            $credit &&
+            CreditService::parseCents((string)$credit['reserved_balance'])!==0
+        ) {
+            throw new DomainException(
+                'Source Advertising Credit is reserved and cannot be transferred safely.'
+            );
+        }
+
+        if (
+            $credit &&
+            CreditService::parseCents((string)$credit['total_balance'])<0
+        ) {
+            throw new DomainException(
+                'Negative source Advertising Credit cannot be transferred safely.'
+            );
+        }
+    }
+
     private function assertReferralsSafe(int $source, int $target): void
     {
         if (!$this->tableExists('referrals')) return;
@@ -173,7 +228,29 @@ class AccountMergeService
     {
         $known = self::NON_OWNERSHIP_REFERENCES;
         foreach (self::SIMPLE_OWNERSHIP as $table => $column) $known[] = "$table.$column";
-        array_push($known, 'designers.user_id','cart_items.user_id','wishlists.user_id','follows.user_id','notifications.user_id','email_preferences.user_id','marketplace_credits.user_id','credit_transactions.user_id','referrals.referrer_user_id','referrals.referred_user_id','seller_referral_payout_batches.referrer_user_id','message_conversations.buyer_user_id','message_conversations.seller_user_id','conversation_messages.sender_user_id','message_blocks.blocker_user_id','message_blocks.blocked_user_id','message_reports.reporter_user_id');
+        array_push(
+            $known,
+            'designers.user_id',
+            'cart_items.user_id',
+            'wishlists.user_id',
+            'follows.user_id',
+            'notifications.user_id',
+            'email_preferences.user_id',
+            'marketplace_credits.user_id',
+            'credit_transactions.user_id',
+            'advertising_credits.user_id',
+            'advertising_credit_transactions.user_id',
+            'advertising_credit_recurring_grants.user_id',
+            'referrals.referrer_user_id',
+            'referrals.referred_user_id',
+            'seller_referral_payout_batches.referrer_user_id',
+            'message_conversations.buyer_user_id',
+            'message_conversations.seller_user_id',
+            'conversation_messages.sender_user_id',
+            'message_blocks.blocker_user_id',
+            'message_blocks.blocked_user_id',
+            'message_reports.reporter_user_id'
+        );
         $refs = DB::rows('select table_name,column_name from information_schema.key_column_usage where referenced_table_schema=database() and referenced_table_name="users"');
         foreach ($refs as $ref) {
             $key = $ref['table_name'].'.'.$ref['column_name'];
@@ -232,6 +309,167 @@ class AccountMergeService
         if($sourceCents>CreditService::MAX_CENTS-$targetCents)throw new DomainException('Combined marketplace credit exceeds the supported maximum.');
         $amount=CreditService::formatCents($sourceCents);$combined=CreditService::formatCents($sourceCents+$targetCents);DB::exec('update marketplace_credits set total_balance="0.00",reserved_balance="0.00" where user_id=?',[$source]);DB::exec('update marketplace_credits set total_balance=? where user_id=?',[$combined,$target]);
         DB::exec('insert into credit_transactions(user_id,amount,type,status,idempotency_key,admin_user_id,description,finalized_at) values(?, ?,"account_merge_transfer_out","finalized",?,?,"Phase 13.1 reconciled account merge credit transfer",now())',[$source,CreditService::formatCents(-$sourceCents),$debitKey,$actor]);$debit=(int)DB::id();DB::exec('insert into credit_transactions(user_id,amount,type,status,idempotency_key,admin_user_id,related_transaction_id,description,finalized_at) values(?, ?,"account_merge_transfer_in","finalized",?,?,?,?,now())',[$target,$amount,$creditKey,$actor,$debit,'Phase 13.1 reconciled account merge credit transfer']);$credit=(int)DB::id();DB::exec('update credit_transactions set related_transaction_id=? where id=?',[$credit,$debit]);return ['amount'=>$amount,'transferred'=>true,'debit_transaction_id'=>$debit,'credit_transaction_id'=>$credit,'combined_balance'=>$combined];
+    }
+
+    private function transferAdvertisingCredit(
+        int $source,
+        int $target,
+        int $actor
+    ): array {
+        if(!$this->tableExists('advertising_credits')){
+            return ['amount'=>'0.00','transferred'=>false];
+        }
+
+        DB::exec(
+            'insert into advertising_credits(user_id,total_balance,reserved_balance)
+             values(?,"0.00","0.00")
+             on duplicate key update user_id=values(user_id)',
+            [$target]
+        );
+
+        $rows=DB::rows(
+            'select user_id,
+                    cast(total_balance as char) total_balance,
+                    cast(reserved_balance as char) reserved_balance
+             from advertising_credits
+             where user_id in (?,?)
+             order by user_id
+             for update',
+            [$source,$target]
+        );
+
+        $by=[];
+        foreach($rows as $row){
+            $by[(int)$row['user_id']]=$row;
+        }
+
+        $sourceRow=$by[$source]??null;
+        $targetRow=$by[$target]??null;
+
+        $sourceCents=CreditService::parseCents(
+            (string)($sourceRow['total_balance']??'0.00')
+        );
+
+        $targetCents=CreditService::parseCents(
+            (string)($targetRow['total_balance']??'0.00')
+        );
+
+        $sourceReserved=CreditService::parseCents(
+            (string)($sourceRow['reserved_balance']??'0.00')
+        );
+
+        $targetReserved=CreditService::parseCents(
+            (string)($targetRow['reserved_balance']??'0.00')
+        );
+
+        if($sourceReserved!==0){
+            throw new DomainException(
+                'Source Advertising Credit is reserved and cannot be transferred safely.'
+            );
+        }
+
+        if(
+            $sourceCents<0 ||
+            $targetReserved<0 ||
+            $targetReserved>$targetCents
+        ){
+            throw new DomainException(
+                'Advertising Credit balances are not safe to reconcile.'
+            );
+        }
+
+        if($sourceCents===0){
+            return ['amount'=>'0.00','transferred'=>false];
+        }
+
+        if($sourceCents>CreditService::MAX_CENTS-$targetCents){
+            throw new DomainException(
+                'Combined Advertising Credit exceeds the supported maximum.'
+            );
+        }
+
+        $debitKey="advertising-credit:account-merge:$source:$target:debit";
+        $creditKey="advertising-credit:account-merge:$source:$target:credit";
+
+        $prior=DB::rows(
+            'select id,idempotency_key
+             from advertising_credit_transactions
+             where idempotency_key in (?,?)
+             for update',
+            [$debitKey,$creditKey]
+        );
+
+        if($prior){
+            throw new DomainException(
+                'A partial or previous Advertising Credit transfer already exists without a completed merge audit.'
+            );
+        }
+
+        $amount=CreditService::formatCents($sourceCents);
+        $combined=CreditService::formatCents(
+            $sourceCents+$targetCents
+        );
+
+        DB::exec(
+            'update advertising_credits
+             set total_balance="0.00",reserved_balance="0.00"
+             where user_id=?',
+            [$source]
+        );
+
+        DB::exec(
+            'update advertising_credits
+             set total_balance=?
+             where user_id=?',
+            [$combined,$target]
+        );
+
+        DB::exec(
+            'insert into advertising_credit_transactions
+             (user_id,amount,type,status,idempotency_key,admin_user_id,description,finalized_at)
+             values(? ,? ,"account_merge_transfer_out","finalized",?,?,
+                    "Reconciled account merge Advertising Credit transfer",now())',
+            [
+                $source,
+                CreditService::formatCents(-$sourceCents),
+                $debitKey,
+                $actor
+            ]
+        );
+
+        $debit=(int)DB::id();
+
+        DB::exec(
+            'insert into advertising_credit_transactions
+             (user_id,amount,type,status,idempotency_key,admin_user_id,
+              related_transaction_id,description,finalized_at)
+             values(? ,? ,"account_merge_transfer_in","finalized",?,?,?,
+                    "Reconciled account merge Advertising Credit transfer",now())',
+            [
+                $target,
+                $amount,
+                $creditKey,
+                $actor,
+                $debit
+            ]
+        );
+
+        $credit=(int)DB::id();
+
+        DB::exec(
+            'update advertising_credit_transactions
+             set related_transaction_id=?
+             where id=?',
+            [$credit,$debit]
+        );
+
+        return [
+            'amount'=>$amount,
+            'transferred'=>true,
+            'debit_transaction_id'=>$debit,
+            'credit_transaction_id'=>$credit,
+            'combined_balance'=>$combined
+        ];
     }
 
     private function updateIfExists(string $table,string $column,int $source,int $target): void

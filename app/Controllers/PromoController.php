@@ -4,17 +4,57 @@ use App\Core\Helpers as H;
 use App\Services\PromoService;
 use App\Services\StripeService;
 use App\Services\NotificationService;
+use App\Services\AdvertisingCreditService;
 
 final class PromoController
 {
     private function seller(): array { H::requireSeller();return PromoService::seller((int)H::user()['id']); }
-    public function index(): void { $s=$this->seller();H::view('seller/promos',['seller'=>$s,'products'=>PromoService::products((int)$s['id']),'categories'=>PromoService::categories(),'packages'=>PromoService::packages(),'campaigns'=>PromoService::campaigns((int)$s['id'])]); }
+    public function index(): void
+    {
+        $s=$this->seller();
+        $advertisingCredit=(new AdvertisingCreditService)->balances((int)$s['user_id']);
+        H::view('seller/promos',[
+            'seller'=>$s,
+            'products'=>PromoService::products((int)$s['id']),
+            'categories'=>PromoService::categories(),
+            'packages'=>PromoService::packages(),
+            'campaigns'=>PromoService::campaigns((int)$s['id']),
+            'advertisingCredit'=>$advertisingCredit
+        ]);
+    }
     public function checkout(): void
     {
         $s=$this->seller();H::verifyCsrf();$ad=null;
         try {
-            $ad=PromoService::createPending($s,(string)($_POST['target_type']??''),($_POST['product_id']??'')!==''?(int)$_POST['product_id']:null,(int)($_POST['package_id']??0),($_POST['category_id']??'')!==''?(int)$_POST['category_id']:null);
-            $session=StripeService::createPromoCheckoutSession($ad);$sessionId=trim((string)($session['id']??''));$url=trim((string)($session['url']??''));
+            $ad=PromoService::createPending(
+                $s,
+                (string)($_POST['target_type']??''),
+                ($_POST['product_id']??'')!==''?(int)$_POST['product_id']:null,
+                (int)($_POST['package_id']??0),
+                ($_POST['category_id']??'')!==''?(int)$_POST['category_id']:null
+            );
+
+            $ad=PromoService::preparePayment(
+                $ad,
+                isset($_POST['use_advertising_credit'])
+            );
+
+            if((int)$ad['stripe_due_cents']===0){
+                PromoService::activate(
+                    (int)$ad['id'],
+                    0,
+                    (string)$ad['currency']
+                );
+                H::flash(
+                    'success',
+                    'Your promotion was paid in full with Advertising Credit and is now active.'
+                );
+                H::redirect('/seller/promos');
+            }
+
+            $session=StripeService::createPromoCheckoutSession($ad);
+            $sessionId=trim((string)($session['id']??''));
+            $url=trim((string)($session['url']??''));
             if($sessionId===''||$url===''||!filter_var($url,FILTER_VALIDATE_URL))throw new \RuntimeException('Stripe Checkout returned an incomplete promotion session.');
             PromoService::storeCheckoutIds((int)$ad['id'],$sessionId,$session['payment_intent']??null);H::redirect($url);
         } catch(\Throwable $e) {

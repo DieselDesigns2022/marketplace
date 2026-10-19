@@ -1,5 +1,28 @@
-<?php use App\Core\Helpers as H;?>
+<?php
+use App\Core\Helpers as H;
+
+$advertisingCredit=$advertisingCredit??[
+    'available'=>'0.00',
+    'reserved'=>'0.00',
+    'available_cents'=>0,
+    'reserved_cents'=>0,
+];
+?>
 <h1>Promotions</h1>
+
+<section class="card">
+    <h2>Advertising Credit</h2>
+    <p>
+        <strong><?=H::money($advertisingCredit['available'])?> available</strong>
+        <?php if($advertisingCredit['reserved_cents']>0):?>
+            · <?=H::money($advertisingCredit['reserved'])?> currently reserved
+        <?php endif;?>
+    </p>
+    <p class="muted">
+        Advertising Credit can be used only toward Creative Moth paid promotions.
+        If your credit does not cover the full promotion, Stripe charges only the remainder.
+    </p>
+</section>
 <p>Promote your approved shop or product with an automatically generated sponsored card.</p>
 <div class="card">
     <h2>How paid promotions work</h2>
@@ -17,11 +40,39 @@
     <label id="promo-category">Category <select name="category_id"><option value="">Choose category</option><?php foreach($categories as $c):?><option value="<?=$c['id']?>"><?=H::e($c['name'])?></option><?php endforeach;?></select></label>
     <fieldset><legend>Package</legend><?php foreach($packages as $p):$placementLabel=ucwords(str_replace('_',' ',$p['placement']));$durationLabel=$p['duration_value'].' '.$p['duration_unit'].($p['duration_value']>1?'s':'');$packageLabel=$placementLabel.' — '.$durationLabel.' — '.H::money($p['price_cents']/100);?><label class="promo-package" data-placement="<?=H::e($p['placement'])?>"><input type="radio" name="package_id" value="<?=$p['id']?>" data-summary="<?=H::e($packageLabel)?>"> <?=H::e($packageLabel)?></label><?php endforeach;?></fieldset>
     <p><strong>Final:</strong> <span id="promo-summary">Choose a package</span></p>
+    <label>
+        <input
+            type="checkbox"
+            name="use_advertising_credit"
+            value="1"
+            checked
+            <?=$advertisingCredit['available_cents']<=0?'disabled':''?>
+        >
+        Use my available Advertising Credit
+    </label>
+
+    <?php if($advertisingCredit['available_cents']<=0):?>
+        <small class="muted">You currently have no Advertising Credit available.</small>
+    <?php endif;?>
+
     <button>Buy Promotion</button>
 </form>
 <script>(()=>{const f=document.querySelector('#promo-form'),t=f.target_type,p=f.placement;function sync(){document.querySelector('#promo-product').hidden=t.value!=='product';document.querySelector('#promo-category').hidden=p.value!=='category';f.querySelectorAll('.promo-package').forEach(x=>x.hidden=x.dataset.placement!==p.value);const c=f.querySelector('input[name=package_id]:checked');if(c&&c.closest('label').hidden)c.checked=false;document.querySelector('#promo-summary').textContent=(f.querySelector('input[name=package_id]:checked')||{}).dataset?.summary||'Choose a package'}f.addEventListener('change',sync);sync()})();</script>
 <h2>Campaign history</h2>
-<?php if(empty($campaigns)):?><div class="card empty-state"><h3>No promotions yet</h3><p>Your purchased promotions and verified payment status will appear here.</p></div><?php else:?><div class="promo-table"><table><tr><th>Target</th><th>Placement/package</th><th>Payment / campaign</th><th>Schedule</th><th>Results</th></tr><?php foreach($campaigns as $a):$used=(int)($a['email_appearances_used']??0);$total=(int)($a['email_total_appearances']??0);?><tr><td><?=H::e($a['target_type']==='shop'?$a['display_name']:($a['product_title']??'Unavailable product'))?></td><td><?=H::e(ucwords(str_replace('_',' ',$a['placement'])))?><?php if($a['placement']==='category'):?><br>Category: <?=H::e($a['category_name']??'Unavailable category')?><?php endif;?><br><?=$a['duration_value'].' '.$a['duration_unit']?> / <?=H::money($a['price_cents']/100)?></td><?php
+<?php if(empty($campaigns)):?><div class="card empty-state"><h3>No promotions yet</h3><p>Your purchased promotions and verified payment status will appear here.</p></div><?php else:?><div class="promo-table"><table><tr><th>Target</th><th>Placement/package</th><th>Payment / campaign</th><th>Schedule</th><th>Results</th></tr><?php foreach($campaigns as $a):$used=(int)($a['email_appearances_used']??0);$total=(int)($a['email_total_appearances']??0);?><tr><td><?=H::e($a['target_type']==='shop'?$a['display_name']:($a['product_title']??'Unavailable product'))?></td><td><?=H::e(ucwords(str_replace('_',' ',$a['placement'])))?><?php if($a['placement']==='category'):?><br>Category: <?=H::e($a['category_name']??'Unavailable category')?><?php endif;?><br><?=$a['duration_value'].' '.$a['duration_unit']?> / <?=H::money($a['price_cents']/100)?>
+<?php if((int)($a['advertising_credit_applied_cents']??0)>0):?>
+    <br><small>
+        Advertising Credit:
+        <?=H::money(((int)$a['advertising_credit_applied_cents'])/100)?>
+    </small>
+<?php endif;?>
+<?php if(($a['stripe_due_cents']??null)!==null):?>
+    <br><small>
+        Stripe:
+        <?=H::money(((int)$a['stripe_due_cents'])/100)?>
+    </small>
+<?php endif;?>
+</td><?php
 $paymentLabel=match((string)$a['payment_status']){
     'paid'=>'Paid',
     'pending'=>'Not completed',
