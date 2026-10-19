@@ -205,7 +205,14 @@
         (int)($prizeWheelState['spins_remaining']??0)<1
     ): ?>
         <p class="notice">
-            You have used all of your spins for this giveaway.
+            Make a qualifying purchase of at least
+            <strong>
+                $<?=number_format(
+                    ((int)($prizeWheelState['minimum_purchase_cents']??500))/100,
+                    2
+                )?>
+            </strong>
+            from this store to unlock a spin.
         </p>
 
     <?php else: ?>
@@ -296,6 +303,147 @@
     text-align:center;
 }
 </style>
+
+<div
+    id="prize-wheel-promo-modal"
+    style="
+        display:none;
+        position:fixed;
+        inset:0;
+        z-index:9999;
+        background:rgba(0,0,0,.72);
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+    "
+>
+    <div
+        class="card"
+        style="
+            max-width:520px;
+            width:100%;
+            position:relative;
+            text-align:center;
+        "
+    >
+        <button
+            type="button"
+            id="prize-wheel-promo-close"
+            aria-label="Close"
+            style="
+                position:absolute;
+                right:14px;
+                top:10px;
+                border:0;
+                background:none;
+                font-size:28px;
+                cursor:pointer;
+            "
+        >×</button>
+
+        <h2>🎡 This seller is spinning!</h2>
+
+        <p>
+            <strong><?=H::e($d['display_name'])?></strong>
+            is participating in Creative Moth's Prize Wheel promotion.
+        </p>
+
+        <?php if(
+            H::user()
+            && (int)($prizeWheelState['spins_remaining']??0)>0
+        ): ?>
+            <p>
+                🎉 You already have an eligible spin waiting from a
+                qualifying purchase at this store!
+            </p>
+
+            <p>
+                <a
+                    class="btn"
+                    href="#creative-moth-prize-wheel"
+                    id="prize-wheel-promo-spin-now"
+                >
+                    Spin Now
+                </a>
+            </p>
+        <?php else: ?>
+            <p>
+                Spend at least
+                <strong>
+                    $<?=number_format(
+                        ((int)(
+                            $prizeWheelState[
+                                'minimum_purchase_cents'
+                            ]??500
+                        ))/100,
+                        2
+                    )?>
+                </strong>
+                at this store during the promotion and you'll unlock
+                <strong>one spin</strong> on this seller's Prize Wheel
+                after your purchase.
+            </p>
+
+            <p class="help-text">
+                Sales tax does not count toward the minimum purchase.
+            </p>
+        <?php endif; ?>
+    </div>
+</div>
+
+<script>
+(() => {
+    const modal=document.getElementById(
+        'prize-wheel-promo-modal'
+    );
+
+    const close=document.getElementById(
+        'prize-wheel-promo-close'
+    );
+
+    const spinNow=document.getElementById(
+        'prize-wheel-promo-spin-now'
+    );
+
+    if(!modal || !close){
+        return;
+    }
+
+    const key=
+        'creative-moth-wheel-promo:'+
+        <?=json_encode(
+            (string)(
+                $prizeWheelState['campaign_key']
+                ??''
+            )
+        )?>+
+        ':store:'+
+        <?=json_encode((string)$d['id'])?>;
+
+    if(
+        !window.sessionStorage.getItem(key)
+    ){
+        modal.style.display='flex';
+        window.sessionStorage.setItem(key,'1');
+    }
+
+    const hide=()=>{
+        modal.style.display='none';
+    };
+
+    close.addEventListener('click',hide);
+
+    modal.addEventListener('click',(event)=>{
+        if(event.target===modal){
+            hide();
+        }
+    });
+
+    if(spinNow){
+        spinNow.addEventListener('click',hide);
+    }
+})();
+</script>
 
 <script>
 (() => {

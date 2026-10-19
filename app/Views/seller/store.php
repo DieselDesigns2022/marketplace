@@ -78,16 +78,21 @@
     <h2>Grand Opening Prize Wheel</h2>
 
     <p>
-        Choose whether your public storefront participates in the
-        Creative Moth Prize Wheel giveaway.
+        Join the Creative Moth Prize Wheel promotion and have a Prize Wheel
+        appear on your own storefront while the promotion is active.
     </p>
 
     <p class="help-text">
-        Opting in does not guarantee the wheel is currently visible.
-        Creative Moth controls the global giveaway switch. When the
-        marketplace Prize Wheel is turned ON, it automatically appears
-        on every opted-in store. When Creative Moth turns it OFF, it is
-        removed from all storefronts automatically.
+        Your wheel uses only prizes donated by your store and approved for
+        Prize Wheel use. Customers who make the required minimum purchase
+        from your store receive one spin on your wheel for that qualifying
+        order.
+    </p>
+
+    <p class="help-text">
+        Creative Moth controls when the overall promotion is turned ON or
+        OFF. Your participation choice remains saved while the promotion
+        is off.
     </p>
 
     <form method="post" class="form">
@@ -110,12 +115,13 @@
                 value="1"
                 <?=!empty($d['prize_wheel_opt_in'])?'checked':''?>
             >
-            Display the Creative Moth Prize Wheel on my storefront
-            whenever the giveaway is active.
+
+            Participate in the Prize Wheel promotion on my storefront.
         </label>
 
         <p class="help-text">
-            You can change this preference at any time.
+            Remember: your store needs approved Prize Wheel donations with
+            available inventory before customers can spin your wheel.
         </p>
 
         <button class="btn">

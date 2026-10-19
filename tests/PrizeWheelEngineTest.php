@@ -124,17 +124,17 @@ $check(
 $check(
     str_contains(
         $admin,
-        'Spins allowed per person'
+        'Minimum purchase required'
     ) &&
     str_contains(
         $admin,
-        'Start New Giveaway Round'
+        'Start New Promotion Round'
     ) &&
     str_contains(
         $admin,
         'Recent Spins / Winners'
     ),
-    'admin controls spin allowance and giveaway rounds'
+    'admin controls qualifying purchase and promotion rounds'
 );
 
 $check(

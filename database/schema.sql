@@ -1941,3 +1941,16 @@ CREATE TABLE IF NOT EXISTS prize_wheel_spins (
         REFERENCES prize_assignments(id)
         ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Store-specific Prize Wheel promotion
+ALTER TABLE prize_wheel_settings
+    ADD COLUMN IF NOT EXISTS minimum_purchase_cents
+        INT UNSIGNED NOT NULL DEFAULT 500,
+    ADD COLUMN IF NOT EXISTS campaign_started_at
+        DATETIME NULL;
+
+ALTER TABLE prize_wheel_spins
+    ADD COLUMN IF NOT EXISTS qualifying_order_id
+        BIGINT NULL AFTER storefront_designer_id;
+
+-- The live migration creates the unique/index/FK constraints.

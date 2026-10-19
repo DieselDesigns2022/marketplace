@@ -63,17 +63,36 @@ final class PrizeWheelController
                 }
 
                 $enabled=($_POST['is_enabled']??'')==='1';
-                $spins=max(
-                    1,
-                    (int)($_POST['spins_per_user']??1)
+
+                $minimumRaw=trim(
+                    (string)(
+                        $_POST['minimum_purchase']
+                        ??'5.00'
+                    )
                 );
 
                 if(
-                    $enabled
-                    && $service->availableWheelPrizeCount()<1
+                    !preg_match(
+                        '/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/',
+                        $minimumRaw
+                    )
                 ){
                     throw new DomainException(
-                        'Add at least one approved available Prize Wheel prize before turning the wheel ON.'
+                        'Enter a valid minimum purchase amount.'
+                    );
+                }
+
+                $minimumPurchaseCents=
+                    (int)round(
+                        ((float)$minimumRaw)*100
+                    );
+
+                if(
+                    $enabled
+                    && $service->optedInStoreCount()<1
+                ){
+                    throw new DomainException(
+                        'At least one approved seller must opt into the Prize Wheel before turning it ON.'
                     );
                 }
 
@@ -83,7 +102,7 @@ final class PrizeWheelController
                     $enabled,
                     (string)($_POST['heading']??''),
                     (string)($_POST['description']??''),
-                    $spins,
+                    $minimumPurchaseCents,
                     (int)H::user()['id']
                 );
 
@@ -107,7 +126,7 @@ final class PrizeWheelController
                         json_encode(
                             [
                                 'is_enabled'=>$enabled,
-                                'spins_per_user'=>$spins,
+                                'minimum_purchase_cents'=>$minimumPurchaseCents,
                                 'heading'=>mb_substr(
                                     trim(
                                         (string)(
@@ -154,6 +173,7 @@ final class PrizeWheelController
             [
                 'settings'=>$service->settings(),
                 'optedInStores'=>$service->optedInStoreCount(),
+                'participatingStores'=>$service->participatingStores(),
                 'availablePrizes'=>$service->availableWheelPrizeCount(),
                 'recentSpins'=>$service->recentSpins(),
             ]

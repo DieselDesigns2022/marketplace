@@ -69,8 +69,8 @@ $check(
 );
 
 $check(
-    str_contains($admin,'OFF — hide from all storefronts') &&
-    str_contains($admin,'ON — show on all opted-in storefronts'),
+    str_contains($admin,'OFF — hide promotion from every store') &&
+    str_contains($admin,'ON — activate participating seller wheels'),
     'admin has explicit master visibility switch'
 );
 

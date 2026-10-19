@@ -2,9 +2,24 @@
 
 <h1>Prize Wheel</h1>
 
+<?php
+$minimumCents=(int)(
+    $settings['minimum_purchase_cents']
+    ??500
+);
+
+$minimumAmount=
+    number_format(
+        $minimumCents/100,
+        2,
+        '.',
+        ''
+    );
+?>
+
 <section class="card page-section">
     <h2>
-        Current status:
+        Promotion status:
         <?php if(!empty($settings['is_enabled'])): ?>
             <span class="badge yes">ON</span>
         <?php else: ?>
@@ -13,70 +28,166 @@
     </h2>
 
     <p>
-        <strong>Opted-in stores:</strong>
+        <strong>Participating sellers:</strong>
         <?=number_format((int)$optedInStores)?>
+
         ·
-        <strong>Available prize units:</strong>
+
+        <strong>Total available prize units:</strong>
         <?=number_format((int)$availablePrizes)?>
+
         ·
-        <strong>Spins per person:</strong>
-        <?=number_format((int)($settings['spins_per_user']??1))?>
+
+        <strong>Minimum store purchase:</strong>
+        $<?=H::e($minimumAmount)?>
     </p>
 
     <?php if(!empty($settings['is_enabled'])): ?>
         <p class="notice success">
-            The Prize Wheel is live on every approved seller storefront
-            that opted in.
+            The Prize Wheel promotion is live. Each participating seller
+            has their own wheel and only awards prizes donated by that
+            seller.
         </p>
     <?php else: ?>
         <p class="notice warning">
-            The Prize Wheel is hidden from the entire public marketplace.
-            Seller opt-in choices and previous winner history remain saved.
+            The Prize Wheel promotion is currently hidden from every
+            storefront.
         </p>
     <?php endif; ?>
 </section>
 
+<section class="card page-section">
+    <h2>Participating Sellers</h2>
+
+    <p class="help-text">
+        These sellers have opted into the promotion. Each seller's wheel
+        uses only that seller's own approved Prize Wheel donations.
+    </p>
+
+    <div class="responsive-table">
+        <table>
+            <thead>
+            <tr>
+                <th>Seller</th>
+                <th>Store</th>
+                <th>Wheel prizes</th>
+                <th>Prize units</th>
+                <th>Ready?</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            <?php foreach(($participatingStores??[]) as $seller): ?>
+                <tr>
+                    <td>
+                        <?=H::e($seller['display_name'])?>
+                    </td>
+
+                    <td>
+                        <a
+                            href="/store/<?=H::e($seller['store_slug'])?>"
+                            target="_blank"
+                        >
+                            View Store
+                        </a>
+                    </td>
+
+                    <td>
+                        <?=number_format(
+                            (int)$seller['available_prizes']
+                        )?>
+                    </td>
+
+                    <td>
+                        <?=number_format(
+                            (int)$seller['available_prize_units']
+                        )?>
+                    </td>
+
+                    <td>
+                        <?php if(
+                            (int)$seller['available_prize_units']>0
+                        ): ?>
+                            <span class="badge yes">
+                                Ready
+                            </span>
+                        <?php else: ?>
+                            <span class="badge no">
+                                Needs Wheel Prizes
+                            </span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+
+            <?php if(empty($participatingStores)): ?>
+                <tr>
+                    <td colspan="5">
+                        No sellers have opted into the Prize Wheel yet.
+                    </td>
+                </tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+
 <?php if(H::canAdmin('prizes.manage')): ?>
 <section class="card page-section">
-    <h2>Giveaway Settings</h2>
+    <h2>Promotion Settings</h2>
 
     <form method="post" class="form">
-        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-        <input type="hidden" name="action" value="settings">
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::csrf()?>"
+        >
+
+        <input
+            type="hidden"
+            name="action"
+            value="settings"
+        >
 
         <label>
-            Prize Wheel visibility
+            Prize Wheel promotion
             <select name="is_enabled" required>
                 <option
                     value="0"
                     <?=empty($settings['is_enabled'])?'selected':''?>
                 >
-                    OFF — hide from all storefronts
+                    OFF — hide promotion from every store
                 </option>
 
                 <option
                     value="1"
                     <?=!empty($settings['is_enabled'])?'selected':''?>
                 >
-                    ON — show on all opted-in storefronts
+                    ON — activate participating seller wheels
                 </option>
             </select>
         </label>
 
         <label>
-            Spins allowed per person for this giveaway
+            Minimum purchase required at the participating store
             <input
                 type="number"
-                name="spins_per_user"
-                min="1"
-                max="25"
+                name="minimum_purchase"
+                min="1.00"
+                max="1000.00"
+                step="0.01"
                 required
-                value="<?=(int)($settings['spins_per_user']??1)?>"
+                value="<?=H::e($minimumAmount)?>"
             >
         </label>
 
+        <p class="help-text">
+            One paid qualifying order unlocks one spin for that seller's
+            wheel. Sales tax does not count toward the minimum.
+        </p>
+
         <label>
-            Wheel heading
+            Promotion heading
             <input
                 name="heading"
                 maxlength="190"
@@ -89,7 +200,7 @@
         </label>
 
         <label>
-            Storefront message
+            Storefront popup / wheel message
             <textarea
                 name="description"
                 maxlength="1000"
@@ -104,24 +215,33 @@
 </section>
 
 <section class="card page-section">
-    <h2>Start Another Giveaway Round</h2>
+    <h2>Start Another Promotion Round</h2>
 
     <p>
-        Starting a new round resets spin eligibility without deleting
-        previous winners or prize history.
+        A new round makes only purchases made during the new round
+        eligible. Previous winners and spin history remain saved.
     </p>
 
     <?php if(!empty($settings['is_enabled'])): ?>
         <p class="notice warning">
-            Turn the Prize Wheel OFF before starting a new giveaway round.
+            Turn the promotion OFF before starting a new round.
         </p>
     <?php else: ?>
         <form method="post">
-            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-            <input type="hidden" name="action" value="new_round">
+            <input
+                type="hidden"
+                name="_csrf"
+                value="<?=H::csrf()?>"
+            >
+
+            <input
+                type="hidden"
+                name="action"
+                value="new_round"
+            >
 
             <button class="btn alt">
-                Start New Giveaway Round
+                Start New Promotion Round
             </button>
         </form>
     <?php endif; ?>
@@ -136,10 +256,10 @@
             <thead>
             <tr>
                 <th>Winner</th>
+                <th>Seller Wheel</th>
+                <th>Qualifying Order</th>
                 <th>Prize</th>
-                <th>Storefront</th>
-                <th>Spin</th>
-                <th>Prize Status</th>
+                <th>Status</th>
                 <th>Won</th>
             </tr>
             </thead>
@@ -150,22 +270,9 @@
                     <td>
                         <?=H::e($spin['winner_name'])?>
                         <br>
-                        <small><?=H::e($spin['winner_email'])?></small>
-                    </td>
-
-                    <td>
-                        <?=H::e($spin['prize_title'])?>
-                        <?php if(
-                            (float)($spin['approximate_retail_value']??0)>0
-                        ): ?>
-                            <br>
-                            <small>
-                                Approx.
-                                <?=H::money(
-                                    $spin['approximate_retail_value']
-                                )?>
-                            </small>
-                        <?php endif; ?>
+                        <small>
+                            <?=H::e($spin['winner_email'])?>
+                        </small>
                     </td>
 
                     <td>
@@ -178,7 +285,11 @@
                     </td>
 
                     <td>
-                        #<?=(int)$spin['spin_number']?>
+                        #<?=(int)$spin['qualifying_order_id']?>
+                    </td>
+
+                    <td>
+                        <?=H::e($spin['prize_title'])?>
                     </td>
 
                     <td>
