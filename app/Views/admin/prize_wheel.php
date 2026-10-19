@@ -12,41 +12,37 @@
         <?php endif; ?>
     </h2>
 
+    <p>
+        <strong>Opted-in stores:</strong>
+        <?=number_format((int)$optedInStores)?>
+        ·
+        <strong>Available prize units:</strong>
+        <?=number_format((int)$availablePrizes)?>
+        ·
+        <strong>Spins per person:</strong>
+        <?=number_format((int)($settings['spins_per_user']??1))?>
+    </p>
+
     <?php if(!empty($settings['is_enabled'])): ?>
         <p class="notice success">
-            The Prize Wheel is currently live on every approved seller
-            storefront that opted in.
+            The Prize Wheel is live on every approved seller storefront
+            that opted in.
         </p>
     <?php else: ?>
         <p class="notice warning">
-            The Prize Wheel is currently hidden from the entire public
-            marketplace. Seller opt-in choices remain saved.
+            The Prize Wheel is hidden from the entire public marketplace.
+            Seller opt-in choices and previous winner history remain saved.
         </p>
     <?php endif; ?>
-
-    <div class="grid">
-        <div class="card">
-            <strong>Opted-in stores</strong>
-            <p><?=number_format((int)$optedInStores)?></p>
-        </div>
-
-        <div class="card">
-            <strong>Available Prize Wheel inventory</strong>
-            <p><?=number_format((int)$availablePrizes)?></p>
-        </div>
-    </div>
 </section>
 
 <?php if(H::canAdmin('prizes.manage')): ?>
 <section class="card page-section">
-    <h2>Grand Opening Prize Wheel Settings</h2>
+    <h2>Giveaway Settings</h2>
 
     <form method="post" class="form">
-        <input
-            type="hidden"
-            name="_csrf"
-            value="<?=H::csrf()?>"
-        >
+        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <input type="hidden" name="action" value="settings">
 
         <label>
             Prize Wheel visibility
@@ -67,12 +63,17 @@
             </select>
         </label>
 
-        <p class="help-text">
-            This is the master switch. Turning it OFF immediately prevents
-            the Prize Wheel from rendering anywhere on seller storefronts.
-            Sellers remain opted in, so turning it back ON restores it
-            automatically to those stores.
-        </p>
+        <label>
+            Spins allowed per person for this giveaway
+            <input
+                type="number"
+                name="spins_per_user"
+                min="1"
+                max="25"
+                required
+                value="<?=(int)($settings['spins_per_user']??1)?>"
+            >
+        </label>
 
         <label>
             Wheel heading
@@ -101,27 +102,111 @@
         </button>
     </form>
 </section>
+
+<section class="card page-section">
+    <h2>Start Another Giveaway Round</h2>
+
+    <p>
+        Starting a new round resets spin eligibility without deleting
+        previous winners or prize history.
+    </p>
+
+    <?php if(!empty($settings['is_enabled'])): ?>
+        <p class="notice warning">
+            Turn the Prize Wheel OFF before starting a new giveaway round.
+        </p>
+    <?php else: ?>
+        <form method="post">
+            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+            <input type="hidden" name="action" value="new_round">
+
+            <button class="btn alt">
+                Start New Giveaway Round
+            </button>
+        </form>
+    <?php endif; ?>
+</section>
 <?php endif; ?>
 
 <section class="card page-section">
-    <h2>How visibility works</h2>
+    <h2>Recent Spins / Winners</h2>
 
-    <p>
-        The Prize Wheel appears only when both conditions are true:
-    </p>
+    <div class="responsive-table">
+        <table>
+            <thead>
+            <tr>
+                <th>Winner</th>
+                <th>Prize</th>
+                <th>Storefront</th>
+                <th>Spin</th>
+                <th>Prize Status</th>
+                <th>Won</th>
+            </tr>
+            </thead>
 
-    <ol>
-        <li>
-            The master Prize Wheel switch on this page is ON.
-        </li>
-        <li>
-            The seller has opted their storefront into the Prize Wheel.
-        </li>
-    </ol>
+            <tbody>
+            <?php foreach(($recentSpins??[]) as $spin): ?>
+                <tr>
+                    <td>
+                        <?=H::e($spin['winner_name'])?>
+                        <br>
+                        <small><?=H::e($spin['winner_email'])?></small>
+                    </td>
 
-    <p>
-        A seller who does not opt in will never display the wheel.
-        When the master switch is OFF, no storefront displays it regardless
-        of seller preference.
-    </p>
+                    <td>
+                        <?=H::e($spin['prize_title'])?>
+                        <?php if(
+                            (float)($spin['approximate_retail_value']??0)>0
+                        ): ?>
+                            <br>
+                            <small>
+                                Approx.
+                                <?=H::money(
+                                    $spin['approximate_retail_value']
+                                )?>
+                            </small>
+                        <?php endif; ?>
+                    </td>
+
+                    <td>
+                        <a
+                            href="/store/<?=H::e($spin['store_slug'])?>"
+                            target="_blank"
+                        >
+                            <?=H::e($spin['storefront_name'])?>
+                        </a>
+                    </td>
+
+                    <td>
+                        #<?=(int)$spin['spin_number']?>
+                    </td>
+
+                    <td>
+                        <?=H::e(
+                            ucwords(
+                                str_replace(
+                                    '_',
+                                    ' ',
+                                    $spin['assignment_status']
+                                )
+                            )
+                        )?>
+                    </td>
+
+                    <td>
+                        <?=H::e($spin['created_at'])?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+
+            <?php if(empty($recentSpins)): ?>
+                <tr>
+                    <td colspan="6">
+                        No Prize Wheel spins yet.
+                    </td>
+                </tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 </section>

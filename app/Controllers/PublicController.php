@@ -716,6 +716,29 @@ class PublicController
             ? $prizeWheelService->settings()
             : null;
 
+        $prizeWheelState=$prizeWheelVisible
+            ? $prizeWheelService->publicState(
+                $d,
+                H::user() ? (int)H::user()['id'] : null
+            )
+            : null;
+
+        $prizeWheelResult=null;
+
+        if(
+            !empty($_SESSION['prize_wheel_result'])
+            && (int)(
+                $_SESSION['prize_wheel_result']['storefront_designer_id']
+                ??0
+            )===(int)$d['id']
+        ){
+            $prizeWheelResult=
+                $_SESSION['prize_wheel_result']['result']
+                ??null;
+
+            unset($_SESSION['prize_wheel_result']);
+        }
+
         H::view(
             'public/store',
             [
@@ -732,6 +755,8 @@ class PublicController
                 'salesCount'=>$salesCount,
                 'prizeWheelVisible'=>$prizeWheelVisible,
                 'prizeWheelSettings'=>$prizeWheelSettings,
+                'prizeWheelState'=>$prizeWheelState,
+                'prizeWheelResult'=>$prizeWheelResult,
                 'meta'=>$this->pageMeta(
                     $title,
                     $description,

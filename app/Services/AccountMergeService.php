@@ -21,6 +21,7 @@ class AccountMergeService
         'custom_order_status_history' => 'actor_user_id', 'seller_earnings' => 'buyer_id',
         'product_ip_risk_scans' => 'seller_id', 'product_ip_rights_confirmations' => 'seller_id',
         'prize_assignments' => 'winner_user_id',
+        'prize_wheel_spins' => 'user_id',
     ];
 
     /** User references which are historical/administrative rather than source-owned identity. */

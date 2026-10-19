@@ -101,7 +101,12 @@ $check(
 $check(
     str_contains(
         $service,
-        '%"prize_wheel"%'
+        'find_in_set('
+    )
+    &&
+    str_contains(
+        $service,
+        '"prize_wheel"'
     ),
     'Prize Wheel inventory count recognizes Prize Wheel donations'
 );

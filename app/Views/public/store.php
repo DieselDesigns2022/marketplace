@@ -89,20 +89,243 @@
         </p>
     <?php endif; ?>
 
-    <div class="prize-wheel-placeholder">
-        <strong>🎡 Prize Wheel Giveaway</strong>
+    <div class="creative-wheel-wrap">
+        <div class="creative-wheel-pointer" aria-hidden="true">▼</div>
 
+        <div
+            class="creative-wheel-disc"
+            id="creative-wheel-disc"
+            aria-label="Creative Moth Prize Wheel"
+        >
+            <div class="creative-wheel-center">
+                SPIN
+            </div>
+        </div>
+    </div>
+
+    <?php if(!empty($prizeWheelResult)): ?>
+        <div class="notice success prize-wheel-result">
+            <h3>🎉 You won!</h3>
+
+            <?php if(!empty($prizeWheelResult['preview_image_path'])): ?>
+                <p>
+                    <img
+                        src="<?=H::e(
+                            $prizeWheelResult['preview_image_path']
+                        )?>"
+                        alt="<?=H::e(
+                            $prizeWheelResult['title']
+                        )?>"
+                        style="max-width:280px;height:auto;"
+                    >
+                </p>
+            <?php endif; ?>
+
+            <p>
+                <strong>
+                    <?=H::e($prizeWheelResult['title'])?>
+                </strong>
+            </p>
+
+            <p>
+                Donated by
+                <strong>
+                    <?=H::e(
+                        $prizeWheelResult['seller_name']
+                        ??'Creative Moth seller'
+                    )?>
+                </strong>
+            </p>
+
+            <?php if(!empty($prizeWheelResult['description'])): ?>
+                <p>
+                    <?=nl2br(
+                        H::e($prizeWheelResult['description'])
+                    )?>
+                </p>
+            <?php endif; ?>
+
+            <?php if(!empty(
+                $prizeWheelResult['fulfillment_instructions']
+            )): ?>
+                <p>
+                    <strong>How to claim:</strong><br>
+                    <?=nl2br(
+                        H::e(
+                            $prizeWheelResult[
+                                'fulfillment_instructions'
+                            ]
+                        )
+                    )?>
+                </p>
+            <?php endif; ?>
+
+            <?php if(!empty($prizeWheelResult['restrictions'])): ?>
+                <p class="help-text">
+                    <strong>Restrictions:</strong>
+                    <?=nl2br(
+                        H::e($prizeWheelResult['restrictions'])
+                    )?>
+                </p>
+            <?php endif; ?>
+
+            <?php if(!empty($prizeWheelResult['spin_id'])): ?>
+                <p>
+                    <a
+                        class="btn"
+                        href="/prize-wheel/spins/<?=(int)$prizeWheelResult['spin_id']?>/file"
+                    >
+                        Download / Claim Prize File
+                    </a>
+                </p>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if(
+        (int)($prizeWheelState['available_prizes']??0)<1
+    ): ?>
+        <p class="notice warning">
+            All Prize Wheel prizes have been claimed.
+        </p>
+
+    <?php elseif(!H::user()): ?>
         <p>
-            The Grand Opening Prize Wheel is live on this participating
-            Creative Moth storefront.
+            <a class="btn" href="/login">
+                Log in to Spin
+            </a>
         </p>
 
         <p class="help-text">
-            Prize spinning and winner fulfillment will use Creative Moth's
-            approved Prize Wheel inventory.
+            A Creative Moth account is required so your prize can be
+            securely attached to you.
         </p>
-    </div>
+
+    <?php elseif(
+        (int)($prizeWheelState['spins_remaining']??0)<1
+    ): ?>
+        <p class="notice">
+            You have used all of your spins for this giveaway.
+        </p>
+
+    <?php else: ?>
+        <p>
+            You have
+            <strong>
+                <?=(int)$prizeWheelState['spins_remaining']?>
+            </strong>
+            spin<?=((int)$prizeWheelState['spins_remaining']===1)?'':'s'?>
+            remaining.
+        </p>
+
+        <form
+            method="post"
+            action="/store/<?=(int)$d['id']?>/prize-wheel/spin"
+            id="creative-wheel-spin-form"
+        >
+            <input
+                type="hidden"
+                name="_csrf"
+                value="<?=H::csrf()?>"
+            >
+
+            <button
+                class="btn"
+                type="submit"
+                id="creative-wheel-spin-button"
+            >
+                Spin the Prize Wheel
+            </button>
+        </form>
+    <?php endif; ?>
 </section>
+
+<style>
+.creative-wheel-wrap{
+    position:relative;
+    width:min(320px,90vw);
+    margin:24px auto;
+}
+.creative-wheel-pointer{
+    position:absolute;
+    z-index:3;
+    top:-18px;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:38px;
+}
+.creative-wheel-disc{
+    width:min(320px,90vw);
+    aspect-ratio:1;
+    border-radius:50%;
+    border:8px solid currentColor;
+    position:relative;
+    display:grid;
+    place-items:center;
+    background:
+        conic-gradient(
+            #7d3cff 0deg 45deg,
+            #ed4d9a 45deg 90deg,
+            #26b6a4 90deg 135deg,
+            #f4a640 135deg 180deg,
+            #7d3cff 180deg 225deg,
+            #ed4d9a 225deg 270deg,
+            #26b6a4 270deg 315deg,
+            #f4a640 315deg 360deg
+        );
+    box-shadow:0 8px 28px rgba(0,0,0,.22);
+}
+.creative-wheel-center{
+    width:34%;
+    aspect-ratio:1;
+    border-radius:50%;
+    background:#fff;
+    color:#111;
+    display:grid;
+    place-items:center;
+    font-weight:800;
+    border:5px solid currentColor;
+    letter-spacing:.06em;
+}
+.creative-wheel-disc.is-spinning{
+    transition:transform 1.8s cubic-bezier(.17,.67,.19,1);
+    transform:rotate(1800deg);
+}
+.prize-wheel-result{
+    margin-top:22px;
+    text-align:center;
+}
+</style>
+
+<script>
+(() => {
+    const form=document.getElementById('creative-wheel-spin-form');
+    const wheel=document.getElementById('creative-wheel-disc');
+    const button=document.getElementById('creative-wheel-spin-button');
+
+    if(!form || !wheel || !button){
+        return;
+    }
+
+    let submitting=false;
+
+    form.addEventListener('submit',(event)=>{
+        if(submitting){
+            return;
+        }
+
+        event.preventDefault();
+        submitting=true;
+        button.disabled=true;
+        button.textContent='Spinning…';
+        wheel.classList.add('is-spinning');
+
+        window.setTimeout(()=>{
+            form.submit();
+        },1850);
+    });
+})();
+</script>
 <?php endif; ?>
 
 <?php if(!empty($d['announcement'])): ?>
