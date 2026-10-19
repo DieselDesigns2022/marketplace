@@ -189,15 +189,17 @@
             ></textarea>
         </label>
 
-        <label>
+        <label class="prize-authorization">
             <input
                 type="checkbox"
                 name="seller_authorized"
                 value="1"
                 required
             >
-            I authorize Creative Moth to award this donated prize
-            according to the uses I selected above.
+            <span>
+                I authorize Creative Moth to award this donated prize
+                according to the uses I selected above.
+            </span>
         </label>
 
         <button class="btn">

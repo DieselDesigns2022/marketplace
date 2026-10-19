@@ -2760,3 +2760,81 @@ img[src*="/uploads/custom_designs/examples/"] {
   width: 100%;
   margin: 0;
 }
+
+/* Prize Donations seller form */
+.prize-donation-form {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.prize-donation-form > label {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0;
+}
+
+.prize-donation-form > label > input,
+.prize-donation-form > label > select,
+.prize-donation-form > label > textarea {
+    width: 100%;
+}
+
+.prize-donation-form .help-text {
+    display: block;
+    margin: 0.35rem 0 0;
+    line-height: 1.45;
+}
+
+.prize-donation-form > .notice {
+    margin: 0;
+}
+
+.prize-donation-form fieldset {
+    margin: 0;
+    padding: 1rem 1.1rem;
+}
+
+.prize-donation-form fieldset legend {
+    padding: 0 0.35rem;
+}
+
+.prize-donation-form fieldset label {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0.45rem 0;
+}
+
+.prize-donation-form fieldset input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.prize-donation-form textarea {
+    min-height: 110px;
+}
+
+.prize-donation-form button[type="submit"],
+.prize-donation-form > button {
+    justify-self: start;
+    margin-top: 0.25rem;
+}
+
+.prize-donation-form .prize-authorization {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    justify-content: flex-start;
+}
+
+.prize-donation-form .prize-authorization input[type="checkbox"] {
+    width: auto;
+    margin: 0.2rem 0 0;
+    flex: 0 0 auto;
+}
+
+.prize-donation-form .prize-authorization span {
+    display: block;
+    line-height: 1.4;
+}
