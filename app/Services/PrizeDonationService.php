@@ -133,9 +133,320 @@ class PrizeDonationService
         return $values;
     }
 
+    private function storeDonationUpload(
+        array $file,
+        string $kind
+    ): array {
+        $label=$kind==='preview'
+            ? 'Preview image'
+            : 'Prize file';
+
+        $error=(int)($file['error']??UPLOAD_ERR_NO_FILE);
+
+        if($error===UPLOAD_ERR_NO_FILE){
+            throw new InvalidArgumentException(
+                $label.' is required.'
+            );
+        }
+
+        if($error!==UPLOAD_ERR_OK){
+            throw new InvalidArgumentException(
+                $label.' upload failed.'
+            );
+        }
+
+        $tmp=(string)($file['tmp_name']??'');
+        $original=(string)($file['name']??'');
+        $reportedSize=$file['size']??null;
+
+        if(
+            $tmp==='' ||
+            $original==='' ||
+            !is_uploaded_file($tmp)
+        ){
+            throw new InvalidArgumentException(
+                $label.' must be a genuine uploaded file.'
+            );
+        }
+
+        if(
+            !is_int($reportedSize) &&
+            !ctype_digit((string)$reportedSize)
+        ){
+            throw new InvalidArgumentException(
+                $label.' has an invalid file size.'
+            );
+        }
+
+        $size=(int)$reportedSize;
+        $actualSize=@filesize($tmp);
+
+        if(
+            $actualSize===false ||
+            $actualSize!==$size ||
+            $size<1
+        ){
+            throw new InvalidArgumentException(
+                $label.' has an invalid file size.'
+            );
+        }
+
+        $finfo=new \finfo(FILEINFO_MIME_TYPE);
+        $mime=(string)($finfo->file($tmp)?:'');
+
+        if($kind==='preview'){
+            if($size>25*1024*1024){
+                throw new InvalidArgumentException(
+                    'Preview image must be 25 MB or smaller.'
+                );
+            }
+
+            $types=[
+                'image/jpeg'=>'jpg',
+                'image/png'=>'png',
+                'image/webp'=>'webp',
+            ];
+
+            if(!isset($types[$mime])){
+                throw new InvalidArgumentException(
+                    'Preview image must be a genuine JPG, PNG, or WEBP image.'
+                );
+            }
+
+            $bytes=@file_get_contents($tmp);
+            $info=$bytes===false
+                ? false
+                : @getimagesizefromstring($bytes);
+
+            if(
+                !$info ||
+                !hash_equals(
+                    $mime,
+                    (string)($info['mime']??'')
+                ) ||
+                !SellerReceiptService::sourceDimensionsAllowed(
+                    (int)$info[0],
+                    (int)$info[1]
+                ) ||
+                !SellerReceiptService::hasExactImageContainer(
+                    $bytes,
+                    $mime
+                )
+            ){
+                throw new InvalidArgumentException(
+                    'Preview image is malformed or unsafe.'
+                );
+            }
+
+            if(
+                !extension_loaded('gd') ||
+                !function_exists('imagecreatefromstring')
+            ){
+                throw new \RuntimeException(
+                    'Image decoding is unavailable.'
+                );
+            }
+
+            $decoded=@imagecreatefromstring($bytes);
+
+            if(!$decoded){
+                throw new InvalidArgumentException(
+                    'Preview image could not be decoded.'
+                );
+            }
+
+            imagedestroy($decoded);
+
+            $directory=public_path(
+                'uploads/prize_donations/previews'
+            );
+
+            if(
+                !is_dir($directory) &&
+                !mkdir($directory,0775,true) &&
+                !is_dir($directory)
+            ){
+                throw new \RuntimeException(
+                    'Prize preview storage is unavailable.'
+                );
+            }
+
+            $name=bin2hex(random_bytes(24)).
+                '.'.$types[$mime];
+
+            $absolute=$directory.'/'.$name;
+
+            if(!move_uploaded_file($tmp,$absolute)){
+                throw new \RuntimeException(
+                    'Prize preview image could not be stored.'
+                );
+            }
+
+            @chmod($absolute,0644);
+
+            return [
+                'kind'=>'preview',
+                'absolute'=>$absolute,
+                'path'=>'/uploads/prize_donations/previews/'.$name,
+                'original_name'=>mb_substr(
+                    basename(
+                        str_replace('\\','/',$original)
+                    ),
+                    0,
+                    190
+                ),
+                'mime'=>$mime,
+                'size'=>$size,
+            ];
+        }
+
+        if($size>100*1024*1024){
+            throw new InvalidArgumentException(
+                'Prize file must be 100 MB or smaller.'
+            );
+        }
+
+        $types=[
+            'application/zip'=>'zip',
+            'application/x-zip-compressed'=>'zip',
+            'application/pdf'=>'pdf',
+            'image/jpeg'=>'jpg',
+            'image/png'=>'png',
+            'image/webp'=>'webp',
+        ];
+
+        if(!isset($types[$mime])){
+            throw new InvalidArgumentException(
+                'Prize file must be a ZIP, PDF, JPG, PNG, or WEBP file.'
+            );
+        }
+
+        if(str_starts_with($mime,'image/')){
+            $bytes=@file_get_contents($tmp);
+            $info=$bytes===false
+                ? false
+                : @getimagesizefromstring($bytes);
+
+            if(
+                !$info ||
+                !hash_equals(
+                    $mime,
+                    (string)($info['mime']??'')
+                ) ||
+                !SellerReceiptService::sourceDimensionsAllowed(
+                    (int)$info[0],
+                    (int)$info[1]
+                ) ||
+                !SellerReceiptService::hasExactImageContainer(
+                    $bytes,
+                    $mime
+                )
+            ){
+                throw new InvalidArgumentException(
+                    'Prize image is malformed or unsafe.'
+                );
+            }
+        }
+
+        $directory=app_path(
+            'storage/protected_uploads/prize_donations'
+        );
+
+        if(
+            !is_dir($directory) &&
+            !mkdir($directory,0770,true) &&
+            !is_dir($directory)
+        ){
+            throw new \RuntimeException(
+                'Protected prize storage is unavailable.'
+            );
+        }
+
+        $name=bin2hex(random_bytes(24)).
+            '.'.$types[$mime];
+
+        $absolute=$directory.'/'.$name;
+
+        if(!move_uploaded_file($tmp,$absolute)){
+            throw new \RuntimeException(
+                'Prize file could not be stored.'
+            );
+        }
+
+        @chmod($absolute,0640);
+
+        return [
+            'kind'=>'prize',
+            'absolute'=>$absolute,
+            'path'=>'prize_donations/'.$name,
+            'original_name'=>mb_substr(
+                basename(
+                    str_replace('\\','/',$original)
+                ),
+                0,
+                190
+            ),
+            'mime'=>$mime,
+            'size'=>$size,
+        ];
+    }
+
+
+    private function removeStoredUpload(?array $file): void
+    {
+        if(
+            $file &&
+            !empty($file['absolute']) &&
+            is_file($file['absolute'])
+        ){
+            @unlink($file['absolute']);
+        }
+    }
+
+
+    public function sellerFile(
+        int $donationId,
+        int $designerId
+    ): ?array {
+        return DB::row(
+            'select id,
+                    designer_id,
+                    prize_file_storage_path,
+                    prize_file_original_name,
+                    prize_file_mime_type,
+                    prize_file_size
+             from prize_donations
+             where id=?
+               and designer_id=?
+               and prize_file_storage_path is not null
+             limit 1',
+            [$donationId,$designerId]
+        );
+    }
+
+
+    public function adminFile(int $donationId): ?array
+    {
+        return DB::row(
+            'select id,
+                    designer_id,
+                    prize_file_storage_path,
+                    prize_file_original_name,
+                    prize_file_mime_type,
+                    prize_file_size
+             from prize_donations
+             where id=?
+               and prize_file_storage_path is not null
+             limit 1',
+            [$donationId]
+        );
+    }
+
+
     public function submit(
         int $designerId,
-        array $data
+        array $data,
+        array $files=[]
     ): int {
         $this->seller($designerId);
 
@@ -203,38 +514,69 @@ class PrizeDonationService
             $data['usage_designations']??[]
         );
 
-        DB::exec(
-            'insert into prize_donations
-             (
-                designer_id,
-                prize_type,
-                title,
-                description,
-                approximate_retail_value,
-                quantity_donated,
-                quantity_remaining,
-                fulfillment_instructions,
-                restrictions,
-                usage_designations,
-                seller_authorized,
-                status
-             )
-             values (?,?,?,?,?,?,?,?,?,?,1,"submitted")',
-            [
-                $designerId,
-                $type,
-                $title,
-                $description,
-                $value,
-                $quantity,
-                $quantity,
-                $instructions,
-                $restrictions!==''?$restrictions:null,
-                implode(',',$usages),
-            ]
-        );
+        $preview=null;
+        $prize=null;
 
-        return (int)DB::id();
+        try{
+            $preview=$this->storeDonationUpload(
+                $files['preview_image']??[],
+                'preview'
+            );
+
+            $prize=$this->storeDonationUpload(
+                $files['prize_file']??[],
+                'prize'
+            );
+
+            DB::exec(
+                'insert into prize_donations
+                 (
+                    designer_id,
+                    prize_type,
+                    title,
+                    description,
+                    preview_image_path,
+                    prize_file_storage_path,
+                    prize_file_original_name,
+                    prize_file_mime_type,
+                    prize_file_size,
+                    approximate_retail_value,
+                    quantity_donated,
+                    quantity_remaining,
+                    fulfillment_instructions,
+                    restrictions,
+                    usage_designations,
+                    seller_authorized,
+                    status
+                 )
+                 values (
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,"submitted"
+                 )',
+                [
+                    $designerId,
+                    $type,
+                    $title,
+                    $description,
+                    $preview['path'],
+                    $prize['path'],
+                    $prize['original_name'],
+                    $prize['mime'],
+                    $prize['size'],
+                    $value,
+                    $quantity,
+                    $quantity,
+                    $instructions,
+                    $restrictions!==''?$restrictions:null,
+                    implode(',',$usages),
+                ]
+            );
+
+            return (int)DB::id();
+        }catch(Throwable $e){
+            $this->removeStoredUpload($preview);
+            $this->removeStoredUpload($prize);
+            throw $e;
+        }
     }
 
     public function sellerDonations(int $designerId): array

@@ -51,6 +51,32 @@
                             <?=H::e($d['title'])?>
                         </h3>
 
+                        <?php if(!empty($d['preview_image_path'])): ?>
+                            <div style="margin:.75rem 0">
+                                <img
+                                    src="<?=H::e(H::assetUrl($d['preview_image_path']))?>"
+                                    alt="<?=H::e($d['title'])?> prize preview"
+                                    style="max-width:220px;max-height:220px;object-fit:contain"
+                                >
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if(!empty($d['prize_file_storage_path'])): ?>
+                            <p>
+                                <a
+                                    class="btn"
+                                    href="/admin/prize-donations/<?=(int)$d['id']?>/file"
+                                >
+                                    Download Prize File
+                                </a>
+                                <?php if(!empty($d['prize_file_original_name'])): ?>
+                                    <span class="muted">
+                                        <?=H::e($d['prize_file_original_name'])?>
+                                    </span>
+                                <?php endif; ?>
+                            </p>
+                        <?php endif; ?>
+
                         <p>
                             Donated by
                             <strong><?=H::e($d['seller_name'])?></strong>

@@ -97,6 +97,7 @@ use App\Controllers\AnalyticsController;
  $router->get('/seller/promos/cancel', [PromoController::class, 'cancel']);
 $router->match(['GET','POST'], '/seller/prize-donations', [PrizeDonationController::class, 'sellerIndex']);
 $router->post('/seller/prize-donations/{id}/cancel', [PrizeDonationController::class, 'sellerCancel']);
+$router->get('/seller/prize-donations/{id}/file', [PrizeDonationController::class, 'sellerFile']);
  $router->get('/promo/click/{token}', [PromoController::class, 'click']);
  $router->get('/seller/onboarding', [SellerController::class, 'onboarding']);
  $router->get('/seller/stripe', [SellerController::class, 'stripe']);
@@ -259,6 +260,7 @@ $router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCa
  $router->post('/admin/credits/advertising-recurring', [AdminCreditController::class, 'createAdvertisingRecurring']);
  $router->post('/admin/credits/advertising-recurring/{id}/deactivate', [AdminCreditController::class, 'deactivateAdvertisingRecurring']);
 $router->get('/admin/prize-donations', [PrizeDonationController::class, 'adminIndex']);
+$router->get('/admin/prize-donations/{id}/file', [PrizeDonationController::class, 'adminFile']);
 $router->post('/admin/prize-donations/{id}/approve', [PrizeDonationController::class, 'approve']);
 $router->post('/admin/prize-donations/{id}/cancel', [PrizeDonationController::class, 'cancel']);
 $router->post('/admin/prize-donations/{id}/assign', [PrizeDonationController::class, 'assign']);

@@ -56,7 +56,8 @@ class PrizeDonationController
             try{
                 $service->submit(
                     (int)$designer['id'],
-                    $_POST
+                    $_POST,
+                    $_FILES
                 );
 
                 H::flash(
@@ -114,6 +115,97 @@ class PrizeDonationController
 
         H::redirect('/seller/prize-donations');
     }
+
+    private function servePrizeFile(array $file): never
+    {
+        $base=realpath(
+            app_path(
+                'storage/protected_uploads/prize_donations'
+            )
+        );
+
+        $real=realpath(
+            app_path(
+                'storage/protected_uploads/'.
+                ltrim(
+                    (string)$file['prize_file_storage_path'],
+                    '/'
+                )
+            )
+        );
+
+        if(
+            !$base ||
+            !$real ||
+            !str_starts_with(
+                $real,
+                $base.DIRECTORY_SEPARATOR
+            ) ||
+            !is_file($real) ||
+            !is_readable($real)
+        ){
+            H::abort(404);
+        }
+
+        $mime=trim(
+            (string)($file['prize_file_mime_type']??'')
+        );
+
+        if($mime===''){
+            $mime='application/octet-stream';
+        }
+
+        $name=(string)(
+            $file['prize_file_original_name']
+            ??'creative-moth-prize'
+        );
+
+        header('Content-Type: '.$mime);
+        header('Content-Length: '.filesize($real));
+        header(
+            "Content-Disposition: attachment; filename*=UTF-8''".
+            rawurlencode($name)
+        );
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+
+        readfile($real);
+        exit;
+    }
+
+
+    public function sellerFile(string $id): void
+    {
+        $designer=$this->seller();
+
+        $file=(new PrizeDonationService())->sellerFile(
+            (int)$id,
+            (int)$designer['id']
+        );
+
+        if(!$file){
+            H::abort(404);
+        }
+
+        $this->servePrizeFile($file);
+    }
+
+
+    public function adminFile(string $id): void
+    {
+        H::requireAdminPermission('prizes.view');
+
+        $file=(new PrizeDonationService())->adminFile(
+            (int)$id
+        );
+
+        if(!$file){
+            H::abort(404);
+        }
+
+        $this->servePrizeFile($file);
+    }
+
 
     public function adminIndex(): void
     {

@@ -101,6 +101,37 @@ $check(
     'seller UI clearly requires a separate form for every individual prize'
 );
 
+
+$check(
+    str_contains($sellerView,'enctype="multipart/form-data"') &&
+    str_contains($sellerView,'name="prize_file"') &&
+    str_contains($sellerView,'name="preview_image"') &&
+    str_contains($sellerView,'Store credit / gift card:') &&
+    str_contains($sellerView,'Custom prize:') &&
+    str_contains($sellerView,'your store logo'),
+    'seller UI requires an actual prize file and promotional preview image'
+);
+
+$check(
+    str_contains($service,'storage/protected_uploads/prize_donations') &&
+    str_contains($service,'uploads/prize_donations/previews') &&
+    str_contains($service,'sellerFile(') &&
+    str_contains($service,'adminFile('),
+    'prize assets use protected prize storage and public preview storage'
+);
+
+$check(
+    str_contains($routes,"'/seller/prize-donations/{id}/file'") &&
+    str_contains($routes,"'/admin/prize-donations/{id}/file'"),
+    'seller and admin protected prize-file download routes are registered'
+);
+
+$check(
+    str_contains($adminView,'Download Prize File') &&
+    str_contains($adminView,'preview_image_path'),
+    'admin can review preview artwork and access the protected donated prize'
+);
+
 $check(
     str_contains($sellerNav,"'Promotions / Ads'") &&
     str_contains($sellerNav,"'/seller/prize-donations'") &&

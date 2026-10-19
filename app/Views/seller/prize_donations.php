@@ -32,7 +32,7 @@
         store. It is separate from Creative Moth Prize Credit.
     </p>
 
-    <form method="post" action="/seller/prize-donations">
+    <form method="post" action="/seller/prize-donations" enctype="multipart/form-data">
         <input
             type="hidden"
             name="_csrf"
@@ -67,6 +67,65 @@
                 maxlength="5000"
                 required
             ></textarea>
+        </label>
+
+        <div class="notice">
+            <strong>Prize files &amp; promotional preview</strong>
+            <p>
+                Every donation needs both an actual prize file and a
+                preview image so Creative Moth can promote and award it.
+            </p>
+            <ul>
+                <li>
+                    <strong>Store credit / gift card:</strong>
+                    place the code or redemption information on an image
+                    and upload that image as the Prize File.
+                </li>
+                <li>
+                    <strong>Custom prize:</strong>
+                    upload an image or PDF explaining how the winner
+                    should contact you and how to order/redeem the custom.
+                </li>
+                <li>
+                    <strong>Digital files:</strong>
+                    upload the finished file, or ZIP multiple files together.
+                </li>
+                <li>
+                    <strong>Preview image:</strong>
+                    upload an image we can use to advertise the prize.
+                    If you do not have a specific preview, your store logo
+                    is perfectly fine.
+                </li>
+            </ul>
+        </div>
+
+        <label>
+            Prize File
+            <input
+                type="file"
+                name="prize_file"
+                accept=".zip,.pdf,.jpg,.jpeg,.png,.webp"
+                required
+            >
+            <small class="help-text">
+                Required. ZIP, PDF, JPG, PNG, or WEBP.
+                This file is stored privately and is not publicly exposed.
+            </small>
+        </label>
+
+        <label>
+            Preview Image
+            <input
+                type="file"
+                name="preview_image"
+                accept="image/jpeg,image/png,image/webp"
+                required
+            >
+            <small class="help-text">
+                Required. JPG, PNG, or WEBP. This is the image Creative
+                Moth may use to visually promote your donated prize.
+                Your logo is acceptable if you do not have a prize preview.
+            </small>
         </label>
 
         <label>
@@ -169,9 +228,26 @@
                     <?php foreach($donations as $d): ?>
                         <tr>
                             <td>
+                                <?php if(!empty($d['preview_image_path'])): ?>
+                                    <div style="margin:0 0 .75rem">
+                                        <img
+                                            src="<?=H::e(H::assetUrl($d['preview_image_path']))?>"
+                                            alt="<?=H::e($d['title'])?> prize preview"
+                                            style="max-width:160px;max-height:160px;object-fit:contain"
+                                        >
+                                    </div>
+                                <?php endif; ?>
+
                                 <strong><?=H::e($d['title'])?></strong>
                                 <br>
                                 <?=H::e($types[$d['prize_type']]??$d['prize_type'])?>
+
+                                <?php if(!empty($d['prize_file_storage_path'])): ?>
+                                    <br>
+                                    <a href="/seller/prize-donations/<?=(int)$d['id']?>/file">
+                                        Download submitted prize file
+                                    </a>
+                                <?php endif; ?>
 
                                 <?php if($d['approximate_retail_value']!==null): ?>
                                     <br>
