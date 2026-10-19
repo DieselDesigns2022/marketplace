@@ -2,7 +2,7 @@
 <h1><?=$mode==='credits'?'Credits':'Referrals & Seller Referral Payouts'?></h1>
 
 <?php if($mode==='credits'):?>
-<p>Marketplace Credits and Advertising Credits are managed here. Their balances and ledgers remain financially separate.</p>
+<p>Marketplace Credits, Advertising Credits, and Prize Credits are managed here. Their balances and ledgers remain financially separate.</p>
 
 <form method="get" action="/admin/credits" class="card form" role="search">
     <label>
@@ -19,6 +19,7 @@
     <th>User</th>
     <th>Marketplace Credit</th>
     <th>Advertising Credit</th>
+    <th>Prize Credit</th>
     <th>Seller</th>
     <th>Review</th>
 </tr>
@@ -29,12 +30,13 @@
     <td><?=H::e($user['name'])?><br><small><?=H::e($user['email'])?></small></td>
     <td><?=H::money($user['available_balance'])?> available</td>
     <td><?=H::money($user['advertising_available_balance'])?> available</td>
+    <td><?=H::money($user['prize_available_balance'])?> available</td>
     <td><?=$user['approved_seller']?'Approved':'No'?></td>
     <td><a href="/admin/credits?user_id=<?=(int)$user['id']?>">Review account</a></td>
 </tr>
 <?php endforeach;?>
 <?php if(!$users):?>
-<tr><td colspan="5">No matching users.</td></tr>
+<tr><td colspan="6">No matching users.</td></tr>
 <?php endif;?>
 </tbody>
 </table>
@@ -65,6 +67,14 @@
         · Available <?=H::money($selected['advertising_available_balance'])?>
     </p>
 
+
+    <h3>Prize Credit</h3>
+    <p>
+        Total <?=H::money($selected['prize_total_balance'])?>
+        · Reserved <?=H::money($selected['prize_reserved_balance'])?>
+        · Available <?=H::money($selected['prize_available_balance'])?>
+    </p>
+
     <?php if(H::canAdmin('credits.adjust')):?>
     <hr>
     <h3>Issue or adjust credit</h3>
@@ -78,6 +88,7 @@
             <select name="credit_type" required>
                 <option value="marketplace">Marketplace Credit</option>
                 <option value="advertising" <?=$selected['approved_seller']?'':'disabled'?>>Advertising Credit</option>
+                <option value="prize">Prize Credit</option>
             </select>
         </label>
 
@@ -89,6 +100,16 @@
         <label>
             Reason
             <textarea name="reason" required minlength="3" maxlength="500"></textarea>
+        </label>
+
+
+        <label>
+            Prize Credit expiration date
+            <input type="date" name="expires_on">
+            <small class="help-text">
+                Optional and used only when issuing positive Prize Credit.
+                Leave blank for no expiration date.
+            </small>
         </label>
 
         <?php if(!$selected['approved_seller']):?>
@@ -197,6 +218,43 @@
 <?php endforeach;?>
 <?php if(!$ledger):?>
 <tr><td colspan="9">No Marketplace Credit activity.</td></tr>
+<?php endif;?>
+</tbody>
+</table>
+</div>
+
+<h2>Prize Credit Ledger</h2>
+<div class="responsive-table">
+<table>
+<thead>
+<tr>
+    <th>Type</th>
+    <th>Amount</th>
+    <th>Status</th>
+    <th>Order</th>
+    <th>Seller</th>
+    <th>Expires</th>
+    <th>Admin</th>
+    <th>Reason</th>
+    <th>Created</th>
+</tr>
+</thead>
+<tbody>
+<?php foreach(($prizeLedger??[]) as $entry):?>
+<tr>
+    <td><?=H::e(ucwords(str_replace('_',' ',$entry['type'])))?></td>
+    <td><?=H::money($entry['amount'])?></td>
+    <td><?=H::e($entry['status'])?></td>
+    <td><?=$entry['order_id']?'#'.(int)$entry['order_id']:'—'?></td>
+    <td><?=$entry['designer_id']?'#'.(int)$entry['designer_id']:'—'?></td>
+    <td><?=H::e($entry['expires_on']??'No expiration')?></td>
+    <td><?=H::e($entry['admin_name']??'—')?></td>
+    <td><?=H::e($entry['description']??'—')?></td>
+    <td><?=H::e($entry['created_at'])?></td>
+</tr>
+<?php endforeach;?>
+<?php if(empty($prizeLedger)):?>
+<tr><td colspan="9">No Prize Credit activity.</td></tr>
 <?php endif;?>
 </tbody>
 </table>

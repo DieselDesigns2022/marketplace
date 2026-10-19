@@ -75,6 +75,64 @@
     <button class="btn">Save Store Settings</button>
 </form>
 <section class="card page-section">
+    <h2>Prize Credit Participation</h2>
+
+    <p>
+        Prize Credit is promotional buyer credit awarded by Creative Moth
+        through games, giveaways, contests, and special events.
+    </p>
+
+    <p class="notice warning">
+        <strong>Participation is completely optional.</strong>
+        Creative Moth does not reimburse sellers for Prize Credit accepted
+        on an order. Your eventual seller payout is based only on the
+        buyer-paid portion of the eligible purchase, subject to the normal
+        marketplace fee calculation.
+    </p>
+
+    <form method="post" class="form">
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::csrf()?>"
+        >
+
+        <input
+            type="hidden"
+            name="settings_section"
+            value="prize_credit"
+        >
+
+        <label>
+            How much Prize Credit will you accept?
+            <select name="prize_credit_mode" required>
+                <?php foreach(
+                    \App\Services\PrizeCreditService::SELLER_MODES
+                    as $key=>$label
+                ): ?>
+                    <option
+                        value="<?=H::e($key)?>"
+                        <?=($d['prize_credit_mode']??'none')===$key?'selected':''?>
+                    >
+                        <?=H::e($label)?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+
+        <p class="help-text">
+            Your setting applies only to eligible purchases from your own
+            store. Prize Credit is separate from Marketplace Credit,
+            Advertising Credit, coupons, and seller-donated store credit.
+        </p>
+
+        <button class="btn">
+            Save Prize Credit Setting
+        </button>
+    </form>
+</section>
+
+<section class="card page-section">
     <h2>Default License Presets</h2>
     <p class="help-text">License descriptions entered here override the Creative Moth default descriptions across all of your listings. License availability and prices are still set per listing, with these settings used as defaults for new listings.</p>
     <?php $presetMap=[]; foreach(($licensePresets??[]) as $preset) $presetMap[$preset['license_key']]=$preset; ?>

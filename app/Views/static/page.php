@@ -248,7 +248,7 @@
 
     <h3>14. Buyer credits and referrals</h3>
     <p>One user account may be attached to only one immutable referrer. The referrer and new buyer each earn $1.50 after the buyer’s first completed order with a positive payment after credits. Fully credit-funded, refunded, failed, cancelled, unpaid, and unresolved review orders do not qualify; an order legitimately approved and completed after review may qualify.</p>
-    <p>Creative Moth may offer buyer referral links, marketplace credits, rewards, discounts, or promotional credits. Credits never expire, may only be used on Creative Moth, and may not be transferred, sold, exchanged for cash, or used outside the marketplace. Credits redeemed on an order are not automatically restored after a refund. Self-referrals, duplicate accounts, fraud, and abuse are forbidden. Creative Moth may reverse fraudulently awarded credit with an auditable adjustment; existing ledger history is never rewritten.</p>
+    <p>Creative Moth may offer buyer referral links, Marketplace Credits, Prize Credits, rewards, discounts, or other promotional credits. Marketplace Credits do not expire unless Creative Moth expressly states otherwise. Prize Credits may carry a stated expiration date. Credits may only be used on Creative Moth and may not be transferred, sold, exchanged for cash, withdrawn, or used outside the marketplace. Refund and reversal treatment for promotional Prize Credit is governed by the applicable Prize Credit terms shown when that credit is issued or redeemed. Self-referrals, duplicate accounts, fraud, and abuse are forbidden. Creative Moth may reverse fraudulently awarded credit with an auditable adjustment; existing ledger history is never rewritten.</p>
 
     <h2>Seller and designer terms</h2>
 

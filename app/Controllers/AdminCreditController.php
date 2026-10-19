@@ -6,6 +6,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\CreditService;
 use App\Services\AdvertisingCreditService;
+use App\Services\PrizeCreditService;
 use App\Services\NotificationService;
 use App\Services\PlatformCreditPayoutService;
 use App\Services\SellerReferralCommissionService;
@@ -17,7 +18,7 @@ final class AdminCreditController
     public function index(): void
     {
         $path=parse_url($_SERVER['REQUEST_URI']??'',PHP_URL_PATH)?:'';$mode=str_starts_with($path,'/admin/credits')?'credits':'referrals';H::requireAdminPermission($mode==='credits'?'credits.view':'referrals.view');
-        $query=mb_substr(trim((string)($_GET['q']??'')),0,190);$selectedId=max(0,(int)($_GET['user_id']??0));$page=max(1,(int)($_GET['page']??1));$offset=($page-1)*25;$users=[];$selected=null;$ledger=[];$advertisingLedger=[];$recurringGrants=[];$referrals=[];$payouts=[];$attempts=[];$commissionTotals=[];$payoutStatus='';
+        $query=mb_substr(trim((string)($_GET['q']??'')),0,190);$selectedId=max(0,(int)($_GET['user_id']??0));$page=max(1,(int)($_GET['page']??1));$offset=($page-1)*25;$users=[];$selected=null;$ledger=[];$advertisingLedger=[];$prizeLedger=[];$recurringGrants=[];$referrals=[];$payouts=[];$attempts=[];$commissionTotals=[];$payoutStatus='';
         if($mode==='credits'){
             $params=[];$where='';
             if($query!==''){
@@ -34,10 +35,43 @@ final class AdminCreditController
                     coalesce(ac.total_balance,0.00) advertising_total_balance,
                     coalesce(ac.reserved_balance,0.00) advertising_reserved_balance,
                     coalesce(ac.total_balance,0.00)-coalesce(ac.reserved_balance,0.00) advertising_available_balance,
+                    coalesce(pc.total_balance,0.00) prize_total_balance,
+                    coalesce(pc.reserved_balance,0.00) prize_reserved_balance,
+                    coalesce(pc.total_balance,0.00)-coalesce(pc.reserved_balance,0.00) prize_available_balance,
                     exists(select 1 from designers d where d.user_id=u.id and d.status='approved') approved_seller
                  from users u
                  left join marketplace_credits c on c.user_id=u.id
                  left join advertising_credits ac on ac.user_id=u.id
+                 left join (
+                    select
+                        user_id,
+                        sum(
+                            case
+                                when status='active'
+                                 and remaining_amount>0
+                                 and (
+                                    expires_on is null
+                                    or expires_on>=current_date()
+                                 )
+                                then remaining_amount
+                                else 0
+                            end
+                        ) total_balance,
+                        sum(
+                            case
+                                when status='active'
+                                 and remaining_amount>0
+                                 and (
+                                    expires_on is null
+                                    or expires_on>=current_date()
+                                 )
+                                then reserved_amount
+                                else 0
+                            end
+                        ) reserved_balance
+                    from prize_credit_grants
+                    group by user_id
+                 ) pc on pc.user_id=u.id
                  $where
                  order by u.id desc
                  limit 25 offset $offset",
@@ -53,10 +87,43 @@ final class AdminCreditController
                     coalesce(ac.total_balance,0.00) advertising_total_balance,
                     coalesce(ac.reserved_balance,0.00) advertising_reserved_balance,
                     coalesce(ac.total_balance,0.00)-coalesce(ac.reserved_balance,0.00) advertising_available_balance,
+                    coalesce(pc.total_balance,0.00) prize_total_balance,
+                    coalesce(pc.reserved_balance,0.00) prize_reserved_balance,
+                    coalesce(pc.total_balance,0.00)-coalesce(pc.reserved_balance,0.00) prize_available_balance,
                     exists(select 1 from designers d where d.user_id=u.id and d.status="approved") approved_seller
                  from users u
                  left join marketplace_credits c on c.user_id=u.id
                  left join advertising_credits ac on ac.user_id=u.id
+                 left join (
+                    select
+                        user_id,
+                        sum(
+                            case
+                                when status="active"
+                                 and remaining_amount>0
+                                 and (
+                                    expires_on is null
+                                    or expires_on>=current_date()
+                                 )
+                                then remaining_amount
+                                else 0
+                            end
+                        ) total_balance,
+                        sum(
+                            case
+                                when status="active"
+                                 and remaining_amount>0
+                                 and (
+                                    expires_on is null
+                                    or expires_on>=current_date()
+                                 )
+                                then reserved_amount
+                                else 0
+                            end
+                        ) reserved_balance
+                    from prize_credit_grants
+                    group by user_id
+                 ) pc on pc.user_id=u.id
                  where u.id=?',
                 [$selectedId]
             ):null;
@@ -79,6 +146,20 @@ final class AdminCreditController
                 [$selectedId]
             ):[];
 
+            $prizeLedger=$selected?DB::rows(
+                'select pct.*,u.name admin_name,
+                        pcg.expires_on
+                 from prize_credit_transactions pct
+                 left join users u
+                    on u.id=pct.admin_user_id
+                 left join prize_credit_grants pcg
+                    on pcg.id=pct.grant_id
+                 where pct.user_id=?
+                 order by pct.id desc
+                 limit 100',
+                [$selectedId]
+            ):[];
+
             $recurringGrants=$selected?DB::rows(
                 'select *
                  from advertising_credit_recurring_grants
@@ -88,7 +169,7 @@ final class AdminCreditController
             ):[];
         }
         else{$referrals=DB::rows('select r.*,a.name referrer_name,b.name referred_name from referrals r join users a on a.id=r.referrer_user_id join users b on b.id=r.referred_user_id where (?=0 or r.referrer_user_id=? or r.referred_user_id=?) order by r.id desc limit 100',[$selectedId,$selectedId,$selectedId]);$payoutStatus=in_array($_GET['payout_status']??'',['processing','paid','failed','not_ready'],true)?$_GET['payout_status']:'';$payouts=DB::rows('select b.*,u.name referrer_name,d.display_name,d.store_slug,d.stripe_details_submitted,d.stripe_payouts_enabled,(select count(*) from seller_referral_transfer_attempts a where a.batch_id=b.id) attempt_count from seller_referral_payout_batches b join users u on u.id=b.referrer_user_id left join designers d on d.user_id=b.referrer_user_id where (?="" or b.status=?) order by b.id desc limit 100',[$payoutStatus,$payoutStatus]);$attempts=DB::rows('select * from seller_referral_transfer_attempts where batch_id in (select id from seller_referral_payout_batches order by id desc) order by id desc limit 300');$commissionTotals=DB::rows('select r.id referral_id,ru.name referrer_name,du.display_name referred_store,r.commission_ended_at,r.commission_end_reason,coalesce(sum(case when l.payout_item_id is null then l.amount_cents else 0 end),0) unpaid_cents,coalesce(sum(case when l.payout_item_id is not null then l.amount_cents else 0 end),0) paid_cents,coalesce(sum(case when l.entry_type="recovery_adjustment" then l.amount_cents else 0 end),0) recovery_cents,coalesce(sum(l.amount_cents),0) lifetime_cents from referrals r join users ru on ru.id=r.referrer_user_id left join designers du on du.user_id=r.referred_user_id left join seller_referral_commission_ledger l on l.referral_id=r.id where r.seller_reward_type="lifetime_commission" group by r.id,ru.name,du.display_name,r.commission_ended_at,r.commission_end_reason order by r.id desc');}
-        H::view('admin/credits',compact('mode','users','selected','ledger','advertisingLedger','recurringGrants','referrals','query','page','payoutStatus','payouts','attempts','commissionTotals'));
+        H::view('admin/credits',compact('mode','users','selected','ledger','advertisingLedger','prizeLedger','recurringGrants','referrals','query','page','payoutStatus','payouts','attempts','commissionTotals'));
     }
 
     public function retrySellerReferralPayout($id): void
@@ -142,7 +223,7 @@ final class AdminCreditController
             $cents = CreditService::parseCents($amount);
             if ($cents === 0) throw new InvalidArgumentException('Zero adjustment.');
 
-            if(!in_array($creditType,['marketplace','advertising'],true)){
+            if(!in_array($creditType,['marketplace','advertising','prize'],true)){
                 throw new InvalidArgumentException('Choose a valid credit type.');
             }
 
@@ -151,7 +232,56 @@ final class AdminCreditController
 
             DB::begin();
 
-            if($creditType==='advertising'){
+            if($creditType==='prize'){
+                (new PrizeCreditService)->adjust(
+                    $userId,
+                    $amount,
+                    $key,
+                    [
+                        'admin_user_id'=>$adminId,
+                        'description'=>mb_substr($reason,0,500),
+                        'expires_on'=>$expiresOn,
+                        'source_type'=>'admin',
+                    ]
+                );
+
+                DB::exec(
+                    'insert into admin_logs
+                     (
+                        admin_user_id,
+                        action,
+                        entity_type,
+                        entity_id,
+                        metadata
+                     )
+                     values (?,?,?,?,?)',
+                    [
+                        $adminId,
+                        'prize_credit_adjustment',
+                        'user',
+                        $userId,
+                        json_encode(
+                            [
+                                'amount'=>CreditService::formatCents($cents),
+                                'reason'=>$reason,
+                                'expires_on'=>$expiresOn!==''?$expiresOn:null,
+                            ],
+                            JSON_THROW_ON_ERROR
+                        ),
+                    ]
+                );
+
+                NotificationService::create(
+                    $userId,
+                    'prize_credit_adjustment',
+                    'buyer',
+                    'Prize Credit updated',
+                    'Your Prize Credit balance was adjusted by '.
+                        CreditService::formatCents($cents).'.',
+                    $key.':notification',
+                    '/account'
+                );
+            } elseif($creditType==='advertising'){
                 (new AdvertisingCreditService)->adjust($userId,$amount,$key,[
                     'admin_user_id'=>$adminId,
                     'description'=>mb_substr($reason,0,500),
@@ -213,7 +343,11 @@ final class AdminCreditController
                 'success',
                 $creditType==='advertising'
                     ? 'Advertising Credit adjustment recorded.'
-                    : 'Marketplace Credit adjustment recorded.'
+                    : (
+                        $creditType==='prize'
+                            ? 'Prize Credit adjustment recorded.'
+                            : 'Marketplace Credit adjustment recorded.'
+                    )
             );
         } catch (Throwable $error) {
             if (DB::pdo()->inTransaction()) DB::rollBack();

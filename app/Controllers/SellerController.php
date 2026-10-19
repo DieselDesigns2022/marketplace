@@ -502,6 +502,57 @@ class SellerController
         $errors = [];
         if ($_POST)
         {
+            if (($_POST['settings_section'] ?? 'store') === 'prize_credit') {
+                $mode=trim(
+                    (string)($_POST['prize_credit_mode']??'none')
+                );
+
+                if(
+                    !array_key_exists(
+                        $mode,
+                        \App\Services\PrizeCreditService::SELLER_MODES
+                    )
+                ){
+                    $errors[]='Choose a valid Prize Credit participation option.';
+                }
+
+                if(!$errors){
+                    DB::exec(
+                        'update designers
+                         set prize_credit_mode=?,
+                             updated_at=now()
+                         where id=?
+                           and user_id=?',
+                        [
+                            $mode,
+                            (int)$d['id'],
+                            (int)H::user()['id'],
+                        ]
+                    );
+
+                    H::flash(
+                        'success',
+                        'Prize Credit participation updated.'
+                    );
+
+                    H::redirect('/seller/store');
+                }
+
+                H::view(
+                    'seller/store',
+                    [
+                        'd'=>$this->d(),
+                        'errors'=>$errors,
+                        'licenseTypes'=>LicenseService::platformTypes(),
+                        'licensePresets'=>LicenseService::sellerPresets(
+                            (int)$d['id']
+                        ),
+                    ]
+                );
+
+                return;
+            }
+
             if (($_POST['settings_section'] ?? 'store') === 'licenses') {
                 $errors = LicenseService::syncSellerPresets((int)$d['id'], $_POST);
                 if (!$errors) { H::flash('success', 'License presets updated.'); H::redirect('/seller/store'); }
