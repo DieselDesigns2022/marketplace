@@ -425,4 +425,654 @@ final class PrizeCreditService
             throw $error;
         }
     }
+
+    public static function allocateCart(
+        array $items,
+        array $couponAllocations,
+        int $availableCents,
+        bool $usePrizeCredit
+    ): array {
+        $empty = [
+            'total_cents' => 0,
+            'item_cents' => [],
+            'seller_cents' => [],
+        ];
+
+        if (!$usePrizeCredit || $availableCents <= 0 || !$items) {
+            return $empty;
+        }
+
+        $sellerItems = [];
+
+        foreach ($items as $index => $item) {
+            $designerId = (int)($item['designer_id'] ?? 0);
+
+            if ($designerId <= 0) {
+                continue;
+            }
+
+            $lineCents = CreditService::parseCents(
+                (string)($item['line_total'] ?? '0.00'),
+                false
+            );
+
+            $couponCents = CreditService::parseCents(
+                (string)($couponAllocations[$index] ?? '0.00'),
+                false
+            );
+
+            $eligible = max(0, $lineCents - $couponCents);
+
+            if ($eligible <= 0) {
+                continue;
+            }
+
+            if (!isset($sellerItems[$designerId])) {
+                $sellerItems[$designerId] = [
+                    'mode' => (string)($item['prize_credit_mode'] ?? 'none'),
+                    'eligible_cents' => 0,
+                    'items' => [],
+                ];
+            }
+
+            $sellerItems[$designerId]['eligible_cents'] += $eligible;
+            $sellerItems[$designerId]['items'][] = [
+                'index' => $index,
+                'eligible_cents' => $eligible,
+            ];
+        }
+
+        $remainingBalance = $availableCents;
+        $itemCents = [];
+        $sellerCents = [];
+        $total = 0;
+
+        foreach ($sellerItems as $designerId => $seller) {
+            if ($remainingBalance <= 0) {
+                break;
+            }
+
+            $limit = self::sellerLimitCents(
+                $seller['mode'],
+                $seller['eligible_cents']
+            );
+
+            $sellerBudget = min(
+                $limit,
+                $remainingBalance
+            );
+
+            if ($sellerBudget <= 0) {
+                continue;
+            }
+
+            $sellerUsed = 0;
+
+            foreach ($seller['items'] as $item) {
+                if ($sellerUsed >= $sellerBudget) {
+                    break;
+                }
+
+                $take = min(
+                    $item['eligible_cents'],
+                    $sellerBudget - $sellerUsed
+                );
+
+                if ($take <= 0) {
+                    continue;
+                }
+
+                $itemCents[$item['index']] = $take;
+                $sellerUsed += $take;
+            }
+
+            if ($sellerUsed > 0) {
+                $sellerCents[$designerId] = $sellerUsed;
+                $total += $sellerUsed;
+                $remainingBalance -= $sellerUsed;
+            }
+        }
+
+        return [
+            'total_cents' => $total,
+            'item_cents' => $itemCents,
+            'seller_cents' => $sellerCents,
+        ];
+    }
+
+    public function reserveExact(
+        int $userId,
+        string $amount,
+        int $orderId,
+        string $idempotencyKey
+    ): string {
+        $cents = CreditService::parseCents($amount);
+
+        if ($cents <= 0) {
+            throw new InvalidArgumentException(
+                'Prize Credit reservation must be positive.'
+            );
+        }
+
+        $owns = !DB::pdo()->inTransaction();
+
+        if ($owns) {
+            DB::begin();
+        }
+
+        try {
+            $existing = DB::row(
+                'select *
+                 from prize_credit_transactions
+                 where idempotency_key=?
+                 limit 1
+                 for update',
+                [$idempotencyKey]
+            );
+
+            if ($existing) {
+                if (
+                    (int)$existing['user_id'] !== $userId ||
+                    (int)$existing['order_id'] !== $orderId ||
+                    CreditService::parseCents(
+                        (string)$existing['amount'],
+                        false
+                    ) !== $cents
+                ) {
+                    throw new DomainException(
+                        'Prize Credit reservation idempotency conflict.'
+                    );
+                }
+
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return CreditService::formatCents($cents);
+            }
+
+            $grants = DB::rows(
+                'select *
+                 from prize_credit_grants
+                 where user_id=?
+                   and status="active"
+                   and remaining_amount>reserved_amount
+                   and (
+                        expires_on is null
+                        or expires_on>=current_date()
+                   )
+                 order by
+                    expires_on is null,
+                    expires_on,
+                    id
+                 for update',
+                [$userId]
+            );
+
+            $needed = $cents;
+            $allocations = [];
+
+            foreach ($grants as $grant) {
+                if ($needed <= 0) {
+                    break;
+                }
+
+                $remaining = CreditService::parseCents(
+                    (string)$grant['remaining_amount']
+                );
+
+                $reserved = CreditService::parseCents(
+                    (string)$grant['reserved_amount']
+                );
+
+                $available = max(
+                    0,
+                    $remaining - $reserved
+                );
+
+                if ($available <= 0) {
+                    continue;
+                }
+
+                $take = min($available, $needed);
+
+                DB::exec(
+                    'update prize_credit_grants
+                     set reserved_amount=reserved_amount+?
+                     where id=?
+                       and reserved_amount+?<=remaining_amount',
+                    [
+                        CreditService::formatCents($take),
+                        (int)$grant['id'],
+                        CreditService::formatCents($take),
+                    ]
+                );
+
+                $allocations[] = [
+                    'grant_id' => (int)$grant['id'],
+                    'cents' => $take,
+                ];
+
+                $needed -= $take;
+            }
+
+            if ($needed > 0) {
+                throw new DomainException(
+                    'Prize Credit balance changed before checkout could reserve it.'
+                );
+            }
+
+            DB::exec(
+                'insert into prize_credit_transactions
+                 (
+                    user_id,
+                    order_id,
+                    amount,
+                    type,
+                    status,
+                    idempotency_key,
+                    description
+                 )
+                 values (
+                    ?,?,?,"reserve","reserved",?,
+                    "Prize Credit reserved for checkout"
+                 )',
+                [
+                    $userId,
+                    $orderId,
+                    CreditService::formatCents($cents),
+                    $idempotencyKey,
+                ]
+            );
+
+            $transactionId = (int)DB::id();
+
+            foreach ($allocations as $allocation) {
+                DB::exec(
+                    'insert into prize_credit_transaction_allocations
+                     (
+                        transaction_id,
+                        grant_id,
+                        amount
+                     )
+                     values (?,?,?)',
+                    [
+                        $transactionId,
+                        $allocation['grant_id'],
+                        CreditService::formatCents(
+                            $allocation['cents']
+                        ),
+                    ]
+                );
+            }
+
+            if ($owns) {
+                DB::commit();
+            }
+
+            return CreditService::formatCents($cents);
+        } catch (Throwable $error) {
+            if ($owns && DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
+            throw $error;
+        }
+    }
+
+    public function finalizeReservation(
+        int $userId,
+        int $orderId,
+        string $idempotencyKey
+    ): bool {
+        $owns = !DB::pdo()->inTransaction();
+
+        if ($owns) {
+            DB::begin();
+        }
+
+        try {
+            $existing = DB::row(
+                'select id
+                 from prize_credit_transactions
+                 where idempotency_key=?
+                 limit 1',
+                [$idempotencyKey]
+            );
+
+            if ($existing) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return false;
+            }
+
+            $reserve = DB::row(
+                'select *
+                 from prize_credit_transactions
+                 where user_id=?
+                   and order_id=?
+                   and type="reserve"
+                   and status="reserved"
+                 order by id desc
+                 limit 1
+                 for update',
+                [$userId, $orderId]
+            );
+
+            if (!$reserve) {
+                throw new DomainException(
+                    'Prize Credit reservation was not found.'
+                );
+            }
+
+            $allocations = DB::rows(
+                'select *
+                 from prize_credit_transaction_allocations
+                 where transaction_id=?
+                 order by id
+                 for update',
+                [(int)$reserve['id']]
+            );
+
+            $total = 0;
+
+            foreach ($allocations as $allocation) {
+                $grant = DB::row(
+                    'select *
+                     from prize_credit_grants
+                     where id=?
+                     for update',
+                    [(int)$allocation['grant_id']]
+                );
+
+                if (!$grant) {
+                    throw new DomainException(
+                        'Prize Credit grant is unavailable.'
+                    );
+                }
+
+                $amount = CreditService::parseCents(
+                    (string)$allocation['amount']
+                );
+
+                $remaining = CreditService::parseCents(
+                    (string)$grant['remaining_amount']
+                );
+
+                $reserved = CreditService::parseCents(
+                    (string)$grant['reserved_amount']
+                );
+
+                if (
+                    $amount <= 0 ||
+                    $reserved < $amount ||
+                    $remaining < $amount
+                ) {
+                    throw new DomainException(
+                        'Prize Credit reservation is inconsistent.'
+                    );
+                }
+
+                $newRemaining = $remaining - $amount;
+                $newReserved = $reserved - $amount;
+
+                DB::exec(
+                    'update prize_credit_grants
+                     set remaining_amount=?,
+                         reserved_amount=?,
+                         status=case
+                            when ?=0 and ?=0
+                            then "exhausted"
+                            else status
+                         end
+                     where id=?',
+                    [
+                        CreditService::formatCents($newRemaining),
+                        CreditService::formatCents($newReserved),
+                        $newRemaining,
+                        $newReserved,
+                        (int)$grant['id'],
+                    ]
+                );
+
+                $total += $amount;
+            }
+
+            DB::exec(
+                'update prize_credit_transactions
+                 set status="finalized",
+                     finalized_at=now()
+                 where id=?',
+                [(int)$reserve['id']]
+            );
+
+            DB::exec(
+                'insert into prize_credit_transactions
+                 (
+                    user_id,
+                    order_id,
+                    amount,
+                    type,
+                    status,
+                    idempotency_key,
+                    description,
+                    finalized_at
+                 )
+                 values (
+                    ?,?,?,"finalize","finalized",?,
+                    "Prize Credit redeemed on paid order",
+                    now()
+                 )',
+                [
+                    $userId,
+                    $orderId,
+                    CreditService::formatCents(-$total),
+                    $idempotencyKey,
+                ]
+            );
+
+            $finalTransactionId = (int)DB::id();
+
+            foreach ($allocations as $allocation) {
+                DB::exec(
+                    'insert into prize_credit_transaction_allocations
+                     (
+                        transaction_id,
+                        grant_id,
+                        amount
+                     )
+                     values (?,?,?)',
+                    [
+                        $finalTransactionId,
+                        (int)$allocation['grant_id'],
+                        $allocation['amount'],
+                    ]
+                );
+            }
+
+            if ($owns) {
+                DB::commit();
+            }
+
+            return true;
+        } catch (Throwable $error) {
+            if ($owns && DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
+            throw $error;
+        }
+    }
+
+    public function releaseReservation(
+        int $userId,
+        int $orderId,
+        string $idempotencyKey
+    ): bool {
+        $owns = !DB::pdo()->inTransaction();
+
+        if ($owns) {
+            DB::begin();
+        }
+
+        try {
+            $existing = DB::row(
+                'select id
+                 from prize_credit_transactions
+                 where idempotency_key=?
+                 limit 1',
+                [$idempotencyKey]
+            );
+
+            if ($existing) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return false;
+            }
+
+            $reserve = DB::row(
+                'select *
+                 from prize_credit_transactions
+                 where user_id=?
+                   and order_id=?
+                   and type="reserve"
+                   and status="reserved"
+                 order by id desc
+                 limit 1
+                 for update',
+                [$userId, $orderId]
+            );
+
+            if (!$reserve) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return false;
+            }
+
+            $allocations = DB::rows(
+                'select *
+                 from prize_credit_transaction_allocations
+                 where transaction_id=?
+                 order by id
+                 for update',
+                [(int)$reserve['id']]
+            );
+
+            $total = 0;
+
+            foreach ($allocations as $allocation) {
+                $amount = CreditService::parseCents(
+                    (string)$allocation['amount']
+                );
+
+                $grant = DB::row(
+                    'select reserved_amount
+                     from prize_credit_grants
+                     where id=?
+                     for update',
+                    [(int)$allocation['grant_id']]
+                );
+
+                if (!$grant) {
+                    throw new DomainException(
+                        'Prize Credit grant is unavailable.'
+                    );
+                }
+
+                $reserved = CreditService::parseCents(
+                    (string)$grant['reserved_amount']
+                );
+
+                if ($reserved < $amount) {
+                    throw new DomainException(
+                        'Prize Credit release exceeds reserved balance.'
+                    );
+                }
+
+                DB::exec(
+                    'update prize_credit_grants
+                     set reserved_amount=reserved_amount-?
+                     where id=?',
+                    [
+                        CreditService::formatCents($amount),
+                        (int)$allocation['grant_id'],
+                    ]
+                );
+
+                $total += $amount;
+            }
+
+            DB::exec(
+                'update prize_credit_transactions
+                 set status="released",
+                     finalized_at=now()
+                 where id=?',
+                [(int)$reserve['id']]
+            );
+
+            DB::exec(
+                'insert into prize_credit_transactions
+                 (
+                    user_id,
+                    order_id,
+                    amount,
+                    type,
+                    status,
+                    idempotency_key,
+                    description,
+                    finalized_at
+                 )
+                 values (
+                    ?,?,?,"release","released",?,
+                    "Prize Credit checkout reservation released",
+                    now()
+                 )',
+                [
+                    $userId,
+                    $orderId,
+                    CreditService::formatCents($total),
+                    $idempotencyKey,
+                ]
+            );
+
+            $releaseTransactionId = (int)DB::id();
+
+            foreach ($allocations as $allocation) {
+                DB::exec(
+                    'insert into prize_credit_transaction_allocations
+                     (
+                        transaction_id,
+                        grant_id,
+                        amount
+                     )
+                     values (?,?,?)',
+                    [
+                        $releaseTransactionId,
+                        (int)$allocation['grant_id'],
+                        $allocation['amount'],
+                    ]
+                );
+            }
+
+            if ($owns) {
+                DB::commit();
+            }
+
+            return true;
+        } catch (Throwable $error) {
+            if ($owns && DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
+            throw $error;
+        }
+    }
+
+
 }

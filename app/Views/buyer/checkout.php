@@ -1,5 +1,10 @@
 <h1>Secure checkout</h1>
-<p class="notice warning">Creative Moth will calculate US sales tax before applying store credit. If credit covers the authoritative total, the order completes immediately; otherwise Stripe securely collects only the remainder.</p>
+<p class="notice warning">
+Creative Moth calculates US sales tax before applying credits.
+Prize Credit applies to eligible merchandise only and never pays sales tax.
+Marketplace Credit is applied after Prize Credit. Stripe securely collects
+anything still due.
+</p>
 <?php if(!$items):?>
     <p>Your cart is empty.</p>
 <?php else:?>
@@ -19,8 +24,39 @@
       <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
       <p class="muted">Sales tax calculated at checkout when required. Creative Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
-      <p>Tax: <strong>calculated as applicable</strong></p><p>Available store credit: <strong><?=H::money($balances['available']??0)?></strong></p>
-      <h2>Subtotal − coupon + tax − credits = final total</h2><p>Before tax and selected credits: <strong><?=H::money($finalTotal ?? $subtotal)?></strong></p>
+      <p>
+        Tax:
+        <strong>calculated as applicable</strong>
+      </p>
+
+      <p>
+        Available Prize Credit:
+        <strong><?=H::money($prizeBalances['available']??0)?></strong>
+      </p>
+
+      <p>
+        Eligible Prize Credit on this cart before tax:
+        <strong>
+          <?=H::money(
+              ((int)($prizePreview['total_cents']??0))/100
+          )?>
+        </strong>
+      </p>
+
+      <p>
+        Available Marketplace Credit:
+        <strong><?=H::money($balances['available']??0)?></strong>
+      </p>
+
+      <h2>
+        Subtotal − coupon − Prize Credit + tax − Marketplace Credit
+        = final total
+      </h2>
+
+      <p>
+        Before tax and selected credits:
+        <strong><?=H::money($finalTotal ?? $subtotal)?></strong>
+      </p>
     </div>
     <form method="post" class="form card">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
@@ -33,7 +69,40 @@
           <label>ZIP code<input name="billing_postal_code" required autocomplete="billing postal-code" inputmode="numeric" value="<?=H::e($_POST['billing_postal_code'] ?? '')?>"></label>
           <input type="hidden" name="billing_country" value="US">
         </fieldset>
-        <label><input type="checkbox" name="use_credits" value="1" <?=((float)($balances['available']??0)>0)?'':'disabled'?>> Use available store credit (up to the final total)</label><p class="help-text">Credit can cover the entire eligible order. A $0.00 credit-funded order completes securely without Stripe.</p>
+        <label>
+          <input
+            type="checkbox"
+            name="use_prize_credit"
+            value="1"
+            <?=(
+                (float)($prizeBalances['available']??0)>0
+                && (int)($prizePreview['total_cents']??0)>0
+            )?'':'disabled'?>
+          >
+          Use available Prize Credit first
+        </label>
+
+        <p class="help-text">
+          Prize Credit applies only to merchandise from participating
+          sellers. It cannot pay sales tax. Each seller's selected
+          per-order limit is enforced automatically.
+        </p>
+
+        <label>
+          <input
+            type="checkbox"
+            name="use_credits"
+            value="1"
+            <?=((float)($balances['available']??0)>0)?'':'disabled'?>
+          >
+          Use available Marketplace Credit after Prize Credit
+        </label>
+
+        <p class="help-text">
+          Marketplace Credit is applied after Prize Credit.
+          If the final amount becomes $0.00, checkout completes securely
+          without Stripe.
+        </p>
         <?php if($needsDrive):?>
           <div class="notice warning">
             <strong>Google Drive delivery instructions</strong>

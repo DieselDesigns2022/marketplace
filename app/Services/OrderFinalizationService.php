@@ -35,17 +35,88 @@ final class OrderFinalizationService
                 throw new DomainException('Internal completion requires a zero total and completed tax calculation.');
             }
             $this->createTaxTransaction($order);
-            $creditCents = CreditService::parseCents((string)$order['credits_applied']);
-            if ($creditCents > 0) {
-                $this->credits->finalizeReservation((int)$order['user_id'], $orderId, 'order:' . $orderId . ':credit:finalize');
+            $creditCents = CreditService::parseCents(
+                (string)$order['credits_applied']
+            );
+
+            $prizeCreditCents = CreditService::parseCents(
+                (string)($order['prize_credit_applied'] ?? '0.00')
+            );
+
+            if ($prizeCreditCents > 0) {
+                (new PrizeCreditService())->finalizeReservation(
+                    (int)$order['user_id'],
+                    $orderId,
+                    'order:' . $orderId . ':prize-credit:finalize'
+                );
             }
 
-            $internalUsesCredit = $internal && $creditCents > 0;
-            $paymentProvider = $internal ? ($internalUsesCredit ? 'store_credit' : 'internal') : 'stripe';
-            $paymentProcessor = $internal ? 'internal' : 'stripe';
-            $paymentMode = $internal ? ($internalUsesCredit ? 'credit' : 'free') : 'checkout';
+            if ($creditCents > 0) {
+                $this->credits->finalizeReservation(
+                    (int)$order['user_id'],
+                    $orderId,
+                    'order:' . $orderId . ':credit:finalize'
+                );
+            }
 
-            DB::exec('update orders set status="paid",payment_status="paid",manual_review_required=0,credit_payment_status=case when credits_applied>0 then "finalized" else "none" end,internally_completed=?,payment_provider=?,payment_processor=?,payment_mode=?,finalization_key=?,finalized_at=now(),paid_at=coalesce(paid_at,now()) where id=?', [$internal ? 1 : 0, $paymentProvider, $paymentProcessor, $paymentMode, $eventKey, $orderId]);
+            $internalUsesCredit =
+                $internal
+                && ($creditCents > 0 || $prizeCreditCents > 0);
+
+            $paymentProvider = $internal
+                ? (
+                    $creditCents > 0
+                        ? 'store_credit'
+                        : (
+                            $prizeCreditCents > 0
+                                ? 'prize_credit'
+                                : 'internal'
+                        )
+                )
+                : 'stripe';
+
+            $paymentProcessor = $internal
+                ? 'internal'
+                : 'stripe';
+
+            $paymentMode = $internal
+                ? ($internalUsesCredit ? 'credit' : 'free')
+                : 'checkout';
+
+            DB::exec(
+                'update orders
+                 set status="paid",
+                     payment_status="paid",
+                     manual_review_required=0,
+                     credit_payment_status=
+                        case
+                            when credits_applied>0
+                            then "finalized"
+                            else "none"
+                        end,
+                     prize_credit_payment_status=
+                        case
+                            when prize_credit_applied>0
+                            then "finalized"
+                            else "none"
+                        end,
+                     internally_completed=?,
+                     payment_provider=?,
+                     payment_processor=?,
+                     payment_mode=?,
+                     finalization_key=?,
+                     finalized_at=now(),
+                     paid_at=coalesce(paid_at,now())
+                 where id=?',
+                [
+                    $internal ? 1 : 0,
+                    $paymentProvider,
+                    $paymentProcessor,
+                    $paymentMode,
+                    $eventKey,
+                    $orderId,
+                ]
+            );
             DB::exec('update order_items set paid_at=coalesce(paid_at,now()),payout_ready_at=coalesce(payout_ready_at,now()),manual_delivery_status=case when fulfillment_type="google_drive" and manual_delivery_status in ("pending_delivery","buyer_email_needed") then "ready_for_seller_delivery" else manual_delivery_status end where order_id=?', [$orderId]);
 
             // Cart remains intact while payment is pending. Once payment is
@@ -63,7 +134,12 @@ final class OrderFinalizationService
 
             DB::exec('update seller_earnings set status="paid_pending_payout" where order_id=?', [$orderId]);
             CouponService::recordUsage($orderId);
-            $platformFunded = $internal || $creditCents > 0;
+            /*
+             * Marketplace Credit is platform-funded.
+             * Prize Credit is seller-funded and must never create
+             * a platform-credit payout hold.
+             */
+            $platformFunded = $creditCents > 0;
             $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->prepareCollabFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->referrals->qualifyBuyer($orderId, $eventKey . ':buyer');
@@ -87,13 +163,88 @@ final class OrderFinalizationService
 
     public function release(int $orderId, string $eventKey): bool
     {
-        $order = DB::row('select * from orders where id=?', [$orderId]);
-        if (!$order || CreditService::parseCents((string)($order['credit_reserved'] ?? '0.00')) <= 0 || ($order['credit_payment_status'] ?? '') !== 'reserved') return false;
+        $order = DB::row(
+            'select * from orders where id=?',
+            [$orderId]
+        );
+
+        if (!$order) {
+            return false;
+        }
+
+        $marketplaceReserved =
+            CreditService::parseCents(
+                (string)($order['credit_reserved'] ?? '0.00')
+            ) > 0
+            && ($order['credit_payment_status'] ?? '') === 'reserved';
+
+        $prizeReserved =
+            CreditService::parseCents(
+                (string)($order['prize_credit_reserved'] ?? '0.00')
+            ) > 0
+            && ($order['prize_credit_payment_status'] ?? '') === 'reserved';
+
+        if (!$marketplaceReserved && !$prizeReserved) {
+            return false;
+        }
+
         DB::begin();
+
         try {
-            $released = $this->credits->releaseReservation((int)$order['user_id'], $orderId, $eventKey);
-            DB::exec('update orders set credit_payment_status="released",credits_applied=0.00,total=subtotal-coupon_discount+tax_amount,stripe_amount_total=round((subtotal-coupon_discount+tax_amount)*100) where id=? and credit_payment_status="reserved"', [$orderId]);
+            $released = false;
+
+            if ($marketplaceReserved) {
+                $released =
+                    $this->credits->releaseReservation(
+                        (int)$order['user_id'],
+                        $orderId,
+                        $eventKey . ':marketplace'
+                    )
+                    || $released;
+            }
+
+            if ($prizeReserved) {
+                $released =
+                    (new PrizeCreditService())->releaseReservation(
+                        (int)$order['user_id'],
+                        $orderId,
+                        $eventKey . ':prize'
+                    )
+                    || $released;
+            }
+
+            DB::exec(
+                'update orders
+                 set credit_payment_status=
+                        case
+                            when credit_payment_status="reserved"
+                            then "released"
+                            else credit_payment_status
+                        end,
+                     prize_credit_payment_status=
+                        case
+                            when prize_credit_payment_status="reserved"
+                            then "released"
+                            else prize_credit_payment_status
+                        end,
+                     credits_applied=0.00,
+                     credit_reserved=0.00,
+                     prize_credit_applied=0.00,
+                     prize_credit_reserved=0.00,
+                     total=subtotal-coupon_discount+tax_amount,
+                     stripe_amount_total=round(
+                        (
+                            subtotal
+                            - coupon_discount
+                            + tax_amount
+                        )*100
+                     )
+                 where id=?',
+                [$orderId]
+            );
+
             DB::commit();
+
             return $released;
         } catch (Throwable $error) {
             DB::rollBack();
@@ -103,11 +254,11 @@ final class OrderFinalizationService
 
     private function prepareFinancialLedgers(int $orderId, string $currency, bool $platformFunded): void
     {
-        $items = DB::rows('select oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id,sum(oi.total_price) total_price,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else oi.total_price*oi.commission_rate end) commission_amount from order_items oi join orders o on o.id=oi.order_id where oi.order_id=? and oi.collab_id is null group by oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id', [$orderId]);
+        $items = DB::rows('select oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id,sum(oi.total_price-coalesce(oi.prize_credit_applied,0)) total_price,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else (oi.total_price-coalesce(oi.prize_credit_applied,0))*oi.commission_rate end) commission_amount from order_items oi join orders o on o.id=oi.order_id where oi.order_id=? and oi.collab_id is null group by oi.order_id,oi.product_id,oi.custom_service_id,oi.designer_id', [$orderId]);
         foreach ($items as $item) {
             DB::exec('insert into platform_commissions (order_id,product_id,custom_service_id,designer_id,gross_sale,commission_amount) select ?,?,?,?,?,? where not exists (select 1 from platform_commissions where order_id=? and product_id<=>? and custom_service_id<=>? and designer_id=?)', [$orderId,$item['product_id'],$item['custom_service_id'],$item['designer_id'],$item['total_price'],round((float)$item['commission_amount'],2),$orderId,$item['product_id'],$item['custom_service_id'],$item['designer_id']]);
         }
-        foreach (DB::rows('select oi.designer_id,sum(oi.total_price) gross,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else oi.total_price*oi.commission_rate end) commission,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_percentage_fee_amount else oi.total_price*oi.commission_rate end) percentage_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_fixed_fee_amount else 0 end) fixed_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.seller_payout_amount else oi.total_price-(oi.total_price*oi.commission_rate) end) payout,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,max(oi.commission_rate) legacy_rate,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled from order_items oi join orders o on o.id=oi.order_id join designers d on d.id=oi.designer_id where oi.order_id=? and oi.collab_id is null group by oi.designer_id,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled', [$orderId]) as $row) {
+        foreach (DB::rows('select oi.designer_id,sum(oi.total_price-coalesce(oi.prize_credit_applied,0)) gross,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.platform_commission_amount else (oi.total_price-coalesce(oi.prize_credit_applied,0))*oi.commission_rate end) commission,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_percentage_fee_amount else (oi.total_price-coalesce(oi.prize_credit_applied,0))*oi.commission_rate end) percentage_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.marketplace_fixed_fee_amount else 0 end) fixed_fee,sum(case when o.marketplace_fee_model="percentage_plus_fixed" then oi.seller_payout_amount else oi.total_price-((oi.total_price-coalesce(oi.prize_credit_applied,0))*oi.commission_rate) end) payout,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,max(oi.commission_rate) legacy_rate,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled from order_items oi join orders o on o.id=oi.order_id join designers d on d.id=oi.designer_id where oi.order_id=? and oi.collab_id is null group by oi.designer_id,o.marketplace_fee_model,o.marketplace_fee_basis_points,o.marketplace_fixed_fee_cents,d.stripe_connect_account_id,d.stripe_details_submitted,d.stripe_payouts_enabled', [$orderId]) as $row) {
             $gross = round((float)$row['gross'], 2);
             $commission = round((float)$row['commission'], 2);
             $payout = max(0, round((float)$row['payout'], 2));
