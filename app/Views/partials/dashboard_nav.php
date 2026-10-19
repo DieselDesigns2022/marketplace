@@ -265,6 +265,11 @@ if ($area === 'buyer') {
                 'Coupons',
                 ['/admin/coupons', '/admin/coupons/']
             ],
+            [
+                '/admin/prize-donations',
+                'Prize Donations',
+                ['/admin/prize-donations', '/admin/prize-donations/']
+            ],
         ],
 
         'Users & Safety' => [

@@ -108,6 +108,14 @@ $check(
     'seller main navigation lists Prize Donations under Promotions / Ads'
 );
 
+
+$check(
+    str_contains($sellerNav,"'Marketplace'") &&
+    str_contains($sellerNav,"'/admin/prize-donations'") &&
+    str_contains($sellerNav,"'Prize Donations'"),
+    'admin main navigation lists Prize Donations under Marketplace'
+);
+
 $check(
     str_contains($adminView,'Prize Inventory') &&
     str_contains($adminView,'Assignments / Winners / Fulfillment') &&
