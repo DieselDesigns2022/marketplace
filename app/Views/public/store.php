@@ -69,6 +69,42 @@
         <span>Seller rating</span>
     </div>
 </section>
+<?php if(!empty($prizeWheelVisible)): ?>
+<section
+    id="creative-moth-prize-wheel"
+    class="card page-section prize-wheel-storefront"
+>
+    <h2>
+        <?=H::e(
+            $prizeWheelSettings['heading']
+            ??'Grand Opening Prize Wheel'
+        )?>
+    </h2>
+
+    <?php if(!empty($prizeWheelSettings['description'])): ?>
+        <p>
+            <?=nl2br(
+                H::e($prizeWheelSettings['description'])
+            )?>
+        </p>
+    <?php endif; ?>
+
+    <div class="prize-wheel-placeholder">
+        <strong>🎡 Prize Wheel Giveaway</strong>
+
+        <p>
+            The Grand Opening Prize Wheel is live on this participating
+            Creative Moth storefront.
+        </p>
+
+        <p class="help-text">
+            Prize spinning and winner fulfillment will use Creative Moth's
+            approved Prize Wheel inventory.
+        </p>
+    </div>
+</section>
+<?php endif; ?>
+
 <?php if(!empty($d['announcement'])): ?>
 <section class="card announcement">
     <h2>Store announcement</h2>

@@ -502,6 +502,32 @@ class SellerController
         $errors = [];
         if ($_POST)
         {
+            if (($_POST['settings_section'] ?? 'store') === 'prize_wheel') {
+                $optIn=isset($_POST['prize_wheel_opt_in']) ? 1 : 0;
+
+                DB::exec(
+                    'update designers
+                     set prize_wheel_opt_in=?,
+                         updated_at=now()
+                     where id=?
+                       and user_id=?',
+                    [
+                        $optIn,
+                        (int)$d['id'],
+                        (int)H::user()['id'],
+                    ]
+                );
+
+                H::flash(
+                    'success',
+                    $optIn
+                        ? 'Your store is opted into the Prize Wheel.'
+                        : 'Your store is no longer opted into the Prize Wheel.'
+                );
+
+                H::redirect('/seller/store');
+            }
+
             if (($_POST['settings_section'] ?? 'store') === 'prize_credit') {
                 $mode=trim(
                     (string)($_POST['prize_credit_mode']??'none')

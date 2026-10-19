@@ -15,6 +15,7 @@ use App\Controllers\AdminWaitlistController;
 use App\Controllers\AdminEmailCampaignController;
 use App\Controllers\AdminCreditController;
 use App\Controllers\PrizeDonationController;
+use App\Controllers\PrizeWheelController;
 use App\Controllers\MessagingController;
 use App\Controllers\CustomDesignController;
 use App\Controllers\PromoController;
@@ -260,6 +261,11 @@ $router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCa
  $router->post('/admin/credits/advertising-recurring', [AdminCreditController::class, 'createAdvertisingRecurring']);
  $router->post('/admin/credits/advertising-recurring/{id}/deactivate', [AdminCreditController::class, 'deactivateAdvertisingRecurring']);
 $router->get('/admin/prize-donations', [PrizeDonationController::class, 'adminIndex']);
+$router->match(
+    ['GET','POST'],
+    '/admin/prize-wheel',
+    [PrizeWheelController::class, 'admin']
+);
 $router->get('/admin/prize-donations/{id}/file', [PrizeDonationController::class, 'adminFile']);
 $router->post('/admin/prize-donations/{id}/approve', [PrizeDonationController::class, 'approve']);
 $router->post('/admin/prize-donations/{id}/cancel', [PrizeDonationController::class, 'cancel']);

@@ -710,7 +710,40 @@ class PublicController
         if ($image) $schema['image'] = H::assetUrl($image);
         $socialLinks = $this->designerSocialLinks($d);
         $reviews = DB::rows('select sr.*,rr.reply_text,rr.created_at reply_created_at,rr.updated_at reply_updated_at,rr.moderation_status reply_moderation_status from seller_reviews sr left join seller_review_replies rr on rr.review_id=sr.id where sr.designer_id=? and sr.moderation_status="published" order by sr.reviewed_at desc',[$d['id']]);
-        H::view('public/store', ['reviews'=>$reviews,'d'=>$d,'socialLinks'=>$socialLinks,'products'=>$products,'customServices'=>$customServices,'collabs'=>$collabs,'followers'=>$followerCount,'isFollowing'=>$isFollowing,'isOwner'=>$isOwner,'productCount'=>count($products),'salesCount'=>$salesCount,'meta'=>$this->pageMeta($title, $description, '/store/'.$d['store_slug'], $schema, ['og_image'=>$image,'twitter_image'=>$image])]);
+        $prizeWheelService=new \App\Services\PrizeWheelService();
+        $prizeWheelVisible=$prizeWheelService->storefrontVisible($d);
+        $prizeWheelSettings=$prizeWheelVisible
+            ? $prizeWheelService->settings()
+            : null;
+
+        H::view(
+            'public/store',
+            [
+                'reviews'=>$reviews,
+                'd'=>$d,
+                'socialLinks'=>$socialLinks,
+                'products'=>$products,
+                'customServices'=>$customServices,
+                'collabs'=>$collabs,
+                'followers'=>$followerCount,
+                'isFollowing'=>$isFollowing,
+                'isOwner'=>$isOwner,
+                'productCount'=>count($products),
+                'salesCount'=>$salesCount,
+                'prizeWheelVisible'=>$prizeWheelVisible,
+                'prizeWheelSettings'=>$prizeWheelSettings,
+                'meta'=>$this->pageMeta(
+                    $title,
+                    $description,
+                    '/store/'.$d['store_slug'],
+                    $schema,
+                    [
+                        'og_image'=>$image,
+                        'twitter_image'=>$image
+                    ]
+                ),
+            ]
+        );
     }
 
 

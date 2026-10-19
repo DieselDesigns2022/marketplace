@@ -75,6 +75,56 @@
     <button class="btn">Save Store Settings</button>
 </form>
 <section class="card page-section">
+    <h2>Grand Opening Prize Wheel</h2>
+
+    <p>
+        Choose whether your public storefront participates in the
+        Creative Moth Prize Wheel giveaway.
+    </p>
+
+    <p class="help-text">
+        Opting in does not guarantee the wheel is currently visible.
+        Creative Moth controls the global giveaway switch. When the
+        marketplace Prize Wheel is turned ON, it automatically appears
+        on every opted-in store. When Creative Moth turns it OFF, it is
+        removed from all storefronts automatically.
+    </p>
+
+    <form method="post" class="form">
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::csrf()?>"
+        >
+
+        <input
+            type="hidden"
+            name="settings_section"
+            value="prize_wheel"
+        >
+
+        <label>
+            <input
+                type="checkbox"
+                name="prize_wheel_opt_in"
+                value="1"
+                <?=!empty($d['prize_wheel_opt_in'])?'checked':''?>
+            >
+            Display the Creative Moth Prize Wheel on my storefront
+            whenever the giveaway is active.
+        </label>
+
+        <p class="help-text">
+            You can change this preference at any time.
+        </p>
+
+        <button class="btn">
+            Save Prize Wheel Setting
+        </button>
+    </form>
+</section>
+
+<section class="card page-section">
     <h2>Prize Credit Participation</h2>
 
     <p>

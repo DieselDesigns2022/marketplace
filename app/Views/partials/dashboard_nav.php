@@ -270,6 +270,11 @@ if ($area === 'buyer') {
                 'Prize Donations',
                 ['/admin/prize-donations', '/admin/prize-donations/']
             ],
+            [
+                '/admin/prize-wheel',
+                'Prize Wheel',
+                ['/admin/prize-wheel']
+            ],
         ],
 
         'Users & Safety' => [
@@ -343,7 +348,7 @@ if ($area === 'buyer') {
 
     $permissionByHref = [
         '/admin'=>'dashboard.view','/admin/analytics'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/social-publishing'=>'promotions.view','/admin/promo-library'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
-        '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/collabs'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view',
+        '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/collabs'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view','/admin/prize-donations'=>'prizes.view','/admin/prize-wheel'=>'prizes.view',
         '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/reviews'=>'reviews.view','/admin/message-reports'=>'messages.view','/admin/feedback'=>'feedback.view','/admin/ip-risk-terms'=>'ip_risk.view',
         '/admin/payment-logs'=>'payments.view','/admin/downloads'=>'downloads.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
     ];
