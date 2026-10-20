@@ -227,11 +227,42 @@ class AdminController
                 if($action==='save_admin'){
                     $permissions->configureAdmin($userId,(array)($_POST['permissions']??[]),($_POST['full_access']??'')==='1',$actor);if($target['role']!=='admin')$this->log('promoted_admin','user',$userId,['previous_role'=>$target['role']]);H::flash('success','Admin access updated.');
                 }else{
-                    $status=($_POST['status']??'')==='active'?'active':'disabled';if($target['role']==='admin')$permissions->requireFullAccess($actor);if($permissions->isCanonicalOwner($userId)&&$status!=='active')throw new \DomainException('The canonical owner cannot be disabled.');DB::begin();DB::exec('update users set status=? where id=?',[$status,$userId]);$this->log('changed_user_status','user',$userId,['status'=>$status]);DB::commit();H::flash('success','Account status updated.');
+                    $status=($_POST['status']??'')==='active'?'active':'disabled';
+                    if($target['role']==='admin')$permissions->requireFullAccess($actor);
+                    if($permissions->isCanonicalOwner($userId)&&$status!=='active')throw new \DomainException('The canonical owner cannot be disabled.');
+
+                    $reactivateSeller=$status==='active'&&($_POST['reactivate_seller']??'')==='1';
+
+                    DB::begin();
+                    DB::exec('update users set status=? where id=?',[$status,$userId]);
+
+                    $sellerReactivated=false;
+                    if($reactivateSeller){
+                        $designer=DB::row('select id,status from designers where user_id=? limit 1',[$userId]);
+                        $approvedApplication=DB::row('select id from designer_applications where user_id=? and status="approved" order by created_at desc,id desc limit 1',[$userId]);
+
+                        if(!$designer||$designer['status']!=='disabled'||!$approvedApplication){
+                            throw new \DomainException('The seller store could not be re-enabled because it is not an eligible disabled approved store.');
+                        }
+
+                        DB::exec('update designers set status="approved",updated_at=now() where id=? and status="disabled"',[(int)$designer['id']]);
+                        $sellerReactivated=true;
+                        $this->log('reenabled_seller_with_user','designer',(int)$designer['id'],['user_id'=>$userId]);
+                    }
+
+                    $this->log('changed_user_status','user',$userId,['status'=>$status,'seller_reactivated'=>$sellerReactivated]);
+                    DB::commit();
+
+                    H::flash(
+                        'success',
+                        $sellerReactivated
+                            ? 'Account and seller store re-enabled.'
+                            : 'Account status updated.'
+                    );
                 }
             } catch(Throwable $error){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$error instanceof \DomainException?$error->getMessage():'Account access was not changed.');}
         }
-        H::view('admin/users',['users'=>DB::rows('select u.id,u.name,u.email,u.role,u.status,u.created_at,coalesce(p.full_access,0) full_access,(select group_concat(g.permission_key order by g.permission_key) from admin_permission_grants g where g.user_id=u.id) permission_keys from users u left join admin_access_profiles p on p.user_id=u.id order by u.created_at desc'),'permissionRegistry'=>AdminPermissionService::PERMISSIONS,'fullAccessAdmin'=>$full,'canonicalOwnerId'=>$permissions->canonicalOwnerUserId()]);
+        H::view('admin/users',['users'=>DB::rows('select u.id,u.name,u.email,u.role,u.status,u.created_at,coalesce(p.full_access,0) full_access,(select group_concat(g.permission_key order by g.permission_key) from admin_permission_grants g where g.user_id=u.id) permission_keys,(select d.id from designers d where d.user_id=u.id limit 1) designer_id,(select d.status from designers d where d.user_id=u.id limit 1) designer_status from users u left join admin_access_profiles p on p.user_id=u.id order by u.created_at desc'),'permissionRegistry'=>AdminPermissionService::PERMISSIONS,'fullAccessAdmin'=>$full,'canonicalOwnerId'=>$permissions->canonicalOwnerUserId()]);
     }
     private function userDeletionBlockReason(array $user): ?string
     {
