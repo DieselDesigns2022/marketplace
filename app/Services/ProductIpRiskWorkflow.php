@@ -18,7 +18,7 @@ class ProductIpRiskWorkflow
         $this->scanner = $scanner ?: new IpRiskScanner();
     }
 
-    public function scanProduct(int $productId, int $sellerUserId): array
+    public function scanProduct(int $productId, int $sellerUserId, bool $notify = true): array
     {
         $owner = $this->ownedProduct($productId, $sellerUserId);
         $previous = $this->repo->state($productId);
@@ -28,7 +28,7 @@ class ProductIpRiskWorkflow
         $matchFingerprint = $this->matchFingerprint($matches);
         $scanId = $this->repo->saveScan($productId, (int)$owner['seller_user_id'], $contentFingerprint, $matchFingerprint, $matches);
         $meaningfulFlag = $matches && (empty($previous['latest_match_fingerprint']) || !hash_equals((string)$previous['latest_match_fingerprint'],$matchFingerprint));
-        if ($meaningfulFlag) {
+        if ($notify && $meaningfulFlag) {
             try {
                 $event="product:$productId:flag-transition:$scanId";
                 NotificationService::create((int)$owner['seller_user_id'],'product_flagged','designer','Product flagged for review','Your product “'.($owner['title']??'Untitled').'” requires an IP risk review.',$event,'/seller/product/'.$productId);
