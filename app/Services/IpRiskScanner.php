@@ -81,6 +81,41 @@ class IpRiskScanner
                     'source_field' => $field,
                 ];
             }
+
+            foreach (($term['context_rules'] ?? []) as $rule) {
+                if (empty($rule['is_enabled'])) {
+                    continue;
+                }
+
+                $trigger = trim((string)($rule['normalized_trigger'] ?? self::normalize((string)$rule['trigger_text'])));
+                $context = trim((string)($rule['normalized_context'] ?? self::normalize((string)$rule['context_text'])));
+
+                if (
+                    $trigger === '' ||
+                    $context === '' ||
+                    !$this->containsTokenPhrase($haystack, $trigger) ||
+                    !$this->containsTokenPhrase($haystack, $context)
+                ) {
+                    continue;
+                }
+
+                $matchKey = 'context:' . $trigger . '+' . $context;
+                $seenKey = ($term['id'] ?? $term['risk_term_id']) . '|' . $matchKey . '|' . $field;
+
+                if (isset($seen[$seenKey])) {
+                    continue;
+                }
+
+                $seen[$seenKey] = true;
+                $matches[] = [
+                    'risk_term_id' => (int)($term['id'] ?? $term['risk_term_id']),
+                    'matched_term' => (string)$term['term'],
+                    'matched_alias' => $rule['trigger_text'] . ' + ' . $rule['context_text'],
+                    'matched_value_key' => $matchKey,
+                    'category' => (string)$term['category'],
+                    'source_field' => $field,
+                ];
+            }
         }
     }
 

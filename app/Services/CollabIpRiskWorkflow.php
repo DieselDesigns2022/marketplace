@@ -13,11 +13,7 @@ final class CollabIpRiskWorkflow
         try {
             $collab = DB::row('select * from collab_events where id=? for update', [$collabId]);
             if (!$collab) throw new \DomainException('Collab not found.');
-            $terms = DB::rows('select * from ip_risk_terms where is_enabled=1');
-            foreach ($terms as &$term) {
-                $term['aliases'] = DB::rows('select * from ip_risk_term_aliases where ip_risk_term_id=? and is_enabled=1', [$term['id']]);
-            }
-            unset($term);
+            $terms = (new \App\Repositories\IpRiskRepository())->enabledTermsWithAliases();
             $input = [
                 'title'=>$collab['title'],
                 'description'=>$collab['description'],

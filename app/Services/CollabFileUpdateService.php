@@ -666,23 +666,7 @@ final class CollabFileUpdateService
             );
         }
 
-        $terms = DB::rows(
-            'select *
-             from ip_risk_terms
-             where is_enabled=1'
-        );
-
-        foreach ($terms as &$term) {
-            $term['aliases'] = DB::rows(
-                'select *
-                 from ip_risk_term_aliases
-                 where ip_risk_term_id=?
-                   and is_enabled=1',
-                [$term['id']]
-            );
-        }
-
-        unset($term);
+        $terms = (new \App\Repositories\IpRiskRepository())->enabledTermsWithAliases();
 
         $rows = DB::rows(
             'select id,original_name

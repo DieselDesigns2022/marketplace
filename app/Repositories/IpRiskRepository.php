@@ -28,8 +28,17 @@ class IpRiskRepository
         foreach (DB::rows('select * from ip_risk_term_aliases where is_enabled=1 and ip_risk_term_id in (' . $placeholders . ') order by alias', $ids) as $alias) {
             $aliasesByTerm[$alias['ip_risk_term_id']][] = $alias;
         }
+        $contextByTerm = [];
+        foreach (DB::rows(
+            'select * from ip_risk_context_rules where is_enabled=1 and ip_risk_term_id in (' . $placeholders . ') order by trigger_text,context_text',
+            $ids
+        ) as $rule) {
+            $contextByTerm[$rule['ip_risk_term_id']][] = $rule;
+        }
+
         foreach ($terms as &$term) {
             $term['aliases'] = $aliasesByTerm[$term['id']] ?? [];
+            $term['context_rules'] = $contextByTerm[$term['id']] ?? [];
         }
         return $terms;
     }
