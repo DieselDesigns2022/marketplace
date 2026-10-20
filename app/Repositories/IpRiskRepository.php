@@ -34,9 +34,115 @@ class IpRiskRepository
         return $terms;
     }
 
-    public function terms(): array
+    private function termFilterSql(array $filters, array &$params): string
     {
-        return DB::rows('select t.*,(select count(*) from ip_risk_term_aliases a where a.ip_risk_term_id=t.id) alias_count from ip_risk_terms t order by t.is_enabled desc,t.category,t.term');
+        $where = [];
+
+        $query = trim((string)($filters['q'] ?? ''));
+        if ($query !== '') {
+            $like = '%' . $query . '%';
+            $where[] = '(t.term like ? or t.normalized_term like ? or exists (
+                select 1
+                from ip_risk_term_aliases sa
+                where sa.ip_risk_term_id=t.id
+                  and (sa.alias like ? or sa.normalized_alias like ?)
+            ))';
+            array_push($params, $like, $like, $like, $like);
+        }
+
+        $category = trim((string)($filters['category'] ?? ''));
+        if ($category !== '' && in_array($category, self::CATEGORIES, true)) {
+            $where[] = 't.category=?';
+            $params[] = $category;
+        }
+
+        $status = (string)($filters['status'] ?? 'all');
+        if ($status === 'enabled') {
+            $where[] = 't.is_enabled=1';
+        } elseif ($status === 'disabled') {
+            $where[] = 't.is_enabled=0';
+        }
+
+        return $where ? ' where ' . implode(' and ', $where) : '';
+    }
+
+    public function terms(array $filters = [], int $limit = 50, int $offset = 0): array
+    {
+        $params = [];
+        $whereSql = $this->termFilterSql($filters, $params);
+
+        $sql = 'select
+                    t.*,
+                    (select count(*) from ip_risk_term_aliases a where a.ip_risk_term_id=t.id) alias_count,
+                    (select group_concat(a.alias order by a.alias separator " • ")
+                     from ip_risk_term_aliases a
+                     where a.ip_risk_term_id=t.id and a.is_enabled=1) aliases_text
+                from ip_risk_terms t'
+                . $whereSql .
+                ' order by t.is_enabled desc,t.category,t.term
+                  limit ' . max(1, (int)$limit) . '
+                  offset ' . max(0, (int)$offset);
+
+        return DB::rows($sql, $params);
+    }
+
+    public function termCount(array $filters = []): int
+    {
+        $params = [];
+        $whereSql = $this->termFilterSql($filters, $params);
+        $row = DB::row('select count(*) c from ip_risk_terms t' . $whereSql, $params);
+        return (int)($row['c'] ?? 0);
+    }
+
+    public function categoryCounts(): array
+    {
+        return DB::rows(
+            'select category,count(*) total
+             from ip_risk_terms
+             group by category
+             order by category'
+        );
+    }
+
+    public function addAlias(int $termId, string $alias): array
+    {
+        $term = $this->term($termId);
+        if (!$term) {
+            return ['IP risk term was not found.'];
+        }
+
+        $alias = trim($alias);
+        if ($alias === '') {
+            return ['Alias is required.'];
+        }
+
+        if (($message = IpRiskScanner::validateTermText($alias)) !== null) {
+            return [$message];
+        }
+
+        $normalized = IpRiskScanner::normalize($alias);
+
+        if ($normalized === (string)$term['normalized_term']) {
+            return ['Alias cannot match the canonical term.'];
+        }
+
+        $errors = $this->collisionErrors($normalized, 'alias', $termId);
+        if ($errors) {
+            return array_values(array_unique($errors));
+        }
+
+        DB::exec(
+            'insert into ip_risk_term_aliases
+                (ip_risk_term_id,alias,normalized_alias,is_enabled)
+             values (?,?,?,1)
+             on duplicate key update
+                alias=values(alias),
+                is_enabled=1,
+                updated_at=now()',
+            [$termId, $alias, $normalized]
+        );
+
+        return [];
     }
 
     public function term(int $id): ?array

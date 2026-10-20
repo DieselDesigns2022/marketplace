@@ -16,7 +16,74 @@ class AdminIpRiskTermsController
     public function index(): void
     {
         $this->gate(false);
-        H::view('admin/ip-risk-terms/index', ['terms' => $this->repo->terms()]);
+
+        $filters = [
+            'q' => trim((string)($_GET['q'] ?? '')),
+            'category' => trim((string)($_GET['category'] ?? '')),
+            'status' => in_array(($_GET['status'] ?? 'all'), ['all','enabled','disabled'], true)
+                ? (string)$_GET['status']
+                : 'all',
+        ];
+
+        $perPage = 50;
+        $total = $this->repo->termCount($filters);
+        $pages = max(1, (int)ceil($total / $perPage));
+        $page = max(1, min((int)($_GET['page'] ?? 1), $pages));
+        $offset = ($page - 1) * $perPage;
+
+        H::view('admin/ip-risk-terms/index', [
+            'terms' => $this->repo->terms($filters, $perPage, $offset),
+            'filters' => $filters,
+            'categories' => IpRiskRepository::CATEGORIES,
+            'categoryCounts' => $this->repo->categoryCounts(),
+            'total' => $total,
+            'page' => $page,
+            'pages' => $pages,
+            'perPage' => $perPage,
+        ]);
+    }
+
+    public function quickStore(): void
+    {
+        $this->gate(true);
+
+        $values = [
+            'term' => trim((string)($_POST['term'] ?? '')),
+            'category' => in_array(($_POST['category'] ?? ''), IpRiskRepository::CATEGORIES, true)
+                ? (string)$_POST['category']
+                : 'other_protected_term',
+            'aliases' => '',
+            'internal_note' => 'Quick-added from the IP Risk Terms dashboard.',
+            'is_enabled' => '1',
+        ];
+
+        $errors = $this->repo->saveTerm($values, (int)H::user()['id']);
+
+        if ($errors) {
+            H::flash('error', implode(' ', $errors));
+        } else {
+            H::flash('success', 'IP risk term added.');
+        }
+
+        H::redirect('/admin/ip-risk-terms');
+    }
+
+    public function quickAlias($id): void
+    {
+        $this->gate(true);
+
+        $errors = $this->repo->addAlias(
+            (int)$id,
+            trim((string)($_POST['alias'] ?? ''))
+        );
+
+        if ($errors) {
+            H::flash('error', implode(' ', $errors));
+        } else {
+            H::flash('success', 'Alias added.');
+        }
+
+        H::redirect('/admin/ip-risk-terms');
     }
 
     public function create(): void

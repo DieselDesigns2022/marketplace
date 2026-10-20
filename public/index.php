@@ -237,7 +237,9 @@ $router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCa
  $router->match(['GET','POST'], '/admin/designers', [AdminController::class, 'designers']);
  $router->get('/admin/ip-risk-terms', [AdminIpRiskTermsController::class, 'index']);
  $router->get('/admin/ip-risk-terms/create', [AdminIpRiskTermsController::class, 'create']);
+ $router->post('/admin/ip-risk-terms/quick-add', [AdminIpRiskTermsController::class, 'quickStore']);
  $router->post('/admin/ip-risk-terms', [AdminIpRiskTermsController::class, 'store']);
+ $router->post('/admin/ip-risk-terms/{id}/aliases', [AdminIpRiskTermsController::class, 'quickAlias']);
  $router->get('/admin/ip-risk-terms/{id}/edit', [AdminIpRiskTermsController::class, 'edit']);
  $router->post('/admin/ip-risk-terms/{id}', [AdminIpRiskTermsController::class, 'update']);
  $router->post('/admin/ip-risk-terms/{id}/enable', [AdminIpRiskTermsController::class, 'enable']);
