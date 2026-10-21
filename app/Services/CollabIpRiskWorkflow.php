@@ -6,7 +6,7 @@ use App\Core\Database as DB;
 
 final class CollabIpRiskWorkflow
 {
-    public function scan(int $collabId): array
+    public function scan(int $collabId, bool $notify = true, bool $forceReevaluate = false): array
     {
         $ownsTransaction = !DB::pdo()->inTransaction();
         if ($ownsTransaction) DB::begin();
@@ -22,7 +22,9 @@ final class CollabIpRiskWorkflow
             $fingerprint = hash('sha256', json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
             $matches = (new IpRiskScanner())->scan($input, $terms);
             $oldFingerprint = (string)($collab['ip_content_fingerprint'] ?? '');
-            $state = self::stateAfterScan((string)$collab['ip_risk_state'], $oldFingerprint, $fingerprint, (bool)$matches);
+            $state = $forceReevaluate
+                ? ($matches ? 'review_required' : 'clear')
+                : self::stateAfterScan((string)$collab['ip_risk_state'], $oldFingerprint, $fingerprint, (bool)$matches);
             DB::exec('update collab_ip_risk_detections set is_active=0 where collab_id=?', [$collabId]);
             foreach ($matches as $match) {
                 DB::exec(
@@ -30,13 +32,16 @@ final class CollabIpRiskWorkflow
                     [$collabId,$match['risk_term_id'],$match['matched_term'],$match['matched_alias'],$match['source_field'],$fingerprint]
                 );
             }
-            DB::exec('update collab_events set ip_risk_state=?,ip_content_fingerprint=? where id=?', [$state,$fingerprint,$collabId]);
+            DB::exec(
+                'update collab_events set ip_risk_state=?,ip_content_fingerprint=?,ip_risk_scanned_at=now() where id=?',
+                [$state,$fingerprint,$collabId]
+            );
             if ($ownsTransaction) DB::commit();
         } catch (\Throwable $error) {
             if ($ownsTransaction && DB::pdo()->inTransaction()) DB::rollBack();
             throw $error;
         }
-        if ($matches && $fingerprint !== $oldFingerprint) {
+        if ($notify && $matches && ($fingerprint !== $oldFingerprint || $forceReevaluate)) {
             $host = DB::row('select u.id from users u join designers d on d.user_id=u.id where d.id=?', [$collab['host_designer_id']]);
             $this->notifySafely(function () use ($host, $collab, $collabId, $fingerprint): void {
                 NotificationService::create((int)$host['id'], 'collab_ip_risk', 'designer', 'Collab requires IP review', 'Your collab “'.$collab['title'].'” requires IP-risk review.', 'collab:'.$collabId.':ip:'.$fingerprint.':host', '/seller/collabs/'.$collabId);
