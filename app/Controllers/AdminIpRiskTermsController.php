@@ -86,6 +86,54 @@ class AdminIpRiskTermsController
         H::redirect('/admin/ip-risk-terms');
     }
 
+    public function contextRule($id): void
+    {
+        $this->gate(true);
+
+        $termId = (int)$id;
+
+        if (!$this->repo->term($termId)) {
+            H::abort(404);
+        }
+
+        $action = (string)($_POST['action'] ?? 'add');
+
+        if ($action === 'add') {
+            $errors = $this->repo->addContextRule(
+                $termId,
+                trim((string)($_POST['trigger_text'] ?? '')),
+                trim((string)($_POST['context_text'] ?? ''))
+            );
+
+            if ($errors) {
+                H::flash('error', implode(' ', $errors));
+            } else {
+                H::flash('success', 'Context rule added.');
+            }
+        } elseif (in_array($action, ['enable','disable'], true)) {
+            $ok = $this->repo->setContextRuleEnabled(
+                $termId,
+                (int)($_POST['rule_id'] ?? 0),
+                $action === 'enable'
+            );
+
+            if (!$ok) {
+                H::abort(404);
+            }
+
+            H::flash(
+                'success',
+                $action === 'enable'
+                    ? 'Context rule enabled.'
+                    : 'Context rule disabled.'
+            );
+        } else {
+            H::flash('error', 'Unsupported context-rule action.');
+        }
+
+        H::redirect('/admin/ip-risk-terms');
+    }
+
     public function create(): void
     {
         $this->gate(true);

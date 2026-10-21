@@ -62,10 +62,10 @@ $canManage = H::canAdmin('ip_risk.manage');
           style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
 
         <label style="flex:1;min-width:240px;">
-            Search term or alias
+            Search term, alias, or context rule
             <input name="q"
                    value="<?=H::e($filters['q'] ?? '')?>"
-                   placeholder="Search Grinch, green guy, NFL..."
+                   placeholder="Search Grinch, green guy, energy drink..."
                    autocomplete="off">
         </label>
 
@@ -130,6 +130,7 @@ $canManage = H::canAdmin('ip_risk.manage');
         <tr>
             <th>Term</th>
             <th>Aliases</th>
+            <th>Context Rules</th>
             <th>Category</th>
             <th>Status</th>
             <th>Actions</th>
@@ -168,6 +169,65 @@ $canManage = H::canAdmin('ip_risk.manage');
                 <?php endif;?>
             </td>
 
+            <td style="min-width:310px;max-width:420px;">
+                <?php if(!empty($term['context_rules'])):?>
+                    <?php foreach($term['context_rules'] as $rule):?>
+                        <div style="margin-bottom:.45rem;">
+                            <strong><?=H::e($rule['trigger_text'])?></strong>
+                            +
+                            <strong><?=H::e($rule['context_text'])?></strong>
+
+                            <?php if(empty($rule['is_enabled'])):?>
+                                <span class="muted">(disabled)</span>
+                            <?php endif;?>
+
+                            <?php if($canManage):?>
+                                <form method="post"
+                                      action="/admin/ip-risk-terms/<?=(int)$term['id']?>/context-rules"
+                                      class="inline"
+                                      style="margin-left:.35rem;">
+                                    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                                    <input type="hidden" name="rule_id" value="<?=(int)$rule['id']?>">
+                                    <input type="hidden"
+                                           name="action"
+                                           value="<?=!empty($rule['is_enabled'])?'disable':'enable'?>">
+                                    <button type="submit">
+                                        <?=!empty($rule['is_enabled'])?'Disable':'Enable'?>
+                                    </button>
+                                </form>
+                            <?php endif;?>
+                        </div>
+                    <?php endforeach;?>
+                <?php else:?>
+                    <span class="muted">No context rules</span>
+                <?php endif;?>
+
+                <?php if($canManage):?>
+                    <details style="margin-top:.5rem;">
+                        <summary style="cursor:pointer;">+ Add context rule</summary>
+
+                        <form method="post"
+                              action="/admin/ip-risk-terms/<?=(int)$term['id']?>/context-rules"
+                              style="display:grid;gap:.4rem;margin-top:.5rem;">
+                            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                            <input type="hidden" name="action" value="add">
+
+                            <input name="trigger_text"
+                                   required
+                                   placeholder="Trigger: monster"
+                                   autocomplete="off">
+
+                            <input name="context_text"
+                                   required
+                                   placeholder="Context: energy drink"
+                                   autocomplete="off">
+
+                            <button type="submit">Add Rule</button>
+                        </form>
+                    </details>
+                <?php endif;?>
+            </td>
+
             <td><?=H::e(str_replace('_',' ',$term['category']))?></td>
 
             <td>
@@ -193,7 +253,7 @@ $canManage = H::canAdmin('ip_risk.manage');
 
     <?php if(!$terms):?>
         <tr>
-            <td colspan="5" class="muted">
+            <td colspan="6" class="muted">
                 No IP-risk terms matched your search.
             </td>
         </tr>

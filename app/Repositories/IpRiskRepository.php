@@ -55,8 +55,22 @@ class IpRiskRepository
                 from ip_risk_term_aliases sa
                 where sa.ip_risk_term_id=t.id
                   and (sa.alias like ? or sa.normalized_alias like ?)
+            ) or exists (
+                select 1
+                from ip_risk_context_rules cr
+                where cr.ip_risk_term_id=t.id
+                  and (
+                    cr.trigger_text like ?
+                    or cr.normalized_trigger like ?
+                    or cr.context_text like ?
+                    or cr.normalized_context like ?
+                  )
             ))';
-            array_push($params, $like, $like, $like, $like);
+            array_push(
+                $params,
+                $like, $like, $like, $like,
+                $like, $like, $like, $like
+            );
         }
 
         $category = trim((string)($filters['category'] ?? ''));
@@ -92,7 +106,34 @@ class IpRiskRepository
                   limit ' . max(1, (int)$limit) . '
                   offset ' . max(0, (int)$offset);
 
-        return DB::rows($sql, $params);
+        $rows = DB::rows($sql, $params);
+
+        if (!$rows) {
+            return [];
+        }
+
+        $ids = array_column($rows, 'id');
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $rulesByTerm = [];
+
+        foreach (
+            DB::rows(
+                'select *
+                 from ip_risk_context_rules
+                 where ip_risk_term_id in (' . $placeholders . ')
+                 order by is_enabled desc,trigger_text,context_text',
+                $ids
+            ) as $rule
+        ) {
+            $rulesByTerm[$rule['ip_risk_term_id']][] = $rule;
+        }
+
+        foreach ($rows as &$row) {
+            $row['context_rules'] = $rulesByTerm[$row['id']] ?? [];
+        }
+        unset($row);
+
+        return $rows;
     }
 
     public function termCount(array $filters = []): int
@@ -152,6 +193,80 @@ class IpRiskRepository
         );
 
         return [];
+    }
+
+    public function addContextRule(
+        int $termId,
+        string $trigger,
+        string $context
+    ): array {
+        if (!$this->term($termId)) {
+            return ['IP risk term was not found.'];
+        }
+
+        $trigger = trim($trigger);
+        $context = trim($context);
+
+        if ($trigger === '' || $context === '') {
+            return ['Both trigger text and context text are required.'];
+        }
+
+        if (($message = IpRiskScanner::validateTermText($trigger)) !== null) {
+            return ['Trigger: ' . $message];
+        }
+
+        if (($message = IpRiskScanner::validateTermText($context)) !== null) {
+            return ['Context: ' . $message];
+        }
+
+        $normalizedTrigger = IpRiskScanner::normalize($trigger);
+        $normalizedContext = IpRiskScanner::normalize($context);
+
+        DB::exec(
+            'insert into ip_risk_context_rules
+                (ip_risk_term_id,trigger_text,normalized_trigger,context_text,normalized_context,is_enabled)
+             values (?,?,?,?,?,1)
+             on duplicate key update
+                trigger_text=values(trigger_text),
+                context_text=values(context_text),
+                is_enabled=1,
+                updated_at=now()',
+            [
+                $termId,
+                $trigger,
+                $normalizedTrigger,
+                $context,
+                $normalizedContext,
+            ]
+        );
+
+        return [];
+    }
+
+    public function setContextRuleEnabled(
+        int $termId,
+        int $ruleId,
+        bool $enabled
+    ): bool {
+        $rule = DB::row(
+            'select id
+             from ip_risk_context_rules
+             where id=? and ip_risk_term_id=?',
+            [$ruleId, $termId]
+        );
+
+        if (!$rule) {
+            return false;
+        }
+
+        DB::exec(
+            'update ip_risk_context_rules
+             set is_enabled=?,updated_at=now()
+             where id=? and ip_risk_term_id=?',
+            [$enabled ? 1 : 0, $ruleId, $termId]
+        );
+
+        return true;
     }
 
     public function term(int $id): ?array

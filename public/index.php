@@ -240,6 +240,7 @@ $router->match(['GET','POST'], '/admin/email-campaigns/{id}/edit', [AdminEmailCa
  $router->post('/admin/ip-risk-terms/quick-add', [AdminIpRiskTermsController::class, 'quickStore']);
  $router->post('/admin/ip-risk-terms', [AdminIpRiskTermsController::class, 'store']);
  $router->post('/admin/ip-risk-terms/{id}/aliases', [AdminIpRiskTermsController::class, 'quickAlias']);
+$router->post('/admin/ip-risk-terms/{id}/context-rules', [AdminIpRiskTermsController::class, 'contextRule']);
  $router->get('/admin/ip-risk-terms/{id}/edit', [AdminIpRiskTermsController::class, 'edit']);
  $router->post('/admin/ip-risk-terms/{id}', [AdminIpRiskTermsController::class, 'update']);
  $router->post('/admin/ip-risk-terms/{id}/enable', [AdminIpRiskTermsController::class, 'enable']);
