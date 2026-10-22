@@ -128,6 +128,16 @@
     </div>
 
     <div class="application-meta-item">
+      <span class="application-meta-label">Country</span>
+      <div class="application-meta-value"><?=H::e(trim((string)($app['country'] ?? '')) !== '' ? $app['country'] : 'Not provided')?></div>
+    </div>
+
+    <div class="application-meta-item">
+      <span class="application-meta-label">State / Province / Region</span>
+      <div class="application-meta-value"><?=H::e(trim((string)($app['region'] ?? '')) !== '' ? $app['region'] : 'Not provided')?></div>
+    </div>
+
+    <div class="application-meta-item">
       <span class="application-meta-label">Portfolio URL</span>
       <div class="application-meta-value">
         <?php if(trim((string)$app['portfolio_url']) !== ''): ?>

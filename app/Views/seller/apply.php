@@ -16,7 +16,7 @@
     <ul>
         <li>Designers can create a public storefront after approval.</li>
         <li>Approved designers can upload digital products for admin review.</li>
-        <li>The application form collects your store name, bio, portfolio, design types, and AI-use disclosure.</li>
+        <li>The application form collects your store name, location, bio, portfolio, design types, and AI-use disclosure.</li>
         <li>Applications are manually reviewed by an admin.</li>
         <li>Only upload original work or work you have the legal right to sell.</li>
         <li>AI disclosure is required on product submissions.</li>
@@ -33,6 +33,18 @@
     </p>
     <p>
     <strong>Desired store URL:</strong> /store/<?=H::e($application['desired_slug'])?>
+    </p>
+    <p>
+    <strong>Location:</strong>
+    <?=H::e(
+        trim((string)($application['country'] ?? '')) === ''
+            ? 'Not provided'
+            : (
+                trim((string)($application['region'] ?? '')) !== ''
+                    ? $application['region'].', '.$application['country']
+                    : $application['country']
+            )
+    )?>
     </p>
     <p>
     <strong>Submitted:</strong>
@@ -79,6 +91,14 @@
     <label>Store URL Name <small>This becomes your store link. Use lowercase letters, numbers, and hyphens only. Example: spooky-designs</small>
     <input name="desired_slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" value="<?=H::e($values['desired_slug']??'')?>">
     </label>
+    <label>Country <small>Required. This helps Creative Moth understand where our designer community is growing.</small>
+    <input name="country" required maxlength="120" autocomplete="country-name" placeholder="Example: United States, Canada, United Kingdom" value="<?=H::e($values['country']??'')?>">
+    </label>
+
+    <label>State / Province / Region <small>Optional. Use whatever regional area applies where you live.</small>
+    <input name="region" maxlength="120" autocomplete="address-level1" placeholder="Example: Michigan, Ontario, England" value="<?=H::e($values['region']??'')?>">
+    </label>
+
     <label>Bio <small>Minimum 25 characters. This helps us understand your work and seeds your storefront.</small>
     <textarea name="bio" required minlength="25">
     <?=H::e($values['bio']??'')?>

@@ -359,7 +359,11 @@ class AdminController
            $id=(int)($_POST['id']??0);
             if(($_POST['action']??'')==='approve') $this->approveApplication($id);
             if(($_POST['action']??'')==='deny') $this->denyApplication($id, trim($_POST['reason']??''), trim($_POST['admin_notes']??''));
-            H::redirect('/admin/applications');
+            $returnStatus = (string)($_POST['return_status'] ?? 'pending');
+            if (!in_array($returnStatus, ['pending','approved','denied','all'], true)) {
+                $returnStatus = 'pending';
+            }
+            H::redirect('/admin/applications?status=' . urlencode($returnStatus));
 
         }
         if($id)

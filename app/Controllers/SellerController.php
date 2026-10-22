@@ -176,7 +176,7 @@ class SellerController
     }
     private function applicationValues(): array
     {
-        return [ 'display_name' => trim($_POST['display_name'] ?? ''), 'desired_slug' => trim($_POST['desired_slug'] ?? ''), 'bio' => trim($_POST['bio'] ?? ''), 'portfolio_url' => $this->normalizeUrl((string)($_POST['portfolio_url'] ?? '')), 'social_links' => trim($_POST['social_links'] ?? ''), 'design_types' => trim($_POST['design_types'] ?? ''), 'uses_ai' => trim($_POST['uses_ai'] ?? ''), 'agreement' => isset($_POST['agreement']), ];
+        return [ 'display_name' => trim($_POST['display_name'] ?? ''), 'desired_slug' => trim($_POST['desired_slug'] ?? ''), 'country' => trim($_POST['country'] ?? ''), 'region' => trim($_POST['region'] ?? ''), 'bio' => trim($_POST['bio'] ?? ''), 'portfolio_url' => $this->normalizeUrl((string)($_POST['portfolio_url'] ?? '')), 'social_links' => trim($_POST['social_links'] ?? ''), 'design_types' => trim($_POST['design_types'] ?? ''), 'uses_ai' => trim($_POST['uses_ai'] ?? ''), 'agreement' => isset($_POST['agreement']), ];
 
     }
     private function validateApplication(array $v, ?int $ignoreApplicationId = null): array
@@ -201,6 +201,18 @@ class SellerController
         {
             $errors[] = 'That store URL is already taken. Please choose another.';
 
+        }
+        if ($v['country'] === '')
+        {
+            $errors[] = 'Country is required.';
+        }
+        elseif (mb_strlen($v['country']) > 120)
+        {
+            $errors[] = 'Country must be 120 characters or fewer.';
+        }
+        if (mb_strlen($v['region']) > 120)
+        {
+            $errors[] = 'State, province, or region must be 120 characters or fewer.';
         }
         if (mb_strlen($v['bio']) < 25)
         {
@@ -402,7 +414,7 @@ class SellerController
         }
         $application = $this->latestApplication();
         $errors = [];
-        $values = $application ?: [ 'display_name' => '', 'desired_slug' => '', 'bio' => '', 'portfolio_url' => '', 'social_links' => '', 'design_types' => '', 'uses_ai' => '', 'agreement' => false, ];
+        $values = $application ?: [ 'display_name' => '', 'desired_slug' => '', 'country' => '', 'region' => '', 'bio' => '', 'portfolio_url' => '', 'social_links' => '', 'design_types' => '', 'uses_ai' => '', 'agreement' => false, ];
         if ($_POST)
         {
             if ($application && $application['status'] === 'pending')
@@ -415,7 +427,7 @@ class SellerController
             $errors = $this->validateApplication( $values, $application && $application['status'] === 'denied' ? (int) $application['id'] : null );
             if (!$errors)
            {
-                DB::exec( 'insert into designer_applications (user_id,display_name,desired_slug,bio,portfolio_url,social_links,design_types,uses_ai,agreement,status) values (?,?,?,?,?,?,?,?,?,"pending")', [ H::user()['id'], $values['display_name'], $values['desired_slug'], $values['bio'], $values['portfolio_url'], $values['social_links'], $values['design_types'], $values['uses_ai'], 1, ] );
+                DB::exec( 'insert into designer_applications (user_id,display_name,desired_slug,country,region,bio,portfolio_url,social_links,design_types,uses_ai,agreement,status) values (?,?,?,?,?,?,?,?,?,?,?,"pending")', [ H::user()['id'], $values['display_name'], $values['desired_slug'], $values['country'], $values['region'], $values['bio'], $values['portfolio_url'], $values['social_links'], $values['design_types'], $values['uses_ai'], 1, ] );
                 $applicationId = DB::id();
                 DB::exec( 'insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)', [ null, 'submitted_designer_application', 'designer_application', $applicationId, json_encode(['user_id' => H::user()['id']]), ] );
                 try { NotificationService::admins('seller_application','New seller application','A new seller application is ready for review.',"seller-application:$applicationId",'/admin/applications/'.$applicationId); } catch(Throwable $e) { NotificationService::reportFailure('seller_application',$e); }
