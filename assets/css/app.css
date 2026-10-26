@@ -2838,3 +2838,152 @@ img[src*="/uploads/custom_designs/examples/"] {
     display: block;
     line-height: 1.4;
 }
+
+
+/* My Collabs deadline cards */
+.collab-list-card{
+    padding:1.15rem 1.25rem;
+    margin-bottom:1rem;
+}
+.collab-list-heading{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+}
+.collab-list-title{
+    display:inline-block;
+    font-size:1.08rem;
+    font-weight:800;
+    line-height:1.35;
+}
+.collab-list-subline{
+    margin-top:.3rem;
+    color:var(--muted);
+    font-size:.92rem;
+}
+.collab-countdown{
+    padding:.55rem .8rem;
+    border-radius:10px;
+    font-size:.85rem;
+    font-weight:900;
+    letter-spacing:.035em;
+    text-align:center;
+    white-space:nowrap;
+}
+.collab-countdown-upload{
+    background:#eee7ff;
+    color:#5f2cc7;
+}
+.collab-countdown-waiting{
+    background:#e8f1ff;
+    color:#235c9e;
+}
+.collab-countdown-selling{
+    background:#dff7e9;
+    color:#14643d;
+}
+.collab-countdown-urgent{
+    background:#ffe1e1;
+    color:#a51f1f;
+}
+.collab-countdown-ended{
+    background:#ededed;
+    color:#555;
+}
+.collab-date-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:.75rem;
+    margin-top:1rem;
+}
+.collab-date-item{
+    padding:.75rem .85rem;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#fafafa;
+}
+.collab-date-item span{
+    display:block;
+    margin-bottom:.2rem;
+    color:var(--muted);
+    font-size:.72rem;
+    font-weight:900;
+    letter-spacing:.055em;
+}
+.collab-date-item strong{
+    display:block;
+    font-size:.95rem;
+}
+@media(max-width:650px){
+    .collab-date-grid{
+        grid-template-columns:1fr;
+    }
+    .collab-countdown{
+        width:100%;
+    }
+}
+
+
+/* 12-Month Collab Calendar */
+.collab-calendar-section{
+    margin-top:2.25rem;
+}
+.collab-calendar-heading{
+    margin-bottom:1rem;
+}
+.collab-calendar-heading h2{
+    margin-bottom:.25rem;
+}
+.collab-calendar-months{
+    display:grid;
+    gap:1rem;
+}
+.collab-calendar-month{
+    padding:1rem 1.2rem;
+}
+.collab-calendar-month h3{
+    margin:0 0 .85rem;
+    font-size:1.05rem;
+    letter-spacing:.04em;
+}
+.collab-calendar-items{
+    display:grid;
+    gap:.65rem;
+}
+.collab-calendar-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:1rem;
+    flex-wrap:wrap;
+    padding:.7rem .8rem;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#fafafa;
+}
+.collab-calendar-item a{
+    font-weight:800;
+}
+.collab-calendar-item strong{
+    font-size:.9rem;
+}
+.collab-calendar-role{
+    display:inline-block;
+    margin-left:.45rem;
+    color:var(--muted);
+    font-size:.78rem;
+    font-weight:700;
+}
+.collab-calendar-empty{
+    margin:0;
+    color:var(--muted);
+    font-style:italic;
+}
+@media(max-width:650px){
+    .collab-calendar-item{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+}

@@ -1,15 +1,58 @@
 <?php
-$deadlineText = static function(array $c): string {
-    $soldOut = !empty($c['quantity_limit']) && (int)($c['sold_count'] ?? 0) >= (int)$c['quantity_limit'];
+$collabTiming = static function(array $c): array {
+    $now = time();
 
-    if ($soldOut) return 'Sold Out';
-    if (($c['status'] ?? '') === 'ended') return 'Ended';
+    $upload = strtotime((string)($c['upload_deadline'] ?? '')) ?: 0;
+    $saleStart = strtotime((string)($c['sale_starts_at'] ?? '')) ?: 0;
+    $saleEnd = strtotime((string)($c['sale_close_date'] ?? '')) ?: 0;
 
-    if (strtotime((string)$c['upload_deadline']) > time()) {
-        return 'Files due: '.date('m/d/Y', strtotime((string)$c['upload_deadline']));
+    $soldOut = !empty($c['quantity_limit'])
+        && (int)($c['sold_count'] ?? 0) >= (int)$c['quantity_limit'];
+
+    $formatDate = static fn(int $timestamp): string =>
+        $timestamp > 0 ? date('M j, Y', $timestamp) : 'Not set';
+
+    $countdown = static function(int $target, int $now): string {
+        if ($target <= $now) return '0 DAYS';
+
+        $seconds = $target - $now;
+        $days = (int)ceil($seconds / 86400);
+
+        if ($days <= 1) {
+            $hours = max(1, (int)ceil($seconds / 3600));
+            return $hours.' HOUR'.($hours === 1 ? '' : 'S');
+        }
+
+        return $days.' DAYS';
+    };
+
+    if ($soldOut) {
+        $phase = 'SOLD OUT';
+        $tone = 'ended';
+    } elseif (($c['status'] ?? '') === 'ended' || ($saleEnd > 0 && $saleEnd <= $now)) {
+        $phase = 'COLLAB ENDED';
+        $tone = 'ended';
+    } elseif ($upload > $now) {
+        $phase = $countdown($upload, $now).' LEFT TO UPLOAD';
+        $tone = ($upload - $now) <= 3 * 86400 ? 'urgent' : 'upload';
+    } elseif ($saleStart > $now) {
+        $phase = $countdown($saleStart, $now).' UNTIL SALES START';
+        $tone = 'waiting';
+    } elseif ($saleEnd > $now) {
+        $phase = $countdown($saleEnd, $now).' LEFT TO SELL';
+        $tone = ($saleEnd - $now) <= 3 * 86400 ? 'urgent' : 'selling';
+    } else {
+        $phase = strtoupper((string)($c['status'] ?? 'COLLAB'));
+        $tone = 'ended';
     }
 
-    return 'Sales end: '.date('m/d/Y', strtotime((string)$c['sale_close_date']));
+    return [
+        'phase' => $phase,
+        'tone' => $tone,
+        'upload' => $formatDate($upload),
+        'sale_start' => $formatDate($saleStart),
+        'sale_end' => $formatDate($saleEnd),
+    ];
 };
 ?>
 
@@ -41,14 +84,38 @@ $deadlineText = static function(array $c): string {
 <h2>Hosted Collabs</h2>
 
 <?php foreach($hosted as $c):?>
-    <article class="card">
-        <a href="/seller/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a>
-        — <?=H::e($c['status'])?>
-        · <?=H::e($deadlineText($c))?>
+    <?php $timing=$collabTiming($c);?>
+    <article class="card collab-list-card">
+        <div class="collab-list-heading">
+            <div>
+                <a class="collab-list-title" href="/seller/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a>
+                <div class="collab-list-subline">
+                    Hosted by you · <?=H::e(ucwords(str_replace('_',' ',(string)$c['status'])))?>
+                    <?php if(!empty($c['quantity_limit'])):?>
+                        · <?=intval($c['sold_count'] ?? 0)?> / <?=intval($c['quantity_limit'])?> sold
+                    <?php endif;?>
+                </div>
+            </div>
 
-        <?php if(!empty($c['quantity_limit'])):?>
-            · <?=intval($c['sold_count'] ?? 0)?> / <?=intval($c['quantity_limit'])?> sold
-        <?php endif;?>
+            <div class="collab-countdown collab-countdown-<?=H::e($timing['tone'])?>">
+                <?=H::e($timing['phase'])?>
+            </div>
+        </div>
+
+        <div class="collab-date-grid">
+            <div class="collab-date-item">
+                <span>FILES DUE</span>
+                <strong><?=H::e($timing['upload'])?></strong>
+            </div>
+            <div class="collab-date-item">
+                <span>SALE STARTS</span>
+                <strong><?=H::e($timing['sale_start'])?></strong>
+            </div>
+            <div class="collab-date-item">
+                <span>SALES END</span>
+                <strong><?=H::e($timing['sale_end'])?></strong>
+            </div>
+        </div>
     </article>
 <?php endforeach;?>
 
@@ -57,18 +124,141 @@ $deadlineText = static function(array $c): string {
 <h2>Participating Collabs</h2>
 
 <?php foreach($participating as $c):?>
-    <article class="card">
-        <a href="/seller/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a>
-        — <?=H::e($c['membership_status'])?> / <?=H::e($c['eligibility'])?>
-        · <?=H::e($deadlineText($c))?>
+    <?php $timing=$collabTiming($c);?>
+    <article class="card collab-list-card">
+        <div class="collab-list-heading">
+            <div>
+                <a class="collab-list-title" href="/seller/collabs/<?=$c['id']?>"><?=H::e($c['title'])?></a>
+                <div class="collab-list-subline">
+                    <?=H::e(ucwords(str_replace('_',' ',(string)$c['membership_status'])))?>
+                    · <?=H::e(ucwords(str_replace('_',' ',(string)$c['eligibility'])))?>
+                    <?php if(!empty($c['quantity_limit'])):?>
+                        · <?=intval($c['sold_count'] ?? 0)?> / <?=intval($c['quantity_limit'])?> sold
+                    <?php endif;?>
+                </div>
+            </div>
 
-        <?php if(!empty($c['quantity_limit'])):?>
-            · <?=intval($c['sold_count'] ?? 0)?> / <?=intval($c['quantity_limit'])?> sold
-        <?php endif;?>
+            <div class="collab-countdown collab-countdown-<?=H::e($timing['tone'])?>">
+                <?=H::e($timing['phase'])?>
+            </div>
+        </div>
+
+        <div class="collab-date-grid">
+            <div class="collab-date-item">
+                <span>FILES DUE</span>
+                <strong><?=H::e($timing['upload'])?></strong>
+            </div>
+            <div class="collab-date-item">
+                <span>SALE STARTS</span>
+                <strong><?=H::e($timing['sale_start'])?></strong>
+            </div>
+            <div class="collab-date-item">
+                <span>SALES END</span>
+                <strong><?=H::e($timing['sale_end'])?></strong>
+            </div>
+        </div>
     </article>
 <?php endforeach;?>
 
 <?php if(!$participating):?><p>None yet.</p><?php endif;?>
+
+
+<?php
+$allUpcomingCollabs = array_merge($hosted, $participating);
+
+$calendarStart = new DateTimeImmutable('first day of this month 00:00:00');
+$calendarEnd = $calendarStart->modify('+12 months');
+
+$collabsByMonth = [];
+
+foreach ($allUpcomingCollabs as $calendarCollab) {
+    $deadlineRaw = trim((string)($calendarCollab['upload_deadline'] ?? ''));
+
+    if ($deadlineRaw === '') {
+        continue;
+    }
+
+    try {
+        $deadline = new DateTimeImmutable($deadlineRaw);
+    } catch (Throwable $e) {
+        continue;
+    }
+
+    if ($deadline < $calendarStart || $deadline >= $calendarEnd) {
+        continue;
+    }
+
+    $monthKey = $deadline->format('Y-m');
+
+    if (!isset($collabsByMonth[$monthKey])) {
+        $collabsByMonth[$monthKey] = [];
+    }
+
+    $calendarCollab['_calendar_deadline'] = $deadline;
+    $collabsByMonth[$monthKey][] = $calendarCollab;
+}
+
+foreach ($collabsByMonth as &$monthCollabs) {
+    usort(
+        $monthCollabs,
+        static fn(array $a, array $b): int =>
+            $a['_calendar_deadline'] <=> $b['_calendar_deadline']
+    );
+}
+unset($monthCollabs);
+?>
+
+<section class="collab-calendar-section">
+    <div class="collab-calendar-heading">
+        <div>
+            <h2>12-Month Collab Calendar</h2>
+            <p class="muted">
+                Hosted and participating collabs grouped by file upload deadline.
+            </p>
+        </div>
+    </div>
+
+    <div class="collab-calendar-months">
+        <?php for($monthOffset = 0; $monthOffset < 12; $monthOffset++):?>
+            <?php
+                $month = $calendarStart->modify("+{$monthOffset} months");
+                $monthKey = $month->format('Y-m');
+                $monthItems = $collabsByMonth[$monthKey] ?? [];
+            ?>
+
+            <section class="card collab-calendar-month">
+                <h3><?=H::e(strtoupper($month->format('F Y')))?></h3>
+
+                <?php if($monthItems):?>
+                    <div class="collab-calendar-items">
+                        <?php foreach($monthItems as $calendarCollab):?>
+                            <div class="collab-calendar-item">
+                                <div>
+                                    <a href="/seller/collabs/<?=(int)$calendarCollab['id']?>">
+                                        <?=H::e($calendarCollab['title'])?>
+                                    </a>
+
+                                    <?php if((int)($calendarCollab['host_designer_id'] ?? 0) === (int)($calendarCollab['host_designer_id'] ?? -1) && isset($calendarCollab['membership_status'])):?>
+                                        <span class="collab-calendar-role">Participating</span>
+                                    <?php elseif(!isset($calendarCollab['membership_status'])):?>
+                                        <span class="collab-calendar-role">Hosted by you</span>
+                                    <?php endif;?>
+                                </div>
+
+                                <strong>
+                                    FILES DUE:
+                                    <?=H::e($calendarCollab['_calendar_deadline']->format('M j, Y'))?>
+                                </strong>
+                            </div>
+                        <?php endforeach;?>
+                    </div>
+                <?php else:?>
+                    <p class="collab-calendar-empty">No collabs scheduled yet.</p>
+                <?php endif;?>
+            </section>
+        <?php endfor;?>
+    </div>
+</section>
 
 <script>
 const price = document.querySelector('#calc-price');
