@@ -427,8 +427,23 @@ class SellerController
             $errors = $this->validateApplication( $values, $application && $application['status'] === 'denied' ? (int) $application['id'] : null );
             if (!$errors)
            {
-                DB::exec( 'insert into designer_applications (user_id,display_name,desired_slug,country,region,bio,portfolio_url,social_links,design_types,uses_ai,agreement,status) values (?,?,?,?,?,?,?,?,?,?,?,"pending")', [ H::user()['id'], $values['display_name'], $values['desired_slug'], $values['country'], $values['region'], $values['bio'], $values['portfolio_url'], $values['social_links'], $values['design_types'], $values['uses_ai'], 1, ] );
-                $applicationId = DB::id();
+                DB::begin();
+                try {
+                    DB::exec( 'insert into designer_applications (user_id,display_name,desired_slug,country,region,bio,portfolio_url,social_links,design_types,uses_ai,agreement,status) values (?,?,?,?,?,?,?,?,?,?,?,"pending")', [ H::user()['id'], $values['display_name'], $values['desired_slug'], $values['country'], $values['region'], $values['bio'], $values['portfolio_url'], $values['social_links'], $values['design_types'], $values['uses_ai'], 1, ] );
+                    $applicationId = DB::id();
+
+                    (new \App\Services\ReferralService())->markSellerIntent(
+                        (int)H::user()['id']
+                    );
+
+                    DB::commit();
+                } catch (Throwable $error) {
+                    if (DB::pdo()->inTransaction()) {
+                        DB::rollBack();
+                    }
+
+                    throw $error;
+                }
                 DB::exec( 'insert into admin_logs (admin_user_id,action,entity_type,entity_id,metadata) values (?,?,?,?,?)', [ null, 'submitted_designer_application', 'designer_application', $applicationId, json_encode(['user_id' => H::user()['id']]), ] );
                 try { NotificationService::admins('seller_application','New seller application','A new seller application is ready for review.',"seller-application:$applicationId",'/admin/applications/'.$applicationId); } catch(Throwable $e) { NotificationService::reportFailure('seller_application',$e); }
                 H::flash('success', 'Your designer application has been submitted and is waiting for review.');
@@ -2654,8 +2669,38 @@ class SellerController
         $this->requireOnboardingComplete();
         H::requireSeller();
         $data = (new \App\Services\ReferralService)->dashboard((int)H::user()['id']);
-        $sellerReferrals = array_values(array_filter($data['made'], static fn(array $referral): bool => !empty($referral['seller_intent'])));
-        H::view('seller/referrals', ['refs' => $sellerReferrals, 'payouts' => $data['payouts'], 'referralCode' => $data['code']]);
+        $sellerReferrals = array_values(array_filter(
+            $data['made'],
+            static fn(array $referral): bool =>
+                !empty($referral['seller_intent'])
+        ));
+
+        $buyerReferrals = array_values(array_filter(
+            $data['made'],
+            static fn(array $referral): bool =>
+                empty($referral['seller_intent']) &&
+                ($referral['referral_type'] ?? '') === 'buyer'
+        ));
+
+        H::view(
+            'seller/referrals',
+            [
+                'refs' => $sellerReferrals,
+                'buyerRefs' => $buyerReferrals,
+                'payouts' => $data['payouts'],
+                'referralCode' => $data['code'],
+                'storeSlug' => (string)(
+                    DB::row(
+                        'select store_slug
+                         from designers
+                         where user_id=?
+                           and status="approved"
+                         limit 1',
+                        [(int)H::user()['id']]
+                    )['store_slug'] ?? ''
+                )
+            ]
+        );
 
     }
     public function rank()

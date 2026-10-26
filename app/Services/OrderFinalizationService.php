@@ -367,7 +367,6 @@ final class OrderFinalizationService
         foreach ($rewardedReferrals as $referral) {
             if (!empty($referral['buyer_rewarded_at'])) {
                 $this->communicationAttempt('buyer_referral_reward', fn() => NotificationService::buyerReferralReward((int)$referral['referrer_user_id'], 'referral:' . $referral['id'] . ':buyer:notify:referrer'));
-                $this->communicationAttempt('buyer_referral_reward', fn() => NotificationService::buyerReferralReward((int)$referral['referred_user_id'], 'referral:' . $referral['id'] . ':buyer:notify:referred'));
             }
             if (!empty($referral['seller_rewarded_at'])) {
                 if (($referral['seller_reward_type'] ?? '') === 'store_credit') {
