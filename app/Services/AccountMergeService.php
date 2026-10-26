@@ -23,6 +23,8 @@ class AccountMergeService
         'prize_assignments' => 'winner_user_id',
         'prize_credit_grants' => 'user_id',
         'prize_credit_transactions' => 'user_id',
+        'battle_votes' => 'user_id',
+        'battle_vote_attempts' => 'user_id',
         'prize_wheel_spins' => 'user_id',
         'prize_wheel_rewards' => 'user_id',
         'prize_wheel_bonus_spins' => 'user_id',

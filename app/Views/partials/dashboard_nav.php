@@ -189,6 +189,11 @@ if ($area === 'buyer') {
                 'Prize Donations',
                 ['/seller/prize-donations', '/seller/prize-donations/']
             ],
+            [
+                '/seller/battle-of-the-designers',
+                'Battle of the Designers',
+                ['/seller/battle-of-the-designers']
+            ],
             ['/seller/social-publishing', 'Social Publishing', ['/seller/social-publishing', '/seller/social/']],
         ],
 

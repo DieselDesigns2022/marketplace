@@ -15,6 +15,7 @@ use App\Controllers\AdminWaitlistController;
 use App\Controllers\AdminEmailCampaignController;
 use App\Controllers\AdminCreditController;
 use App\Controllers\PrizeDonationController;
+use App\Controllers\BattleController;
 use App\Controllers\PrizeWheelController;
 use App\Controllers\MessagingController;
 use App\Controllers\CustomDesignController;
@@ -264,6 +265,20 @@ $router->post('/admin/ip-risk-terms/{id}/context-rules', [AdminIpRiskTermsContro
  $router->post('/admin/credits/adjust', [AdminCreditController::class, 'adjust']);
  $router->post('/admin/credits/advertising-recurring', [AdminCreditController::class, 'createAdvertisingRecurring']);
  $router->post('/admin/credits/advertising-recurring/{id}/deactivate', [AdminCreditController::class, 'deactivateAdvertisingRecurring']);
+
+$router->get('/battle-of-the-designers', [BattleController::class, 'index']);
+$router->get('/battle-of-the-designers/{slug}', [BattleController::class, 'show']);
+$router->post('/battle-of-the-designers/{slug}/matchups/{matchupId}/vote', [BattleController::class, 'vote']);
+
+$router->get('/seller/battle-of-the-designers', [BattleController::class, 'seller']);
+$router->post('/seller/battle-of-the-designers/{id}/signup', [BattleController::class, 'signup']);
+$router->post('/seller/battle-of-the-designers/{id}/withdraw', [BattleController::class, 'withdraw']);
+
+$router->get('/admin/battles', [BattleController::class, 'adminIndex']);
+$router->post('/admin/battles/create', [BattleController::class, 'adminCreate']);
+$router->get('/admin/battles/{id}', [BattleController::class, 'adminShow']);
+$router->post('/admin/battles/{id}/action', [BattleController::class, 'adminAction']);
+
 $router->get('/admin/prize-donations', [PrizeDonationController::class, 'adminIndex']);
 $router->match(
     ['GET','POST'],
