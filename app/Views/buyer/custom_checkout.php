@@ -2,7 +2,7 @@
 
 <p class="notice warning">
     Sales tax is calculated using your US billing address.
-    Store credit is applied after tax.
+    Prize Credit applies to merchandise first. Store credit may then apply to the remaining merchandise and tax.
 </p>
 
 <?php foreach($errors as $error): ?>
@@ -46,7 +46,7 @@
     <?php endif; ?>
 
     <p>
-        Before tax and store credit:
+        Before tax and credits:
         <strong><?=H::money($subtotal)?></strong>
     </p>
 
@@ -138,6 +138,29 @@
 
     </fieldset>
 
+    <?php if((string)($service['prize_credit_mode'] ?? 'none') !== 'none'): ?>
+        <p>
+            Available Prize Credit:
+            <strong><?=H::money($prizeAvailable ?? 0)?></strong>
+        </p>
+
+        <label>
+            <input
+                type="checkbox"
+                name="use_prize_credit"
+                value="1"
+                <?=((float)($prizeAvailable ?? 0) > 0) ? '' : 'disabled'?>
+            >
+
+            Use available Prize Credit
+        </label>
+
+        <p class="help-text">
+            Prize Credit applies only to this Custom Design merchandise.
+            It is applied before store credit and cannot pay sales tax.
+        </p>
+    <?php endif; ?>
+
     <label>
         <input
             type="checkbox"
@@ -152,7 +175,7 @@
     <p class="help-text">
         Your final total will be the Custom Design price
         plus selected license add-ons and applicable tax,
-        minus any store credit you choose to use.
+        minus Prize Credit and store credit you choose to use.
     </p>
 
     <button class="btn" type="submit">

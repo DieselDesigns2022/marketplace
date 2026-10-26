@@ -100,8 +100,9 @@ $check(
 
 $check(
     str_contains($terms,'Prize Credits may carry a stated expiration date') &&
-    str_contains($terms,'Refund and reversal treatment'),
-    'Terms distinguish Prize Credit expiration and unresolved refund treatment'
+    str_contains($terms,'Prize Credit used on merchandise is restored') &&
+    str_contains($terms,'original expiration or revocation status'),
+    'Terms define Prize Credit expiration and refund restoration'
 );
 
 $check(

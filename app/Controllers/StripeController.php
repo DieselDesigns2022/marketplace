@@ -44,6 +44,13 @@ class StripeController
         $allocated=$refundService->allocations($orderId);
         $allocatedTotal=array_sum(array_map(static fn(array $r):int=>(int)$r['refunded_cents'],$allocated));
         if($allocatedTotal<=0){if($owns)DB::commit();return;}
+
+        (new \App\Services\PrizeCreditService())
+            ->restoreRefundedCredit(
+                (int)$order['user_id'],
+                $orderId
+            );
+
         $collabItem=DB::row('select oi.* from order_items oi where oi.order_id=? and oi.collab_id is not null limit 1',[$orderId]);
         if($collabItem){$this->reconcileCollabRefund($order,$collabItem,$allocated,$refundService);(new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();return;}
         if(($order['marketplace_fee_model']??'legacy_percentage')!=='percentage_plus_fixed'){
@@ -52,7 +59,7 @@ class StripeController
             (new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();return;
         }
         $payoutSnapshots=[];foreach(DB::rows('select * from seller_payouts where order_id=?',[$orderId]) as $p)$payoutSnapshots[(int)$p['designer_id']]=$p;
-        $grouped=[];foreach($allocated as $item)$grouped[(int)$item['designer_id']][]=['id'=>(int)$item['id'],'seller_id'=>(int)$item['designer_id'],'gross_cents'=>max(0,StripeService::cents($item['total_price'])-(int)$item['refunded_cents'])];
+        $grouped=[];foreach($allocated as $item)$grouped[(int)$item['designer_id']][]=['id'=>(int)$item['id'],'seller_id'=>(int)$item['designer_id'],'gross_cents'=>max(0,StripeService::cents($item['total_price'])-CreditService::parseCents((string)($item['prize_credit_applied']??'0.00'),false)-(int)$item['refunded_cents'])];
         foreach($grouped as $designer=>$sellerItems){
             $payout=$payoutSnapshots[$designer]??null;if(!$payout)continue;
             $calculator=new MarketplaceFeeService((int)round((float)$payout['commission_rate_snapshot']*10000),(int)$payout['fixed_fee_cents_snapshot']);

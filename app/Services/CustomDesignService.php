@@ -1838,9 +1838,9 @@ final class CustomDesignService
 
         $licenseDescription=
             self::serviceLicenseDescriptionList($selectedLicenses);
-$identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['id'],$price,$billing],JSON_THROW_ON_ERROR));$tax=$checkout->calculateTax([['id'=>'custom-'.$service['id'],'total_price'=>$price]],$billing,$identity);$taxAmount=CreditService::formatCents($tax['tax_cents']);$grossCents=CreditService::parseCents($price)+$tax['tax_cents'];if((int)$tax['total_cents']!==$grossCents)throw new \RuntimeException('Stripe Tax total did not match the authoritative custom-service snapshot.');$creditService=new CreditService;$available=$creditService->balances($buyerId)['available'];$breakdown=CreditService::checkoutBreakdown($price,'0.00',$taxAmount,$available,($input['use_credits']??'')==='1');$creditCents=$breakdown['credit_cents'];$credits=CreditService::formatCents($creditCents);$total=CreditService::formatCents($breakdown['final_cents']);$rate=StripeService::commissionRate();$stored=[];
+$identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['id'],$price,$billing],JSON_THROW_ON_ERROR));$tax=$checkout->calculateTax([['id'=>'custom-'.$service['id'],'total_price'=>$price]],$billing,$identity);$taxAmount=CreditService::formatCents($tax['tax_cents']);$grossCents=CreditService::parseCents($price)+$tax['tax_cents'];if((int)$tax['total_cents']!==$grossCents)throw new \RuntimeException('Stripe Tax total did not match the authoritative custom-service snapshot.');$creditService=new CreditService;$prizeService=new PrizeCreditService();$stored=[];
         DB::begin();try{
-            $fresh=DB::row('select s.*,d.display_name,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.is_active=1 and d.status="approved" for update',[$service['id']]);if(
+            $fresh=DB::row('select s.*,d.display_name,d.user_id seller_user_id,d.prize_credit_mode from custom_design_services s join designers d on d.id=s.designer_id where s.id=? and s.is_active=1 and d.status="approved" for update',[$service['id']]);if(
                 !$fresh ||
                 CreditService::formatCents(
                     CreditService::parseCents((string)$fresh['price'])
@@ -1864,8 +1864,86 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                     'The license options changed. Review the service and try again.'
                 );
             }
-            $fee=(MarketplaceFeeService::configured()->calculate([['id'=>1,'seller_id'=>(int)$fresh['designer_id'],'gross_cents'=>CreditService::parseCents($price)]]))[(int)$fresh['designer_id']];
-            $order=$checkout->createOrder(['user_id'=>$buyerId,'subtotal'=>$price,'tax_amount'=>$taxAmount,'tax_snapshot'=>$tax['snapshot'],'tax_calculation_id'=>$tax['id'],'billing_snapshot'=>json_encode($billing,JSON_THROW_ON_ERROR),'credits'=>$credits,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>'0.00','commission_total'=>CreditService::formatCents($fee['fee_cents'])]);DB::exec('update orders set marketplace_fee_model="percentage_plus_fixed",marketplace_fee_basis_points=?,marketplace_fixed_fee_cents=? where id=?',[StripeService::commissionBasisPoints(),StripeService::commissionFixedCents(),$order]);if($creditCents>0){$credits=$creditService->reserve($buyerId,$credits,$order,'order:'.$order.':credit:reserve');$creditCents=CreditService::parseCents($credits);$total=CreditService::formatCents($grossCents-$creditCents);DB::exec('update orders set credits_applied=?,credit_reserved=?,credit_payment_status=?,total=?,stripe_amount_total=?,stripe_paid_amount=? where id=?',[$credits,$credits,$creditCents>0?'reserved':'none',$total,$grossCents-$creditCents,'0.00',$order]);}
+            $prizeAvailableCents=$prizeService->availableSpendableCents($buyerId);
+            $prizeAllocation=PrizeCreditService::allocateCart(
+                [[
+                    'designer_id'=>(int)$fresh['designer_id'],
+                    'line_total'=>$price,
+                    'prize_credit_mode'=>(string)($fresh['prize_credit_mode']??'none'),
+                ]],
+                [],
+                $prizeAvailableCents,
+                ($input['use_prize_credit']??'')==='1'
+            );
+            $prizeCreditCents=(int)$prizeAllocation['total_cents'];
+            $merchandiseAfterPrizeCents=max(
+                0,
+                CreditService::parseCents($price)-$prizeCreditCents
+            );
+            $available=$creditService->balances($buyerId)['available'];
+            $breakdown=CreditService::checkoutBreakdown(
+                CreditService::formatCents($merchandiseAfterPrizeCents),
+                '0.00',
+                $taxAmount,
+                $available,
+                ($input['use_credits']??'')==='1'
+            );
+            $creditCents=$breakdown['credit_cents'];
+            $credits=CreditService::formatCents($creditCents);
+            $total=CreditService::formatCents($breakdown['final_cents']);
+            $paymentGrossCents=$merchandiseAfterPrizeCents+$tax['tax_cents'];
+            $fee=(MarketplaceFeeService::configured()->calculate([['id'=>1,'seller_id'=>(int)$fresh['designer_id'],'gross_cents'=>$merchandiseAfterPrizeCents]]))[(int)$fresh['designer_id']];
+            $order=$checkout->createOrder(['user_id'=>$buyerId,'subtotal'=>$price,'tax_amount'=>$taxAmount,'tax_snapshot'=>$tax['snapshot'],'tax_calculation_id'=>$tax['id'],'billing_snapshot'=>json_encode($billing,JSON_THROW_ON_ERROR),'credits'=>$credits,'total'=>$total,'currency'=>StripeService::currency(),'amount_cents'=>CreditService::parseCents($total),'stripe_paid_amount'=>'0.00','commission_total'=>CreditService::formatCents($fee['fee_cents'])]);
+            DB::exec('update orders set marketplace_fee_model="percentage_plus_fixed",marketplace_fee_basis_points=?,marketplace_fixed_fee_cents=? where id=?',[StripeService::commissionBasisPoints(),StripeService::commissionFixedCents(),$order]);
+            if($prizeCreditCents>0){
+                $reservedPrize=$prizeService->reserveExact(
+                    $buyerId,
+                    CreditService::formatCents($prizeCreditCents),
+                    $order,
+                    'order:'.$order.':prize-credit:reserve'
+                );
+                if(CreditService::parseCents($reservedPrize)!==$prizeCreditCents){
+                    throw new \DomainException(
+                        'Prize Credit reservation did not match custom checkout allocation.'
+                    );
+                }
+                DB::exec(
+                    'update orders
+                     set prize_credit_applied=?,
+                         prize_credit_reserved=?,
+                         prize_credit_payment_status="reserved"
+                     where id=?',
+                    [
+                        $reservedPrize,
+                        $reservedPrize,
+                        $order
+                    ]
+                );
+            }
+            if($creditCents>0){
+                $credits=$creditService->reserve($buyerId,$credits,$order,'order:'.$order.':credit:reserve');
+                $creditCents=CreditService::parseCents($credits);
+                $total=CreditService::formatCents($paymentGrossCents-$creditCents);
+                DB::exec(
+                    'update orders
+                     set credits_applied=?,
+                         credit_reserved=?,
+                         credit_payment_status=?,
+                         total=?,
+                         stripe_amount_total=?,
+                         stripe_paid_amount=?
+                     where id=?',
+                    [
+                        $credits,
+                        $credits,
+                        $creditCents>0?'reserved':'none',
+                        $total,
+                        $paymentGrossCents-$creditCents,
+                        '0.00',
+                        $order
+                    ]
+                );
+            }
             $item=$checkout->addItem([
                 'order_id'=>$order,
                 'custom_service_id'=>$fresh['id'],
@@ -1883,7 +1961,7 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                 'total_price'=>$price,
                 'commission_rate'=>$rate
             ]);
-            $itemFee=$fee['items'][1];DB::exec('update order_items set platform_commission_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($itemFee['fee_cents']),CreditService::formatCents($itemFee['percentage_fee_cents']),CreditService::formatCents($itemFee['fixed_fee_cents']),CreditService::formatCents($itemFee['seller_earnings_cents']),$item]);
+            $itemFee=$fee['items'][1];DB::exec('update order_items set prize_credit_applied=?,prize_credit_mode_snapshot=?,platform_commission_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($prizeCreditCents),(string)($fresh['prize_credit_mode']??'none'),CreditService::formatCents($itemFee['fee_cents']),CreditService::formatCents($itemFee['percentage_fee_cents']),CreditService::formatCents($itemFee['fixed_fee_cents']),CreditService::formatCents($itemFee['seller_earnings_cents']),$item]);
             DB::exec('insert into custom_orders(order_id,order_item_id,custom_service_id,buyer_user_id,designer_id,status,service_snapshot,brief_snapshot,agreed_price,turnaround_min_days,turnaround_days,included_revisions) values(?,?,?,?,?,"new",?,?,?,?,?,?)',[$order,$item,$fresh['id'],$buyerId,$fresh['designer_id'],json_encode(['title'=>$fresh['title'],'description'=>$fresh['description'],'buyer_instructions'=>$fresh['buyer_instructions'],'brief_fields'=>$briefConfig,'licenses'=>json_decode($licenseSnapshot,true)],JSON_THROW_ON_ERROR),json_encode($brief,JSON_THROW_ON_ERROR),$price,$fresh['turnaround_min_days']??$fresh['turnaround_days'],$fresh['turnaround_days'],$fresh['included_revisions']]);$custom=(int)DB::id();
             foreach($uploads as $uploadIndex=>$upload){
                 $path=$this->store($upload,'references',true);
@@ -1929,7 +2007,7 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                         ) ?: null
                     ]
                 );
-            }DB::exec('insert into seller_earnings(order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,null,?,?,?,?,?,"pending_payment")',[$order,$fresh['designer_id'],$buyerId,$price,CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);if($fee['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$fresh['designer_id'],'fee-cap:order:'.$order.':seller:'.$fresh['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);$created=DB::row('select * from orders where id=?',[$order]);$items=DB::rows('select * from order_items where order_id=?',[$order]);if(CreditService::parseCents($total)===0){$finalizer=new OrderFinalizationService;$finalizer->finalize($order,'internal-credit-order:'.$order,true);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);$finalizer->settlePlatformCreditPayoutsAfterCommit($order);$finalizer->communicate($order);H::redirect('/dashboard/order/'.$order);}$session=$checkout->checkout($created,$items);DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?',[$session['id']??null,$order]);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);header('Location: '.$session['url'],true,303);exit;
+            }DB::exec('insert into seller_earnings(order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,null,?,?,?,?,?,"pending_payment")',[$order,$fresh['designer_id'],$buyerId,CreditService::formatCents($fee['gross_cents']),CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);if($fee['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$fresh['designer_id'],'fee-cap:order:'.$order.':seller:'.$fresh['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);$created=DB::row('select * from orders where id=?',[$order]);$items=DB::rows('select * from order_items where order_id=?',[$order]);if(CreditService::parseCents($total)===0){$finalizer=new OrderFinalizationService;$finalizer->finalize($order,'internal-credit-order:'.$order,true);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);$finalizer->settlePlatformCreditPayoutsAfterCommit($order);$finalizer->communicate($order);H::redirect('/dashboard/order/'.$order);}$session=$checkout->checkout($created,$items);DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?',[$session['id']??null,$order]);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);header('Location: '.$session['url'],true,303);exit;
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $path)@unlink($path);throw$e;}
     }
 

@@ -42,6 +42,13 @@ final class CollabCheckoutService
             $coupon = $result['coupon']; $discountCents = CreditService::parseCents((string)$result['discount'], false);
         }
         $merchandiseCents = max(0, $subtotalCents - $discountCents);
+
+        if (($input['use_prize_credit'] ?? '') === '1') {
+            throw new DomainException(
+                'Prize Credit is not available on Collab Bundles.'
+            );
+        }
+
         $billing = StripeService::normalizeBillingAddress([
             'line1'=>trim((string)($input['billing_line1']??'')), 'line2'=>trim((string)($input['billing_line2']??'')),
             'city'=>trim((string)($input['billing_city']??'')), 'state'=>trim((string)($input['billing_state']??'')),

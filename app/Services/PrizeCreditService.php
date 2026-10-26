@@ -1075,4 +1075,387 @@ final class PrizeCreditService
     }
 
 
+    public function availableSpendableCents(int $userId): int
+    {
+        $total = 0;
+
+        foreach (
+            DB::rows(
+                'select remaining_amount,reserved_amount
+                 from prize_credit_grants
+                 where user_id=?
+                   and status="active"
+                   and (
+                        expires_on is null
+                        or expires_on>=current_date()
+                   )
+                 order by id',
+                [$userId]
+            ) as $grant
+        ) {
+            $remaining = CreditService::parseCents(
+                (string)$grant['remaining_amount']
+            );
+
+            $reserved = CreditService::parseCents(
+                (string)$grant['reserved_amount']
+            );
+
+            $total += max(0, $remaining - $reserved);
+        }
+
+        return $total;
+    }
+
+    public static function refundedPrizeTargetCents(
+        int $prizeCents,
+        int $postPrizeMerchandiseCents,
+        int $refundedMerchandiseCents
+    ): int {
+        $prizeCents = max(0, $prizeCents);
+        $basis = max(0, $postPrizeMerchandiseCents);
+        $refunded = max(0, $refundedMerchandiseCents);
+
+        if ($prizeCents === 0 || $refunded === 0) {
+            return 0;
+        }
+
+        if ($basis === 0) {
+            return $prizeCents;
+        }
+
+        $refunded = min($basis, $refunded);
+
+        return min(
+            $prizeCents,
+            intdiv(
+                ($prizeCents * $refunded) + intdiv($basis, 2),
+                $basis
+            )
+        );
+    }
+
+    public function restoreRefundedCredit(
+        int $userId,
+        int $orderId
+    ): int {
+        $owns = !DB::pdo()->inTransaction();
+
+        if ($owns) {
+            DB::begin();
+        }
+
+        try {
+            $order = DB::row(
+                'select id,user_id
+                 from orders
+                 where id=?
+                 for update',
+                [$orderId]
+            );
+
+            if (!$order) {
+                throw new DomainException('Order not found.');
+            }
+
+            if ((int)$order['user_id'] !== $userId) {
+                throw new DomainException(
+                    'Prize Credit refund owner does not match the order.'
+                );
+            }
+
+            $finalize = DB::row(
+                'select *
+                 from prize_credit_transactions
+                 where user_id=?
+                   and order_id=?
+                   and type="finalize"
+                   and status="finalized"
+                 order by id desc
+                 limit 1
+                 for update',
+                [$userId, $orderId]
+            );
+
+            if (!$finalize) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return 0;
+            }
+
+            $target = 0;
+
+            $items = DB::rows(
+                'select
+                    oi.id,
+                    oi.total_price,
+                    oi.prize_credit_applied,
+                    coalesce(
+                        (
+                            select sum(a.merchandise_refund_cents)
+                            from marketplace_refund_allocations a
+                            where a.order_item_id=oi.id
+                        ),
+                        0
+                    ) refunded_cents
+                 from order_items oi
+                 where oi.order_id=?
+                   and oi.prize_credit_applied>0
+                 order by oi.id
+                 for update',
+                [$orderId]
+            );
+
+            foreach ($items as $item) {
+                $price = CreditService::parseCents(
+                    (string)$item['total_price'],
+                    false
+                );
+
+                $prize = CreditService::parseCents(
+                    (string)$item['prize_credit_applied'],
+                    false
+                );
+
+                $basis = max(0, $price - $prize);
+
+                $target += self::refundedPrizeTargetCents(
+                    $prize,
+                    $basis,
+                    (int)$item['refunded_cents']
+                );
+            }
+
+            if ($target <= 0) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return 0;
+            }
+
+            $restored = CreditService::parseCents(
+                (string)(
+                    DB::row(
+                        'select coalesce(sum(amount),0) amount
+                         from prize_credit_transactions
+                         where user_id=?
+                           and order_id=?
+                           and type="reversal"
+                           and status="reversed"',
+                        [$userId, $orderId]
+                    )['amount'] ?? '0.00'
+                ),
+                false
+            );
+
+            $delta = $target - $restored;
+
+            if ($delta <= 0) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return 0;
+            }
+
+            $key =
+                'order:' .
+                $orderId .
+                ':prize-credit:refund:' .
+                $target;
+
+            $existing = DB::row(
+                'select id
+                 from prize_credit_transactions
+                 where idempotency_key=?
+                 limit 1',
+                [$key]
+            );
+
+            if ($existing) {
+                if ($owns) {
+                    DB::commit();
+                }
+
+                return 0;
+            }
+
+            $finalAllocations = DB::rows(
+                'select
+                    a.grant_id,
+                    a.amount,
+                    coalesce(
+                        (
+                            select sum(ra.amount)
+                            from prize_credit_transaction_allocations ra
+                            join prize_credit_transactions rt
+                              on rt.id=ra.transaction_id
+                            where rt.user_id=?
+                              and rt.order_id=?
+                              and rt.type="reversal"
+                              and rt.status="reversed"
+                              and ra.grant_id=a.grant_id
+                        ),
+                        0
+                    ) restored_amount
+                 from prize_credit_transaction_allocations a
+                 where a.transaction_id=?
+                 order by a.id
+                 for update',
+                [
+                    $userId,
+                    $orderId,
+                    (int)$finalize['id'],
+                ]
+            );
+
+            $needed = $delta;
+            $grantRestorations = [];
+
+            foreach ($finalAllocations as $allocation) {
+                if ($needed <= 0) {
+                    break;
+                }
+
+                $originalUsed = CreditService::parseCents(
+                    (string)$allocation['amount'],
+                    false
+                );
+
+                $alreadyRestored = CreditService::parseCents(
+                    (string)$allocation['restored_amount'],
+                    false
+                );
+
+                $capacity = max(
+                    0,
+                    $originalUsed - $alreadyRestored
+                );
+
+                if ($capacity <= 0) {
+                    continue;
+                }
+
+                $take = min($capacity, $needed);
+
+                $grant = DB::row(
+                    'select *
+                     from prize_credit_grants
+                     where id=?
+                     for update',
+                    [(int)$allocation['grant_id']]
+                );
+
+                if (!$grant) {
+                    throw new DomainException(
+                        'Original Prize Credit grant is unavailable.'
+                    );
+                }
+
+                $remaining = CreditService::parseCents(
+                    (string)$grant['remaining_amount']
+                );
+
+                $original = CreditService::parseCents(
+                    (string)$grant['original_amount']
+                );
+
+                if ($remaining + $take > $original) {
+                    throw new DomainException(
+                        'Prize Credit refund would exceed the original grant.'
+                    );
+                }
+
+                DB::exec(
+                    'update prize_credit_grants
+                     set remaining_amount=remaining_amount+?,
+                         status=case
+                            when status="exhausted"
+                            then "active"
+                            else status
+                         end
+                     where id=?',
+                    [
+                        CreditService::formatCents($take),
+                        (int)$grant['id'],
+                    ]
+                );
+
+                $grantRestorations[] = [
+                    'grant_id' => (int)$grant['id'],
+                    'cents' => $take,
+                ];
+
+                $needed -= $take;
+            }
+
+            if ($needed !== 0) {
+                throw new DomainException(
+                    'Prize Credit refund could not be matched to original grants.'
+                );
+            }
+
+            DB::exec(
+                'insert into prize_credit_transactions
+                 (
+                    user_id,
+                    order_id,
+                    amount,
+                    type,
+                    status,
+                    idempotency_key,
+                    description,
+                    finalized_at
+                 )
+                 values (
+                    ?,?,?,"reversal","reversed",?,
+                    "Prize Credit restored after merchandise refund",
+                    now()
+                 )',
+                [
+                    $userId,
+                    $orderId,
+                    CreditService::formatCents($delta),
+                    $key,
+                ]
+            );
+
+            $transactionId = (int)DB::id();
+
+            foreach ($grantRestorations as $restoration) {
+                DB::exec(
+                    'insert into prize_credit_transaction_allocations
+                     (
+                        transaction_id,
+                        grant_id,
+                        amount
+                     )
+                     values (?,?,?)',
+                    [
+                        $transactionId,
+                        $restoration['grant_id'],
+                        CreditService::formatCents(
+                            $restoration['cents']
+                        ),
+                    ]
+                );
+            }
+
+            if ($owns) {
+                DB::commit();
+            }
+
+            return $delta;
+        } catch (Throwable $error) {
+            if ($owns && DB::pdo()->inTransaction()) {
+                DB::rollBack();
+            }
+
+            throw $error;
+        }
+    }
+
 }

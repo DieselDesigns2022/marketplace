@@ -3,6 +3,12 @@
     <p><strong><?=H::money($collab['price_cents'] / 100)?></strong> for one shared Collab Bundle.</p>
     <p>Available through <?=H::e($collab['sale_close_date'])?>.</p>
 </section>
+
+<p class="help-text">
+    Prize Credit is not available on Collab Bundles because the seller payout
+    is shared between multiple participating designers.
+</p>
+
 <form method="post" class="form card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <?php if($storefront):?><input type="hidden" name="storefront_designer_id" value="<?=(int)$storefront?>"><?php endif;?>

@@ -12,7 +12,17 @@ $check(str_contains($email,'customFinalAvailable')&&str_contains($service,'Email
 $check(str_contains($service,'for update')&&str_contains($service,'where id=? and status=?')&&str_contains($service,'revisions_used=revisions_used+?'),'SOURCE CONTRACT transition persistence locks state and increments an accepted revision once');
 $check(str_contains($controller,'o.payment_status in ("paid","partially_refunded","refunded")')&&str_contains($service,"\$side==='seller'"),'SOURCE CONTRACT seller history excludes unpaid briefs while retaining refunded history');
 $check(str_contains($buyer,'left join products p on p.id=oi.product_id')&&str_contains($source('app/Views/buyer/order.php'),"!empty(\$i['product_id'])")&&str_contains($source('app/Views/buyer/purchases.php'),'product_titles'),'SOURCE CONTRACT custom-only and normal purchases use snapshot labels without false product links');
-$check(str_contains($buyer,'o.payment_status in ("paid","partially_refunded")')&&!str_contains($buyer,'o.payment_status in ("paid","partially_refunded","refunded")'),'SOURCE CONTRACT normal buyer downloads exclude fully refunded custom finals');
+$check(
+    str_contains(
+        $buyer,
+        'co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded")'
+    ) &&
+    !str_contains(
+        $buyer,
+        'co.status="completed" and f.file_kind="final" and o.payment_status in ("paid","partially_refunded","refunded")'
+    ),
+    'SOURCE CONTRACT normal buyer downloads exclude fully refunded custom finals'
+);
 $check(str_contains($service,'CreditService::checkoutBreakdown')&&str_contains($service,'credit:reserve')&&str_contains($service,'internal-credit-order:'),'SOURCE CONTRACT custom checkout uses existing credit reservation and internal finalization lifecycle');
 $check(str_contains($source('app/Views/public/custom_service.php'),'25MB each')&&str_contains($service,'MAX_SIZE=26214400'),'SOURCE CONTRACT reference upload UI and server agree on 25MB');
 

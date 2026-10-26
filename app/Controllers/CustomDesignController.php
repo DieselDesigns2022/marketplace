@@ -93,6 +93,11 @@ final class CustomDesignController {
              ?'1'
              :'0';
 
+         $input['use_prize_credit']=
+             ($_POST['use_prize_credit']??'')==='1'
+             ?'1'
+             :'0';
+
          $input['checkout_token']=$token;
 
          try{
@@ -150,6 +155,11 @@ final class CustomDesignController {
      $balances=(new \App\Services\CreditService)
          ->balances((int)H::user()['id']);
 
+     $prizeAvailable=\App\Services\CreditService::formatCents(
+         (new \App\Services\PrizeCreditService())
+             ->availableSpendableCents((int)H::user()['id'])
+     );
+
      H::view(
          'buyer/custom_checkout',
          [
@@ -161,12 +171,13 @@ final class CustomDesignController {
                  (float)$service['price']
                  +$licenseTotal,
              'balances'=>$balances,
+             'prizeAvailable'=>$prizeAvailable,
              'errors'=>$errors
          ]
      );
  }
 
- private function publicService(string $slug):array{return DB::row('select s.*,d.display_name,d.store_slug,d.user_id seller_user_id from custom_design_services s join designers d on d.id=s.designer_id where s.slug=? and s.is_active=1 and d.status="approved"',[$slug])??H::abort(404);}
+ private function publicService(string $slug):array{return DB::row('select s.*,d.display_name,d.store_slug,d.user_id seller_user_id,d.prize_credit_mode from custom_design_services s join designers d on d.id=s.designer_id where s.slug=? and s.is_active=1 and d.status="approved"',[$slug])??H::abort(404);}
  private function detailView(array $s,array $errors):void{
      $api=new CustomDesignService;
      $balances=H::user()?(new \App\Services\CreditService)->balances((int)H::user()['id']):['available'=>'0.00'];
