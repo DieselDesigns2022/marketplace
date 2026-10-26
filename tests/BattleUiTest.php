@@ -128,13 +128,21 @@ $check(
     ) &&
     str_contains(
         $admin,
-        'Open Round Voting'
+        'Schedule Round'
+    ) &&
+    str_contains(
+        $admin,
+        'Round start — Eastern Time'
     ) &&
     str_contains(
         $admin,
         'Close Round &amp; Count Votes'
+    ) &&
+    str_contains(
+        $controller,
+        "action==='schedule_round'"
     ),
-    'admin Battle UI manages bracket and rounds'
+    'admin Battle UI manages bracket scheduling and rounds'
 );
 
 $check(
@@ -143,6 +151,18 @@ $check(
         'The system did not automatically choose a winner.'
     ),
     'admin UI preserves unresolved tie decisions'
+);
+
+$check(
+    str_contains(
+        $admin,
+        '24 hours exactly'
+    ) &&
+    !str_contains(
+        $admin,
+        'Voting duration per round'
+    ),
+    'admin Battle UI uses fixed 24-hour rounds'
 );
 
 $check(
@@ -187,6 +207,43 @@ $check(
         'Battle of the Designers'
     ),
     'seller navigation exposes Battle of the Designers'
+);
+
+
+$check(
+    str_contains(
+        $public,
+        'battle-head-to-head'
+    ) &&
+    str_contains(
+        $public,
+        'Previous Round Winners'
+    ) &&
+    str_contains(
+        $public,
+        'Visit Their Store'
+    ),
+    'Battle presents designers head-to-head and promotes previous-round winners'
+);
+
+$check(
+    str_contains(
+        $admin,
+        'Registered Voter Audit'
+    ) &&
+    str_contains(
+        $admin,
+        'Account created'
+    ) &&
+    str_contains(
+        $admin,
+        'IP address'
+    ) &&
+    str_contains(
+        $admin,
+        'Browser / device evidence'
+    ),
+    'admin Battle UI exposes registered voter audit evidence'
 );
 
 exit($fail?1:0);

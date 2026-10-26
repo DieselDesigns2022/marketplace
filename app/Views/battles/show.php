@@ -1,5 +1,81 @@
 <?php use App\Core\Helpers as H; ?>
 
+<style>
+.battle-matchup-card {
+    padding: 28px;
+}
+
+.battle-head-to-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr);
+    gap: 28px;
+    align-items: center;
+}
+
+.battle-designer-option {
+    text-align: center;
+    min-width: 0;
+}
+
+.battle-designer-logo {
+    width: min(100%, 320px);
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 18px;
+    border-radius: 18px;
+}
+
+.battle-designer-option h3 {
+    margin: 0 0 16px;
+}
+
+.battle-vs {
+    font-size: 2.25rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.battle-previous-winners {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 20px;
+}
+
+.battle-previous-winner {
+    text-align: center;
+}
+
+.battle-previous-winner img {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 12px;
+    border-radius: 14px;
+}
+
+@media (max-width: 720px) {
+    .battle-head-to-head {
+        grid-template-columns: 1fr;
+    }
+
+    .battle-vs {
+        padding: 6px 0;
+    }
+}
+</style>
+
+<?php if(!empty($adminPreview)): ?>
+<section class="attention-panel">
+    <strong>ADMIN PREVIEW — NOT PUBLIC</strong>
+    <p>
+        This is the actual Battle presentation using two fake designers.
+        Voting buttons are disabled in preview mode.
+    </p>
+</section>
+<?php endif; ?>
+
 <header class="dashboard-heading">
     <div>
         <a href="/battle-of-the-designers">
@@ -107,32 +183,47 @@
 
     <div class="dashboard-grid">
     <?php foreach($round['matchups'] as $matchup): ?>
-        <article class="card">
+        <article class="card battle-matchup-card">
             <p>
                 <strong>
                     Matchup #<?=number_format((int)$matchup['bracket_position'])?>
                 </strong>
             </p>
 
-            <div class="dashboard-grid">
-                <div>
+            <div class="battle-head-to-head">
+                <div class="battle-designer-option">
                     <?php if($matchup['participant_one_id']): ?>
                         <img
                             src="<?=H::e($matchup['participant_one_logo'])?>"
                             alt="<?=H::e($matchup['participant_one_name'])?> logo"
-                            style="width:180px;height:180px;object-fit:contain"
+                            class="battle-designer-logo"
                         >
 
                         <h3>
                             <?=H::e($matchup['participant_one_name'])?>
                         </h3>
 
-                        <?php if($matchup['status']==='open'): ?>
-                            <?php if(!H::user()): ?>
+                        <?php if(
+                            $matchup['status']==='open' ||
+                            !empty($adminPreview)
+                        ): ?>
+
+                            <?php if(!empty($adminPreview)): ?>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    disabled
+                                >
+                                    Preview Vote Button
+                                </button>
+
+                            <?php elseif(!H::user()): ?>
                                 <a class="btn" href="/login">
                                     Log In to Vote
                                 </a>
+
                             <?php elseif(isset($votes[(int)$matchup['id']])): ?>
+
                                 <?php if(
                                     $votes[(int)$matchup['id']]===
                                     (int)$matchup['participant_one_id']
@@ -141,6 +232,7 @@
                                         Your Vote
                                     </span>
                                 <?php endif; ?>
+
                             <?php else: ?>
                                 <form
                                     method="post"
@@ -151,40 +243,62 @@
                                         name="_csrf"
                                         value="<?=H::e(H::csrf())?>"
                                     >
+
                                     <input
                                         type="hidden"
                                         name="participant_id"
                                         value="<?=(int)$matchup['participant_one_id']?>"
                                     >
+
                                     <button class="btn">
                                         Vote
                                     </button>
                                 </form>
                             <?php endif; ?>
                         <?php endif; ?>
+
                     <?php else: ?>
                         <p><em>Bye</em></p>
                     <?php endif; ?>
                 </div>
 
-                <div>
+                <div class="battle-vs" aria-hidden="true">
+                    VS
+                </div>
+
+                <div class="battle-designer-option">
                     <?php if($matchup['participant_two_id']): ?>
                         <img
                             src="<?=H::e($matchup['participant_two_logo'])?>"
                             alt="<?=H::e($matchup['participant_two_name'])?> logo"
-                            style="width:180px;height:180px;object-fit:contain"
+                            class="battle-designer-logo"
                         >
 
                         <h3>
                             <?=H::e($matchup['participant_two_name'])?>
                         </h3>
 
-                        <?php if($matchup['status']==='open'): ?>
-                            <?php if(!H::user()): ?>
+                        <?php if(
+                            $matchup['status']==='open' ||
+                            !empty($adminPreview)
+                        ): ?>
+
+                            <?php if(!empty($adminPreview)): ?>
+                                <button
+                                    class="btn"
+                                    type="button"
+                                    disabled
+                                >
+                                    Preview Vote Button
+                                </button>
+
+                            <?php elseif(!H::user()): ?>
                                 <a class="btn" href="/login">
                                     Log In to Vote
                                 </a>
+
                             <?php elseif(isset($votes[(int)$matchup['id']])): ?>
+
                                 <?php if(
                                     $votes[(int)$matchup['id']]===
                                     (int)$matchup['participant_two_id']
@@ -193,6 +307,7 @@
                                         Your Vote
                                     </span>
                                 <?php endif; ?>
+
                             <?php else: ?>
                                 <form
                                     method="post"
@@ -203,17 +318,20 @@
                                         name="_csrf"
                                         value="<?=H::e(H::csrf())?>"
                                     >
+
                                     <input
                                         type="hidden"
                                         name="participant_id"
                                         value="<?=(int)$matchup['participant_two_id']?>"
                                     >
+
                                     <button class="btn">
                                         Vote
                                     </button>
                                 </form>
                             <?php endif; ?>
                         <?php endif; ?>
+
                     <?php else: ?>
                         <p><em>Bye</em></p>
                     <?php endif; ?>
@@ -242,9 +360,12 @@
                         <?=H::e($matchup['winner_name'])?>
                     </strong>
                 </p>
+
             <?php elseif($matchup['status']==='tied'): ?>
                 <p>
-                    <strong>Tied — awaiting resolution</strong>
+                    <strong>
+                        Tied — awaiting resolution
+                    </strong>
                 </p>
             <?php endif; ?>
         </article>
@@ -252,3 +373,54 @@
     </div>
 </section>
 <?php endforeach; ?>
+
+<?php if(
+    !empty($previousRoundWinners) ||
+    !empty($adminPreview)
+): ?>
+<section class="card">
+    <h2>🏆 Previous Round Winners</h2>
+
+    <p class="muted">
+        These designers advanced from the previous round.
+        Visit their Creative Moth stores while they continue through the Battle.
+    </p>
+
+    <?php if(!empty($previousRoundWinners)): ?>
+        <div class="battle-previous-winners">
+            <?php foreach($previousRoundWinners as $winner): ?>
+                <article class="battle-previous-winner">
+                    <a href="/store/<?=H::e($winner['store_slug'])?>">
+                        <img
+                            src="<?=H::e($winner['logo_path'])?>"
+                            alt="<?=H::e($winner['display_name'])?> logo"
+                        >
+
+                        <h3>
+                            <?=H::e($winner['display_name'])?>
+                        </h3>
+                    </a>
+
+                    <a
+                        class="btn alt"
+                        href="/store/<?=H::e($winner['store_slug'])?>"
+                    >
+                        Visit Their Store
+                    </a>
+                </article>
+            <?php endforeach; ?>
+        </div>
+
+    <?php elseif(!empty($adminPreview)): ?>
+        <div class="attention-panel">
+            <strong>Preview placement</strong>
+
+            <p>
+                After Round 1 is completed, the winning designers from the
+                previous round will appear here with their logo, store name,
+                and a direct link to visit their Creative Moth store.
+            </p>
+        </div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>

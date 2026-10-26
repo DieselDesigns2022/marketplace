@@ -14,14 +14,51 @@
         </p>
     </div>
 
-    <a
-        class="btn"
-        href="/battle-of-the-designers/<?=H::e($event['slug'])?>"
-        target="_blank"
-    >
-        View Public Battle
-    </a>
+    <?php if((int)($event['is_preview']??0)===1): ?>
+        <a
+            class="btn"
+            href="/admin/battles/<?=(int)$event['id']?>/preview"
+            target="_blank"
+        >
+            View Private Battle Preview
+        </a>
+    <?php else: ?>
+        <a
+            class="btn"
+            href="/battle-of-the-designers/<?=H::e($event['slug'])?>"
+            target="_blank"
+        >
+            View Public Battle
+        </a>
+    <?php endif; ?>
 </header>
+
+<?php if((int)($event['is_preview']??0)===1): ?>
+<section class="attention-panel">
+    <h2>ADMIN-ONLY PREVIEW</h2>
+
+    <p>
+        This Battle uses fake designers for visual testing.
+        Sellers and buyers cannot see this event.
+    </p>
+
+    <form
+        method="post"
+        action="/admin/battles/<?=(int)$event['id']?>/preview/delete"
+        onsubmit="return confirm('Delete this Battle preview and both fake designers?');"
+    >
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::e(H::csrf())?>"
+        >
+
+        <button class="btn alt">
+            Delete Preview + Fake Designers
+        </button>
+    </form>
+</section>
+<?php endif; ?>
 
 <section class="card">
     <h2>Battle Configuration</h2>
@@ -32,45 +69,14 @@
     </p>
 
     <p>
-        <strong>Voting duration:</strong>
-        <?=$event['voting_minutes']
-            ? number_format((int)$event['voting_minutes']).' minutes'
-            : 'Not set'?>
+        <strong>Round duration:</strong>
+        24 hours exactly
     </p>
 
-    <?php if($event['status']!=='completed'): ?>
-        <form
-            method="post"
-            action="/admin/battles/<?=(int)$event['id']?>/action"
-            class="form"
-        >
-            <input
-                type="hidden"
-                name="_csrf"
-                value="<?=H::e(H::csrf())?>"
-            >
-            <input
-                type="hidden"
-                name="action"
-                value="voting_minutes"
-            >
-
-            <label>
-                Voting duration per round, in minutes
-                <input
-                    type="number"
-                    name="voting_minutes"
-                    min="1"
-                    value="<?=H::e((string)($event['voting_minutes']??''))?>"
-                    required
-                >
-            </label>
-
-            <button class="btn">
-                Update Voting Duration
-            </button>
-        </form>
-    <?php endif; ?>
+    <p class="muted">
+        Participating designers receive emails 12 hours before the round,
+        when voting goes live, and when 1 hour remains.
+    </p>
 </section>
 
 <section class="card">
@@ -150,37 +156,88 @@
             </p>
 
             <?php if($round['voting_opens_at']): ?>
+                <?php
+                $opensEastern=(new DateTimeImmutable(
+                    $round['voting_opens_at'],
+                    new DateTimeZone('UTC')
+                ))->setTimezone(
+                    new DateTimeZone('America/Detroit')
+                );
+
+                $closesEastern=(new DateTimeImmutable(
+                    $round['voting_closes_at'],
+                    new DateTimeZone('UTC')
+                ))->setTimezone(
+                    new DateTimeZone('America/Detroit')
+                );
+                ?>
+
                 <p>
-                    <?=H::e($round['voting_opens_at'])?>
+                    <strong>
+                        <?=H::e(
+                            $round['status']==='pending'
+                                ? 'Scheduled:'
+                                : 'Voting window:'
+                        )?>
+                    </strong>
+
+                    <?=H::e($opensEastern->format('M j, Y g:i A'))?>
                     →
-                    <?=H::e($round['voting_closes_at'])?>
+                    <?=H::e($closesEastern->format('M j, Y g:i A'))?>
+                    ET
                 </p>
             <?php endif; ?>
         </div>
 
-        <?php if($round['status']==='pending'): ?>
+        <?php if(
+            $round['status']==='pending' &&
+            (int)($event['is_preview']??0)!==1 &&
+            empty($round['voting_opens_at']) &&
+            (
+                (int)$round['round_number']===1 ||
+                $event['status']==='active'
+            )
+        ): ?>
             <form
                 method="post"
                 action="/admin/battles/<?=(int)$event['id']?>/action"
+                class="form"
             >
                 <input
                     type="hidden"
                     name="_csrf"
                     value="<?=H::e(H::csrf())?>"
                 >
+
                 <input
                     type="hidden"
                     name="action"
-                    value="open_round"
+                    value="schedule_round"
                 >
+
                 <input
                     type="hidden"
                     name="round_number"
                     value="<?=(int)$round['round_number']?>"
                 >
 
+                <label>
+                    Round start — Eastern Time
+                    <input
+                        type="datetime-local"
+                        name="starts_at"
+                        required
+                    >
+                </label>
+
+                <p class="muted">
+                    Round 1 must be scheduled at least 12 hours ahead.
+                    Voting will open automatically and remain open exactly 24 hours.
+                    Later rounds are scheduled automatically when the winners advance.
+                </p>
+
                 <button class="btn">
-                    Open Round Voting
+                    Schedule Round
                 </button>
             </form>
         <?php elseif($round['status']==='open'): ?>
@@ -411,5 +468,100 @@
 
     <?php if(!$flags): ?>
         <p>No Battle voting flags.</p>
+    <?php endif; ?>
+</section>
+
+<section class="card">
+    <h2>Registered Voter Audit</h2>
+
+    <p class="muted">
+        Admin-only voter details for manual fraud and bot review.
+        These details are never shown publicly.
+    </p>
+
+    <?php if(!empty($voterLedger)): ?>
+        <div style="overflow-x:auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Round</th>
+                        <th>Matchup</th>
+                        <th>Registered voter</th>
+                        <th>Email</th>
+                        <th>Account created</th>
+                        <th>Voted for</th>
+                        <th>Vote time</th>
+                        <th>IP address</th>
+                        <th>Browser / device evidence</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                <?php foreach($voterLedger as $vote): ?>
+                    <tr>
+                        <td>
+                            <?=number_format((int)$vote['round_number'])?>
+                        </td>
+
+                        <td>
+                            #<?=number_format((int)$vote['bracket_position'])?>
+                        </td>
+
+                        <td>
+                            <strong>
+                                <?=H::e($vote['voter_name'])?>
+                            </strong>
+                            <br>
+                            User #<?=(int)$vote['user_id']?>
+                        </td>
+
+                        <td>
+                            <?=H::e($vote['voter_email'])?>
+                        </td>
+
+                        <td>
+                            <?=H::e($vote['account_created_at'])?>
+                        </td>
+
+                        <td>
+                            <strong>
+                                <?=H::e($vote['voted_for_name'])?>
+                            </strong>
+                        </td>
+
+                        <td>
+                            <?=H::e($vote['voted_at'])?>
+                        </td>
+
+                        <td>
+                            <code><?=H::e($vote['ip_address'])?></code>
+                        </td>
+
+                        <td style="max-width:360px;word-break:break-word">
+                            <?=H::e($vote['user_agent'])?>
+
+                            <?php if(!empty($vote['browser_fingerprint_hash'])): ?>
+                                <br>
+                                <small>
+                                    Fingerprint:
+                                    <code>
+                                        <?=H::e(
+                                            substr(
+                                                $vote['browser_fingerprint_hash'],
+                                                0,
+                                                16
+                                            )
+                                        )?>…
+                                    </code>
+                                </small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php else: ?>
+        <p>No registered users have voted in this Battle yet.</p>
     <?php endif; ?>
 </section>

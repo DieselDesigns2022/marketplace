@@ -71,6 +71,13 @@ final class BattleController
                     (int)$event['id']
                 ),
                 'votes'=>$votes,
+                'previousRoundWinners'=>
+                    !empty($event['current_round'])
+                        ? $service->previousRoundWinners(
+                            (int)$event['id'],
+                            (int)$event['current_round']
+                        )
+                        : [],
             ]
         );
     }
@@ -206,6 +213,115 @@ final class BattleController
         );
     }
 
+    public function adminCreatePreview(): void
+    {
+        H::requireAdminPermission(
+            'prizes.manage'
+        );
+
+        H::verifyCsrf();
+
+        try{
+            $id=(new BattleService())
+                ->createPreview(
+                    (int)H::user()['id']
+                );
+
+            H::flash(
+                'success',
+                'Battle preview created with two fake designers.'
+            );
+
+            H::redirect(
+                '/admin/battles/'.$id
+            );
+
+        }catch(Throwable $error){
+            H::flash(
+                'error',
+                $this->message($error)
+            );
+
+            H::redirect('/admin/battles');
+        }
+    }
+
+    public function adminPreview($id): void
+    {
+        H::requireAdminPermission(
+            'prizes.view'
+        );
+
+        $service=new BattleService();
+
+        $event=$service->eventById(
+            (int)$id
+        );
+
+        if(
+            !$event ||
+            (int)($event['is_preview']??0)!==1
+        ){
+            H::abort(404);
+        }
+
+        H::view(
+            'battles/show',
+            [
+                'event'=>$event,
+                'participants'=>
+                    $service->participants(
+                        (int)$id
+                    ),
+                'rounds'=>
+                    $service->bracket(
+                        (int)$id
+                    ),
+                'votes'=>[],
+                'previousRoundWinners'=>
+                    !empty($event['current_round'])
+                        ? $service->previousRoundWinners(
+                            (int)$event['id'],
+                            (int)$event['current_round']
+                        )
+                        : [],
+                'adminPreview'=>true,
+            ]
+        );
+    }
+
+    public function adminDeletePreview($id): void
+    {
+        H::requireAdminPermission(
+            'prizes.manage'
+        );
+
+        H::verifyCsrf();
+
+        try{
+            $deleted=(new BattleService())
+                ->deletePreview(
+                    (int)$id,
+                    (int)H::user()['id']
+                );
+
+            H::flash(
+                $deleted?'success':'warning',
+                $deleted
+                    ? 'Battle preview and fake designers deleted.'
+                    : 'Battle preview was not found.'
+            );
+
+        }catch(Throwable $error){
+            H::flash(
+                'error',
+                $this->message($error)
+            );
+        }
+
+        H::redirect('/admin/battles');
+    }
+
     public function adminCreate(): void
     {
         H::requireAdminPermission(
@@ -214,20 +330,10 @@ final class BattleController
 
         H::verifyCsrf();
 
-        $minutes=trim(
-            (string)(
-                $_POST['voting_minutes']??
-                ''
-            )
-        );
-
         try{
             $id=(new BattleService())->createEvent(
                 (int)H::user()['id'],
-                (string)($_POST['title']??''),
-                $minutes!==''
-                    ? (int)$minutes
-                    : null
+                (string)($_POST['title']??'')
             );
 
             H::flash(
@@ -278,6 +384,9 @@ final class BattleController
                 'flags'=>$service->voteFlags(
                     (int)$id
                 ),
+                'voterLedger'=>$service->voterLedger(
+                    (int)$id
+                ),
             ]
         );
     }
@@ -296,21 +405,7 @@ final class BattleController
         );
 
         try{
-            if($action==='voting_minutes'){
-                $service->setVotingMinutes(
-                    (int)$id,
-                    (int)(
-                        $_POST['voting_minutes']??
-                        0
-                    ),
-                    (int)H::user()['id']
-                );
-
-                H::flash(
-                    'success',
-                    'Battle voting duration updated.'
-                );
-            }elseif($action==='generate'){
+            if($action==='generate'){
                 $result=$service->generateBracket(
                     (int)$id,
                     (int)H::user()['id']
@@ -322,19 +417,23 @@ final class BattleController
                     $result['participants'].
                     ' designers.'
                 );
-            }elseif($action==='open_round'){
-                $service->openRound(
+            }elseif($action==='schedule_round'){
+                $result=$service->scheduleRound(
                     (int)$id,
                     (int)(
                         $_POST['round_number']??
                         0
                     ),
-                    (int)H::user()['id']
+                    (int)H::user()['id'],
+                    (string)(
+                        $_POST['starts_at']??
+                        ''
+                    )
                 );
 
                 H::flash(
                     'success',
-                    'Battle round opened for voting.'
+                    'Battle round scheduled. Designers will receive their 12-hour warning before voting opens automatically.'
                 );
             }elseif($action==='close_round'){
                 $result=$service->closeRound(

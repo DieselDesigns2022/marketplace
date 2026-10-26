@@ -23,7 +23,6 @@ class AccountMergeService
         'prize_assignments' => 'winner_user_id',
         'prize_credit_grants' => 'user_id',
         'prize_credit_transactions' => 'user_id',
-        'battle_votes' => 'user_id',
         'battle_vote_attempts' => 'user_id',
         'prize_wheel_spins' => 'user_id',
         'prize_wheel_rewards' => 'user_id',
@@ -104,6 +103,7 @@ class AccountMergeService
             DB::row('select id from users where id in (?,?) for update', [$sourceId, $targetId]);
             $reconciliation = [];
             $reconciliation['deduplicated'] = $this->moveDeduplicated($sourceId, $targetId);
+            $reconciliation['battle_votes'] = $this->moveBattleVotes($sourceId, $targetId);
             foreach (self::SIMPLE_OWNERSHIP as $table => $column) $this->updateIfExists($table, $column, $sourceId, $targetId);
             $this->mergeEmailPreferences($sourceId, $targetId);
             $this->moveMessaging($sourceId, $targetId);
@@ -247,6 +247,7 @@ class AccountMergeService
         array_push(
             $known,
             'designers.user_id',
+            'battle_votes.user_id',
             'cart_items.user_id',
             'wishlists.user_id',
             'follows.user_id',
@@ -274,6 +275,111 @@ class AccountMergeService
             $row = DB::row('select 1 present from `'.$ref['table_name'].'` where `'.$ref['column_name'].'`=? limit 1', [$source]);
             if ($row) throw new DomainException("Unrecognized populated user reference blocks merge: $key.");
         }
+    }
+
+    private function moveBattleVotes(
+        int $source,
+        int $target
+    ): array {
+        if(!$this->tableExists('battle_votes')){
+            return [
+                'moved'=>0,
+                'deduplicated'=>0,
+                'conflicts'=>[],
+            ];
+        }
+
+        $votes=DB::rows(
+            'select *
+             from battle_votes
+             where user_id=?
+             order by id
+             for update',
+            [$source]
+        );
+
+        $moved=0;
+        $deduplicated=0;
+        $conflicts=[];
+
+        foreach($votes as $vote){
+            $existing=DB::row(
+                'select *
+                 from battle_votes
+                 where matchup_id=?
+                   and user_id=?
+                 limit 1
+                 for update',
+                [
+                    (int)$vote['matchup_id'],
+                    $target,
+                ]
+            );
+
+            if($existing){
+                $conflicts[]=[
+                    'matchup_id'=>
+                        (int)$vote['matchup_id'],
+                    'source_vote_id'=>
+                        (int)$vote['id'],
+                    'source_participant_id'=>
+                        (int)$vote['participant_id'],
+                    'target_vote_id'=>
+                        (int)$existing['id'],
+                    'target_participant_id'=>
+                        (int)$existing['participant_id'],
+                ];
+
+                DB::exec(
+                    'insert into battle_vote_attempts
+                     (
+                        battle_id,
+                        matchup_id,
+                        user_id,
+                        ip_address,
+                        user_agent,
+                        fingerprint_hash,
+                        outcome
+                     )
+                     values (?,?,?,?,?,?,"duplicate")',
+                    [
+                        (int)$vote['battle_id'],
+                        (int)$vote['matchup_id'],
+                        $target,
+                        (string)$vote['ip_address'],
+                        (string)$vote['user_agent'],
+                        (string)$vote['fingerprint_hash'],
+                    ]
+                );
+
+                DB::exec(
+                    'delete from battle_votes
+                     where id=?',
+                    [(int)$vote['id']]
+                );
+
+                $deduplicated++;
+                continue;
+            }
+
+            DB::exec(
+                'update battle_votes
+                 set user_id=?
+                 where id=?',
+                [
+                    $target,
+                    (int)$vote['id'],
+                ]
+            );
+
+            $moved++;
+        }
+
+        return [
+            'moved'=>$moved,
+            'deduplicated'=>$deduplicated,
+            'conflicts'=>$conflicts,
+        ];
     }
 
     private function moveDeduplicated(int $source, int $target): array

@@ -9,6 +9,35 @@
     </div>
 </header>
 
+<section class="card attention-panel">
+    <h2>Preview / Test Battle</h2>
+
+    <p>
+        Create a private Battle with two fake designers so you can review
+        the real Battle presentation before opening registration to sellers.
+    </p>
+
+    <p class="muted">
+        Preview Battles are admin-only. They do not appear to sellers or buyers,
+        do not send Battle emails, and do not award Advertising Credit.
+    </p>
+
+    <form
+        method="post"
+        action="/admin/battles/preview/create"
+    >
+        <input
+            type="hidden"
+            name="_csrf"
+            value="<?=H::e(H::csrf())?>"
+        >
+
+        <button class="btn">
+            Create 2-Designer Battle Preview
+        </button>
+    </form>
+</section>
+
 <section class="card">
     <h2>Create Battle</h2>
 
@@ -32,17 +61,13 @@
             >
         </label>
 
-        <label>
-            Voting duration per round, in minutes
-            <input
-                type="number"
-                name="voting_minutes"
-                min="1"
-            >
-        </label>
+        <p>
+            <strong>Round duration:</strong>
+            24 hours exactly
+        </p>
 
         <p class="muted">
-            Voting duration may be left blank now, but it must be deliberately set before the first round can open.
+            Every designer receives the same 24-hour voting window.
         </p>
 
         <button class="btn">
@@ -69,7 +94,12 @@
             <tbody>
             <?php foreach($events as $event): ?>
                 <tr>
-                    <td><?=H::e($event['title'])?></td>
+                    <td>
+                        <?=H::e($event['title'])?>
+                        <?php if((int)($event['is_preview']??0)===1): ?>
+                            <strong> — ADMIN PREVIEW</strong>
+                        <?php endif; ?>
+                    </td>
                     <td><?=H::e($event['status'])?></td>
                     <td><?=number_format((int)$event['participant_count'])?></td>
                     <td><?=number_format((int)$event['open_flag_count'])?></td>

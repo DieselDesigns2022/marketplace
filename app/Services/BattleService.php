@@ -10,6 +10,9 @@ use Throwable;
 final class BattleService
 {
     public const CHAMPION_AD_CREDIT='100.00';
+    public const ROUND_DURATION_HOURS=24;
+    public const PRE_BATTLE_EMAIL_HOURS=12;
+    public const FINAL_PUSH_EMAIL_HOURS=1;
 
     /*
      * These are technical abuse ceilings, not Battle scoring rules.
@@ -159,8 +162,7 @@ final class BattleService
 
     public function createEvent(
         int $adminId,
-        string $title,
-        ?int $votingMinutes=null
+        string $title
     ): int {
         $title=trim($title);
 
@@ -173,22 +175,12 @@ final class BattleService
             );
         }
 
-        if(
-            $votingMinutes!==null &&
-            $votingMinutes<1
-        ){
-            throw new InvalidArgumentException(
-                'Voting duration must be at least one minute.'
-            );
-        }
-
         $slug=self::safeSlug($title);
 
         return $this->atomic(function()use(
             $adminId,
             $title,
-            $slug,
-            $votingMinutes
+            $slug
         ){
             if(!DB::row(
                 'select id
@@ -212,7 +204,11 @@ final class BattleService
                 [$slug]
             )){
                 $slug.='-'.substr(
-                    hash('sha256',microtime(true).random_bytes(8)),
+                    hash(
+                        'sha256',
+                        microtime(true).
+                        random_bytes(8)
+                    ),
                     0,
                     8
                 );
@@ -223,14 +219,12 @@ final class BattleService
                  (
                     title,
                     slug,
-                    voting_minutes,
                     created_by_admin_id
                  )
-                 values (?,?,?,?)',
+                 values (?,?,?)',
                 [
                     $title,
                     $slug,
-                    $votingMinutes,
                     $adminId,
                 ]
             );
@@ -244,77 +238,12 @@ final class BattleService
                 $id,
                 [
                     'title'=>$title,
-                    'voting_minutes'=>$votingMinutes,
+                    'round_duration_hours'=>
+                        self::ROUND_DURATION_HOURS,
                 ]
             );
 
             return $id;
-        });
-    }
-
-    public function setVotingMinutes(
-        int $battleId,
-        int $minutes,
-        int $adminId
-    ): bool {
-        if($minutes<1){
-            throw new InvalidArgumentException(
-                'Voting duration must be at least one minute.'
-            );
-        }
-
-        return $this->atomic(function()use(
-            $battleId,
-            $minutes,
-            $adminId
-        ){
-            $battle=DB::row(
-                'select *
-                 from battle_events
-                 where id=?
-                 for update',
-                [$battleId]
-            );
-
-            if(!$battle){
-                return false;
-            }
-
-            if($battle['status']==='completed'){
-                throw new DomainException(
-                    'A completed Battle cannot be changed.'
-                );
-            }
-
-            if(DB::row(
-                'select id
-                 from battle_rounds
-                 where battle_id=?
-                   and status="open"
-                 limit 1',
-                [$battleId]
-            )){
-                throw new DomainException(
-                    'Voting duration cannot change while a round is open.'
-                );
-            }
-
-            DB::exec(
-                'update battle_events
-                 set voting_minutes=?
-                 where id=?',
-                [$minutes,$battleId]
-            );
-
-            $this->adminLog(
-                $adminId,
-                'updated_battle_voting_duration',
-                'battle_event',
-                $battleId,
-                ['minutes'=>$minutes]
-            );
-
-            return true;
         });
     }
 
@@ -943,6 +872,250 @@ final class BattleService
         }
     }
 
+    public function scheduleRound(
+        int $battleId,
+        int $roundNumber,
+        int $adminId,
+        string $startsAtLocal
+    ): array {
+        $timezone=new \DateTimeZone(
+            'America/Detroit'
+        );
+
+        $start=\DateTimeImmutable::createFromFormat(
+            'Y-m-d\TH:i',
+            trim($startsAtLocal),
+            $timezone
+        );
+
+        if(!$start){
+            throw new InvalidArgumentException(
+                'Choose a valid Battle start date and time.'
+            );
+        }
+
+        if(
+            $start->getTimestamp() <
+            time()+
+            (
+                self::PRE_BATTLE_EMAIL_HOURS *
+                60 *
+                60
+            )
+        ){
+            throw new DomainException(
+                'The Battle round must be scheduled at least 12 hours ahead.'
+            );
+        }
+
+        $opens=$start
+            ->setTimezone(
+                new \DateTimeZone('UTC')
+            )
+            ->format('Y-m-d H:i:s');
+
+        return $this->atomic(function()use(
+            $battleId,
+            $roundNumber,
+            $adminId,
+            $opens
+        ){
+            return $this->scheduleRoundLocked(
+                $battleId,
+                $roundNumber,
+                $adminId,
+                $opens
+            );
+        });
+    }
+
+    private function scheduleRoundLocked(
+        int $battleId,
+        int $roundNumber,
+        int $adminId,
+        string $opens
+    ): array {
+        $battle=DB::row(
+            'select *
+             from battle_events
+             where id=?
+             for update',
+            [$battleId]
+        ) ?? throw new DomainException(
+            'Battle not found.'
+        );
+
+        if((int)($battle['is_preview']??0)===1){
+            throw new DomainException(
+                'Preview Battles cannot schedule real voting rounds.'
+            );
+        }
+
+        if(
+            !in_array(
+                $battle['status'],
+                ['seeded','active'],
+                true
+            )
+        ){
+            throw new DomainException(
+                'This Battle cannot schedule a voting round.'
+            );
+        }
+
+        $round=DB::row(
+            'select *
+             from battle_rounds
+             where battle_id=?
+               and round_number=?
+             for update',
+            [$battleId,$roundNumber]
+        ) ?? throw new DomainException(
+            'Battle round not found.'
+        );
+
+        if($round['status']!=='pending'){
+            throw new DomainException(
+                'Only a pending Battle round can be scheduled.'
+            );
+        }
+
+        if(!empty($round['voting_opens_at'])){
+            throw new DomainException(
+                'That Battle round is already scheduled.'
+            );
+        }
+
+        if($roundNumber>1){
+            $previous=DB::row(
+                'select status
+                 from battle_rounds
+                 where battle_id=?
+                   and round_number=?
+                 for update',
+                [
+                    $battleId,
+                    $roundNumber-1
+                ]
+            );
+
+            if(
+                !$previous ||
+                $previous['status']!=='completed'
+            ){
+                throw new DomainException(
+                    'The previous Battle round must be completed first.'
+                );
+            }
+        }
+
+        $pending=DB::rows(
+            'select *
+             from battle_matchups
+             where battle_id=?
+               and round_number=?
+               and status="pending"
+             order by bracket_position
+             for update',
+            [
+                $battleId,
+                $roundNumber
+            ]
+        );
+
+        if(!$pending){
+            throw new DomainException(
+                'That round has no pending matchups.'
+            );
+        }
+
+        foreach($pending as $matchup){
+            if(
+                empty($matchup['participant_one_id']) ||
+                empty($matchup['participant_two_id'])
+            ){
+                throw new DomainException(
+                    'The bracket is not ready to schedule this round.'
+                );
+            }
+        }
+
+        $opensTimestamp=strtotime(
+            $opens.' UTC'
+        );
+
+        if($opensTimestamp===false){
+            throw new DomainException(
+                'Battle start time could not be calculated.'
+            );
+        }
+
+        $closes=gmdate(
+            'Y-m-d H:i:s',
+            $opensTimestamp+
+            (
+                self::ROUND_DURATION_HOURS *
+                60 *
+                60
+            )
+        );
+
+        DB::exec(
+            'update battle_rounds
+             set voting_opens_at=?,
+                 voting_closes_at=?
+             where id=?',
+            [
+                $opens,
+                $closes,
+                (int)$round['id'],
+            ]
+        );
+
+        DB::exec(
+            'update battle_matchups
+             set voting_opens_at=?,
+                 voting_closes_at=?
+             where battle_id=?
+               and round_number=?
+               and status="pending"',
+            [
+                $opens,
+                $closes,
+                $battleId,
+                $roundNumber,
+            ]
+        );
+
+        $this->queueRoundEmails(
+            $battleId,
+            $roundNumber,
+            $opens,
+            $closes
+        );
+
+        $this->adminLog(
+            $adminId,
+            'scheduled_battle_round',
+            'battle_event',
+            $battleId,
+            [
+                'round'=>$roundNumber,
+                'opens_at'=>$opens,
+                'closes_at'=>$closes,
+                'duration_hours'=>
+                    self::ROUND_DURATION_HOURS,
+                'warning_hours'=>
+                    self::PRE_BATTLE_EMAIL_HOURS,
+            ]
+        );
+
+        return [
+            'opens_at'=>$opens,
+            'closes_at'=>$closes,
+        ];
+    }
+
     public function openRound(
         int $battleId,
         int $roundNumber,
@@ -963,24 +1136,9 @@ final class BattleService
                 'Battle not found.'
             );
 
-            if(
-                !in_array(
-                    $battle['status'],
-                    ['seeded','active'],
-                    true
-                )
-            ){
+            if((int)($battle['is_preview']??0)===1){
                 throw new DomainException(
-                    'This Battle cannot open a voting round.'
-                );
-            }
-
-            if(
-                empty($battle['voting_minutes']) ||
-                (int)$battle['voting_minutes']<1
-            ){
-                throw new DomainException(
-                    'Set the Battle voting duration before opening a round.'
+                    'Preview Battles cannot open real voting rounds.'
                 );
             }
 
@@ -1001,84 +1159,41 @@ final class BattleService
                 );
             }
 
-            if($roundNumber>1){
-                $previous=DB::row(
-                    'select *
-                     from battle_rounds
-                     where battle_id=?
-                       and round_number=?',
-                    [$battleId,$roundNumber-1]
-                );
-
-                if(
-                    !$previous ||
-                    $previous['status']!=='completed'
-                ){
-                    throw new DomainException(
-                        'The previous Battle round must be completed first.'
-                    );
-                }
-            }
-
-            $pending=DB::rows(
-                'select *
-                 from battle_matchups
-                 where battle_id=?
-                   and round_number=?
-                   and status="pending"
-                 for update',
-                [$battleId,$roundNumber]
-            );
-
-            if(!$pending){
+            if(
+                empty($round['voting_opens_at']) ||
+                empty($round['voting_closes_at'])
+            ){
                 throw new DomainException(
-                    'That round has no pending matchups.'
+                    'That Battle round has not been scheduled.'
                 );
             }
 
-            foreach($pending as $matchup){
-                if(
-                    empty($matchup['participant_one_id']) ||
-                    empty($matchup['participant_two_id'])
-                ){
-                    throw new DomainException(
-                        'The bracket is not ready to open this round.'
-                    );
-                }
+            if(
+                time() <
+                strtotime(
+                    (string)$round['voting_opens_at'].
+                    ' UTC'
+                )
+            ){
+                throw new DomainException(
+                    'That Battle round is not scheduled to open yet.'
+                );
             }
-
-            $opens=date('Y-m-d H:i:s');
-
-            $closes=date(
-                'Y-m-d H:i:s',
-                time()+
-                ((int)$battle['voting_minutes']*60)
-            );
 
             DB::exec(
                 'update battle_rounds
-                 set status="open",
-                     voting_opens_at=?,
-                     voting_closes_at=?
+                 set status="open"
                  where id=?',
-                [
-                    $opens,
-                    $closes,
-                    (int)$round['id'],
-                ]
+                [(int)$round['id']]
             );
 
             DB::exec(
                 'update battle_matchups
-                 set status="open",
-                     voting_opens_at=?,
-                     voting_closes_at=?
+                 set status="open"
                  where battle_id=?
                    and round_number=?
                    and status="pending"',
                 [
-                    $opens,
-                    $closes,
                     $battleId,
                     $roundNumber,
                 ]
@@ -1089,26 +1204,283 @@ final class BattleService
                  set status="active",
                      current_round=?
                  where id=?',
-                [$roundNumber,$battleId]
+                [
+                    $roundNumber,
+                    $battleId,
+                ]
             );
 
             $this->adminLog(
                 $adminId,
-                'opened_battle_round',
+                'opened_scheduled_battle_round',
                 'battle_event',
                 $battleId,
                 [
                     'round'=>$roundNumber,
-                    'opens_at'=>$opens,
-                    'closes_at'=>$closes,
+                    'opens_at'=>$round['voting_opens_at'],
+                    'closes_at'=>$round['voting_closes_at'],
                 ]
             );
 
             return [
-                'opens_at'=>$opens,
-                'closes_at'=>$closes,
+                'opens_at'=>$round['voting_opens_at'],
+                'closes_at'=>$round['voting_closes_at'],
             ];
         });
+    }
+
+    public function processSchedule(
+        int $limit=50
+    ): array {
+        $limit=max(
+            1,
+            min(200,$limit)
+        );
+
+        $opened=0;
+        $closed=0;
+        $ties=0;
+        $errors=[];
+
+        $dueOpen=DB::rows(
+            'select
+                r.battle_id,
+                r.round_number,
+                e.created_by_admin_id
+             from battle_rounds r
+             join battle_events e
+               on e.id=r.battle_id
+             where r.status="pending"
+               and r.voting_opens_at is not null
+               and r.voting_opens_at<=utc_timestamp()
+               and e.is_preview=0
+               and e.status in ("seeded","active")
+             order by r.voting_opens_at,r.id
+             limit '.$limit
+        );
+
+        foreach($dueOpen as $row){
+            try{
+                $this->openRound(
+                    (int)$row['battle_id'],
+                    (int)$row['round_number'],
+                    (int)$row['created_by_admin_id']
+                );
+
+                $opened++;
+
+            }catch(Throwable $error){
+                $errors[]=
+                    'open:'.
+                    (int)$row['battle_id'].
+                    ':'.
+                    (int)$row['round_number'].
+                    ':'.
+                    $error->getMessage();
+            }
+        }
+
+        $dueClose=DB::rows(
+            'select
+                r.battle_id,
+                r.round_number,
+                e.created_by_admin_id
+             from battle_rounds r
+             join battle_events e
+               on e.id=r.battle_id
+             where r.status="open"
+               and r.voting_closes_at is not null
+               and r.voting_closes_at<=utc_timestamp()
+               and e.is_preview=0
+             order by r.voting_closes_at,r.id
+             limit '.$limit
+        );
+
+        foreach($dueClose as $row){
+            try{
+                $result=$this->closeRound(
+                    (int)$row['battle_id'],
+                    (int)$row['round_number'],
+                    (int)$row['created_by_admin_id']
+                );
+
+                $closed++;
+
+                $ties+=(int)($result['ties']??0);
+
+            }catch(Throwable $error){
+                $errors[]=
+                    'close:'.
+                    (int)$row['battle_id'].
+                    ':'.
+                    (int)$row['round_number'].
+                    ':'.
+                    $error->getMessage();
+            }
+        }
+
+        return [
+            'opened'=>$opened,
+            'closed'=>$closed,
+            'ties'=>$ties,
+            'errors'=>$errors,
+        ];
+    }
+
+    private function queueRoundEmails(
+        int $battleId,
+        int $roundNumber,
+        string $opens,
+        string $closes
+    ): void {
+        $battle=DB::row(
+            'select id,title,slug
+             from battle_events
+             where id=?',
+            [$battleId]
+        );
+
+        if(!$battle){
+            throw new DomainException(
+                'Battle not found while scheduling emails.'
+            );
+        }
+
+        $participants=DB::rows(
+            'select distinct
+                p.id participant_id,
+                d.display_name,
+                d.store_slug,
+                u.id user_id,
+                u.name,
+                u.email
+             from battle_matchups m
+             join battle_participants p
+               on p.id in (
+                    m.participant_one_id,
+                    m.participant_two_id
+               )
+             join designers d
+               on d.id=p.designer_id
+             join users u
+               on u.id=d.user_id
+             where m.battle_id=?
+               and m.round_number=?
+               and m.status in ("pending","open")
+               and u.status="active"
+             order by p.id',
+            [
+                $battleId,
+                $roundNumber,
+            ]
+        );
+
+        $opensTs=strtotime($opens);
+        $closesTs=strtotime($closes);
+
+        if(
+            $opensTs===false ||
+            $closesTs===false
+        ){
+            throw new DomainException(
+                'Battle email schedule timestamps are invalid.'
+            );
+        }
+
+        foreach($participants as $participant){
+            $base=[
+                'name'=>$participant['name'],
+                'store_name'=>$participant['display_name'],
+                'battle_title'=>$battle['title'],
+                'round_number'=>$roundNumber,
+                'round_hours'=>self::ROUND_DURATION_HOURS,
+                'battle_url'=>
+                    H::baseUrl().
+                    '/battle-of-the-designers/'.
+                    $battle['slug'],
+            ];
+
+            EmailQueueService::queueAt(
+                'transactional',
+                $participant['email'],
+                'Your Battle time is almost here!',
+                'battle_notification',
+                $base+[
+                    'stage'=>'upcoming',
+                    'message'=>
+                        'Your Battle time is almost here! '.
+                        'You have exactly 24 hours to get your votes in. '.
+                        'Get ready to share your matchup and rally your supporters.',
+                ],
+                'battle:'.
+                    $battleId.
+                    ':round:'.
+                    $roundNumber.
+                    ':participant:'.
+                    $participant['participant_id'].
+                    ':upcoming',
+                date(
+                    'Y-m-d H:i:s',
+                    $opensTs-
+                    (
+                        self::PRE_BATTLE_EMAIL_HOURS *
+                        60 *
+                        60
+                    )
+                )
+            );
+
+            EmailQueueService::queueAt(
+                'transactional',
+                $participant['email'],
+                'Your Battle is LIVE!',
+                'battle_notification',
+                $base+[
+                    'stage'=>'live',
+                    'message'=>
+                        'Your Battle is officially live! '.
+                        'You have exactly 24 hours to collect votes. '.
+                        'Share your Battle link and send your supporters to Creative Moth to vote.',
+                ],
+                'battle:'.
+                    $battleId.
+                    ':round:'.
+                    $roundNumber.
+                    ':participant:'.
+                    $participant['participant_id'].
+                    ':live',
+                $opens
+            );
+
+            EmailQueueService::queueAt(
+                'transactional',
+                $participant['email'],
+                '1 hour left in your Battle!',
+                'battle_notification',
+                $base+[
+                    'stage'=>'final_hour',
+                    'message'=>
+                        'Only 1 hour remains in your Battle! '.
+                        'This is your last chance to make a final push for votes before the round closes.',
+                ],
+                'battle:'.
+                    $battleId.
+                    ':round:'.
+                    $roundNumber.
+                    ':participant:'.
+                    $participant['participant_id'].
+                    ':final-hour',
+                date(
+                    'Y-m-d H:i:s',
+                    $closesTs-
+                    (
+                        self::FINAL_PUSH_EMAIL_HOURS *
+                        60 *
+                        60
+                    )
+                )
+            );
+        }
     }
 
     private function requestIdentity(
@@ -1770,6 +2142,23 @@ final class BattleService
                 $roundNumber
             );
 
+            $nextOpens=gmdate(
+                'Y-m-d H:i:s',
+                time()+
+                (
+                    self::PRE_BATTLE_EMAIL_HOURS *
+                    60 *
+                    60
+                )
+            );
+
+            $this->scheduleRoundLocked(
+                $battleId,
+                $roundNumber+1,
+                $adminId,
+                $nextOpens
+            );
+
             return;
         }
 
@@ -1890,6 +2279,7 @@ final class BattleService
                     ) participant_count
              from battle_events e
              where e.status<>"cancelled"
+               and e.is_preview=0
              order by
                 case e.status
                     when "active" then 1
@@ -1900,6 +2290,355 @@ final class BattleService
                 end,
                 e.id desc'
         );
+    }
+
+    public function createPreview(
+        int $adminId
+    ): int {
+        return $this->atomic(function()use($adminId){
+            $admin=DB::row(
+                'select id
+                 from users
+                 where id=?
+                   and role="admin"
+                   and status="active"
+                 for update',
+                [$adminId]
+            );
+
+            if(!$admin){
+                throw new DomainException(
+                    'An active admin is required.'
+                );
+            }
+
+            $existing=DB::row(
+                'select id
+                 from battle_events
+                 where is_preview=1
+                 order by id desc
+                 limit 1
+                 for update'
+            );
+
+            if($existing){
+                return (int)$existing['id'];
+            }
+
+            $suffix=bin2hex(random_bytes(4));
+
+            $fakeUsers=[
+                [
+                    'name'=>'Preview Designer Luna',
+                    'email'=>'battle-preview-luna-'.$suffix.'@example.test',
+                    'display'=>'Luna & Ink Studio',
+                    'slug'=>'battle-preview-luna-'.$suffix,
+                    'logo'=>'LUNA & INK',
+                ],
+                [
+                    'name'=>'Preview Designer Raven',
+                    'email'=>'battle-preview-raven-'.$suffix.'@example.test',
+                    'display'=>'Raven Moon Creative',
+                    'slug'=>'battle-preview-raven-'.$suffix,
+                    'logo'=>'RAVEN MOON',
+                ],
+            ];
+
+            $designerIds=[];
+
+            foreach($fakeUsers as $index=>$fake){
+                DB::exec(
+                    'insert into users
+                     (
+                        name,
+                        email,
+                        password_hash,
+                        role,
+                        status
+                     )
+                     values (?,?,?,?,?)',
+                    [
+                        $fake['name'],
+                        $fake['email'],
+                        password_hash(
+                            bin2hex(random_bytes(32)),
+                            PASSWORD_DEFAULT
+                        ),
+                        'designer',
+                        'active',
+                    ]
+                );
+
+                $userId=(int)DB::id();
+
+                DB::exec(
+                    'insert into designers
+                     (
+                        user_id,
+                        display_name,
+                        store_slug,
+                        status
+                     )
+                     values (?,?,?,"approved")',
+                    [
+                        $userId,
+                        $fake['display'],
+                        $fake['slug'],
+                    ]
+                );
+
+                $designerId=(int)DB::id();
+                $designerIds[]=$designerId;
+
+                $dir=public_path(
+                    'uploads/battles/logos'
+                );
+
+                if(
+                    !is_dir($dir) &&
+                    !mkdir($dir,0775,true) &&
+                    !is_dir($dir)
+                ){
+                    throw new DomainException(
+                        'Battle preview logo storage is unavailable.'
+                    );
+                }
+
+                $filename=
+                    'preview-'.$suffix.'-'.$index.'.png';
+
+                $absolute=$dir.'/'.$filename;
+
+                $canvas=imagecreatetruecolor(
+                    800,
+                    800
+                );
+
+                $bg=imagecolorallocate(
+                    $canvas,
+                    $index===0?235:28,
+                    $index===0?220:24,
+                    $index===0?235:35
+                );
+
+                $fg=imagecolorallocate(
+                    $canvas,
+                    $index===0?35:245,
+                    $index===0?25:235,
+                    $index===0?45:245
+                );
+
+                imagefill(
+                    $canvas,
+                    0,
+                    0,
+                    $bg
+                );
+
+                imagestring(
+                    $canvas,
+                    5,
+                    260,
+                    365,
+                    $fake['logo'],
+                    $fg
+                );
+
+                if(!imagepng(
+                    $canvas,
+                    $absolute,
+                    6
+                )){
+                    imagedestroy($canvas);
+
+                    throw new DomainException(
+                        'Battle preview logo could not be created.'
+                    );
+                }
+
+                imagedestroy($canvas);
+                @chmod($absolute,0644);
+
+                $fakeUsers[$index]['logo_path']=
+                    '/uploads/battles/logos/'.
+                    $filename;
+            }
+
+            DB::exec(
+                'insert into battle_events
+                 (
+                    title,
+                    slug,
+                    status,
+                    is_preview,
+                    created_by_admin_id
+                 )
+                 values (?,?,?,?,?)',
+                [
+                    'Battle of the Designers — PREVIEW',
+                    'battle-preview-'.$suffix,
+                    'signup',
+                    1,
+                    $adminId,
+                ]
+            );
+
+            $battleId=(int)DB::id();
+
+            foreach($designerIds as $index=>$designerId){
+                DB::exec(
+                    'insert into battle_participants
+                     (
+                        battle_id,
+                        designer_id,
+                        logo_path
+                     )
+                     values (?,?,?)',
+                    [
+                        $battleId,
+                        $designerId,
+                        $fakeUsers[$index]['logo_path'],
+                    ]
+                );
+            }
+
+            $this->adminLog(
+                $adminId,
+                'created_battle_preview',
+                'battle_event',
+                $battleId,
+                [
+                    'fake_designers'=>2,
+                ]
+            );
+
+            return $battleId;
+        });
+    }
+
+    public function deletePreview(
+        int $battleId,
+        int $adminId
+    ): bool {
+        return $this->atomic(function()use(
+            $battleId,
+            $adminId
+        ){
+            $battle=DB::row(
+                'select *
+                 from battle_events
+                 where id=?
+                   and is_preview=1
+                 for update',
+                [$battleId]
+            );
+
+            if(!$battle){
+                return false;
+            }
+
+            $designers=DB::rows(
+                'select
+                    d.id designer_id,
+                    d.user_id,
+                    p.logo_path
+                 from battle_participants p
+                 join designers d
+                   on d.id=p.designer_id
+                 where p.battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_vote_flags
+                 where battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_vote_attempts
+                 where battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_votes
+                 where battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_matchups
+                 where battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_rounds
+                 where battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'update battle_events
+                 set champion_participant_id=null
+                 where id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_participants
+                 where battle_id=?',
+                [$battleId]
+            );
+
+            DB::exec(
+                'delete from battle_events
+                 where id=?',
+                [$battleId]
+            );
+
+            foreach($designers as $designer){
+                $logo=(string)$designer['logo_path'];
+
+                if(
+                    str_starts_with(
+                        $logo,
+                        '/uploads/battles/logos/preview-'
+                    )
+                ){
+                    $absolute=
+                        public_path(
+                            ltrim($logo,'/')
+                        );
+
+                    if(is_file($absolute)){
+                        @unlink($absolute);
+                    }
+                }
+
+                DB::exec(
+                    'delete from designers
+                     where id=?',
+                    [(int)$designer['designer_id']]
+                );
+
+                DB::exec(
+                    'delete from users
+                     where id=?',
+                    [(int)$designer['user_id']]
+                );
+            }
+
+            $this->adminLog(
+                $adminId,
+                'deleted_battle_preview',
+                'battle_event',
+                $battleId
+            );
+
+            return true;
+        });
     }
 
     public function adminEvents(): array
@@ -1940,6 +2679,7 @@ final class BattleService
                on p.battle_id=e.id
               and p.designer_id=d.id
              where e.status<>"cancelled"
+               and e.is_preview=0
              order by e.id desc',
             [$userId]
         );
@@ -2055,6 +2795,95 @@ final class BattleService
         }
 
         return $votes;
+    }
+
+    public function voterLedger(int $battleId): array
+    {
+        return DB::rows(
+            'select
+                v.id vote_id,
+                v.created_at voted_at,
+                v.ip_address,
+                v.user_agent,
+                v.fingerprint_hash browser_fingerprint_hash,
+
+                u.id user_id,
+                u.name voter_name,
+                u.email voter_email,
+                u.created_at account_created_at,
+
+                m.round_number,
+                m.bracket_position,
+
+                d.display_name voted_for_name,
+                d.store_slug voted_for_store,
+
+                p.logo_path voted_for_logo
+
+             from battle_votes v
+
+             join users u
+               on u.id=v.user_id
+
+             join battle_matchups m
+               on m.id=v.matchup_id
+
+             join battle_participants p
+               on p.id=v.participant_id
+
+             join designers d
+               on d.id=p.designer_id
+
+             where v.battle_id=?
+
+             order by
+                m.round_number desc,
+                m.bracket_position,
+                d.display_name,
+                v.created_at desc,
+                v.id desc',
+            [$battleId]
+        );
+    }
+
+    public function previousRoundWinners(
+        int $battleId,
+        int $currentRound
+    ): array {
+        if($currentRound<=1){
+            return [];
+        }
+
+        return DB::rows(
+            'select distinct
+                p.id participant_id,
+                p.logo_path,
+                d.display_name,
+                d.store_slug,
+                m.round_number,
+                m.bracket_position
+
+             from battle_matchups m
+
+             join battle_participants p
+               on p.id=m.winner_participant_id
+
+             join designers d
+               on d.id=p.designer_id
+
+             where m.battle_id=?
+               and m.round_number=?
+               and m.status="completed"
+               and m.winner_participant_id is not null
+
+             order by
+                m.bracket_position,
+                d.display_name',
+            [
+                $battleId,
+                $currentRound-1
+            ]
+        );
     }
 
     public function voteFlags(int $battleId): array

@@ -84,15 +84,38 @@ $check(
 );
 
 $check(
+    BattleService::ROUND_DURATION_HOURS===24 &&
+    BattleService::PRE_BATTLE_EMAIL_HOURS===12 &&
+    BattleService::FINAL_PUSH_EMAIL_HOURS===1 &&
     str_contains(
         $service,
-        'Set the Battle voting duration before opening a round.'
+        'self::ROUND_DURATION_HOURS *'
+    ) &&
+    !str_contains(
+        $service,
+        'voting_minutes'
+    ),
+    'every Battle round is exactly 24 hours'
+);
+
+$check(
+    str_contains(
+        $service,
+        "'battle_notification'"
     ) &&
     str_contains(
-        $migration,
-        'voting_minutes INT UNSIGNED NULL'
+        $service,
+        "':upcoming'"
+    ) &&
+    str_contains(
+        $service,
+        "':live'"
+    ) &&
+    str_contains(
+        $service,
+        "':final-hour'"
     ),
-    'Battle voting duration has no invented default'
+    'Battle schedules 12-hour warning, live, and final-hour designer emails'
 );
 
 $check(
@@ -228,5 +251,59 @@ $check(
     'rejected Battle vote attempts are committed for audit review'
 );
 
+
+
+$accountMerge=file_get_contents(
+    dirname(__DIR__).
+    '/app/Services/AccountMergeService.php'
+);
+
+$check(
+    str_contains(
+        $service,
+        'public function scheduleRound('
+    ) &&
+    str_contains(
+        $service,
+        'public function processSchedule('
+    ) &&
+    str_contains(
+        $service,
+        'self::PRE_BATTLE_EMAIL_HOURS'
+    ) &&
+    str_contains(
+        $service,
+        'self::ROUND_DURATION_HOURS'
+    ),
+    'Battle rounds schedule 12 hours ahead, open automatically, and last exactly 24 hours'
+);
+
+$check(
+    str_contains(
+        $service,
+        '$roundNumber+1'
+    ) &&
+    str_contains(
+        $service,
+        '$this->scheduleRoundLocked('
+    ),
+    'Battle automatically schedules the next winner round'
+);
+
+$check(
+    !str_contains(
+        $accountMerge,
+        "'battle_votes' => 'user_id'"
+    ) &&
+    str_contains(
+        $accountMerge,
+        'private function moveBattleVotes('
+    ) &&
+    str_contains(
+        $accountMerge,
+        '"duplicate"'
+    ),
+    'Battle account merges preserve one vote per matchup without losing audit evidence'
+);
 
 exit($fail?1:0);

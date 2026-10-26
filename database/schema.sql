@@ -2053,7 +2053,7 @@ CREATE TABLE battle_events (
         'cancelled'
     ) NOT NULL DEFAULT 'signup',
 
-    voting_minutes INT UNSIGNED NULL,
+    is_preview TINYINT(1) NOT NULL DEFAULT 0,
 
     seed_token CHAR(64) NULL,
     bracket_size INT UNSIGNED NULL,
@@ -2071,13 +2071,11 @@ CREATE TABLE battle_events (
 
     UNIQUE KEY battle_events_slug_uq (slug),
     KEY battle_events_status_idx (status,created_at),
+    KEY battle_events_preview_idx (is_preview,status),
 
     CONSTRAINT battle_events_created_admin_fk
         FOREIGN KEY (created_by_admin_id)
         REFERENCES users(id),
-
-    CONSTRAINT battle_events_voting_minutes_chk
-        CHECK (voting_minutes IS NULL OR voting_minutes >= 1)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;

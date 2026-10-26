@@ -40,6 +40,165 @@ final class EmailQueueService
             $classification,$email,mb_substr(strip_tags((string)($data['name']??'')),0,120),mb_substr(strip_tags($subject),0,190),$template,$json,$links['campaign_id']??null,$links['campaign_recipient_id']??null,$links['waitlist_entry_id']??null,mb_substr($dedupe,0,190)]);
     }
 
+    public static function queueAt(
+        string $classification,
+        string $email,
+        string $subject,
+        string $template,
+        array $data,
+        string $dedupe,
+        string $sendAt,
+        array $links=[]
+    ): bool {
+        $email=strtolower(trim($email));
+
+        if(
+            !in_array(
+                $classification,
+                ['transactional','marketing'],
+                true
+            ) ||
+            !self::validEnvelope(
+                $email,
+                $subject
+            )
+        ){
+            return false;
+        }
+
+        $timestamp=strtotime($sendAt);
+
+        if($timestamp===false){
+            throw new \InvalidArgumentException(
+                'Scheduled email time is invalid.'
+            );
+        }
+
+        unset($data['admin_test_send']);
+
+        if(!empty($links['admin_test'])){
+            $data['admin_test_send']=true;
+        }
+
+        if($classification==='marketing'){
+            if(!empty($links['waitlist_entry_id'])){
+                $w=DB::row(
+                    'select id,unsubscribe_nonce
+                     from waitlist_entries
+                     where id=?',
+                    [$links['waitlist_entry_id']]
+                );
+
+                if(!$w){
+                    return false;
+                }
+
+                $data['unsubscribe_url']=
+                    UnsubscribeService::url(
+                        'w',
+                        (int)$w['id'],
+                        $w['unsubscribe_nonce']
+                    );
+
+            }elseif(!empty($data['user_id'])){
+                $p=DB::row(
+                    'select *
+                     from email_preferences
+                     where user_id=?',
+                    [$data['user_id']]
+                );
+
+                if(!$p){
+                    return false;
+                }
+
+                $category=(string)(
+                    $data['marketing_preference']??''
+                );
+
+                if(
+                    $category!=='' &&
+                    !EmailPreferenceService::enabled(
+                        $p,
+                        $category
+                    )
+                ){
+                    return false;
+                }
+
+                $kind=[
+                    'weekly'=>'uw',
+                    'monthly'=>'um',
+                    'favorite_shop'=>'uf'
+                ][$category]??'u';
+
+                $data['unsubscribe_url']=
+                    UnsubscribeService::url(
+                        $kind,
+                        (int)$p['user_id'],
+                        $p['unsubscribe_nonce']
+                    );
+
+                $data['manage_preferences_url'] ??=
+                    H::baseUrl().
+                    '/account#email-preferences';
+
+            }else{
+                return false;
+            }
+        }
+
+        $json=json_encode(
+            $data,
+            JSON_THROW_ON_ERROR |
+            JSON_UNESCAPED_SLASHES
+        );
+
+        return DB::exec(
+            'insert ignore into email_messages
+             (
+                classification,
+                recipient_email,
+                recipient_name,
+                subject,
+                template,
+                template_data,
+                campaign_id,
+                campaign_recipient_id,
+                waitlist_entry_id,
+                deduplication_key,
+                next_attempt_at
+             )
+             values (?,?,?,?,?,?,?,?,?,?,?)',
+            [
+                $classification,
+                $email,
+                mb_substr(
+                    strip_tags(
+                        (string)($data['name']??'')
+                    ),
+                    0,
+                    120
+                ),
+                mb_substr(
+                    strip_tags($subject),
+                    0,
+                    190
+                ),
+                $template,
+                $json,
+                $links['campaign_id']??null,
+                $links['campaign_recipient_id']??null,
+                $links['waitlist_entry_id']??null,
+                mb_substr($dedupe,0,190),
+                date(
+                    'Y-m-d H:i:s',
+                    $timestamp
+                ),
+            ]
+        );
+    }
+
     public static function paidOrder(int $orderId): void
     {
         $o=DB::row('select o.*,u.email,u.name from orders o join users u on u.id=o.user_id where o.id=? and o.payment_status="paid" and o.manual_review_required=0',[$orderId]);
