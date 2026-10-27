@@ -1,9 +1,23 @@
-<?php use App\Core\Helpers as H; use App\Services\AdminPermissionService; $canManage=H::canAdmin('users.manage'); ?>
+<?php use App\Core\Helpers as H; use App\Services\AdminPermissionService; $canManage=H::canAdmin('users.manage');
+$userFilters=\App\Services\UserDirectoryFilter::state($_GET);
+$userTotal=count($users);
+$users=\App\Services\UserDirectoryFilter::apply($users,$userFilters);
+$userFilterQuery=http_build_query(array_filter($userFilters,static fn($v)=>$v!==''));
+$userAction='/admin/users'.($userFilterQuery!==''?'?'.$userFilterQuery:'');
+?>
 <header class="dashboard-heading"><div><h1>Users</h1><p class="muted">Manage account status and, when authorized, Admin access.</p></div></header>
+<form method="get" action="/admin/users" class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end">
+<label>Account type <select name="user_role"><option value="">All users</option><?php foreach(['admin'=>'Admins','seller'=>'Sellers','buyer'=>'Buyers'] as $value=>$label): ?><option value="<?=$value?>" <?=$userFilters['user_role']===$value?'selected':''?>><?=$label?></option><?php endforeach; ?></select></label>
+<label>Account status <select name="user_status"><option value="">All statuses</option><?php foreach(['active'=>'Active','disabled'=>'Disabled'] as $value=>$label): ?><option value="<?=$value?>" <?=$userFilters['user_status']===$value?'selected':''?>><?=$label?></option><?php endforeach; ?></select></label>
+<label>Name or email <input type="search" name="user_q" maxlength="150" value="<?=H::e($userFilters['user_q'])?>"></label>
+<button>Filter users</button><a href="/admin/users">Reset</a>
+</form>
+<p>Showing <?=count($users)?> of <?=$userTotal?> users. Sellers includes admins with a seller profile.</p>
+<?php if(!$users): ?><p class="card">No users match these filters.</p><?php endif; ?>
 <div class="responsive-table"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Account Created</th><th>Account actions</th></tr></thead><tbody>
 <?php foreach($users as $user): $canonical=$canonicalOwnerId!==null&&(int)$user['id']===(int)$canonicalOwnerId; $grants=array_filter(explode(',',(string)$user['permission_keys'])); ?><tr><td><?=H::e($user['name'])?></td><td><?=H::e($user['email'])?></td><td><?=H::e($user['role'])?></td><td><?=H::e($user['status'])?></td><td><?=H::e(date('M j, Y g:i A', strtotime($user['created_at'])))?></td><td>
 <?php if($canManage&&!$canonical&&($user['role']!=='admin'||$fullAccessAdmin)): ?>
-<form method="post" action="/admin/users" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:.45rem;">
+<form method="post" action="<?=H::e($userAction)?>" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:.45rem;">
 <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
 <input type="hidden" name="action" value="status">
 <input type="hidden" name="id" value="<?=(int)$user['id']?>">
@@ -19,6 +33,6 @@
 <?php endif;?>
 </form>
 <?php endif; ?>
-<?php if($fullAccessAdmin): ?><details><summary><?=$user['role']==='admin'?'Edit Admin access':'Promote to Admin'?></summary><form method="post" action="/admin/users"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="save_admin"><input type="hidden" name="id" value="<?=(int)$user['id']?>"><label><input type="checkbox" name="full_access" value="1" <?=((int)$user['full_access']===1)?'checked':''?> <?=$canonical?'disabled':''?>> Full access</label><?php if($canonical):?><input type="hidden" name="full_access" value="1"><?php endif;?><fieldset><legend>Granular permissions</legend><?php foreach($permissionRegistry as $permission):?><label><input type="checkbox" name="permissions[]" value="<?=H::e($permission)?>" <?=in_array($permission,$grants,true)?'checked':''?>> <?=H::e(['social_content.view'=>'Social Content — View','social_content.manage'=>'Social Content — Manage (also select View)'][$permission]??$permission)?></label><?php endforeach;?></fieldset><button class="btn">Save Admin access</button></form></details><?php endif; ?>
+<?php if($fullAccessAdmin): ?><details><summary><?=$user['role']==='admin'?'Edit Admin access':'Promote to Admin'?></summary><form method="post" action="<?=H::e($userAction)?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="save_admin"><input type="hidden" name="id" value="<?=(int)$user['id']?>"><label><input type="checkbox" name="full_access" value="1" <?=((int)$user['full_access']===1)?'checked':''?> <?=$canonical?'disabled':''?>> Full access</label><?php if($canonical):?><input type="hidden" name="full_access" value="1"><?php endif;?><fieldset><legend>Granular permissions</legend><?php foreach($permissionRegistry as $permission):?><label><input type="checkbox" name="permissions[]" value="<?=H::e($permission)?>" <?=in_array($permission,$grants,true)?'checked':''?>> <?=H::e(['social_content.view'=>'Social Content — View','social_content.manage'=>'Social Content — Manage (also select View)'][$permission]??$permission)?></label><?php endforeach;?></fieldset><button class="btn">Save Admin access</button></form></details><?php endif; ?>
 <?php if($canManage&&(int)$user['id']!==(int)H::user()['id']&&$user['role']!=='admin'):?><details class="permanent-delete"><summary>Permanent delete</summary><form method="post" action="/admin/users/<?=(int)$user['id']?>/delete" class="permanent-delete-form"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><label>Type <?=H::e($user['email'])?> to permanently delete<input type="email" name="confirm_email" required autocomplete="off"></label><button class="danger-button">Permanently delete user</button></form></details><?php endif;?>
 </td></tr><?php endforeach;?></tbody></table></div>

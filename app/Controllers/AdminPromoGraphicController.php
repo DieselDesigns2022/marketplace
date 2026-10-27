@@ -8,7 +8,8 @@ final class AdminPromoGraphicController
 {
     private function gate(string $permission):void
     {
-        H::requireAdminPermission($permission);
+        H::requireLogin();
+        if (!\App\Services\PromoGraphicAccessService::can($permission)) H::abort(403);
     }
 
     public function index():void

@@ -375,7 +375,7 @@ if ($area === 'buyer') {
     foreach ($groups as $groupName => $links) {
         foreach ($links as $index => $link) {
             $permission = $permissionByHref[$link[0]] ?? null;
-            $groups[$groupName][$index][3] = $permission === null || H::canAdmin($permission);
+            $groups[$groupName][$index][3] = $link[0] === '/admin/promo-library' ? \App\Services\PromoGraphicAccessService::can('promotions.view') : ($permission === null || H::canAdmin($permission));
         }
     }
 }

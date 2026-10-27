@@ -6,8 +6,9 @@ $when=static function(?string $value): string {
 };
 ?>
 <h1>Social Content</h1>
+<p><a class="btn" href="/admin/promo-library">Open Promo Graphics Library</a></p>
 <p>Prepare posts, copy shop details, and track what has been posted. This queue does not publish to social accounts.</p>
-<p class="muted">Seller spotlights appear when an active seller has an approved store and an approved product. Existing eligible stores are included once. Dates below use Eastern time.</p>
+<p class="muted">Seller spotlights appear when an active seller has an approved store and an approved product. Newest stores appear first, based on their store-joined date. Existing eligible stores are included once. Dates below use Eastern time.</p>
 <?php if($error): ?><div class="notice error" role="alert"><?=H::e($error)?></div><?php endif; ?>
 <form method="get" action="/admin/social-content" class="card">
 <label>Content type <select name="type"><option value="">All content</option><?php foreach($types as $key=>$label): ?><option value="<?=H::e($key)?>" <?=$type===$key?'selected':''?>><?=H::e($label)?></option><?php endforeach; ?></select></label>
@@ -43,16 +44,41 @@ $when=static function(?string $value): string {
 <?php if(!$items): ?><div class="card">No content matches these filters. Disabled sale events are not advertised as live.</div><?php endif; ?>
 <nav aria-label="Queue pages"><?php if($page>1): ?><a href="?<?=H::e(http_build_query(['type'=>$type,'status'=>$status,'q'=>$q,'page'=>$page-1]))?>">Previous</a><?php endif; ?> Page <?=$page?> of <?=$pages?> <?php if($page<$pages): ?><a href="?<?=H::e(http_build_query(['type'=>$type,'status'=>$status,'q'=>$q,'page'=>$page+1]))?>">Next</a><?php endif; ?></nav>
 <?php if($canManage): ?>
-<details class="card" <?=($form['action']??'')==='create'?'open':''?>><summary>Add giveaway, referral, or event highlight</summary>
-<p>Add only confirmed event details. This creates a content task; it does not create or activate a giveaway or referral program.</p>
+<details class="card" <?=($form['action']??'')==='create'?'open':''?>><summary>Social Media Planner</summary>
+<h2>Plan a social media post</h2>
+<p>Use this planner to keep post ideas and ready-to-share captions in one place. The website owner or social media manager can add a post here for the team to use later.</p>
+
+<h3>How to add a planned post</h3>
+<ol>
+<li><strong>Choose a type:</strong> Giveaway, Referral, or Event / Prize Highlight. This helps you find the post using the content-type filter above.</li>
+<li><strong>Give it a clear title:</strong> For example, “Friday giveaway reminder.” This title is for your team to recognize the post.</li>
+<li><strong>Add the page to promote:</strong> Enter the part of the Creative Moth link after creativemoth.com. For example, enter <code>/browse</code> to send people to the marketplace.</li>
+<li><strong>Choose when you want to post:</strong> The date and time use Eastern time. You can leave this blank if you have not decided yet. This is a planning note—not an automatic publishing time or reminder.</li>
+<li><strong>Write the caption:</strong> Add the words you want to share on social media. Include the important details and tell readers what to do next, such as shop, enter, or visit a page.</li>
+<li><strong>Click Add to planner:</strong> Your post will appear in the queue above with a “To post” status. Use the content-type filter or search to find it.</li>
+</ol>
+
+<h3>When you are ready to share it</h3>
+<ol>
+<li>Find the planned post in the queue and check that its details and link are still correct.</li>
+<li>Click <strong>Copy caption</strong>. The copied text includes the link you entered.</li>
+<li>Open the <strong>Promo Graphics Library</strong> if you need an image, then create the post on your social media platform using the caption and image you choose.</li>
+<li>After publishing it yourself, return here and click <strong>Mark posted / done</strong>. This tells the rest of the team it has been handled.</li>
+</ol>
+
+<p>To find completed posts, change the Status filter to <strong>Posted / Done</strong>. If a post was marked done by mistake, click <strong>Return to queue</strong>.</p>
+
+<p><strong>Example:</strong> Choose Giveaway, use “Friday giveaway reminder” as the title, enter the page explaining that giveaway, choose Friday’s posting time, and write your reminder caption. Your manager can then find everything needed to prepare that post.</p>
+
+<p><strong>This planner saves your posting task only.</strong> It does not publish or schedule posts on Facebook, Instagram, or other platforms, send reminders, or create the giveaway or referral offer itself. Add those posts here once the offer and its details are ready.</p>
 <form method="post" action="/admin/social-content">
 <input type="hidden" name="_csrf" value="<?=H::csrf()?>"><input type="hidden" name="action" value="create">
 <label>Type <select name="content_type"><?php foreach(['giveaway','referral','highlight'] as $t): ?><option value="<?=$t?>" <?=($form['content_type']??'')===$t?'selected':''?>><?=H::e($types[$t])?></option><?php endforeach; ?></select></label>
-<label>Title <input name="title" maxlength="190" required value="<?=H::e($form['title']??'')?>"></label>
-<label>Public site path <input name="target_path" placeholder="/browse" maxlength="500" required value="<?=H::e($form['target_path']??'')?>"></label>
-<label>Planned date — Eastern <input type="datetime-local" name="relevant_at" value="<?=H::e($form['relevant_at']??'')?>"></label>
+<label>Post title (for example, Friday giveaway reminder) <input name="title" maxlength="190" required value="<?=H::e($form['title']??'')?>"></label>
+<label>Link to promote — the part after creativemoth.com <input name="target_path" placeholder="/browse" maxlength="500" required value="<?=H::e($form['target_path']??'')?>"></label>
+<label>When to post — Eastern time (optional) <input type="datetime-local" name="relevant_at" value="<?=H::e($form['relevant_at']??'')?>"></label>
 <label>Caption <textarea name="caption" rows="5" maxlength="4000" required><?=H::e($form['caption']??'')?></textarea></label>
-<button>Add content task</button>
+<button>Add to planner</button>
 </form></details>
 <?php endif; ?>
 <p id="social-copy-status" role="status" aria-live="polite"></p>

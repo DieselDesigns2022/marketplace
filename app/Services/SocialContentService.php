@@ -31,7 +31,7 @@ final class SocialContentService
             left join grand_opening_sales s on s.designer_id=d.id and s.event_id=1
             where d.status="approved" and u.status="active" and coalesce(d.store_slug,"")<>""
               and exists(select 1 from products p where p.designer_id=d.id and p.status="approved")
-            order by d.created_at,d.id');
+            order by d.created_at desc,d.id desc');
         foreach ($shops as $d) {
             $details=[];
             if ($d['is_participating']) $details[]='Sale: '.number_format((int)$d['discount_basis_points']/100,2).'% off '.($d['product_scope']==='shop'?'shop-wide':'selected products').' (event '.$state.')';
@@ -73,7 +73,7 @@ final class SocialContentService
                 'Discover '.$d['display_name'].' on Creative Moth! Visit their shop for Prize Wheel availability, entry requirements, and prize details:', '', $d['avatar_path']??'');
         }
         foreach (DB::rows('select id,content_type,title,target_path,relevant_at,caption from social_content_manual order by id') as $m) {
-            $items[]=$this->card('manual:'.$m['id'],$m['content_type'],$m['title'],$m['target_path'],$m['relevant_at']??'','Planned date',$m['caption'],'Manually prepared content — verify event rules before posting.');
+            $items[]=$this->card('manual:'.$m['id'],$m['content_type'],$m['title'],$m['target_path'],$m['relevant_at']??'','Planned date',$m['caption'],'Added by your team for the social media manager to post.');
         }
         $states=[];
         foreach (DB::rows('select s.content_key,s.status,s.version,s.done_at,u.name done_by_name from social_content_states s left join users u on u.id=s.done_by') as $s) $states[$s['content_key']]=$s;
