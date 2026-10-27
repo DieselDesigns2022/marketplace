@@ -298,4 +298,6 @@ $router->post('/admin/prize-assignments/{id}/release', [PrizeDonationController:
  $router->get('/admin/homepage-preview', [AdminController::class, 'homepagePreview']);
  $router->match(['GET','POST'], '/admin/homepage', [AdminController::class, 'homepage']);
  $router->match(['GET','POST'], '/admin/ads', [AdminController::class, 'ads']);
+$router->match(['GET','POST'], '/seller/grand-opening-sale', [\App\Controllers\GrandOpeningSaleController::class, 'seller']);
+$router->match(['GET','POST'], '/admin/grand-opening', [\App\Controllers\GrandOpeningSaleController::class, 'admin']);
  $router->dispatch($_SERVER['REQUEST_METHOD'], parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
