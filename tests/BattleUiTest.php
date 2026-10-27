@@ -246,4 +246,42 @@ $check(
     'admin Battle UI exposes registered voter audit evidence'
 );
 
+
+$sellerBattle=file_get_contents(
+    dirname(__DIR__).
+    '/app/Views/seller/battles.php'
+);
+
+$check(
+    str_contains(
+        $sellerBattle,
+        'How Battle of the Designers Works'
+    ) &&
+    str_contains(
+        $sellerBattle,
+        'Designers Are Randomly Paired'
+    ) &&
+    str_contains(
+        $sellerBattle,
+        'Each Battle round lasts exactly'
+    ) &&
+    str_contains(
+        $sellerBattle,
+        'registered Creative Moth'
+    ) &&
+    str_contains(
+        $sellerBattle,
+        'Winners Advance'
+    ) &&
+    str_contains(
+        $sellerBattle,
+        '$100 Creative Moth Advertising Credit'
+    ) &&
+    str_contains(
+        $sellerBattle,
+        'promote your'
+    ),
+    'seller Battle signup explains the tournament and advertising-credit prize'
+);
+
 exit($fail?1:0);
