@@ -159,6 +159,7 @@ class AdminController
 
         if (!$permissions->can($adminId,'dashboard.view')) {
             $firstAllowed=[
+                'social_content.view'=>'/admin/social-content',
                 'users.view'=>'/admin/users',
                 'applications.view'=>'/admin/applications',
                 'designers.view'=>'/admin/designers',
