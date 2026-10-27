@@ -122,6 +122,25 @@ $check(str_contains($html,'name="version"') && str_contains($html,'name="_csrf"'
 $controller=file_get_contents(app_path('app/Controllers/SocialContentController.php'));
 $check(str_contains($controller,"empty(\$_SESSION['_csrf'])") && str_contains($controller,'H::verifyCsrf()'),'Controller rejects missing CSRF tokens');
 $nav=file_get_contents(app_path('app/Views/partials/dashboard_nav.php'));
-$check(str_contains($nav,"'Marketplace' => [\n            ['/admin/social-content'"),'Menu in Marketplace');
+$navigation = (static function(): array {
+    $path = '/admin/social-content';
+    ob_start();
+    try {
+        include app_path('app/Views/partials/dashboard_nav.php');
+        return ['groups'=>$groups,'html'=>ob_get_contents()];
+    } finally {
+        ob_end_clean();
+    }
+})();
+$marketplaceLinks = array_column($navigation['groups']['Marketplace']??[],0);
+$check(in_array('/admin/social-content',$marketplaceLinks,true),'Social Content belongs to Marketplace regardless of position');
+$locations = [];
+foreach ($navigation['groups'] as $section=>$links) {
+    foreach ($links as $link) {
+        if ($link[0]==='/admin/social-content') $locations[]=$section;
+    }
+}
+$check($locations===['Marketplace'],'Social Content appears once, only in Marketplace');
+$check(str_contains($navigation['html'],'href="/admin/social-content"'),'Authorized social viewer sees the navigation link');
 $check(str_contains(file_get_contents(app_path('app/Controllers/AdminController.php')),"'social_content.view'=>'/admin/social-content'"),'Limited-admin landing redirect exists');
 echo "PASS: $checks Social Content checks\n";
