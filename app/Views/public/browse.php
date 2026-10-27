@@ -19,9 +19,10 @@ $queryLink = function(array $overrides = []) use ($filters, $selectedSort, $isCa
 $categoryNames = [];
 foreach (($cats ?? []) as $c) $categoryNames[$c['slug']] = $c['name'];
 $active = [];
-foreach (['q'=>'Search','category'=>'Category','ai'=>'AI','pod'=>'POD','creator'=>'Creator','min_price'=>'Min price','max_price'=>'Max price','featured'=>'Featured','new'=>'Recently added','file_type'=>'File type','commercial'=>'Commercial license'] as $key=>$label) {
+foreach (['q'=>'Search','category'=>'Category','ai'=>'AI','pod'=>'POD','creator'=>'Creator','min_price'=>'Min price','max_price'=>'Max price','featured'=>'Featured','new'=>'Recently added','file_type'=>'File type','commercial'=>'Commercial license','grand_opening'=>'Grand Opening Sale'] as $key=>$label) {
     $value = $filters[$key] ?? '';
     if ($value === '') continue;
+    if ($key === 'grand_opening') { $active[] = 'Grand Opening Sale'; continue; }
     if ($key === 'category') $value = $categoryNames[$value] ?? $value;
     if ($key === 'pod') $value = $value === '1' ? 'Allowed' : 'Not allowed';
     if ($key === 'featured' && $value === '1') { $active[] = 'Featured only'; continue; }
@@ -158,7 +159,8 @@ foreach (['q'=>'Search','category'=>'Category','ai'=>'AI','pod'=>'POD','creator'
 }
 </style>
 
-<form class="browse-filter-shell" action="<?=H::e($basePath)?>" method="get">
+<form class="browse-filter-shell" action="<?=H::e($basePath)?>
+<?php if(($filters['grand_opening']??'')==='1'): ?><input type="hidden" name="grand_opening" value="1"><?php endif; ?>" method="get">
 
     <div class="browse-filter-primary">
 

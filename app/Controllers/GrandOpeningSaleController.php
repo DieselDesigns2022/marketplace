@@ -60,7 +60,9 @@ final class GrandOpeningSaleController
                     : '';
             }
             try {
-                $service->saveEvent($formDates,(int)H::user()['id']);
+                $saveInput=$formDates;
+                if(isset($_POST['is_enabled'])) $saveInput['is_enabled']='1';
+                $service->saveEvent($saveInput,(int)H::user()['id']);
                 $_SESSION['grand_opening_dates_saved'] = true;
                 H::redirect('/admin/grand-opening#saved-event');
             } catch (Throwable $e) {

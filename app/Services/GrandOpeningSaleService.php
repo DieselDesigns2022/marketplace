@@ -9,7 +9,7 @@ use Throwable;
 
 final class GrandOpeningSaleService
 {
-    public const PRICING_READY = false;
+    public const PRICING_READY = true;
 
     public static function basisPoints(string $value): int
     {

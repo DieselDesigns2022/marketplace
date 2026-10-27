@@ -1,3 +1,4 @@
+<?php $products=(new \App\Services\GrandOpeningPricingService())->decorate($products); ?>
 <div class="grid products">
 <?php if(!empty($gridSponsoredPromo))include app_path('app/Views/public/sponsored_card.php');?>
 <?php foreach ($products as $p): ?>
@@ -119,7 +120,7 @@ $listingUrl = $listingType === 'custom'
     </div>
 
     <a href="<?=H::e($listingUrl)?>" class="product-meta">
-        <p><strong><?=H::money($p['price'])?></strong></p>
+        <p><?php if(isset($p['go_regular_price']) && (float)$p['go_regular_price']>(float)$p['price']): ?><del><?=H::money($p['go_regular_price'])?></del> <?php endif; ?><strong><?=H::money($p['price'])?></strong><?php if(!empty($p['go_points'])): ?> <span class="badge ok">Grand Opening Sale</span><?php endif; ?></p>
     </a>
 </article>
 <?php endforeach; ?>

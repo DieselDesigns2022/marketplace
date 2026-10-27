@@ -38,5 +38,5 @@ $check(Sale::state($event,$end)==='ended','end exclusive');
 $event['is_enabled']=0;
 $check(Sale::state($event,$start)==='draft','disabled');
 $check(Sale::state([])==='unscheduled','unscheduled');
-$check(!Sale::PRICING_READY,'activation locked');
+$check(Sale::PRICING_READY,'pricing integration ready');
 echo "PASS: $checks Grand Opening Sale control checks\n";

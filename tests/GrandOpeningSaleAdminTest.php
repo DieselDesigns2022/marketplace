@@ -53,7 +53,7 @@ namespace {
         ['starts_at'=>'2026-12-01T12:00','ends_at'=>'2026-12-08T11:59'],
         ['starts_at'=>'2026-12-01T12:00','ends_at'=>''],
         ['starts_at'=>'2026-02-30T12:00','ends_at'=>'2026-03-10T12:00'],
-        array_merge($valid,['is_enabled'=>'1']),
+        ['starts_at'=>'','ends_at'=>'','is_enabled'=>'1'],
     ] as $invalid) {
         $caught = false;
         try { $service->saveEvent($invalid,7); }

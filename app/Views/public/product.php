@@ -39,7 +39,8 @@
         </a>
     <?php else:?>Uncategorized<?php endif;?>
         </p>
-        <h2><?=H::money($p['price'])?></h2>
+        <h2><?php if((float)($p['go_regular_price']??$p['price'])>(float)$p['price']): ?><del><?=H::money($p['go_regular_price'])?></del> <?php endif; ?><?=H::money($p['price'])?></h2>
+        <?php if(!empty($p['go_points'])): ?><p class="notice success">Grand Opening Sale: <?=number_format((int)$p['go_points']/100,2)?>% off this product and paid license add-ons. Checkout automatically applies whichever saves more: the sale or your coupon.</p><?php endif; ?>
         <p>
         <span class="badge ai">
         <?=H::e($p['ai_disclosure'])?>

@@ -12,7 +12,7 @@ $percent=number_format((int)$sale['discount_basis_points']/100,2,'.','');
 <?=H::e(str_replace('T',' ',Sale::localInput($event['ends_at'])))?> Eastern.
 <?php else: ?>Dates will be announced.<?php endif; ?>
 </p>
-<p>Choose your discount and products. Coupons and sale discounts cannot be combined.
+<p>Choose your discount and products. The discount covers product prices and paid license add-ons. Checkout automatically applies the sale or coupon with the highest total savings. Discounts cannot be combined.
 Products must be approved and available before they can appear in the sale.</p>
 </div>
 <form method="post" class="card form">

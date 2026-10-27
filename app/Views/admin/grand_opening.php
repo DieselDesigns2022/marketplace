@@ -9,6 +9,10 @@ $formatEventDate = static function(string $value): string {
 };
 ?>
 <h1>Grand Opening</h1>
+<?php if($hasDates): ?>
+<p><a class="btn" href="/admin/homepage-preview?grand_opening=1" target="_blank" rel="noopener">Preview active sale homepage</a></p>
+<p class="muted">Admin-only preview using participating sellers and products. This does not enable the sale or change your dates.</p>
+<?php endif; ?>
 
 <?php if($dateError): ?>
 <div class="notice error" role="alert" id="date-save-error" tabindex="-1">
@@ -49,10 +53,13 @@ Grand Opening dates saved successfully.
 <input type="datetime-local" name="ends_at" value="<?=H::e($formDates['ends_at'])?>" required>
 </label>
 <p>The event must run at least seven days from the selected start time.</p>
+<label><input type="checkbox" name="is_enabled" value="1" <?=!empty($event['is_enabled'])?'checked':''?>> Enable Grand Opening on these dates</label>
+<p>When enabled, sale prices and homepage content start and end automatically.</p>
 <button type="submit">Save event dates</button>
 </form>
 <?php endif; ?>
 
+<div class="card"><h2>Sale homepage features</h2><p>Use <a href="/admin/homepage">Homepage Management</a> to feature products and designers. Eligible sale products and participating shops are shown first in the Grand Opening section. Features appear only while the event is live.</p></div>
 <h2>Participating sellers (<?=count($saleSellers)?>)</h2>
 <?php if(!$saleSellers): ?>
 <div class="card"><p>No sellers have joined the Grand Opening Sale yet.</p></div>

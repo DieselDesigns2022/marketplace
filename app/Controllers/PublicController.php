@@ -6,6 +6,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\LicenseService;
 use App\Services\PromoService;
+use App\Services\GrandOpeningPricingService as OpeningPricing;
 
 class PublicController
 {
@@ -159,6 +160,9 @@ class PublicController
                 'designers'=>$designers,
                 'collabs'=>$collabs,
                 'partySellers'=>$partySellers,
+                'openingEvent'=>(new \App\Services\GrandOpeningSaleService())->event(),
+                'openingProducts'=>(new OpeningPricing())->saleProducts(),
+                'openingSellers'=>(new OpeningPricing())->saleSellers(),
                 'homepagePromo'=>PromoService::chooseWebsite('homepage'),
                 'meta'=>$this->pageMeta(
                     'Creative Moth',
@@ -185,6 +189,7 @@ class PublicController
     {
         $filters = [
             'q' => trim((string)($_GET['q'] ?? '')),
+            'grand_opening' => (($_GET['grand_opening']??'')==='1'?'1':''),
             'category' => $categorySlug ?: trim((string)($_GET['category'] ?? '')),
             'ai' => trim((string)($_GET['ai'] ?? '')),
             'pod' => trim((string)($_GET['pod'] ?? '')),
@@ -286,7 +291,7 @@ class PublicController
                 p.id,
                 p.title,
                 p.slug,
-                p.price,
+                ".OpeningPricing::priceSql()." price,
                 p.created_at,
                 p.updated_at,
                 p.is_featured,
@@ -333,7 +338,7 @@ class PublicController
          * These filters belong specifically to downloadable product
          * metadata and therefore do not apply to custom services.
          */
-        foreach (['ai', 'pod', 'featured', 'file_type', 'commercial'] as $key) {
+        foreach (['ai', 'pod', 'featured', 'file_type', 'commercial', 'grand_opening'] as $key) {
             if (trim((string)($filters[$key] ?? '')) !== '') {
                 $customEnabled = false;
             }
@@ -601,8 +606,9 @@ class PublicController
         if (in_array($filters['ai'], ['No AI Used','AI Assisted','AI Generated'], true)) { $where[] = 'p.ai_disclosure=?'; $params[] = $filters['ai']; }
         if ($filters['pod'] === '0' || $filters['pod'] === '1') { $where[] = 'p.pod_allowed=?'; $params[] = (int)$filters['pod']; }
         if ($filters['creator'] !== '') { $where[] = 'd.store_slug=?'; $params[] = $filters['creator']; }
-        if ($filters['min_price'] !== '' && is_numeric($filters['min_price'])) { $where[] = 'p.price>=?'; $params[] = max(0, (float)$filters['min_price']); }
-        if ($filters['max_price'] !== '' && is_numeric($filters['max_price'])) { $where[] = 'p.price<=?'; $params[] = max(0, (float)$filters['max_price']); }
+        if (($filters['grand_opening']??'')==='1') $where[] = OpeningPricing::priceSql().'<p.price';
+        if ($filters['min_price'] !== '' && is_numeric($filters['min_price'])) { $where[] = OpeningPricing::priceSql().'>=?'; $params[] = max(0, (float)$filters['min_price']); }
+        if ($filters['max_price'] !== '' && is_numeric($filters['max_price'])) { $where[] = OpeningPricing::priceSql().'<=?'; $params[] = max(0, (float)$filters['max_price']); }
         if ($filters['min_price'] !== '' && $filters['max_price'] !== '' && is_numeric($filters['min_price']) && is_numeric($filters['max_price']) && (float)$filters['min_price'] > (float)$filters['max_price']) $where[] = '1=0';
         if ($filters['featured'] === '1') $where[] = 'p.is_featured=1';
         if ($filters['new'] === '1') $where[] = 'p.created_at >= date_sub(now(), interval 30 day)';
@@ -660,12 +666,18 @@ class PublicController
     public function product($slug): void
     {
         $p = DB::row('select p.*,d.user_id seller_user_id,d.display_name,d.store_slug,d.creator_rank,d.founder_position,d.founder_active,d.average_rating,d.review_count,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.slug=? and p.status="approved" and d.status="approved"', [$slug]) ?? H::abort(404);
+        $p=(new OpeningPricing())->decorate([$p])[0];
         $images = DB::rows('select * from product_images where product_id=? order by sort_order,id', [$p['id']]);
         $preview = $images[0]['image_path'] ?? '';
         $title = $p['seo_title'] ?: $p['title'];
         $description = trim((string)($p['seo_description'] ?: ($p['short_description'] ?: preg_replace('/\s+/', ' ', strip_tags((string)$p['description'])))));
         $description = mb_substr($description, 0, 160);
         $licenses = LicenseService::productLicenses($p);
+        foreach ($licenses as &$openingLicense) {
+            $openingLicense['regular_price']=$openingLicense['price'];
+            $openingLicense['price']=\App\Services\CreditService::formatCents(OpeningPricing::component(\App\Services\CreditService::parseCents((string)$openingLicense['price'],false),(int)($p['go_points']??0)));
+        }
+        unset($openingLicense);
         $defaultLicense = $licenses[0] ?? ['price' => (float)($p['price'] ?? 0), 'license_key' => 'personal'];
         foreach ($licenses as $license) if (!empty($license['is_default'])) $defaultLicense = $license;
         $productUrl = H::canonical('/product/'.$p['slug']);

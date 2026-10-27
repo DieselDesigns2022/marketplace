@@ -897,6 +897,19 @@ class AdminController
          * Render the actual marketplace homepage controller.
          * This is admin-only and does not change the public waitlist.
          */
+        if (($_GET['grand_opening'] ?? '') === '1') {
+            $event = (new \App\Services\GrandOpeningSaleService())->event();
+            if (empty($event['starts_at']) || empty($event['ends_at'])) {
+                H::redirect('/admin/grand-opening');
+                return;
+            }
+            header('Cache-Control: private, no-store, max-age=0');
+            header('X-Robots-Tag: noindex, nofollow');
+            \App\Services\GrandOpeningPricingService::withHomepagePreview(
+                static function(): void { (new PublicController())->home(); }
+            );
+            return;
+        }
         (new PublicController())->home();
     }
 

@@ -1,3 +1,24 @@
+<?php
+$openingPreview = \App\Services\GrandOpeningPricingService::isHomepagePreview();
+$openingState = $openingPreview ? 'live' : \App\Services\GrandOpeningSaleService::state($openingEvent);
+?>
+<?php if($openingPreview): ?>
+<div class="notice" role="status">
+<strong>Admin preview — active Grand Opening Sale</strong>
+<p>Your saved dates and live discounts have not changed. Product and shop links open their actual live pages.</p>
+<a href="/admin/grand-opening">Back to Grand Opening settings</a>
+</div>
+<?php endif; ?>
+<style>
+.opening-hero{background:linear-gradient(125deg,#15111d,#39205b);color:#fff;border:2px solid #35dbcb}
+.opening-hero h1,.opening-hero .eyebrow{color:#fff}
+.opening-hero a:not(.btn){color:#7af0e5}
+.opening-shop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media(max-width:680px){.opening-shop-grid{grid-template-columns:1fr}}
+</style>
+<?php if(in_array($openingState,['upcoming','live'],true)): ?>
+<?php include app_path('app/Views/public/grand_opening_hero.php'); ?>
+<?php else: ?>
 <section class="hero">
     <p class="eyebrow">Digital designs for creative projects</p>
     <h1>Shop downloadable designs from independent creators.</h1>
@@ -8,6 +29,7 @@
     </form>
     <p><a class="btn" href="/browse">Browse Digital Designs</a> <a class="btn alt" href="/sell">Sell on Creative Moth</a></p>
 </section>
+<?php endif; ?>
 <?php if(!empty($homepagePromo)):?><section class="page-section sponsored-section"><h2>Sponsored</h2><div class="grid"><?php $sponsoredPromo=$homepagePromo;include app_path('app/Views/public/sponsored_card.php');?></div></section><?php endif;?>
 <section class="page-section">
     <h2>Explore marketplace categories</h2>
@@ -18,6 +40,7 @@
     </div>
 </section>
 
+<?php include app_path('app/Views/public/grand_opening_sale.php'); ?>
 <?php if(!empty($collabs)):?>
 <section class="page-section collabs-home-section">
     <div class="section-heading-row">
@@ -44,8 +67,8 @@
 </section>
 <?php endif;?>
 
-<?php if(!empty($partySellers)): ?>
-<section class="page-section grand-opening-party-sellers">
+<?php if(!empty($partySellers) && $openingState==='live'): ?>
+<section class="page-section grand-opening-party-sellers" id="party-sellers">
     <div class="section-heading-row">
         <div>
             <h2>🎉 Grand Opening Party Sellers</h2>

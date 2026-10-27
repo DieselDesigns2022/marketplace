@@ -72,35 +72,31 @@ class CartController
 
     }
 
-    private function totals(array $items): array
+    private array $pricing = [];
+
+    private function totals(array $items, bool $lock=false): array
     {
-        $subtotal=0;
-        foreach($items as &$p)
-        {
-            $licenses = LicenseService::purchasableLicenses((int)$p['id'], $p['license_type']);
-            $p['licenses'] = LicenseService::productLicenses($p);
-            $p['selected_license_keys'] = array_column($licenses, 'license_key');
-            $p['license_invalid'] = !$licenses;
-            $p['license_key'] = $licenses ? LicenseService::keyList($licenses) : (string)$p['license_type'];
-            $p['license_name'] = $licenses ? LicenseService::nameList($licenses) : 'Unavailable license';
-            $p['license_description'] = $licenses ? LicenseService::descriptionList($licenses) : 'One or more selected licenses are no longer available. Please choose available licenses before checkout.';
-            $p['license_price'] = $licenses ? LicenseService::priceTotal($licenses) : 0.00;
-            $p['fulfillment_type'] = $p['fulfillment_type'] ?? 'downloadable';
-            $p['fulfillment_label'] = $p['fulfillment_type'] === 'google_drive' ? 'Google Drive / Manual Delivery' : 'Downloadable Product';
-            $p['line_total'] = $licenses ? (float)$p['price'] + $p['license_price'] : 0;
-            if (!empty($p['cart_item_id']) && H::user() && $licenses) DB::exec('update cart_items set quantity=1, price_snapshot=?, license_price_snapshot=?, total_snapshot=?, fulfillment_type_snapshot=? where id=? and user_id=?', [$p['price'], $p['license_price'], $p['line_total'], $p['fulfillment_type'], $p['cart_item_id'], H::user()['id']]);
-            if ($licenses) $subtotal += $p['line_total'];
-
+        $this->pricing=(new \App\Services\GrandOpeningPricingService())->cart(
+            $items,(string)($_SESSION['coupon_code']??''),(int)(H::user()['id']??0),$lock
+        );
+        if (!empty($this->pricing['coupon_candidate']) && empty($this->pricing['coupon_candidate']['ok'])) {
+            unset($_SESSION['coupon_code']);
         }
-        return [$items,$subtotal];
-
+        foreach ($this->pricing['items'] as $p) {
+            if (!empty($p['cart_item_id']) && H::user() && empty($p['license_invalid'])) {
+                DB::exec('update cart_items set quantity=1,price_snapshot=?,license_price_snapshot=?,total_snapshot=?,fulfillment_type_snapshot=? where id=? and user_id=?',[
+                    $p['price'],$p['license_price'],$p['line_total'],$p['fulfillment_type'],$p['cart_item_id'],H::user()['id']
+                ]);
+            }
+        }
+        return [$this->pricing['items'],$this->pricing['subtotal_cents']/100];
     }
 
     public function show()
     {
         [$items,$subtotal]=$this->totals($this->items());
         $couponResult = $this->currentCoupon($items);
-        H::view('buyer/cart',['items'=>$items,'subtotal'=>$subtotal,'couponResult'=>$couponResult]);
+        H::view('buyer/cart',['items'=>$items,'subtotal'=>$subtotal,'couponResult'=>$couponResult,'pricing'=>$this->pricing]);
 
     }
 
@@ -197,20 +193,24 @@ class CartController
 
     private function currentCoupon(array $items): ?array
     {
-        if (!H::user() || empty($_SESSION['coupon_code'])) return null;
-        $result = CouponService::validate((string)$_SESSION['coupon_code'], $items, (int)H::user()['id']);
-        if (!$result['ok']) unset($_SESSION['coupon_code']);
-        return $result;
+        return $this->pricing['coupon_result']??null;
     }
 
     public function applyCoupon(): void
     {
         H::requireLogin();
-        [$items,] = $this->totals($this->items());
-        $result = CouponService::validate((string)($_POST['coupon_code'] ?? ''), $items, (int)H::user()['id']);
-        if (!$result['ok']) { H::flash('error', $result['error']); unset($_SESSION['coupon_code']); }
-        else { $_SESSION['coupon_code'] = $result['code']; H::flash('success', 'Coupon applied.'); }
-        H::redirect($_SERVER['HTTP_REFERER'] ?? '/cart');
+        $_SESSION['coupon_code']=CouponService::normalizeCode((string)($_POST['coupon_code']??''));
+        $this->totals($this->items());
+        $candidate=$this->pricing['coupon_candidate'];
+        if (empty($candidate['ok'])) {
+            H::flash('error',$candidate['error']??'Enter a coupon code.');
+            unset($_SESSION['coupon_code']);
+        } else {
+            H::flash('success',$this->pricing['mode']==='coupon'
+                ? 'Coupon applied. It gives you the highest discount.'
+                : 'The Grand Opening Sale gives you the highest discount and remains applied.');
+        }
+        H::redirect('/cart');
     }
 
     public function removeCoupon(): void
@@ -242,6 +242,7 @@ class CartController
             }
             try
            {
+               DB::pdo()->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
                DB::begin();
                 $valid=[];
                 foreach($items as $p)
@@ -256,7 +257,14 @@ class CartController
                     H::redirect('/cart');
 
                }
-                $subtotal=array_sum(array_column($valid,'line_total'));
+                [$valid,] = $this->totals($valid,true);
+                foreach ($valid as $freshItem) {
+                    if (($freshItem['fulfillment_type']??'downloadable')==='google_drive'
+                        && !filter_var(trim($_POST['google_drive_email']??''),FILTER_VALIDATE_EMAIL)) {
+                        throw new \DomainException('A valid Google Drive email is required.');
+                    }
+                }
+                $subtotal=CreditService::formatCents($this->pricing['subtotal_cents']);
                 $couponResult = $this->currentCoupon($valid);
                 $coupon = ($couponResult && $couponResult['ok']) ? $couponResult['coupon'] : null;
                 $couponDiscount = $coupon ? (float)$couponResult['discount'] : 0.0;
@@ -531,8 +539,11 @@ class CartController
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
                     $manualStatus = $isManualDelivery ? 'pending_delivery' : 'not_applicable';
-                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version,seller_receipt_note_snapshot,seller_receipt_image_path_snapshot) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot(LicenseService::selectedLicenses($p, $p['license_key'])),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null,$receiptSnapshot['note'],$receiptSnapshot['image_path']]);
+                    DB::exec('insert into order_items (order_id,product_id,product_title,product_slug,product_image,designer_id,seller_name,license_type,license_name,license_price,license_description,license_snapshot,fulfillment_type,delivery_instructions_snapshot,buyer_google_drive_email,manual_delivery_status,unit_price,commercial_license_price,total_price,commission_rate,purchased_file_version,seller_receipt_note_snapshot,seller_receipt_image_path_snapshot) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$order,$p['id'],$p['title'],$p['slug'],$p['thumbnail'] ?? null,$p['designer_id'],$p['display_name'] ?? null,$p['license_key'],$p['license_name'],$p['license_price'],$p['license_description'],LicenseService::snapshot($p['go_paid_licenses']),$p['fulfillment_type'] ?? 'downloadable',$isManualDelivery ? ($p['manual_delivery_instructions'] ?? null) : null,$itemGoogleDriveEmail,$manualStatus,$p['price'],$p['license_price'],$discountedLine,$commissionRate,null,$receiptSnapshot['note'],$receiptSnapshot['image_path']]);
                     $itemId=(int)DB::id();
+                    (new \App\Services\GrandOpeningPricingService())->snapshot(
+                        $itemId,$p,CreditService::parseCents((string)$lineDiscount,false)
+                    );
                     $itemPrizeCents = (int)(
                         $prizeAllocation['item_cents'][$idx] ?? 0
                     );
@@ -593,7 +604,8 @@ class CartController
            }
             catch(Throwable $e)
            {
-               DB::rollBack();
+               if (DB::pdo()->inTransaction()) DB::rollBack();
+                error_log('Grand Opening checkout pricing: '.get_class($e).': '.$e->getMessage());
                 H::flash('error','Checkout failed. Please try again. If this persists, ask an admin to verify Stripe environment configuration.');
                 H::redirect('/cart');
 
@@ -636,6 +648,7 @@ class CartController
             'buyer/checkout',
             [
                 'items' => $items,
+                'pricing' => $this->pricing,
                 'subtotal' => $total,
                 'couponResult' => $couponResult,
                 'discount' => $discount,

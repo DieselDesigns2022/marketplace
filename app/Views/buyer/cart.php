@@ -1,4 +1,5 @@
 <h1>Cart</h1>
+<?php if(!empty($pricing['notice'])): ?><p class="notice warning"><?=H::e($pricing['notice'])?></p><?php endif; ?>
 <style>
 .cart-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:1.5rem;align-items:start}
 .cart-items{min-width:0;overflow-x:auto}
@@ -46,14 +47,14 @@
                </a>
                </td>
                <td>
-               <?php if(!empty($p['license_invalid'])):?><span class="muted">Unavailable</span><?php else:?><?=H::money($p['price'])?><?php endif;?>
+               <?php if(!empty($p['license_invalid'])):?><span class="muted">Unavailable</span><?php else:?><?php if((float)($p['go_regular_price']??$p['price'])>(float)$p['price']): ?><del><?=H::money($p['go_regular_price'])?></del> <?php endif; ?><?=H::money($p['price'])?><?php endif;?>
                </td>
                <td>
                <form method="post" action="/cart/update">
                    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
                    <p class="help-text license-help-note">Hover over ? for a quick preview or click ? to open the full license details.</p>
                     <?php foreach($p['licenses'] as $license):?>
-                       <label><input type="checkbox" name="license_type[<?=$p['cart_item_id']?>][]" value="<?=H::e($license['license_key'])?>" <?=in_array($license['license_key'], $p['selected_license_keys'] ?? [], true)?'checked':''?> <?=$license['license_key']==='personal'?'checked disabled':''?>> <?=H::e($license['name'])?> <?php if($license['license_key']==='personal'):?><span class="muted">included/free</span><?php else:?><span class="muted">+<?=H::money($license['price'])?></span><?php endif;?><?php if($license['description']):?><span class="license-help" role="button" tabindex="0" aria-label="<?=H::e($license['name'])?> license details"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($license['description'])?></span></span><?php endif;?></label>
+                       <label><input type="checkbox" name="license_type[<?=$p['cart_item_id']?>][]" value="<?=H::e($license['license_key'])?>" <?=in_array($license['license_key'], $p['selected_license_keys'] ?? [], true)?'checked':''?> <?=$license['license_key']==='personal'?'checked disabled':''?>> <?=H::e($license['name'])?> <?php if($license['license_key']==='personal'):?><span class="muted">included/free</span><?php else:?><span class="muted">+<?=H::money(\App\Services\GrandOpeningPricingService::component(\App\Services\CreditService::parseCents((string)$license['price'],false),(int)($p['go_applied_points']??0))/100)?></span><?php endif;?><?php if($license['description']):?><span class="license-help" role="button" tabindex="0" aria-label="<?=H::e($license['name'])?> license details"><span class="license-help-icon">?</span><span class="license-help-text"><?=H::e($license['description'])?></span></span><?php endif;?></label>
                        <?php if($license['license_key']==='personal'):?><input type="hidden" name="license_type[<?=$p['cart_item_id']?>][]" value="personal"><?php endif;?>
                    <?php endforeach;?>
                    <?php if(!empty($p['license_invalid'])):?><p class="notice error">This license is no longer available. Please choose another license.</p><?php endif;?>
@@ -74,6 +75,7 @@
                </td>
                <td>
                <?=H::money($p['line_total'])?>
+               <?php if(!empty($p['go_applied_points'])): ?><br><span class="badge ok">Grand Opening Sale</span><?php endif; ?>
                </td>
                <td>
                <form method="post" action="/cart/remove/<?=$p['cart_item_id']?>">
@@ -93,9 +95,10 @@
 
       <p class="cart-summary-row">
         <span>Subtotal</span>
-        <strong><?=H::money($subtotal)?></strong>
+        <strong><?=H::money(($pricing['regular_cents']??0)/100)?></strong>
       </p>
 
+      <?php if(!empty($pricing['sale_savings_cents'])): ?><p class="cart-summary-row"><span>Grand Opening Sale</span><strong>-<?=H::money($pricing['sale_savings_cents']/100)?></strong></p><?php endif; ?>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?>
         <p class="cart-summary-row">
           <span>Coupon <?=H::e($couponResult['coupon']['code'])?></span>
@@ -118,9 +121,13 @@
 
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?>
         <p class="notice success">Coupon <?=H::e($couponResult['coupon']['code'])?> saves <?=H::money($discount)?>.</p>
-        <form method="post" action="/cart/coupon/remove"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="coupon-action">Remove coupon</button></form>
+
       <?php endif;?>
 
+      <?php if(!empty($_SESSION['coupon_code'])): ?>
+        <form method="post" action="/cart/coupon/remove"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="coupon-action">Remove coupon</button></form>
+      <?php endif; ?>
+      <p>Sale and coupon discounts do not stack. We apply the highest total savings.</p>
       <p><a class="btn" href="/checkout">Checkout</a></p>
     </div>
     </div>

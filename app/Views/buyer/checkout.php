@@ -1,4 +1,5 @@
 <h1>Secure checkout</h1>
+<?php if(!empty($pricing['notice'])): ?><p class="notice warning"><?=H::e($pricing['notice'])?></p><?php endif; ?>
 <p class="notice warning">
 Creative Moth calculates US sales tax before applying credits.
 Prize Credit applies to eligible merchandise only and never pays sales tax.
@@ -21,7 +22,8 @@ anything still due.
         <?php endforeach;?>
     </table>
     <div class="card">
-      <p>Subtotal: <strong><?=H::money($subtotal)?></strong></p>
+      <p>Regular subtotal: <strong><?=H::money(($pricing['regular_cents']??0)/100)?></strong></p>
+      <?php if(!empty($pricing['sale_savings_cents'])): ?><p>Grand Opening Sale: <strong>-<?=H::money($pricing['sale_savings_cents']/100)?></strong></p><?php endif; ?>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
       <p class="muted">Sales tax calculated at checkout when required. Creative Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
       <p>
@@ -49,7 +51,7 @@ anything still due.
       </p>
 
       <h2>
-        Subtotal − coupon − Prize Credit + tax − Marketplace Credit
+        Subtotal after sale or coupon − Prize Credit + tax − Marketplace Credit
         = final total
       </h2>
 
