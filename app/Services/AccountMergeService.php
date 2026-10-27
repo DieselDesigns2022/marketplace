@@ -27,7 +27,6 @@ class AccountMergeService
         'prize_wheel_spins' => 'user_id',
         'prize_wheel_rewards' => 'user_id',
         'prize_wheel_bonus_spins' => 'user_id',
-        'grand_opening_giveaway_entries' => 'user_id',
     ];
 
     /** User references which are historical/administrative rather than source-owned identity. */
@@ -104,6 +103,7 @@ class AccountMergeService
             $reconciliation = [];
             $reconciliation['deduplicated'] = $this->moveDeduplicated($sourceId, $targetId);
             $reconciliation['battle_votes'] = $this->moveBattleVotes($sourceId, $targetId);
+            $reconciliation['grand_opening_passport'] = $this->moveGrandOpeningPassport($sourceId, $targetId);
             foreach (self::SIMPLE_OWNERSHIP as $table => $column) $this->updateIfExists($table, $column, $sourceId, $targetId);
             $this->mergeEmailPreferences($sourceId, $targetId);
             $this->moveMessaging($sourceId, $targetId);
@@ -380,6 +380,159 @@ class AccountMergeService
             'deduplicated'=>$deduplicated,
             'conflicts'=>$conflicts,
         ];
+    }
+
+    private function moveGrandOpeningPassport(
+        int $source,
+        int $target
+    ): array {
+        $result=[
+            'stamps_moved'=>0,
+            'visits_moved'=>0,
+            'giveaway_entries_moved'=>0,
+            'giveaway_entries_deduplicated'=>0,
+        ];
+
+        if($this->tableExists('grand_opening_passport_stamps')){
+            $before=(int)(
+                DB::row(
+                    'select count(*) c
+                     from grand_opening_passport_stamps
+                     where user_id=?',
+                    [$target]
+                )['c']??0
+            );
+
+            DB::exec(
+                'insert ignore into grand_opening_passport_stamps
+                 (user_id,stamp_key,completed_at)
+                 select ?,stamp_key,completed_at
+                 from grand_opening_passport_stamps
+                 where user_id=?',
+                [$target,$source]
+            );
+
+            $after=(int)(
+                DB::row(
+                    'select count(*) c
+                     from grand_opening_passport_stamps
+                     where user_id=?',
+                    [$target]
+                )['c']??0
+            );
+
+            $result['stamps_moved']=max(
+                0,
+                $after-$before
+            );
+
+            DB::exec(
+                'delete from grand_opening_passport_stamps
+                 where user_id=?',
+                [$source]
+            );
+        }
+
+        if($this->tableExists('grand_opening_store_visits')){
+            $before=(int)(
+                DB::row(
+                    'select count(*) c
+                     from grand_opening_store_visits
+                     where user_id=?',
+                    [$target]
+                )['c']??0
+            );
+
+            DB::exec(
+                'insert ignore into grand_opening_store_visits
+                 (user_id,designer_id,first_visited_at)
+                 select ?,designer_id,first_visited_at
+                 from grand_opening_store_visits
+                 where user_id=?',
+                [$target,$source]
+            );
+
+            $after=(int)(
+                DB::row(
+                    'select count(*) c
+                     from grand_opening_store_visits
+                     where user_id=?',
+                    [$target]
+                )['c']??0
+            );
+
+            $result['visits_moved']=max(
+                0,
+                $after-$before
+            );
+
+            DB::exec(
+                'delete from grand_opening_store_visits
+                 where user_id=?',
+                [$source]
+            );
+        }
+
+        if($this->tableExists('grand_opening_giveaway_entries')){
+            $entries=DB::rows(
+                'select *
+                 from grand_opening_giveaway_entries
+                 where user_id=?
+                 order by id
+                 for update',
+                [$source]
+            );
+
+            foreach($entries as $entry){
+                if(
+                    ($entry['source_type']??'')==='passport'
+                ){
+                    $duplicate=DB::row(
+                        'select id
+                         from grand_opening_giveaway_entries
+                         where user_id=?
+                           and campaign_key=?
+                           and source_type="passport"
+                           and source_key <=> ?
+                         limit 1
+                         for update',
+                        [
+                            $target,
+                            $entry['campaign_key'],
+                            $entry['source_key'],
+                        ]
+                    );
+
+                    if($duplicate){
+                        DB::exec(
+                            'delete from grand_opening_giveaway_entries
+                             where id=?',
+                            [(int)$entry['id']]
+                        );
+
+                        $result[
+                            'giveaway_entries_deduplicated'
+                        ]++;
+
+                        continue;
+                    }
+                }
+
+                DB::exec(
+                    'update grand_opening_giveaway_entries
+                     set user_id=?
+                     where id=?',
+                    [
+                        $target,
+                        (int)$entry['id'],
+                    ]
+                );
+
+                $result['giveaway_entries_moved']++;
+            }
+        }
+
+        return $result;
     }
 
     private function moveDeduplicated(int $source, int $target): array

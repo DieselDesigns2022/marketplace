@@ -679,6 +679,14 @@ class PublicController
     public function store($slug): void
     {
         $d = DB::row('select * from designers where store_slug=? and status="approved"', [$slug]) ?? H::abort(404);
+
+        if(H::user()){
+            (new \App\Services\GrandOpeningPassportService())
+                ->recordStoreVisit(
+                    (int)H::user()['id'],
+                    (int)$d['id']
+                );
+        }
         $products = DB::rows('select p.*,d.display_name,d.store_slug,d.average_rating,d.review_count,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" order by p.created_at desc', [$d['id']]);
         $customServices = DB::rows('select s.*,(select image_path from custom_service_images csi where csi.custom_service_id=s.id order by csi.sort_order,csi.id limit 1) preview_image from custom_design_services s where s.designer_id=? and s.is_active=1 order by s.created_at desc,s.id desc', [$d['id']]);
         $collabs = (new \App\Repositories\CollabRepository())->publicForDesigner((int)$d['id']);

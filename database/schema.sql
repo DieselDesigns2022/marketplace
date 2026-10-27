@@ -1909,7 +1909,7 @@ CREATE TABLE IF NOT EXISTS prize_wheel_spins (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     campaign_key VARCHAR(64) NOT NULL,
     user_id BIGINT NOT NULL,
-    storefront_designer_id BIGINT NOT NULL,
+    storefront_designer_id BIGINT DEFAULT NULL,
     prize_donation_id BIGINT NOT NULL,
     prize_assignment_id BIGINT NOT NULL,
     spin_number SMALLINT UNSIGNED NOT NULL,
@@ -2012,6 +2012,7 @@ CREATE TABLE prize_wheel_bonus_spins (
     user_id BIGINT NOT NULL,
     storefront_designer_id BIGINT NOT NULL,
     source_spin_id BIGINT NULL,
+  source_key varchar(190) DEFAULT NULL,
     status ENUM('available','consumed') NOT NULL DEFAULT 'available',
     consumed_spin_id BIGINT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2023,8 +2024,8 @@ CREATE TABLE grand_opening_giveaway_entries (
     campaign_key VARCHAR(64) NOT NULL,
     user_id BIGINT NOT NULL,
     storefront_designer_id BIGINT NOT NULL,
-    source_type ENUM('prize_wheel') NOT NULL DEFAULT 'prize_wheel',
-    source_spin_id BIGINT NOT NULL,
+    source_type enum('prize_wheel','passport') NOT NULL DEFAULT 'prize_wheel',
+    source_spin_id BIGINT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY grand_opening_entry_spin_unique(source_spin_id)
 );
@@ -2039,6 +2040,36 @@ ALTER TABLE prize_wheel_spins
 -- ============================================================
 -- BATTLE OF THE DESIGNERS
 -- ============================================================
+
+
+CREATE TABLE grand_opening_passport_stamps (
+  id bigint NOT NULL AUTO_INCREMENT,
+  user_id bigint NOT NULL,
+  stamp_key varchar(64) NOT NULL,
+  completed_at timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (id),
+  UNIQUE KEY grand_opening_passport_stamp_unique (user_id,stamp_key),
+  KEY grand_opening_passport_stamp_user_idx (user_id,completed_at),
+  CONSTRAINT grand_opening_passport_stamp_user_fk
+    FOREIGN KEY (user_id) REFERENCES users (id),
+  UNIQUE KEY `grand_opening_entry_source_unique`
+    (`campaign_key`,`user_id`,`source_type`,`source_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE grand_opening_store_visits (
+  id bigint NOT NULL AUTO_INCREMENT,
+  user_id bigint NOT NULL,
+  designer_id bigint NOT NULL,
+  first_visited_at timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (id),
+  UNIQUE KEY grand_opening_store_visit_unique (user_id,designer_id),
+  KEY grand_opening_store_visit_user_idx (user_id,first_visited_at),
+  KEY grand_opening_store_visit_designer_idx (designer_id),
+  CONSTRAINT grand_opening_store_visit_user_fk
+    FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT grand_opening_store_visit_designer_fk
+    FOREIGN KEY (designer_id) REFERENCES designers (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE battle_events (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

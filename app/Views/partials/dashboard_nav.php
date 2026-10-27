@@ -49,6 +49,11 @@ if ($area === 'buyer') {
     $groups = [
         'Overview' => [
             ['/dashboard', 'Overview', ['/dashboard']],
+            [
+                '/dashboard/passport',
+                'Grand Opening Passport',
+                ['/dashboard/passport']
+            ],
             ['/dashboard/reviews', 'My Reviews', ['/dashboard/reviews', '/dashboard/reviews/']],
             [
                 '/buyer/messages',

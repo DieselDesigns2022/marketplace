@@ -5,6 +5,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\SellerReceiptService;
 use App\Services\SellerReviewService;
+use App\Services\GrandOpeningPassportService;
 class BuyerController
 {
     private function protectedFileAvailable(?string $storagePath): bool
@@ -25,9 +26,24 @@ class BuyerController
         $customBase=realpath(app_path('storage/protected_uploads/custom_designs'));$customAvailable=array_filter($customFiles,static function(array $file)use($customBase):bool{$real=realpath(app_path('storage/protected_uploads/'.ltrim($file['storage_path']??'','/')));return(bool)($customBase&&$real&&str_starts_with($real,$customBase.DIRECTORY_SEPARATOR)&&is_file($real)&&is_readable($real));});
         $collabAvailable=(int)(DB::row('select count(*) c from order_items oi join orders o on o.id=oi.order_id join collab_events ce on ce.id=oi.collab_id where o.user_id=? and o.payment_status in ("paid","partially_refunded") and ce.final_zip_path is not null and coalesce((select sum(a.merchandise_refund_cents) from marketplace_refund_allocations a where a.order_item_id=oi.id),0)<round(oi.total_price*100)',[$uid])['c']??0);
         $summary['available_downloads']=count(array_filter($eligibleFiles,fn(array $file):bool=>$this->protectedFileAvailable($file['storage_path']??null)))+count($customAvailable)+$collabAvailable;
-        H::view('buyer/home',['summary'=>$summary,'orders'=>DB::rows('select * from orders where user_id=? and payment_status in ("paid","partially_refunded","refunded") order by created_at desc limit 5',[$uid]),'wishlist'=>DB::rows('select p.title,p.slug,(select image_path from product_images where product_id=p.id order by sort_order,id limit 1) preview_image from wishlists w join products p on p.id=w.product_id where w.user_id=? order by w.created_at desc limit 4',[$uid]),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc limit 5',[$uid])]);
+        $passport=(new GrandOpeningPassportService())->progress($uid);
+
+        H::view('buyer/home',['passport'=>$passport,'summary'=>$summary,'orders'=>DB::rows('select * from orders where user_id=? and payment_status in ("paid","partially_refunded","refunded") order by created_at desc limit 5',[$uid]),'wishlist'=>DB::rows('select p.title,p.slug,(select image_path from product_images where product_id=p.id order by sort_order,id limit 1) preview_image from wishlists w join products p on p.id=w.product_id where w.user_id=? order by w.created_at desc limit 4',[$uid]),'notifications'=>DB::rows('select * from notifications where user_id=? order by created_at desc limit 5',[$uid])]);
 
     }
+    public function passport()
+    {
+        H::requireLogin();
+
+        $passport=(new GrandOpeningPassportService())
+            ->progress((int)H::user()['id']);
+
+        H::view(
+            'buyer/passport',
+            ['passport'=>$passport]
+        );
+    }
+
     public function purchases()
     {
         H::requireLogin();

@@ -78,6 +78,7 @@ use App\Controllers\AnalyticsController;
  $router->post('/notifications/{id}/open', [NotificationController::class, 'open']);
  $router->post('/notifications/{id}/read', [NotificationController::class, 'read']);
  $router->get('/dashboard', [BuyerController::class, 'home']);
+$router->get('/dashboard/passport', [BuyerController::class, 'passport']);
  $router->get('/dashboard/purchases', [BuyerController::class, 'purchases']);
  $router->get('/dashboard/downloads', [BuyerController::class, 'downloads']);
  $router->get('/dashboard/order/{id}', [BuyerController::class, 'order']);
