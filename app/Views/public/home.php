@@ -1,3 +1,10 @@
+<?php if((new \App\Services\FinalGiveawayService())->live()): ?>
+<section class="card opening-hero" style="border:3px solid #35dbcb;padding:24px;margin-bottom:20px">
+<h2>Grand Prize Drawing — LIVE NOW</h2>
+<p>Watch the wheel and find out who wins each prize!</p>
+<a class="btn" href="/live-giveaway">View the live drawing</a>
+</section>
+<?php endif; ?>
 <?php
 $openingPreview = \App\Services\GrandOpeningPricingService::isHomepagePreview();
 $openingState = $openingPreview ? 'live' : \App\Services\GrandOpeningSaleService::state($openingEvent);

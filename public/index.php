@@ -302,4 +302,10 @@ $router->match(['GET','POST'], '/seller/grand-opening-sale', [\App\Controllers\G
 $router->match(['GET','POST'], '/admin/grand-opening', [\App\Controllers\GrandOpeningSaleController::class, 'admin']);
 $router->match(['GET','POST'], '/admin/social-content', [\App\Controllers\SocialContentController::class, 'index']);
 $router->match(['GET','POST'], '/admin/referral-giveaway', [\App\Controllers\BuyerReferralGiveawayController::class, 'index']);
+$router->match(['GET','POST'], '/admin/final-giveaway', [\App\Controllers\FinalGiveawayController::class, 'admin']);
+$router->get('/live-giveaway', [\App\Controllers\FinalGiveawayController::class, 'show']);
+$router->get('/live-giveaway/state', [\App\Controllers\FinalGiveawayController::class, 'state']);
+$router->get('/dashboard/giveaway-prizes/{id}', [\App\Controllers\FinalGiveawayController::class, 'prize']);
+$router->post('/admin/final-giveaway/remove-entry', [\App\Controllers\FinalGiveawayController::class, 'remove']);
+$router->get('/admin/final-giveaway/view', [\App\Controllers\FinalGiveawayController::class, 'operator']);
  $router->dispatch($_SERVER['REQUEST_METHOD'], parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));

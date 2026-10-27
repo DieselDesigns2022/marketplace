@@ -129,7 +129,7 @@ final class BuyerReferralGiveawayService
             $last=DB::row('select * from buyer_referral_giveaway_draws order by id desc limit 1 for update');
             if($last && $last['status']!=='disqualified')return (int)$last['id'];
             $this->refresh();
-            $pool=DB::rows('select e.id,e.referral_id,e.referrer_user_id,e.referred_user_id,e.qualifying_cents,e.qualifying_orders from buyer_referral_giveaway_entries e where e.status="eligible" and not exists(select 1 from buyer_referral_giveaway_draws d where d.winner_user_id=e.referrer_user_id and d.status="disqualified") order by e.id for update');
+            $pool=DB::rows('select e.id,e.referral_id,e.referrer_user_id,e.referred_user_id,e.qualifying_cents,e.qualifying_orders from buyer_referral_giveaway_entries e where e.status="eligible" and not exists(select 1 from final_giveaway_draws f where f.winner_entry_key=concat("referral:",e.id)) and not exists(select 1 from buyer_referral_giveaway_draws d where d.winner_user_id=e.referrer_user_id and d.status="disqualified") order by e.id for update');
             if(!$pool)throw new DomainException('No eligible entries are available.');
             $snapshot=json_encode($pool,JSON_THROW_ON_ERROR);$index=random_int(0,count($pool)-1);$winner=$pool[$index];
             DB::exec('insert into buyer_referral_giveaway_draws(winner_entry_id,winner_user_id,pool_snapshot,pool_hash,pool_count,selected_index,drawn_by) values(?,?,?,?,?,?,?)',[$winner['id'],$winner['referrer_user_id'],$snapshot,hash('sha256',$snapshot),count($pool),$index,$actor]);
