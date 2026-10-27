@@ -277,9 +277,6 @@ $router->post('/seller/battle-of-the-designers/{id}/withdraw', [BattleController
 
 $router->get('/admin/battles', [BattleController::class, 'adminIndex']);
 $router->post('/admin/battles/create', [BattleController::class, 'adminCreate']);
-$router->post('/admin/battles/preview/create', [BattleController::class, 'adminCreatePreview']);
-$router->get('/admin/battles/{id}/preview', [BattleController::class, 'adminPreview']);
-$router->post('/admin/battles/{id}/preview/delete', [BattleController::class, 'adminDeletePreview']);
 $router->get('/admin/battles/{id}', [BattleController::class, 'adminShow']);
 $router->post('/admin/battles/{id}/action', [BattleController::class, 'adminAction']);
 

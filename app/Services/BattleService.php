@@ -945,12 +945,6 @@ final class BattleService
             'Battle not found.'
         );
 
-        if((int)($battle['is_preview']??0)===1){
-            throw new DomainException(
-                'Preview Battles cannot schedule real voting rounds.'
-            );
-        }
-
         if(
             !in_array(
                 $battle['status'],
@@ -1136,12 +1130,6 @@ final class BattleService
                 'Battle not found.'
             );
 
-            if((int)($battle['is_preview']??0)===1){
-                throw new DomainException(
-                    'Preview Battles cannot open real voting rounds.'
-                );
-            }
-
             $round=DB::row(
                 'select *
                  from battle_rounds
@@ -1253,7 +1241,6 @@ final class BattleService
              where r.status="pending"
                and r.voting_opens_at is not null
                and r.voting_opens_at<=utc_timestamp()
-               and e.is_preview=0
                and e.status in ("seeded","active")
              order by r.voting_opens_at,r.id
              limit '.$limit
@@ -1291,7 +1278,6 @@ final class BattleService
              where r.status="open"
                and r.voting_closes_at is not null
                and r.voting_closes_at<=utc_timestamp()
-               and e.is_preview=0
              order by r.voting_closes_at,r.id
              limit '.$limit
         );
@@ -2279,7 +2265,6 @@ final class BattleService
                     ) participant_count
              from battle_events e
              where e.status<>"cancelled"
-               and e.is_preview=0
              order by
                 case e.status
                     when "active" then 1
@@ -2290,355 +2275,6 @@ final class BattleService
                 end,
                 e.id desc'
         );
-    }
-
-    public function createPreview(
-        int $adminId
-    ): int {
-        return $this->atomic(function()use($adminId){
-            $admin=DB::row(
-                'select id
-                 from users
-                 where id=?
-                   and role="admin"
-                   and status="active"
-                 for update',
-                [$adminId]
-            );
-
-            if(!$admin){
-                throw new DomainException(
-                    'An active admin is required.'
-                );
-            }
-
-            $existing=DB::row(
-                'select id
-                 from battle_events
-                 where is_preview=1
-                 order by id desc
-                 limit 1
-                 for update'
-            );
-
-            if($existing){
-                return (int)$existing['id'];
-            }
-
-            $suffix=bin2hex(random_bytes(4));
-
-            $fakeUsers=[
-                [
-                    'name'=>'Preview Designer Luna',
-                    'email'=>'battle-preview-luna-'.$suffix.'@example.test',
-                    'display'=>'Luna & Ink Studio',
-                    'slug'=>'battle-preview-luna-'.$suffix,
-                    'logo'=>'LUNA & INK',
-                ],
-                [
-                    'name'=>'Preview Designer Raven',
-                    'email'=>'battle-preview-raven-'.$suffix.'@example.test',
-                    'display'=>'Raven Moon Creative',
-                    'slug'=>'battle-preview-raven-'.$suffix,
-                    'logo'=>'RAVEN MOON',
-                ],
-            ];
-
-            $designerIds=[];
-
-            foreach($fakeUsers as $index=>$fake){
-                DB::exec(
-                    'insert into users
-                     (
-                        name,
-                        email,
-                        password_hash,
-                        role,
-                        status
-                     )
-                     values (?,?,?,?,?)',
-                    [
-                        $fake['name'],
-                        $fake['email'],
-                        password_hash(
-                            bin2hex(random_bytes(32)),
-                            PASSWORD_DEFAULT
-                        ),
-                        'designer',
-                        'active',
-                    ]
-                );
-
-                $userId=(int)DB::id();
-
-                DB::exec(
-                    'insert into designers
-                     (
-                        user_id,
-                        display_name,
-                        store_slug,
-                        status
-                     )
-                     values (?,?,?,"approved")',
-                    [
-                        $userId,
-                        $fake['display'],
-                        $fake['slug'],
-                    ]
-                );
-
-                $designerId=(int)DB::id();
-                $designerIds[]=$designerId;
-
-                $dir=public_path(
-                    'uploads/battles/logos'
-                );
-
-                if(
-                    !is_dir($dir) &&
-                    !mkdir($dir,0775,true) &&
-                    !is_dir($dir)
-                ){
-                    throw new DomainException(
-                        'Battle preview logo storage is unavailable.'
-                    );
-                }
-
-                $filename=
-                    'preview-'.$suffix.'-'.$index.'.png';
-
-                $absolute=$dir.'/'.$filename;
-
-                $canvas=imagecreatetruecolor(
-                    800,
-                    800
-                );
-
-                $bg=imagecolorallocate(
-                    $canvas,
-                    $index===0?235:28,
-                    $index===0?220:24,
-                    $index===0?235:35
-                );
-
-                $fg=imagecolorallocate(
-                    $canvas,
-                    $index===0?35:245,
-                    $index===0?25:235,
-                    $index===0?45:245
-                );
-
-                imagefill(
-                    $canvas,
-                    0,
-                    0,
-                    $bg
-                );
-
-                imagestring(
-                    $canvas,
-                    5,
-                    260,
-                    365,
-                    $fake['logo'],
-                    $fg
-                );
-
-                if(!imagepng(
-                    $canvas,
-                    $absolute,
-                    6
-                )){
-                    imagedestroy($canvas);
-
-                    throw new DomainException(
-                        'Battle preview logo could not be created.'
-                    );
-                }
-
-                imagedestroy($canvas);
-                @chmod($absolute,0644);
-
-                $fakeUsers[$index]['logo_path']=
-                    '/uploads/battles/logos/'.
-                    $filename;
-            }
-
-            DB::exec(
-                'insert into battle_events
-                 (
-                    title,
-                    slug,
-                    status,
-                    is_preview,
-                    created_by_admin_id
-                 )
-                 values (?,?,?,?,?)',
-                [
-                    'Battle of the Designers — PREVIEW',
-                    'battle-preview-'.$suffix,
-                    'signup',
-                    1,
-                    $adminId,
-                ]
-            );
-
-            $battleId=(int)DB::id();
-
-            foreach($designerIds as $index=>$designerId){
-                DB::exec(
-                    'insert into battle_participants
-                     (
-                        battle_id,
-                        designer_id,
-                        logo_path
-                     )
-                     values (?,?,?)',
-                    [
-                        $battleId,
-                        $designerId,
-                        $fakeUsers[$index]['logo_path'],
-                    ]
-                );
-            }
-
-            $this->adminLog(
-                $adminId,
-                'created_battle_preview',
-                'battle_event',
-                $battleId,
-                [
-                    'fake_designers'=>2,
-                ]
-            );
-
-            return $battleId;
-        });
-    }
-
-    public function deletePreview(
-        int $battleId,
-        int $adminId
-    ): bool {
-        return $this->atomic(function()use(
-            $battleId,
-            $adminId
-        ){
-            $battle=DB::row(
-                'select *
-                 from battle_events
-                 where id=?
-                   and is_preview=1
-                 for update',
-                [$battleId]
-            );
-
-            if(!$battle){
-                return false;
-            }
-
-            $designers=DB::rows(
-                'select
-                    d.id designer_id,
-                    d.user_id,
-                    p.logo_path
-                 from battle_participants p
-                 join designers d
-                   on d.id=p.designer_id
-                 where p.battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_vote_flags
-                 where battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_vote_attempts
-                 where battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_votes
-                 where battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_matchups
-                 where battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_rounds
-                 where battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'update battle_events
-                 set champion_participant_id=null
-                 where id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_participants
-                 where battle_id=?',
-                [$battleId]
-            );
-
-            DB::exec(
-                'delete from battle_events
-                 where id=?',
-                [$battleId]
-            );
-
-            foreach($designers as $designer){
-                $logo=(string)$designer['logo_path'];
-
-                if(
-                    str_starts_with(
-                        $logo,
-                        '/uploads/battles/logos/preview-'
-                    )
-                ){
-                    $absolute=
-                        public_path(
-                            ltrim($logo,'/')
-                        );
-
-                    if(is_file($absolute)){
-                        @unlink($absolute);
-                    }
-                }
-
-                DB::exec(
-                    'delete from designers
-                     where id=?',
-                    [(int)$designer['designer_id']]
-                );
-
-                DB::exec(
-                    'delete from users
-                     where id=?',
-                    [(int)$designer['user_id']]
-                );
-            }
-
-            $this->adminLog(
-                $adminId,
-                'deleted_battle_preview',
-                'battle_event',
-                $battleId
-            );
-
-            return true;
-        });
     }
 
     public function adminEvents(): array
@@ -2679,7 +2315,6 @@ final class BattleService
                on p.battle_id=e.id
               and p.designer_id=d.id
              where e.status<>"cancelled"
-               and e.is_preview=0
              order by e.id desc',
             [$userId]
         );

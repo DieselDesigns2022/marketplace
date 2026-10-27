@@ -14,51 +14,10 @@
         </p>
     </div>
 
-    <?php if((int)($event['is_preview']??0)===1): ?>
-        <a
-            class="btn"
-            href="/admin/battles/<?=(int)$event['id']?>/preview"
-            target="_blank"
-        >
-            View Private Battle Preview
-        </a>
-    <?php else: ?>
-        <a
-            class="btn"
-            href="/battle-of-the-designers/<?=H::e($event['slug'])?>"
-            target="_blank"
-        >
-            View Public Battle
-        </a>
-    <?php endif; ?>
+
 </header>
 
-<?php if((int)($event['is_preview']??0)===1): ?>
-<section class="attention-panel">
-    <h2>ADMIN-ONLY PREVIEW</h2>
 
-    <p>
-        This Battle uses fake designers for visual testing.
-        Sellers and buyers cannot see this event.
-    </p>
-
-    <form
-        method="post"
-        action="/admin/battles/<?=(int)$event['id']?>/preview/delete"
-        onsubmit="return confirm('Delete this Battle preview and both fake designers?');"
-    >
-        <input
-            type="hidden"
-            name="_csrf"
-            value="<?=H::e(H::csrf())?>"
-        >
-
-        <button class="btn alt">
-            Delete Preview + Fake Designers
-        </button>
-    </form>
-</section>
-<?php endif; ?>
 
 <section class="card">
     <h2>Battle Configuration</h2>
@@ -191,7 +150,6 @@
 
         <?php if(
             $round['status']==='pending' &&
-            (int)($event['is_preview']??0)!==1 &&
             empty($round['voting_opens_at']) &&
             (
                 (int)$round['round_number']===1 ||

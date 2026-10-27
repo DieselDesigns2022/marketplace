@@ -66,15 +66,7 @@
 }
 </style>
 
-<?php if(!empty($adminPreview)): ?>
-<section class="attention-panel">
-    <strong>ADMIN PREVIEW — NOT PUBLIC</strong>
-    <p>
-        This is the actual Battle presentation using two fake designers.
-        Voting buttons are disabled in preview mode.
-    </p>
-</section>
-<?php endif; ?>
+
 
 <header class="dashboard-heading">
     <div>
@@ -204,20 +196,10 @@
                         </h3>
 
                         <?php if(
-                            $matchup['status']==='open' ||
-                            !empty($adminPreview)
+                            $matchup['status']==='open'
                         ): ?>
 
-                            <?php if(!empty($adminPreview)): ?>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    disabled
-                                >
-                                    Preview Vote Button
-                                </button>
-
-                            <?php elseif(!H::user()): ?>
+                            <?php if(!H::user()): ?>
                                 <a class="btn" href="/login">
                                     Log In to Vote
                                 </a>
@@ -279,20 +261,10 @@
                         </h3>
 
                         <?php if(
-                            $matchup['status']==='open' ||
-                            !empty($adminPreview)
+                            $matchup['status']==='open'
                         ): ?>
 
-                            <?php if(!empty($adminPreview)): ?>
-                                <button
-                                    class="btn"
-                                    type="button"
-                                    disabled
-                                >
-                                    Preview Vote Button
-                                </button>
-
-                            <?php elseif(!H::user()): ?>
+                            <?php if(!H::user()): ?>
                                 <a class="btn" href="/login">
                                     Log In to Vote
                                 </a>
@@ -375,8 +347,7 @@
 <?php endforeach; ?>
 
 <?php if(
-    !empty($previousRoundWinners) ||
-    !empty($adminPreview)
+    !empty($previousRoundWinners)
 ): ?>
 <section class="card">
     <h2>🏆 Previous Round Winners</h2>
@@ -411,16 +382,6 @@
             <?php endforeach; ?>
         </div>
 
-    <?php elseif(!empty($adminPreview)): ?>
-        <div class="attention-panel">
-            <strong>Preview placement</strong>
-
-            <p>
-                After Round 1 is completed, the winning designers from the
-                previous round will appear here with their logo, store name,
-                and a direct link to visit their Creative Moth store.
-            </p>
-        </div>
     <?php endif; ?>
 </section>
 <?php endif; ?>
