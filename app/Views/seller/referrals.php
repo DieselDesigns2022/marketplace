@@ -14,8 +14,9 @@ $referralLink = H::baseUrl()
     . '/register?ref='
     . rawurlencode($storeSlug ?: $referralCode);
 ?>
+<?php $giveaway=(new \App\Services\BuyerReferralGiveawayService())->personal((int)H::user()['id']); include app_path('app/Views/buyer/referral_giveaway.php'); ?>
 
-<section class="card" style="margin-bottom:1.5rem">
+<section id="your-referral-link" class="card" style="margin-bottom:1.5rem">
     <h1>Your Creative Moth Referral Link</h1>
 
     <p>

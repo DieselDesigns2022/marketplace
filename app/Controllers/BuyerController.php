@@ -152,7 +152,7 @@ class BuyerController
     {
         H::requireLogin();
         $credit=new \App\Services\CreditService;$ref=new \App\Services\ReferralService;$id=(int)H::user()['id'];
-        H::view('buyer/referrals',['balances'=>$credit->balances($id),'tx'=>$credit->ledger($id),'referrals'=>$ref->dashboard($id)]);
+        H::view('buyer/referrals',['balances'=>$credit->balances($id),'tx'=>$credit->ledger($id),'referrals'=>$ref->dashboard($id),'giveaway'=>(new \App\Services\BuyerReferralGiveawayService())->personal($id)]);
 
     }
     public function toggleWishlist($id)

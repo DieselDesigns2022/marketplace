@@ -1,4 +1,5 @@
 <h1>Referrals &amp; store credit</h1>
+<?php include app_path('app/Views/buyer/referral_giveaway.php'); ?>
 <div class="attention-panel">
 <p><strong>Buyer referral rewards are now an approved-seller advertising benefit.</strong></p>
 <p>

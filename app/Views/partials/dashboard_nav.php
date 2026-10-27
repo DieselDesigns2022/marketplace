@@ -246,6 +246,7 @@ if ($area === 'buyer') {
         ],
 
         'Marketplace' => [
+            ['/admin/referral-giveaway', 'Referral Giveaway', ['/admin/referral-giveaway']],
             ['/admin/social-content', 'Social Content', ['/admin/social-content']],
             [
                 '/admin/orders',
@@ -365,6 +366,7 @@ if ($area === 'buyer') {
 
     $groups['Marketplace'][] = ['/admin/grand-opening', 'Grand Opening', ['/admin/grand-opening']];
     $permissionByHref = [
+        '/admin/referral-giveaway'=>'referrals.view',
         '/admin/social-content'=>'social_content.view',
         '/admin/grand-opening'=>'homepage.view',
         '/admin'=>'dashboard.view','/admin/analytics'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/social-publishing'=>'promotions.view','/admin/promo-library'=>'promotions.view','/admin/waitlist'=>'waitlist.view',

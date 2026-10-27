@@ -301,4 +301,5 @@ $router->post('/admin/prize-assignments/{id}/release', [PrizeDonationController:
 $router->match(['GET','POST'], '/seller/grand-opening-sale', [\App\Controllers\GrandOpeningSaleController::class, 'seller']);
 $router->match(['GET','POST'], '/admin/grand-opening', [\App\Controllers\GrandOpeningSaleController::class, 'admin']);
 $router->match(['GET','POST'], '/admin/social-content', [\App\Controllers\SocialContentController::class, 'index']);
+$router->match(['GET','POST'], '/admin/referral-giveaway', [\App\Controllers\BuyerReferralGiveawayController::class, 'index']);
  $router->dispatch($_SERVER['REQUEST_METHOD'], parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
