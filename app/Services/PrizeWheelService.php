@@ -25,9 +25,18 @@ final class PrizeWheelService
         ];
     }
 
+    public static function promotionState(array $settings,?int $now=null): string
+    {
+        if(empty($settings['starts_at']) && empty($settings['ends_at'])){
+            return empty($settings['is_enabled'])?'draft':'live';
+        }
+        if(empty($settings['starts_at']) || empty($settings['ends_at']))return 'draft';
+        return GrandOpeningSaleService::state($settings,$now);
+    }
+
     public function globallyEnabled(): bool
     {
-        return !empty($this->settings()['is_enabled']);
+        return self::promotionState($this->settings())==='live';
     }
 
     public function storefrontVisible(array $designer): bool
@@ -125,6 +134,8 @@ final class PrizeWheelService
             'update prize_wheel_settings
              set campaign_key=?,
                  campaign_started_at=now(),
+                 starts_at=null,
+                 ends_at=null,
                  updated_by=?,
                  updated_at=now()
              where id=1',
@@ -324,6 +335,8 @@ final class PrizeWheelService
             ?: $settings['enabled_at']
             ?: '1970-01-01 00:00:00';
 
+        if(!empty($settings['starts_at']))$startedAt=max($startedAt,$settings['starts_at']);
+        $endsAt=$settings['ends_at']??'9999-12-31 23:59:59';
         $minimum=$this->qualifyingMinimumCents();
 
         return DB::rows(
@@ -386,6 +399,7 @@ final class PrizeWheelService
                     o.finalized_at,
                     o.created_at
                )>=?
+               and coalesce(o.paid_at,o.finalized_at,o.created_at)<?
                and ws.id is null
              group by
                 o.id,
@@ -400,6 +414,7 @@ final class PrizeWheelService
                 $userId,
                 $storefrontDesignerId,
                 $startedAt,
+                $endsAt,
                 $minimum,
             ]
         );
@@ -432,6 +447,7 @@ final class PrizeWheelService
         int $userId
     ): int {
         $settings=$this->settings();
+        if(self::promotionState($settings)!=='live')return 0;
         $campaign=(string)($settings['campaign_key']??'');
 
         $bonus=(int)(
@@ -726,7 +742,7 @@ final class PrizeWheelService
     ): array {
         $settings=$this->settings();
 
-        if(empty($settings['is_enabled'])){
+        if(self::promotionState($settings)!=='live'){
             throw new DomainException(
                 'The Prize Wheel promotion is not currently active.'
             );
@@ -811,6 +827,12 @@ final class PrizeWheelService
 
         try{
             DB::begin();
+            $locked=DB::row('select * from prize_wheel_settings where id=1 for update');
+            if(!$locked || self::promotionState($locked)!=='live' || $locked['campaign_key']!==$campaign){
+                throw new DomainException('The Prize Wheel promotion is not currently active.');
+            }
+            $adminId=(int)($locked['updated_by']??0);
+            if($adminId<1)throw new DomainException('Wheel administrator is unavailable.');
 
             $eligible=$this->eligibleOrders(
                 $storefrontDesignerId,
@@ -980,7 +1002,7 @@ final class PrizeWheelService
     ): array {
         $settings=$this->settings();
 
-        if(empty($settings['is_enabled'])){
+        if(self::promotionState($settings)!=='live'){
             return [];
         }
 
@@ -1031,6 +1053,8 @@ final class PrizeWheelService
             return [];
         }
 
+        if(!empty($settings['starts_at']) && $paidAt<$settings['starts_at'])return [];
+        if(!empty($settings['ends_at']) && $paidAt>=$settings['ends_at'])return [];
         $minimum=$this->qualifyingMinimumCents();
 
         return DB::rows(

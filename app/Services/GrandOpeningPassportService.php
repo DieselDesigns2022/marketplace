@@ -282,6 +282,9 @@ final class GrandOpeningPassportService
 
     private function awardGiveawayEntry(int $userId): void
     {
+        // Preserve stamps and progress; award event entries only during the scheduled event.
+        $event=(new GrandOpeningSaleService())->event();
+        if(GrandOpeningSaleService::state($event)!=='live')return;
         $settings=(new PrizeWheelService())->settings();
 
         $campaign=trim(

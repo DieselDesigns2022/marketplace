@@ -19,12 +19,15 @@ $minimumAmount=number_format(
 <section class="card page-section">
     <h2>
         Promotion status:
-        <?php if(!empty($settings['is_enabled'])): ?>
-            <span class="badge yes">ON</span>
-        <?php else: ?>
-            <span class="badge no">OFF</span>
-        <?php endif; ?>
+        <strong><?=H::e(ucfirst(\App\Services\PrizeWheelService::promotionState($settings)))?></strong>
     </h2>
+
+    <?php if(!empty($settings['starts_at']) && !empty($settings['ends_at'])): ?>
+    <p><strong>Automatic schedule — Detroit time:</strong><br>
+    Starts <?=H::e(\App\Services\BattleService::eastern($settings['starts_at']))?><br>
+    Runs through <?=H::e(\App\Services\BattleService::eastern(gmdate('Y-m-d H:i:s',strtotime($settings['ends_at'].' UTC')-1)))?>.</p>
+    <p>ON schedules the wheel for these dates. It stays hidden before the start and closes automatically after the final minute. OFF pauses it immediately.</p>
+    <?php endif; ?>
 
     <p>
         <strong>Participating sellers:</strong>

@@ -133,6 +133,10 @@ $percent=(int)($passport['percent']??0);
 <div class="passport-shell">
     <section class="card passport-hero">
         <h1>Grand Opening Passport</h1>
+        <?php $entryEvent=(new \App\Services\GrandOpeningSaleService())->event(); ?>
+        <?php if(!empty($entryEvent['starts_at']) && !empty($entryEvent['ends_at'])): ?>
+        <p>Giveaway entries open <?=H::e(\App\Services\BattleService::eastern($entryEvent['starts_at']))?> and close after <?=H::e(\App\Services\BattleService::eastern(gmdate('Y-m-d H:i:s',strtotime($entryEvent['ends_at'].' UTC')-1)))?>. Your saved stamps remain on this passport.</p>
+        <?php endif; ?>
 
         <p>
             Complete all 8 Grand Opening activities to earn

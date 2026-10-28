@@ -1,0 +1,1 @@
+ALTER TABLE prize_wheel_settings ADD COLUMN starts_at DATETIME NULL, ADD COLUMN ends_at DATETIME NULL;

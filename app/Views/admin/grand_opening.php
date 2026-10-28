@@ -32,7 +32,7 @@ Grand Opening dates saved successfully.
 <?php if($hasDates): ?>
 <h3>Creative Moth Grand Opening</h3>
 <p><strong>Starts:</strong> <?=H::e($formatEventDate($event['starts_at']))?></p>
-<p><strong>Ends:</strong> <?=H::e($formatEventDate($event['ends_at']))?></p>
+<p><strong>Runs through:</strong> <?=H::e($formatEventDate(gmdate('Y-m-d H:i:s',strtotime($event['ends_at'].' UTC')-1)))?></p>
 <p><strong>Status:</strong> <?=H::e(ucfirst(Sale::state($event)))?></p>
 <?php if(empty($event['is_enabled'])): ?>
 <p>Your dates are saved. The event has not been activated.</p>
@@ -49,10 +49,10 @@ Grand Opening dates saved successfully.
 <label>Start — Eastern time
 <input type="datetime-local" name="starts_at" value="<?=H::e($formDates['starts_at'])?>" required>
 </label>
-<label>End — Eastern time
+<label>Closes at — Eastern time (exclusive)
 <input type="datetime-local" name="ends_at" value="<?=H::e($formDates['ends_at'])?>" required>
 </label>
-<p>The event must run at least seven days from the selected start time.</p>
+<p>The event must run at least seven days. To include all of November 8 through 11:59 p.m., the closing boundary is November 9 at midnight.</p>
 <label><input type="checkbox" name="is_enabled" value="1" <?=!empty($event['is_enabled'])?'checked':''?>> Enable Grand Opening on these dates</label>
 <p>When enabled, sale prices and homepage content start and end automatically.</p>
 <button type="submit">Save event dates</button>
