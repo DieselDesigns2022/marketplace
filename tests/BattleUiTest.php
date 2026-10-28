@@ -145,13 +145,7 @@ $check(
     'admin Battle UI manages bracket scheduling and rounds'
 );
 
-$check(
-    str_contains(
-        $admin,
-        'The system did not automatically choose a winner.'
-    ),
-    'admin UI preserves unresolved tie decisions'
-);
+$check(!str_contains($admin,'value="resolve_tie"') && str_contains($admin,'battle_phase.php'), 'Admin shows automatic tie phases without a manual winner picker');
 
 $check(
     str_contains(

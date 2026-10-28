@@ -19,6 +19,7 @@
 <?php foreach($events as $event): ?>
     <article class="card">
         <h2><?=H::e($event['title'])?></h2>
+<?php include app_path('app/Views/partials/battle_calendar.php'); ?>
 
         <p>
             <span class="status-badge">

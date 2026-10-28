@@ -103,7 +103,8 @@ final class BattleController
                 (int)($_POST['participant_id']??0),
                 (int)H::user()['id'],
                 (string)($_SERVER['REMOTE_ADDR']??''),
-                (string)($_SERVER['HTTP_USER_AGENT']??'')
+                (string)($_SERVER['HTTP_USER_AGENT']??''),
+                (int)($_POST['voting_phase']??-1)
             );
 
             H::flash(
@@ -342,7 +343,7 @@ final class BattleController
                         : 'success',
                     $result['ties']>0
                         ? $result['ties'].
-                            ' matchup(s) ended in a tie and require review.'
+                            ' matchup(s) started a re-battle or overtime.'
                         : 'Battle round completed.'
                 );
             }elseif($action==='resolve_tie'){

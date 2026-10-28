@@ -118,17 +118,7 @@ $check(
     'Battle schedules 12-hour warning, live, and final-hour designer emails'
 );
 
-$check(
-    str_contains(
-        $service,
-        'set status="tied"'
-    ) &&
-    str_contains(
-        $service,
-        'Only a tied matchup can be manually resolved.'
-    ),
-    'Battle ties stop advancement instead of inventing a tie-break rule'
-);
+$check(str_contains($service,'queueTieEmails') && str_contains($service,'Admins cannot select a winner.'), 'Ties use re-battle and overtime instead of admin-selected winners');
 
 $check(
     str_contains(

@@ -120,7 +120,7 @@
                 <p style="margin-top:8px">
                     Votes must come from
                     <strong>registered Creative Moth accounts</strong>.
-                    Each account may vote only once in each matchup.
+                    Each account may vote once in the original matchup, once again in a re-battle, and once in overtime.
                 </p>
             </div>
         </li>
@@ -164,7 +164,7 @@
 
         <ul>
             <li>
-                <strong>12 hours before</strong> your Battle begins
+                <strong>12 hours before</strong> the first round begins; later-round reminders explain when you will compete if you advance
             </li>
 
             <li>
@@ -217,6 +217,7 @@
 <?php foreach($events as $event): ?>
 <section class="card">
     <h2><?=H::e($event['title'])?></h2>
+<?php include app_path('app/Views/partials/battle_calendar.php'); ?>
 
     <p>
         Status:
@@ -249,7 +250,7 @@
         <?php endif; ?>
 
         <?php if(
-            $event['status']==='signup' &&
+            \App\Services\BattleService::signupOpen($event) &&
             $event['participant_status']==='active'
         ): ?>
             <form
@@ -268,7 +269,7 @@
             </form>
         <?php endif; ?>
 
-    <?php elseif($event['status']==='signup'): ?>
+    <?php elseif(\App\Services\BattleService::signupOpen($event)): ?>
 
         <form
             method="post"

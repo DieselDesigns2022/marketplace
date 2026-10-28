@@ -7,6 +7,7 @@
         </a>
 
         <h1><?=H::e($event['title'])?></h1>
+<?php include app_path('app/Views/partials/battle_calendar.php'); ?>
 
         <p>
             Status:
@@ -33,7 +34,7 @@
     </p>
 
     <p class="muted">
-        Participating designers receive emails 12 hours before the round,
+        Designers receive a reminder 12 hours before the first round and conditional reminders for later rounds,
         when voting goes live, and when 1 hour remains.
     </p>
 </section>
@@ -68,7 +69,7 @@
         <?php endforeach; ?>
     </div>
 
-    <?php if($event['status']==='signup'): ?>
+    <?php if($event['status']==='signup'&&empty($event['signup_closes_at'])): ?>
         <form
             method="post"
             action="/admin/battles/<?=(int)$event['id']?>/action"
@@ -123,12 +124,12 @@
                     new DateTimeZone('America/Detroit')
                 );
 
-                $closesEastern=(new DateTimeImmutable(
+                $closesEastern=$round['voting_closes_at'] ? (new DateTimeImmutable(
                     $round['voting_closes_at'],
                     new DateTimeZone('UTC')
                 ))->setTimezone(
                     new DateTimeZone('America/Detroit')
-                );
+                ) : null;
                 ?>
 
                 <p>
@@ -140,16 +141,15 @@
                         )?>
                     </strong>
 
-                    <?=H::e($opensEastern->format('M j, Y g:i A'))?>
+                    <?=H::e($opensEastern->format('M j, Y g:i A T'))?>
                     →
-                    <?=H::e($closesEastern->format('M j, Y g:i A'))?>
-                    ET
+                    <?=H::e(($closesEastern ? $closesEastern->format('M j, Y g:i A T') : 'Overtime — first new valid vote wins'))?>
                 </p>
             <?php endif; ?>
         </div>
 
         <?php if(
-            $round['status']==='pending' &&
+            $round['status']==='pending' && empty($event['first_round_opens_at']) &&
             empty($round['voting_opens_at']) &&
             (
                 (int)$round['round_number']===1 ||
@@ -229,6 +229,8 @@
     <div class="dashboard-grid">
     <?php foreach($round['matchups'] as $matchup): ?>
         <article class="card">
+        <?php include app_path('app/Views/partials/battle_phase.php'); ?>
+
             <h3>
                 Matchup #<?=(int)$matchup['bracket_position']?>
             </h3>
@@ -280,62 +282,7 @@
                 </p>
             <?php endif; ?>
 
-            <?php if($matchup['status']==='tied'): ?>
-                <div class="attention-panel">
-                    <strong>Tied Matchup</strong>
 
-                    <p>
-                        The system did not automatically choose a winner.
-                        Select the winner according to the Battle tie decision.
-                    </p>
-
-                    <form
-                        method="post"
-                        action="/admin/battles/<?=(int)$event['id']?>/action"
-                        class="form"
-                    >
-                        <input
-                            type="hidden"
-                            name="_csrf"
-                            value="<?=H::e(H::csrf())?>"
-                        >
-                        <input
-                            type="hidden"
-                            name="action"
-                            value="resolve_tie"
-                        >
-                        <input
-                            type="hidden"
-                            name="matchup_id"
-                            value="<?=(int)$matchup['id']?>"
-                        >
-
-                        <label>
-                            Winner
-                            <select
-                                name="winner_participant_id"
-                                required
-                            >
-                                <option value="">
-                                    — Choose —
-                                </option>
-
-                                <option value="<?=(int)$matchup['participant_one_id']?>">
-                                    <?=H::e($matchup['participant_one_name'])?>
-                                </option>
-
-                                <option value="<?=(int)$matchup['participant_two_id']?>">
-                                    <?=H::e($matchup['participant_two_name'])?>
-                                </option>
-                            </select>
-                        </label>
-
-                        <button class="btn">
-                            Resolve Tie
-                        </button>
-                    </form>
-                </div>
-            <?php endif; ?>
         </article>
     <?php endforeach; ?>
     </div>
@@ -443,7 +390,7 @@
                 <thead>
                     <tr>
                         <th>Round</th>
-                        <th>Matchup</th>
+                        <th>Matchup</th><th>Voting phase</th>
                         <th>Registered voter</th>
                         <th>Email</th>
                         <th>Account created</th>
@@ -463,7 +410,7 @@
 
                         <td>
                             #<?=number_format((int)$vote['bracket_position'])?>
-                        </td>
+                        </td><td><?=H::e(['Original','Re-battle','Overtime'][(int)$vote['voting_phase']]??'Unknown')?></td>
 
                         <td>
                             <strong>
@@ -478,7 +425,7 @@
                         </td>
 
                         <td>
-                            <?=H::e($vote['account_created_at'])?>
+                            <?=H::e(\App\Services\BattleService::eastern($vote['account_created_at']))?>
                         </td>
 
                         <td>
@@ -488,7 +435,7 @@
                         </td>
 
                         <td>
-                            <?=H::e($vote['voted_at'])?>
+                            <?=H::e(\App\Services\BattleService::eastern($vote['voted_at']))?>
                         </td>
 
                         <td>

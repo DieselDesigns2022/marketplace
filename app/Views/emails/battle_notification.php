@@ -12,7 +12,7 @@
     <strong>
         Round <?=number_format((int)($data['round_number']??0))?>
         ·
-        24-hour voting window
+        <?=htmlspecialchars($data['phase_label']??'24-hour voting window',ENT_QUOTES,'UTF-8')?>
     </strong>
 </p>
 
@@ -26,3 +26,5 @@
     Good luck!<br>
     Creative Moth
 </p>
+
+<?php if(!empty($data['voting_window'])): ?><p><strong>Eastern Time, Detroit:</strong><br><?=htmlspecialchars($data['voting_window'],ENT_QUOTES,'UTF-8')?></p><?php endif; ?>

@@ -308,16 +308,19 @@ class AccountMergeService
                  from battle_votes
                  where matchup_id=?
                    and user_id=?
+                   and voting_phase=?
                  limit 1
                  for update',
                 [
                     (int)$vote['matchup_id'],
                     $target,
+                    (int)$vote['voting_phase'],
                 ]
             );
 
             if($existing){
                 $conflicts[]=[
+                    'voting_phase'=>(int)$vote['voting_phase'],
                     'matchup_id'=>
                         (int)$vote['matchup_id'],
                     'source_vote_id'=>

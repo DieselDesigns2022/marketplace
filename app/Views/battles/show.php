@@ -75,6 +75,7 @@
         </a>
 
         <h1><?=H::e($event['title'])?></h1>
+<?php include app_path('app/Views/partials/battle_calendar.php'); ?>
 
         <p>
             <strong>Champion Prize:</strong>
@@ -89,7 +90,7 @@
     <?php endif; ?>
 </header>
 
-<?php if($event['status']==='signup'): ?>
+<?php if(\App\Services\BattleService::signupOpen($event)): ?>
 <section class="card">
     <h2>Designer Signup Is Open</h2>
     <p>
@@ -164,18 +165,20 @@
         <p>
             Voting closes:
             <strong>
-                <?=H::e($round['voting_closes_at'])?>
+                <?=H::e(($round['voting_closes_at']?\App\Services\BattleService::eastern($round['voting_closes_at']):'Overtime — waiting for the first new valid vote'))?>
             </strong>
         </p>
     <?php elseif($round['status']==='tied'): ?>
         <p>
-            This round contains a tied matchup awaiting review.
+            Tied matchups require a re-battle before advancement.
         </p>
     <?php endif; ?>
 
     <div class="dashboard-grid">
     <?php foreach($round['matchups'] as $matchup): ?>
         <article class="card battle-matchup-card">
+        <?php include app_path('app/Views/partials/battle_phase.php'); ?>
+
             <p>
                 <strong>
                     Matchup #<?=number_format((int)$matchup['bracket_position'])?>
@@ -228,7 +231,7 @@
 
                                     <input
                                         type="hidden"
-                                        name="participant_id"
+                                        name="voting_phase" value="<?=(int)$matchup['voting_phase']?>"><input type="hidden" name="participant_id"
                                         value="<?=(int)$matchup['participant_one_id']?>"
                                     >
 
@@ -293,7 +296,7 @@
 
                                     <input
                                         type="hidden"
-                                        name="participant_id"
+                                        name="voting_phase" value="<?=(int)$matchup['voting_phase']?>"><input type="hidden" name="participant_id"
                                         value="<?=(int)$matchup['participant_two_id']?>"
                                     >
 
