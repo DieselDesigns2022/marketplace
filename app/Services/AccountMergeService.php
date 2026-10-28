@@ -110,6 +110,7 @@ class AccountMergeService
             $this->moveReferrals($sourceId, $targetId);
             $reconciliation['credit'] = $this->transferCredit($sourceId, $targetId, $actor);
             $reconciliation['advertising_credit'] = $this->transferAdvertisingCredit($sourceId, $targetId, $actor);
+            $this->updateIfExists('advertising_credit_lots','user_id',$sourceId,$targetId);
 
             DB::exec(
                 'update advertising_credit_recurring_grants set user_id=? where user_id=?',
@@ -258,6 +259,7 @@ class AccountMergeService
             'advertising_credits.user_id',
             'advertising_credit_transactions.user_id',
             'advertising_credit_recurring_grants.user_id',
+            'advertising_credit_lots.user_id',
             'referrals.referrer_user_id',
             'referrals.referred_user_id',
             'seller_referral_payout_batches.referrer_user_id',

@@ -8,7 +8,20 @@ $formatEventDate = static function(string $value): string {
         ->format('M j, Y \a\t g:i A T');
 };
 ?>
-<h1>Grand Opening</h1>
+<h1>Grand Opening Control Center</h1>
+<p>Event status, participation, prizes, and delivery in one place. Dates use Detroit Eastern time. Refresh to see updated totals.</p>
+<?php if(!empty($dashboard['warnings'])): ?>
+<section class="card" aria-label="Items to review"><h2>Needs attention</h2><ul>
+<?php foreach($dashboard['warnings'] as $warning): ?><li><?=H::e($warning)?></li><?php endforeach; ?>
+</ul></section>
+<?php endif; ?>
+<div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))">
+<?php foreach(($dashboard['cards']??[]) as $card): ?>
+<section class="card"><h2><?=H::e($card['title'])?></h2><dl>
+<?php foreach($card['values'] as $label=>$value): ?><dt><?=H::e($label)?></dt><dd><?=H::e((string)$value)?></dd><?php endforeach; ?>
+</dl><a class="btn" href="<?=H::e($card['url'])?>">Manage <?=H::e($card['title'])?></a></section>
+<?php endforeach; ?>
+</div>
 <?php if($hasDates): ?>
 <p><a class="btn" href="/admin/homepage-preview?grand_opening=1" target="_blank" rel="noopener">Preview active sale homepage</a></p>
 <p class="muted">Admin-only preview using participating sellers and products. This does not enable the sale or change your dates.</p>

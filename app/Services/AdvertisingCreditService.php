@@ -10,6 +10,12 @@ final class AdvertisingCreditService
 {
     public function balances(int $userId): array
     {
+        $own=!DB::pdo()->inTransaction();
+        if ($own) DB::begin();
+        try {
+            AdvertisingCreditAllocationService::expire($userId);
+            if ($own) DB::commit();
+        } catch (\Throwable $e) { if($own && DB::pdo()->inTransaction())DB::rollBack();throw $e; }
         $row=DB::row(
             'select total_balance,reserved_balance from advertising_credits where user_id=?',
             [$userId]
@@ -57,10 +63,10 @@ final class AdvertisingCreditService
             [$userId]
         );
 
-        return DB::row(
-            'select * from advertising_credits where user_id=? for update',
-            [$userId]
-        ) ?? throw new DomainException('Advertising credit account unavailable.');
+        $row=DB::row('select * from advertising_credits where user_id=? for update',[$userId]);
+        if (!$row) throw new DomainException('Advertising credit account unavailable.');
+        AdvertisingCreditAllocationService::synchronize($userId);
+        return $row;
     }
 
     public function adjust(
@@ -76,6 +82,8 @@ final class AdvertisingCreditService
             throw new InvalidArgumentException('Advertising Credit amount cannot be zero.');
         }
 
+        $expires=AdvertisingCreditAllocationService::expiration($meta['expires_on']??null);
+        if ($cents<0 && $expires) throw new DomainException('Expiration applies only to positive grants.');
         $this->lock($userId);
 
         $existing=DB::row(
@@ -129,6 +137,9 @@ final class AdvertisingCreditService
             ]
         );
 
+        $transaction=(int)DB::id();
+        if ($cents>0) AdvertisingCreditAllocationService::grant($userId,$transaction,$cents,$expires);
+        else AdvertisingCreditAllocationService::allocate($userId,$transaction,-$cents,false);
         return true;
     }
 
@@ -192,6 +203,7 @@ final class AdvertisingCreditService
             [$userId,CreditService::formatCents(-$cents),$key,$adId]
         );
 
+        AdvertisingCreditAllocationService::allocate($userId,(int)DB::id(),$cents,true);
         return $cents;
     }
 
@@ -266,6 +278,7 @@ final class AdvertisingCreditService
             ]
         );
 
+        AdvertisingCreditAllocationService::allocate($userId,(int)DB::id(),$requestedCents,true);
         return $requestedCents;
     }
 
@@ -346,6 +359,7 @@ final class AdvertisingCreditService
             ]
         );
 
+        AdvertisingCreditAllocationService::settle($userId,(int)$reservation['id'],(int)DB::id(),true);
         return true;
     }
 
@@ -404,99 +418,13 @@ final class AdvertisingCreditService
             [$userId,$amount,$key,$adId,$reservation['id']]
         );
 
+        AdvertisingCreditAllocationService::settle($userId,(int)$reservation['id'],(int)DB::id(),false);
         return true;
     }
 
-    public function createRecurring(
-        int $userId,
-        string $amount,
-        int $day,
-        int $adminId,
-        string $description,
-        bool $grantNow
-    ): int {
-        $this->requireApprovedSeller($userId);
-
-        $cents=CreditService::parseCents($amount,false);
-        if($cents<=0){
-            throw new InvalidArgumentException('Recurring amount must be greater than zero.');
-        }
-
-        if($day<1||$day>28){
-            throw new InvalidArgumentException('Recurring day must be between 1 and 28.');
-        }
-
-        if(mb_strlen($description)<3||mb_strlen($description)>500){
-            throw new InvalidArgumentException('Provide a reason between 3 and 500 characters.');
-        }
-
-        $now=new \DateTimeImmutable('now',new \DateTimeZone('UTC'));
-        $next=$now
-            ->modify('first day of next month')
-            ->setTime(0,0)
-            ->modify('+'.($day-1).' days');
-
-        DB::begin();
-        try {
-            DB::exec(
-                'insert into advertising_credit_recurring_grants
-                 (user_id,amount,frequency,day_of_month,starts_at,next_run_at,is_active,created_by_admin_id,description)
-                 values (?,?,"monthly",?,now(),?,1,?,?)',
-                [
-                    $userId,
-                    CreditService::formatCents($cents),
-                    $day,
-                    $next->format('Y-m-d H:i:s'),
-                    $adminId,
-                    $description
-                ]
-            );
-
-            $id=(int)DB::id();
-
-            if($grantNow){
-                $this->lock($userId);
-
-                $amountFormatted=CreditService::formatCents($cents);
-
-                DB::exec(
-                    'update advertising_credits
-                     set total_balance=total_balance+?
-                     where user_id=?',
-                    [$amountFormatted,$userId]
-                );
-
-                DB::exec(
-                    'insert into advertising_credit_transactions
-                     (user_id,amount,type,status,idempotency_key,recurring_grant_id,admin_user_id,description,finalized_at)
-                     values (?,?,"recurring_grant","finalized",?,?,?,?,now())',
-                    [
-                        $userId,
-                        $amountFormatted,
-                        'advertising-recurring:'.$id.':initial',
-                        $id,
-                        $adminId,
-                        $description
-                    ]
-                );
-
-                DB::exec(
-                    'update advertising_credit_recurring_grants
-                     set last_granted_at=now()
-                     where id=?',
-                    [$id]
-                );
-            }
-
-            DB::commit();
-            return $id;
-
-        } catch(\Throwable $e){
-            if(DB::pdo()->inTransaction()){
-                DB::rollBack();
-            }
-            throw $e;
-        }
+    public function createRecurring(int $userId,string $amount,int $day,int $adminId,string $description,bool $grantNow,array $options=[]): int
+    {
+        return (new AdvertisingCreditScheduleService())->save(null,$userId,$amount,$day,$adminId,$description,$grantNow,$options);
     }
 
     public function deactivateRecurring(int $id): bool
@@ -521,6 +449,7 @@ final class AdvertisingCreditService
              limit $limit"
         );
 
+        AdvertisingCreditAllocationService::processExpired($limit);
         $processed=0;
 
         foreach($rows as $candidate){
@@ -542,6 +471,12 @@ final class AdvertisingCreditService
                     continue;
                 }
 
+                if (($grant['ends_at'] && $grant['next_run_at']>$grant['ends_at']) ||
+                    !DB::row('select d.id from designers d join users u on u.id=d.user_id where d.user_id=? and d.status="approved" and u.status="active"',[$grant['user_id']])) {
+                    DB::exec('update advertising_credit_recurring_grants set is_active=0 where id=?',[$grant['id']]);
+                    DB::commit();continue;
+                }
+                if ($grant['next_run_at']<$grant['starts_at']) throw new DomainException('Recurring schedule precedes its start.');
                 $runKey='advertising-recurring:'.
                     (int)$grant['id'].':'.
                     $grant['next_run_at'];
@@ -576,22 +511,18 @@ final class AdvertisingCreditService
                         ]
                     );
 
+                    $transaction=(int)DB::id();
+                    $expires=null;
+                    if ($grant['expiry_days']) $expires=(new \DateTimeImmutable($grant['next_run_at'],new \DateTimeZone('UTC')))
+                        ->setTimezone(new \DateTimeZone($grant['schedule_timezone']))
+                        ->modify('+'.(int)$grant['expiry_days'].' days')
+                        ->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+                    AdvertisingCreditAllocationService::grant((int)$grant['user_id'],$transaction,CreditService::parseCents((string)$grant['amount']),$expires);
+                    AdvertisingCreditAllocationService::expire((int)$grant['user_id']);
                     $processed++;
                 }
 
-                $current=new \DateTimeImmutable(
-                    $grant['next_run_at'],
-                    new \DateTimeZone('UTC')
-                );
-
-                $next=$current
-                    ->modify('first day of next month')
-                    ->setTime(
-                        (int)$current->format('H'),
-                        (int)$current->format('i'),
-                        (int)$current->format('s')
-                    )
-                    ->modify('+'.((int)$grant['day_of_month']-1).' days');
+                $next=AdvertisingCreditScheduleService::next($grant['next_run_at'],(int)$grant['day_of_month'],$grant['schedule_timezone']);
 
                 DB::exec(
                     'update advertising_credit_recurring_grants
@@ -604,8 +535,8 @@ final class AdvertisingCreditService
                      where id=?',
                     [
                         $grant['next_run_at'],
-                        $next->format('Y-m-d H:i:s'),
-                        $next->format('Y-m-d H:i:s'),
+                        $next,
+                        $next,
                         $grant['id']
                     ]
                 );

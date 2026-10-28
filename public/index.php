@@ -266,6 +266,7 @@ $router->post('/admin/ip-risk-terms/{id}/context-rules', [AdminIpRiskTermsContro
  $router->post('/admin/credits/adjust', [AdminCreditController::class, 'adjust']);
  $router->post('/admin/credits/advertising-recurring', [AdminCreditController::class, 'createAdvertisingRecurring']);
  $router->post('/admin/credits/advertising-recurring/{id}/deactivate', [AdminCreditController::class, 'deactivateAdvertisingRecurring']);
+ $router->post('/admin/credits/advertising-recurring/{id}/edit', [AdminCreditController::class, 'editAdvertisingRecurring']);
 
 $router->get('/battle-of-the-designers', [BattleController::class, 'index']);
 $router->get('/battle-of-the-designers/{slug}', [BattleController::class, 'show']);

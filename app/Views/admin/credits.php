@@ -104,10 +104,10 @@
 
 
         <label>
-            Prize Credit expiration date
+            Prize / Advertising Credit expiration date
             <input type="date" name="expires_on">
             <small class="help-text">
-                Optional and used only when issuing positive Prize Credit.
+                Optional for positive Prize or Advertising Credit. Advertising Credit remains usable through this date in Detroit.
                 Leave blank for no expiration date.
             </small>
         </label>
@@ -143,10 +143,16 @@
         </label>
 
         <label>
-            <input type="checkbox" name="grant_now" value="1" checked>
+            <input type="checkbox" name="grant_now" value="1">
             Issue the first credit immediately
         </label>
 
+        <label>First grant date — Detroit time <input type="date" name="starts_on" required></label>
+        <label>End date (optional) <input type="date" name="ends_on"></label>
+        <label>Each monthly grant expires after this many days (optional)
+            <input type="number" name="expiry_days" min="1" max="3650">
+        </label>
+        <p>Leave expiration blank to keep credit indefinitely. Existing grants are not changed when you edit a schedule.</p>
         <button class="btn">Create recurring Advertising Credit</button>
     </form>
     <?php endif;?>
@@ -172,12 +178,24 @@
 <tr>
     <td><?=H::money($grant['amount'])?></td>
     <td><?=(int)$grant['day_of_month']?></td>
-    <td><?=H::e($grant['next_run_at'])?></td>
-    <td><?=H::e($grant['last_granted_at']??'—')?></td>
+    <td><?=H::e(\App\Services\AdvertisingCreditScheduleService::display($grant['next_run_at']))?></td>
+    <td><?=H::e(\App\Services\AdvertisingCreditScheduleService::display($grant['last_granted_at']))?></td>
     <td><?=$grant['is_active']?'Active':'Stopped'?></td>
     <td><?=H::e($grant['description'])?></td>
     <td>
         <?php if($grant['is_active']&&H::canAdmin('credits.adjust')):?>
+        <details><summary>Edit monthly schedule</summary>
+        <form method="post" action="/admin/credits/advertising-recurring/<?=(int)$grant['id']?>/edit" class="form">
+            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+            <label>Monthly amount <input name="amount" value="<?=H::e($grant['amount'])?>" required inputmode="decimal"></label>
+            <label>Monthly day <input type="number" name="day_of_month" min="1" max="28" value="<?=(int)$grant['day_of_month']?>" required></label>
+            <label>Next grant date — Detroit time <input type="date" name="starts_on" value="<?=H::e(\App\Services\AdvertisingCreditScheduleService::localDate($grant['next_run_at']))?>" required></label>
+            <label>Last grant date (optional) <input type="date" name="ends_on" value="<?=H::e(\App\Services\AdvertisingCreditScheduleService::localDate($grant['ends_at']))?>"></label>
+            <label>Expire each future grant after days (optional) <input type="number" name="expiry_days" min="1" max="3650" value="<?=H::e($grant['expiry_days']??'')?>"></label>
+            <label>Reason <textarea name="reason" required minlength="3" maxlength="500"><?=H::e($grant['description'])?></textarea></label>
+            <button>Save schedule</button>
+        </form>
+        </details>
         <form method="post" action="/admin/credits/advertising-recurring/<?=(int)$grant['id']?>/deactivate">
             <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
             <button>Stop recurring credit</button>
@@ -193,6 +211,14 @@
 </table>
 </div>
 
+<h2>Advertising Credit grants</h2>
+<p>Expiring credit is used first. Credit held for an ad checkout stays protected until payment succeeds or the hold is released.</p>
+<div class="responsive-table"><table><thead><tr><th>Grant</th><th>Remaining</th><th>Held for checkout</th><th>Expires — Detroit time</th></tr></thead><tbody>
+<?php foreach($advertisingLots as $lot): ?>
+<tr><td><?=(int)$lot['id']?></td><td><?=H::money($lot['remaining_amount'])?></td><td><?=H::money($lot['reserved_amount'])?></td><td><?=H::e($lot['expires_at']?\App\Services\AdvertisingCreditScheduleService::display($lot['expires_at']):'No expiration')?></td></tr>
+<?php endforeach; ?>
+<?php if(!$advertisingLots): ?><tr><td colspan="4">No Advertising Credit grants issued.</td></tr><?php endif; ?>
+</tbody></table></div>
 <h2>Marketplace Credit Ledger</h2>
 <div class="responsive-table">
 <table>

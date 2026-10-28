@@ -77,6 +77,7 @@ final class GrandOpeningSaleController
         }
         H::view('admin/grand_opening',[
             'event'=>$event,
+            'dashboard'=>(new \App\Services\GrandOpeningDashboardService())->summary(static fn(string $permission):bool=>H::canAdmin($permission)),
             'dateError'=>$dateError,
             'savedNotice'=>$savedNotice,
             'formDates'=>$formDates,

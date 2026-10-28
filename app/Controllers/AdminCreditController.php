@@ -18,7 +18,7 @@ final class AdminCreditController
     public function index(): void
     {
         $path=parse_url($_SERVER['REQUEST_URI']??'',PHP_URL_PATH)?:'';$mode=str_starts_with($path,'/admin/credits')?'credits':'referrals';H::requireAdminPermission($mode==='credits'?'credits.view':'referrals.view');
-        $query=mb_substr(trim((string)($_GET['q']??'')),0,190);$selectedId=max(0,(int)($_GET['user_id']??0));$page=max(1,(int)($_GET['page']??1));$offset=($page-1)*25;$users=[];$selected=null;$ledger=[];$advertisingLedger=[];$prizeLedger=[];$recurringGrants=[];$referrals=[];$payouts=[];$attempts=[];$commissionTotals=[];$payoutStatus='';
+        $query=mb_substr(trim((string)($_GET['q']??'')),0,190);$selectedId=max(0,(int)($_GET['user_id']??0));$page=max(1,(int)($_GET['page']??1));$offset=($page-1)*25;$users=[];$selected=null;$ledger=[];$advertisingLedger=[];$advertisingLots=[];$prizeLedger=[];$recurringGrants=[];$referrals=[];$payouts=[];$attempts=[];$commissionTotals=[];$payoutStatus='';
         if($mode==='credits'){
             $params=[];$where='';
             if($query!==''){
@@ -137,6 +137,7 @@ final class AdminCreditController
                 [$selectedId]
             ):[];
 
+            $advertisingLots=$selected?DB::rows('select * from advertising_credit_lots where user_id=? order by expires_at is null,expires_at,id',[$selectedId]):[];
             $advertisingLedger=$selected?DB::rows(
                 'select ct.*,a.name admin_name
                  from advertising_credit_transactions ct
@@ -169,7 +170,7 @@ final class AdminCreditController
             ):[];
         }
         else{$referrals=DB::rows('select r.*,a.name referrer_name,b.name referred_name from referrals r join users a on a.id=r.referrer_user_id join users b on b.id=r.referred_user_id where (?=0 or r.referrer_user_id=? or r.referred_user_id=?) order by r.id desc limit 100',[$selectedId,$selectedId,$selectedId]);$payoutStatus=in_array($_GET['payout_status']??'',['processing','paid','failed','not_ready'],true)?$_GET['payout_status']:'';$payouts=DB::rows('select b.*,u.name referrer_name,d.display_name,d.store_slug,d.stripe_details_submitted,d.stripe_payouts_enabled,(select count(*) from seller_referral_transfer_attempts a where a.batch_id=b.id) attempt_count from seller_referral_payout_batches b join users u on u.id=b.referrer_user_id left join designers d on d.user_id=b.referrer_user_id where (?="" or b.status=?) order by b.id desc limit 100',[$payoutStatus,$payoutStatus]);$attempts=DB::rows('select * from seller_referral_transfer_attempts where batch_id in (select id from seller_referral_payout_batches order by id desc) order by id desc limit 300');$commissionTotals=DB::rows('select r.id referral_id,ru.name referrer_name,du.display_name referred_store,r.commission_ended_at,r.commission_end_reason,coalesce(sum(case when l.payout_item_id is null then l.amount_cents else 0 end),0) unpaid_cents,coalesce(sum(case when l.payout_item_id is not null then l.amount_cents else 0 end),0) paid_cents,coalesce(sum(case when l.entry_type="recovery_adjustment" then l.amount_cents else 0 end),0) recovery_cents,coalesce(sum(l.amount_cents),0) lifetime_cents from referrals r join users ru on ru.id=r.referrer_user_id left join designers du on du.user_id=r.referred_user_id left join seller_referral_commission_ledger l on l.referral_id=r.id where r.seller_reward_type="lifetime_commission" group by r.id,ru.name,du.display_name,r.commission_ended_at,r.commission_end_reason order by r.id desc');}
-        H::view('admin/credits',compact('mode','users','selected','ledger','advertisingLedger','prizeLedger','recurringGrants','referrals','query','page','payoutStatus','payouts','attempts','commissionTotals'));
+        H::view('admin/credits',compact('mode','users','selected','ledger','advertisingLedger','advertisingLots','prizeLedger','recurringGrants','referrals','query','page','payoutStatus','payouts','attempts','commissionTotals'));
     }
 
     public function retrySellerReferralPayout($id): void
@@ -214,6 +215,7 @@ final class AdminCreditController
         $amount = trim((string)($_POST['amount'] ?? ''));
         $reason = trim((string)($_POST['reason'] ?? ''));
         $creditType = (string)($_POST['credit_type'] ?? 'marketplace');
+        $expiresOn=trim((string)($_POST['expires_on']??''));
         $target = DB::row('select id,status from users where id=?', [$userId]);
         if (!$target || $target['status'] !== 'active' || mb_strlen($reason) < 3 || mb_strlen($reason) > 500) {
             H::flash('error', 'Select an active user and provide a reason between 3 and 500 characters.');
@@ -283,6 +285,7 @@ final class AdminCreditController
                 );
             } elseif($creditType==='advertising'){
                 (new AdvertisingCreditService)->adjust($userId,$amount,$key,[
+                    'expires_on'=>$expiresOn,
                     'admin_user_id'=>$adminId,
                     'description'=>mb_substr($reason,0,500),
                 ]);
@@ -375,7 +378,8 @@ final class AdminCreditController
                 $day,
                 (int)H::user()['id'],
                 $reason,
-                $grantNow
+                $grantNow,
+                $_POST
             );
 
             DB::exec(
@@ -403,6 +407,21 @@ final class AdminCreditController
         }
 
         H::redirect('/admin/credits?user_id='.$userId);
+    }
+
+    public function editAdvertisingRecurring($id): void
+    {
+        H::requireAdminPermission('credits.adjust');H::verifyCsrf();
+        $grant=DB::row('select * from advertising_credit_recurring_grants where id=?',[(int)$id]);
+        if (!$grant) H::abort(404);
+        try {
+            (new \App\Services\AdvertisingCreditScheduleService())->save((int)$id,(int)$grant['user_id'],trim((string)($_POST['amount']??'')),(int)($_POST['day_of_month']??0),(int)H::user()['id'],trim((string)($_POST['reason']??'')),false,$_POST);
+            H::flash('success','Recurring Advertising Credit schedule updated. Previous grants are unchanged.');
+        } catch (Throwable $e) {
+            error_log('Advertising schedule update failed: '.$e->getMessage());
+            H::flash('error',$e instanceof \DomainException?$e->getMessage():'Schedule could not be updated.');
+        }
+        H::redirect('/admin/credits?user_id='.(int)$grant['user_id']);
     }
 
     public function deactivateAdvertisingRecurring($id): void
