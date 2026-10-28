@@ -586,7 +586,11 @@ final class AdvertisingCreditService
 
                 $next=$current
                     ->modify('first day of next month')
-                    ->setTime(0,0)
+                    ->setTime(
+                        (int)$current->format('H'),
+                        (int)$current->format('i'),
+                        (int)$current->format('s')
+                    )
                     ->modify('+'.((int)$grant['day_of_month']-1).' days');
 
                 DB::exec(
