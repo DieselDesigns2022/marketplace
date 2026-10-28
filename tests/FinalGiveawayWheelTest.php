@@ -31,6 +31,7 @@ $fixture('designers',['id'=>1,'user_id'=>3,'display_name'=>'Prize donor','store_
 $start=gmdate('Y-m-d H:i:s',time()-7200);$end=gmdate('Y-m-d H:i:s',time()-3600);
 $fixture('grand_opening_events',['id'=>1,'campaign_key'=>'grand-opening-2026','starts_at'=>$start,'ends_at'=>$end,'is_enabled'=>0]);
 DB::exec('insert into buyer_referral_giveaway_settings(id,starts_at,ends_at) values(1,?,?)',[$start,$end]);
+$fixture('final_giveaway_settings',['id'=>1,'is_live'=>0]);
 $fixture('prize_donations',['id'=>1,'designer_id'=>1,'prize_type'=>'bundle','title'=>'Digital prize','description'=>'Fixture','quantity_donated'=>5,'quantity_remaining'=>5,'fulfillment_instructions'=>'PRIVATE-CODE-123','restrictions'=>'Personal use only','usage_designations'=>'giveaway','seller_authorized'=>1,'status'=>'available']);
 for($i=1;$i<=5;$i++)$fixture('grand_opening_giveaway_entries',['id'=>$i,'campaign_key'=>'grand-opening-2026','user_id'=>2,'source_type'=>$i===1?'passport':'prize_wheel','source_key'=>'fixture-'.$i,'created_at'=>$start]);
 $s=new Wheel();

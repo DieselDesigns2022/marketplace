@@ -33,6 +33,7 @@ DB::exec('insert into admin_permission_grants(user_id,permission_key,granted_by)
 $fixture('designers',['id'=>1,'user_id'=>2,'display_name'=>'Shop A','store_slug'=>'shop-a','status'=>'approved']);
 $fixture('designers',['id'=>2,'user_id'=>6,'display_name'=>'Shop B','store_slug'=>'shop-b','status'=>'approved']);
 $fixture('grand_opening_events',['id'=>1,'campaign_key'=>'grand-opening-2026','starts_at'=>$start,'ends_at'=>$end,'is_enabled'=>0]);
+$fixture('buyer_referral_giveaway_settings',['id'=>1,'is_enabled'=>0,'starts_at'=>null,'ends_at'=>null]);
 $g=new Giveaway();$refs=new ReferralService();
 $denied=static function(callable $fn,string $message)use($check):void{try{$fn();}catch(DomainException|InvalidArgumentException $e){$check(true,$message);return;}throw new RuntimeException($message);};
 $denied(fn()=>$refs->attach(3,'TESTCODE4','buyer'),'Ordinary buyer cannot refer before giveaway enable');

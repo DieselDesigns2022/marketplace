@@ -31,6 +31,10 @@ namespace {
     $property->setAccessible(true);
     $property->setValue(null,$pdo);
 
+    DB::exec(
+        'insert into grand_opening_events(id,campaign_key,is_enabled) values(1,"grand-opening-2026",0)'
+    );
+
     $checks = 0;
     $check = static function(bool $ok,string $label) use (&$checks): void {
         if (!$ok) throw new RuntimeException($label);
