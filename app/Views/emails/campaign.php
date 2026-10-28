@@ -5,19 +5,28 @@ use App\Core\Helpers as H;
 $rich =
     ($data['body_format'] ?? 'plain') === 'rich_html';
 
+$customLayout=
+    $rich &&
+    str_contains(
+        (string)($data['body'] ?? ''),
+        'data-cm-layout="custom"'
+    );
+
 ?>
 
 <div
     style="
-        padding:28px;
+        padding:<?=$customLayout?'0':'28px'?>;
         font-size:16px;
         line-height:1.65;
         color:#231942;
     "
 >
-    <p>
-        Hello <?=H::e($data['name'] ?? '')?>,
-    </p>
+    <?php if(!$customLayout): ?>
+        <p>
+            Hello <?=H::e($data['name'] ?? '')?>,
+        </p>
+    <?php endif; ?>
 
     <?php if($rich): ?>
 

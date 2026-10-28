@@ -5,7 +5,7 @@ use App\Core\Helpers as H;
 
 final class EmailCampaignService
 {
-    public const AUDIENCES=['waitlist_all','waitlist_buyer','waitlist_seller','waitlist_both','waitlist_tester','users_opted_in'];
+    public const AUDIENCES=['waitlist_all','waitlist_buyer','waitlist_seller','waitlist_both','waitlist_tester','users_opted_in','users_sellers','users_sellers_system'];
 
     public const WAITLIST_COMPOSE_AUDIENCES=[
         'waitlist_all',
@@ -24,6 +24,8 @@ final class EmailCampaignService
             'waitlist_both'=>'Seller & Buyer',
             'waitlist_tester'=>'Testers',
             'users_opted_in'=>'Opted-in registered users',
+            'users_sellers'=>'Registered Sellers — Marketing / Optional',
+            'users_sellers_system'=>'Registered Sellers — Required / System',
         ][$audience] ?? 'Unknown audience';
     }
     public static function safeCta(?string $url): ?string { $original=(string)$url;if(str_contains($original,'\\')||preg_match('/[\x00-\x1F\x7F]/',$original))return null;$url=trim($original);if($url==='')return null;if($url[0]==='/')return NotificationService::safeActionUrl($url);$p=parse_url($url);$app=parse_url(H::baseUrl());if($p===false||$app===false||($p['scheme']??'')!=='https'||($app['scheme']??'')!=='https'||isset($p['user'])||isset($p['pass']))return null;$host=strtolower($p['host']??'');$appHost=strtolower($app['host']??'');$port=(int)($p['port']??443);$appPort=(int)($app['port']??443);return $host!==''&&hash_equals($appHost,$host)&&$port===$appPort?mb_substr($url,0,500):null; }
@@ -114,14 +116,46 @@ final class EmailCampaignService
             );
         }
 
+        /*
+         * Full-document HTML pasted into HTML Source mode is reduced
+         * to the BODY contents before sanitizing. Preserve the internal
+         * custom-layout marker so preview/send knows this is a complete
+         * branded email design.
+         */
+        $customLayout=
+            str_contains(
+                $html,
+                'data-cm-layout="custom"'
+            );
+
+        if(
+            preg_match(
+                '/<body\\b[^>]*>(.*)<\\/body>/is',
+                $html,
+                $bodyMatch
+            )
+        ){
+            $html=$bodyMatch[1];
+
+            if($customLayout){
+                $html=
+                    '<div data-cm-layout="custom">'.
+                    $html.
+                    '</div>';
+            }
+        }
+
         $allowed=[
             'p','br',
             'strong','b',
             'em','i','u',
-            'h2','h3',
+            'h1','h2','h3','h4',
             'ul','ol','li',
-            'a',
-            'blockquote',
+            'a','blockquote',
+            'div','span',
+            'table','thead','tbody','tfoot',
+            'tr','td','th',
+            'img','hr',
         ];
 
         $document=new \DOMDocument(
@@ -184,17 +218,14 @@ final class EmailCampaignService
                         continue;
                     }
 
-                    $href='';
-                    $title='';
+                    $attrs=[];
 
-                    if($tag==='a'){
-                        $href=trim(
-                            $child->getAttribute('href')
-                        );
-
-                        $title=trim(
-                            $child->getAttribute('title')
-                        );
+                    if($child->attributes){
+                        foreach($child->attributes as $attribute){
+                            $attrs[
+                                strtolower($attribute->name)
+                            ]=$attribute->value;
+                        }
                     }
 
                     while(
@@ -207,22 +238,139 @@ final class EmailCampaignService
                     }
 
                     if(
-                        $tag==='a' &&
-                        self::safeRichLink($href)!==null
+                        isset($attrs['style']) &&
+                        ($style=self::safeInlineStyle(
+                            $attrs['style']
+                        ))!==''
                     ){
                         $child->setAttribute(
-                            'href',
-                            self::safeRichLink($href)
+                            'style',
+                            $style
+                        );
+                    }
+
+                    if(
+                        $tag==='div' &&
+                        ($attrs['data-cm-layout']??'')==='custom'
+                    ){
+                        $child->setAttribute(
+                            'data-cm-layout',
+                            'custom'
+                        );
+                    }
+
+                    if($tag==='a'){
+                        $href=self::safeRichLink(
+                            trim(
+                                (string)($attrs['href']??'')
+                            )
                         );
 
-                        if($title!==''){
+                        if($href!==null){
                             $child->setAttribute(
-                                'title',
-                                mb_substr($title,0,190)
+                                'href',
+                                $href
                             );
                         }
-                    } elseif($tag==='a'){
-                        $child->removeAttribute('href');
+
+                        if(
+                            !empty($attrs['title'])
+                        ){
+                            $child->setAttribute(
+                                'title',
+                                mb_substr(
+                                    $attrs['title'],
+                                    0,
+                                    190
+                                )
+                            );
+                        }
+
+                        if(
+                            in_array(
+                                strtolower(
+                                    (string)($attrs['target']??'')
+                                ),
+                                ['_blank','_self'],
+                                true
+                            )
+                        ){
+                            $child->setAttribute(
+                                'target',
+                                strtolower($attrs['target'])
+                            );
+                        }
+                    }
+
+                    if($tag==='img'){
+                        $src=self::safeImageSrc(
+                            trim(
+                                (string)($attrs['src']??'')
+                            )
+                        );
+
+                        if($src===null){
+                            $node->removeChild($child);
+                            $child=$next;
+                            continue;
+                        }
+
+                        $child->setAttribute(
+                            'src',
+                            $src
+                        );
+
+                        if(isset($attrs['alt'])){
+                            $child->setAttribute(
+                                'alt',
+                                mb_substr(
+                                    strip_tags($attrs['alt']),
+                                    0,
+                                    300
+                                )
+                            );
+                        }
+                    }
+
+                    if(
+                        in_array(
+                            $tag,
+                            [
+                                'table','thead','tbody','tfoot',
+                                'tr','td','th','img'
+                            ],
+                            true
+                        )
+                    ){
+                        foreach(
+                            [
+                                'width','height',
+                                'align','valign',
+                                'cellspacing','cellpadding',
+                                'border','role'
+                            ]
+                            as $name
+                        ){
+                            if(!isset($attrs[$name])){
+                                continue;
+                            }
+
+                            $value=trim(
+                                (string)$attrs[$name]
+                            );
+
+                            if(
+                                preg_match(
+                                    '/^[a-zA-Z0-9 _%.-]{1,80}$/',
+                                    $value
+                                )
+                            ){
+                                $child->setAttribute(
+                                    $name,
+                                    $value
+                                );
+                            }
+                        }
                     }
 
                     $cleanNode($child);
@@ -241,6 +389,91 @@ final class EmailCampaignService
         }
 
         return trim($output);
+    }
+
+    private static function safeInlineStyle(
+        string $style
+    ): string {
+        $style=trim($style);
+
+        if($style===''){
+            return '';
+        }
+
+        if(
+            preg_match(
+                '/(?:expression\s*\(|javascript\s*:|vbscript\s*:|data\s*:|@import|behavior\s*:|-moz-binding|url\s*\()/i',
+                $style
+            )
+        ){
+            return '';
+        }
+
+        $safe=[];
+
+        foreach(explode(';',$style) as $declaration){
+            $declaration=trim($declaration);
+
+            if(
+                $declaration==='' ||
+                !str_contains($declaration,':')
+            ){
+                continue;
+            }
+
+            [$property,$value]=array_map(
+                'trim',
+                explode(':',$declaration,2)
+            );
+
+            $property=strtolower($property);
+
+            if(
+                !preg_match(
+                    '/^[a-z-]{1,50}$/',
+                    $property
+                ) ||
+                !preg_match(
+                    '/^[#(),.%\/ a-zA-Z0-9_"\'-]{1,300}$/',
+                    $value
+                )
+            ){
+                continue;
+            }
+
+            $safe[]=$property.':'.$value;
+        }
+
+        return implode(';',$safe);
+    }
+
+    private static function safeImageSrc(
+        string $url
+    ): ?string {
+        if(
+            $url==='' ||
+            str_contains($url,'\\') ||
+            preg_match(
+                '/[\x00-\x1F\x7F]/',
+                $url
+            )
+        ){
+            return null;
+        }
+
+        $parts=parse_url($url);
+
+        if(
+            $parts===false ||
+            strtolower(
+                (string)($parts['scheme']??'')
+            )!=='https' ||
+            empty($parts['host'])
+        ){
+            return null;
+        }
+
+        return mb_substr($url,0,1500);
     }
 
     private static function safeRichLink(string $url): ?string
@@ -677,9 +910,14 @@ final class EmailCampaignService
                     'user_id'=>$r['user_id']
                 ];
 
+                $classification=
+                    $c['audience']==='users_sellers_system'
+                        ? 'transactional'
+                        : 'marketing';
+
                 $queued=
                     EmailQueueService::queue(
-                        'marketing',
+                        $classification,
                         $r['email'],
                         $c['subject'],
                         'campaign',
@@ -751,6 +989,41 @@ final class EmailCampaignService
                    and ep.marketing_opt_in=1
                    and ep.marketing_opted_out_at is null
                    and length(ep.unsubscribe_nonce)=64'
+            );
+        }
+
+        if($aud==='users_sellers'){
+            return DB::rows(
+                'select
+                    u.id user_id,
+                    null waitlist_entry_id,
+                    u.email,
+                    u.name
+                 from designers d
+                 join users u
+                   on u.id=d.user_id
+                 join email_preferences ep
+                   on ep.user_id=u.id
+                 where d.status="approved"
+                   and u.status="active"
+                   and ep.marketing_opt_in=1
+                   and ep.marketing_opted_out_at is null
+                   and length(ep.unsubscribe_nonce)=64'
+            );
+        }
+
+        if($aud==='users_sellers_system'){
+            return DB::rows(
+                'select
+                    u.id user_id,
+                    null waitlist_entry_id,
+                    u.email,
+                    u.name
+                 from designers d
+                 join users u
+                   on u.id=d.user_id
+                 where d.status="approved"
+                   and u.status="active"'
             );
         }
 

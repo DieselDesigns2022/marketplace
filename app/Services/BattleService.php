@@ -565,20 +565,42 @@ final class BattleService
                     );
                 }
 
-                if(DB::row(
-                    'select id
+                $existingParticipant=DB::row(
+                    'select *
                      from battle_participants
                      where battle_id=?
                        and designer_id=?
-                     limit 1',
+                     limit 1
+                     for update',
                     [
                         $battleId,
                         (int)$designer['id'],
                     ]
-                )){
-                    throw new DomainException(
-                        'Your store is already registered for this Battle.'
+                );
+
+                if($existingParticipant){
+                    if(
+                        ($existingParticipant['status']??'')
+                        !=='withdrawn'
+                    ){
+                        throw new DomainException(
+                            'Your store is already registered for this Battle.'
+                        );
+                    }
+
+                    DB::exec(
+                        'update battle_participants
+                         set status="active",
+                             logo_path=?,
+                             seed_position=null
+                         where id=?',
+                        [
+                            $stored['path'],
+                            (int)$existingParticipant['id'],
+                        ]
                     );
+
+                    return (int)$existingParticipant['id'];
                 }
 
                 DB::exec(
@@ -2212,6 +2234,7 @@ final class BattleService
              left join battle_participants p
                on p.battle_id=e.id
               and p.designer_id=d.id
+              and p.status<>"withdrawn"
              where e.status<>"cancelled"
              order by e.id desc',
             [$userId]

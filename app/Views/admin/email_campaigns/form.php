@@ -8,8 +8,29 @@ $audience=$campaign['audience']??'users_opted_in';
 $bodyFormat=$campaign['body_format']??'rich_html';
 $body=(string)($campaign['body']??'');
 
+$isCustomHtml=
+    $bodyFormat==='rich_html' &&
+    str_contains(
+        $body,
+        'data-cm-layout="custom"'
+    );
+
+$sourceBody=$body;
+
+if(
+    $isCustomHtml &&
+    preg_match(
+        '/^<div data-cm-layout="custom">(.*)<\/div>$/s',
+        $body,
+        $customMatch
+    )
+){
+    $sourceBody=$customMatch[1];
+}
+
 if($bodyFormat!=='rich_html'){
     $body=nl2br(H::e($body));
+    $sourceBody=$body;
 }
 
 $scheduleTimezone=
@@ -134,7 +155,18 @@ if(
                         </p>
                     <?php endif; ?>
 
-                    <p>Hello Creative Moth member,</p>
+                    <?php if(
+                        !(
+                            ($campaign['body_format']??'rich_html')
+                            ==='rich_html' &&
+                            str_contains(
+                                (string)($campaign['body']??''),
+                                'data-cm-layout="custom"'
+                            )
+                        )
+                    ): ?>
+                        <p>Hello Creative Moth member,</p>
+                    <?php endif; ?>
 
                     <div>
                         <?php if(
@@ -183,7 +215,15 @@ if(
                     <br>
                     Creative Moth
                     <br><br>
-                    An unsubscribe link will be included automatically.
+                    <?php if(
+                        ($campaign['audience']??'')
+                        ==='users_sellers_system'
+                    ): ?>
+                        Required seller system notice — no marketing
+                        unsubscribe link is added.
+                    <?php else: ?>
+                        An unsubscribe link will be included automatically.
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -262,6 +302,35 @@ if(
             </label>
 
             <div
+                style="
+                    display:flex;
+                    gap:8px;
+                    margin:7px 0 10px;
+                "
+            >
+                <button
+                    type="button"
+                    id="visual-mode-button"
+                >
+                    Visual Editor
+                </button>
+
+                <button
+                    type="button"
+                    id="html-mode-button"
+                >
+                    HTML Source
+                </button>
+            </div>
+
+            <p class="muted" style="margin-top:0">
+                Use Visual Editor for normal formatted emails.
+                Use HTML Source when pasting a complete branded
+                email layout with tables, images, buttons, colors,
+                and inline styles.
+            </p>
+
+            <div
                 id="email-toolbar"
                 style="
                     display:flex;
@@ -335,6 +404,26 @@ if(
                     overflow:auto;
                 "
             ><?=$body?></div>
+
+            <textarea
+                id="html-source-editor"
+                spellcheck="false"
+                style="
+                    display:none;
+                    width:100%;
+                    min-height:520px;
+                    padding:14px;
+                    border:1px solid #ccc;
+                    border-radius:8px;
+                    background:#111;
+                    color:#f5f5f5;
+                    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+                    font-size:13px;
+                    line-height:1.45;
+                    white-space:pre;
+                    overflow:auto;
+                "
+            ><?=H::e($sourceBody)?></textarea>
 
             <textarea
                 name="body"
@@ -522,6 +611,21 @@ if(
     const form =
         document.getElementById('newsletter-form');
 
+    const sourceEditor =
+        document.getElementById('html-source-editor');
+
+    const toolbar =
+        document.getElementById('email-toolbar');
+
+    const visualModeButton =
+        document.getElementById('visual-mode-button');
+
+    const htmlModeButton =
+        document.getElementById('html-mode-button');
+
+    let editorMode =
+        <?= $isCustomHtml ? "'html'" : "'visual'" ?>;
+
     const headingTool =
         document.getElementById('heading-tool');
 
@@ -529,8 +633,63 @@ if(
         document.getElementById('link-tool');
 
     function syncBody() {
+        if(editorMode==='html'){
+            bodyInput.value=
+                '<div data-cm-layout="custom">' +
+                sourceEditor.value +
+                '</div>';
+            return;
+        }
+
         bodyInput.value=editor.innerHTML;
     }
+
+    function showVisualMode() {
+        if(editorMode==='html'){
+            editor.innerHTML=sourceEditor.value;
+        }
+
+        editorMode='visual';
+        toolbar.style.display='flex';
+        editor.style.display='block';
+        sourceEditor.style.display='none';
+
+        visualModeButton.disabled=true;
+        htmlModeButton.disabled=false;
+
+        syncBody();
+    }
+
+    function showHtmlMode() {
+        if(editorMode==='visual'){
+            sourceEditor.value=editor.innerHTML;
+        }
+
+        editorMode='html';
+        toolbar.style.display='none';
+        editor.style.display='none';
+        sourceEditor.style.display='block';
+
+        visualModeButton.disabled=false;
+        htmlModeButton.disabled=true;
+
+        syncBody();
+    }
+
+    visualModeButton.addEventListener(
+        'click',
+        showVisualMode
+    );
+
+    htmlModeButton.addEventListener(
+        'click',
+        showHtmlMode
+    );
+
+    sourceEditor.addEventListener(
+        'input',
+        syncBody
+    );
 
     document
         .querySelectorAll('[data-command]')
@@ -605,6 +764,10 @@ if(
 
     form.addEventListener('submit',syncBody);
 
-    syncBody();
+    if(editorMode==='html'){
+        showHtmlMode();
+    }else{
+        showVisualMode();
+    }
 })();
 </script>

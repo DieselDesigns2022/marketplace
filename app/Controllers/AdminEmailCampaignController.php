@@ -19,7 +19,19 @@ final class AdminEmailCampaignController
             $action=(string)($_POST['action']??'');
             if(!in_array($action,['preview','save','queue'],true))$errors[]='Choose Preview, Save draft, or Save and queue.';
             $errors=array_merge($errors,EmailCampaignService::validate($_POST));
-            if($action==='preview'&&!$errors)$preview=true;
+            if($action==='preview'&&!$errors){
+                if(
+                    ($_POST['body_format']??'plain')
+                    ==='rich_html'
+                ){
+                    $campaign['body']=
+                        EmailCampaignService::sanitizeRichBody(
+                            (string)($_POST['body']??'')
+                        );
+                }
+
+                $preview=true;
+            }
             elseif(in_array($action,['save','queue'],true)&&!$errors){$id=EmailCampaignService::create($_POST,(int)H::user()['id']);if($action==='queue'&&EmailCampaignService::queue($id)===0)H::flash('warning','No eligible consented recipients were found; the campaign completed without deliveries.');H::redirect('/admin/email-campaigns/'.$id);}
         }
         H::view('admin/email_campaigns/form',compact('errors','campaign','preview'));
@@ -708,7 +720,32 @@ final class AdminEmailCampaignController
         $email=strtolower(trim($_POST['test_email']??''));$admin=filter_var($email,FILTER_VALIDATE_EMAIL)?DB::row('select id,email from users where role="admin" and status="active" and lower(email)=?',[$email]):null;
         if(!$admin){H::flash('warning','Test email must belong to an active administrator.');return;}
         $pref=DB::row('select user_id from email_preferences where user_id=?',[$admin['id']]);if(!$pref)DB::exec('insert into email_preferences(user_id,marketing_opt_in,unsubscribe_nonce) values (?,0,?)',[$admin['id'],bin2hex(random_bytes(32))]);
-        $ok=EmailQueueService::queue('marketing',$email,'[TEST — NOT A LIVE CAMPAIGN] '.$campaign['subject'],'campaign',['name'=>'Admin','body'=>$campaign['body'],'body_format'=>$campaign['body_format']??'plain','preheader'=>$campaign['preheader']??null,'cta_label'=>$campaign['cta_label'],'cta_url'=>$campaign['cta_url'],'user_id'=>(int)$admin['id']],"campaign:$id:test:".hash('sha256',$email.':'.microtime(true)),['admin_test'=>true]);
+        $classification=
+            ($campaign['audience']??'')==='users_sellers_system'
+                ? 'transactional'
+                : 'marketing';
+
+        $ok=EmailQueueService::queue(
+            $classification,
+            $email,
+            '[TEST — NOT A LIVE CAMPAIGN] '.$campaign['subject'],
+            'campaign',
+            [
+                'name'=>'Admin',
+                'body'=>$campaign['body'],
+                'body_format'=>$campaign['body_format']??'plain',
+                'preheader'=>$campaign['preheader']??null,
+                'cta_label'=>$campaign['cta_label'],
+                'cta_url'=>$campaign['cta_url'],
+                'user_id'=>(int)$admin['id']
+            ],
+            "campaign:$id:test:".
+                hash(
+                    'sha256',
+                    $email.':'.microtime(true)
+                ),
+            ['admin_test'=>true]
+        );
         H::flash($ok?'success':'warning',$ok?'Test message queued only for the selected administrator.':'The test message could not be queued.');
     }
 }
