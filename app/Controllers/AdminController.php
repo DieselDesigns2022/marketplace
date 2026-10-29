@@ -223,9 +223,19 @@ class AdminController
     {
         $this->gate('users.view', 'users.manage');$permissions=new AdminPermissionService();$actor=(int)H::user()['id'];$full=$permissions->isFullAccess($actor);
         if ($_POST) {
-            $userId=(int)($_POST['id']??0);$action=(string)($_POST['action']??'status');$target=DB::row('select id,email,role,status from users where id=?',[$userId]);if(!$target)H::abort(404);
+            $userId=(int)($_POST['id']??0);$action=(string)($_POST['action']??'status');$target=DB::row('select id,email,role,status,is_tester from users where id=?',[$userId]);if(!$target)H::abort(404);
             try {
-                if($action==='save_admin'){
+                if($action==='save_tester'){
+                    H::verifyCsrf();
+                    $isTester=($_POST['is_tester']??'')==='1'?1:0;
+                    DB::begin();
+                    DB::exec('update users set is_tester=? where id=?',[$isTester,$userId]);
+                    $designer=DB::row('select id from designers where user_id=? limit 1',[$userId]);
+                    if($designer)(new CreatorRecognitionService)->recalculate((int)$designer['id'],false,false,'tester_status_change');
+                    $this->log('changed_tester_status','user',$userId,['is_tester'=>(bool)$isTester]);
+                    DB::commit();
+                    H::flash('success',$isTester?'Tester status enabled.':'Tester status removed.');
+                }elseif($action==='save_admin'){
                     $permissions->configureAdmin($userId,(array)($_POST['permissions']??[]),($_POST['full_access']??'')==='1',$actor);if($target['role']!=='admin')$this->log('promoted_admin','user',$userId,['previous_role'=>$target['role']]);H::flash('success','Admin access updated.');
                 }else{
                     $status=($_POST['status']??'')==='active'?'active':'disabled';
@@ -263,7 +273,7 @@ class AdminController
                 }
             } catch(Throwable $error){if(DB::pdo()->inTransaction())DB::rollBack();H::flash('error',$error instanceof \DomainException?$error->getMessage():'Account access was not changed.');}
         }
-        H::view('admin/users',['users'=>DB::rows('select u.id,u.name,u.email,u.role,u.status,u.created_at,coalesce(p.full_access,0) full_access,(select group_concat(g.permission_key order by g.permission_key) from admin_permission_grants g where g.user_id=u.id) permission_keys,(select d.id from designers d where d.user_id=u.id limit 1) designer_id,(select d.status from designers d where d.user_id=u.id limit 1) designer_status from users u left join admin_access_profiles p on p.user_id=u.id order by u.created_at desc'),'permissionRegistry'=>AdminPermissionService::PERMISSIONS,'fullAccessAdmin'=>$full,'canonicalOwnerId'=>$permissions->canonicalOwnerUserId()]);
+        H::view('admin/users',['users'=>DB::rows('select u.id,u.name,u.email,u.role,u.status,u.is_tester,u.created_at,coalesce(p.full_access,0) full_access,(select group_concat(g.permission_key order by g.permission_key) from admin_permission_grants g where g.user_id=u.id) permission_keys,(select d.id from designers d where d.user_id=u.id limit 1) designer_id,(select d.status from designers d where d.user_id=u.id limit 1) designer_status from users u left join admin_access_profiles p on p.user_id=u.id order by u.created_at desc'),'permissionRegistry'=>AdminPermissionService::PERMISSIONS,'fullAccessAdmin'=>$full,'canonicalOwnerId'=>$permissions->canonicalOwnerUserId()]);
     }
     private function userDeletionBlockReason(array $user): ?string
     {

@@ -73,20 +73,21 @@ final class CreatorRecognitionService
             // Required universal order: designer, global Founder mutex, occupied positions.
             $d=DB::row('select * from designers where id=? for update',[$designerId]);
             if(!$d)throw new DomainException('Seller not found.');
+            $isTester=(bool)(DB::row('select is_tester from users where id=?',[(int)$d['user_id']])['is_tester']??false);
             $position=$d['founder_position']!==null?(int)$d['founder_position']:null;
             // Acquire the Founder mutex before the first consistent recognition read.
             // This prevents a transaction that waited on the mutex from planning
             // positions from a pre-lock REPEATABLE READ snapshot.
-            $needsFounderLock=$position!==null||$d['status']==='approved';
+            $needsFounderLock=$position!==null||($d['status']==='approved'&&$isTester);
             if($needsFounderLock&&!$dryRun)DB::row('select id from creator_recognition_lock where id=1 for update');
             $orders=$this->qualifyingOrders($designerId);$count=count($orders);$calculated=self::rankForSales($count);
             $effective=!empty($d['rank_override'])&&$d['rank_override_value']?$d['rank_override_value']:$calculated;
             $last=$count?$orders[$count-1]['at']:null;
             $earned=$d['founder_earned_at']??null;$tenthId=$d['founder_qualifying_order_id']??null;
-            if($position===null&&$d['status']==='approved'&&$count>=10){
+            if($position===null&&$d['status']==='approved'&&$isTester&&$count>=10){
                 $occupied=array_map('intval',array_column(DB::rows('select founder_position from designers where founder_position is not null order by founder_position'),'founder_position'));
                 $candidates=[];
-                foreach(DB::rows('select id from designers where status="approved" and founder_position is null') as $candidate){
+                foreach(DB::rows('select d.id from designers d join users u on u.id=d.user_id where d.status="approved" and d.founder_position is null and u.is_tester=1') as $candidate){
                     $candidateOrders=(int)$candidate['id']===$designerId?$orders:$this->qualifyingOrders((int)$candidate['id']);
                     if(count($candidateOrders)>=10)$candidates[]=['designer_id'=>(int)$candidate['id'],'tenth_at'=>$candidateOrders[9]['at'],'tenth_order_id'=>$candidateOrders[9]['id']];
                 }
@@ -95,7 +96,7 @@ final class CreatorRecognitionService
                 if($position!==null){$earned=$orders[9]['at'];$tenthId=$orders[9]['id'];}
             }
             $mode=$d['founder_override_state']??'automatic';$now=self::utcNow();
-            $active=$position!==null&&self::founderActive($last,$mode,$now);
+            $active=$position!==null&&$isTester&&self::founderActive($last,$mode,$now);
             $inactiveAt=$position!==null&&!$active?($d['founder_inactive_at']?:$now):null;
             $after=['qualifying_sales_count'=>$count,'calculated_rank'=>$calculated,'creator_rank'=>$effective,'last_qualifying_sale_at'=>$last,'founder_position'=>$position,'founder_earned_at'=>$earned,'founder_qualifying_order_id'=>$tenthId,'founder_active'=>$active?1:0,'founder_inactive_at'=>$inactiveAt,'founder_override_state'=>$mode];
             $changed=$this->changedFields($d,$after);$rankChanged=(bool)array_intersect($changed,self::RANK_FIELDS);$founderChanged=(bool)array_intersect($changed,self::FOUNDER_FIELDS);
@@ -126,7 +127,7 @@ final class CreatorRecognitionService
     public function recalculateAll(bool $dryRun=false,bool $notify=false): array
     {
         $eligible=[];$ids=[];
-        foreach(DB::rows('select id,founder_position from designers where status="approved" order by id') as $d){$ids[]=(int)$d['id'];if($d['founder_position']===null&&count($orders=$this->qualifyingOrders((int)$d['id']))>=10)$eligible[]=['designer_id'=>(int)$d['id'],'tenth_at'=>$orders[9]['at'],'tenth_order_id'=>$orders[9]['id']];}
+        foreach(DB::rows('select d.id,d.founder_position,u.is_tester from designers d join users u on u.id=d.user_id where d.status="approved" order by d.id') as $d){$ids[]=(int)$d['id'];if((int)$d['is_tester']===1&&$d['founder_position']===null&&count($orders=$this->qualifyingOrders((int)$d['id']))>=10)$eligible[]=['designer_id'=>(int)$d['id'],'tenth_at'=>$orders[9]['at'],'tenth_order_id'=>$orders[9]['id']];}
         $reserved=array_map('intval',array_column(DB::rows('select founder_position from designers where founder_position is not null'),'founder_position'));$plan=self::planFounderPositions($eligible,$reserved);$order=array_flip(array_keys($plan));
         usort($ids,static fn($a,$b)=>($order[$a]??PHP_INT_MAX)<=>($order[$b]??PHP_INT_MAX)?:$a<=>$b);
         $results=[];foreach($ids as $id)$results[]=$this->recalculate($id,$dryRun,$notify,$notify?'automatic':'backfill',$plan[$id]??null);return $results;
@@ -157,6 +158,8 @@ final class CreatorRecognitionService
         try{
             $d=DB::row('select * from designers where id=? for update',[$designerId]);
             if(!$d)throw new DomainException('Seller not found.');
+            $isTester=(bool)(DB::row('select is_tester from users where id=?',[(int)$d['user_id']])['is_tester']??false);
+            if(in_array($action,['grant','force_active','restore'],true)&&!$isTester)throw new DomainException('Founder recognition is available only to tester accounts.');
             DB::row('select id from creator_recognition_lock where id=1 for update');
             $orders=$this->qualifyingOrders($designerId);$count=count($orders);$calculated=self::rankForSales($count);
             $effective=!empty($d['rank_override'])&&$d['rank_override_value']?$d['rank_override_value']:$calculated;
@@ -178,7 +181,7 @@ final class CreatorRecognitionService
             }
             if($position!==null&&!$qualificationOrder&&$currentTenth){$qualificationOrder=$currentTenth;$earnedAt=$earnedAt?:$orders[9]['at'];}
             $mode=$actionNoOp?$d['founder_override_state']:($action==='force_active'?'force_active':($action==='force_inactive'?'force_inactive':'automatic'));
-            $active=$position!==null&&self::founderActive($last,$mode,self::utcNow());
+            $active=$position!==null&&$isTester&&self::founderActive($last,$mode,self::utcNow());
             $before=['position'=>$d['founder_position']!==null?(int)$d['founder_position']:null,'active'=>(bool)$d['founder_active'],'mode'=>$d['founder_override_state']];
             $after=['position'=>$position,'active'=>$active,'mode'=>$mode];$founderChanged=$before!==$after;
             $automaticFounderRefresh=$actionNoOp&&$founderChanged;$adminFounderChanged=$founderChanged&&!$actionNoOp;

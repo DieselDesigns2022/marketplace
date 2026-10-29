@@ -9,13 +9,24 @@ $userAction='/admin/users'.($userFilterQuery!==''?'?'.$userFilterQuery:'');
 <form method="get" action="/admin/users" class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end">
 <label>Account type <select name="user_role"><option value="">All users</option><?php foreach(['admin'=>'Admins','seller'=>'Sellers','buyer'=>'Buyers'] as $value=>$label): ?><option value="<?=$value?>" <?=$userFilters['user_role']===$value?'selected':''?>><?=$label?></option><?php endforeach; ?></select></label>
 <label>Account status <select name="user_status"><option value="">All statuses</option><?php foreach(['active'=>'Active','disabled'=>'Disabled'] as $value=>$label): ?><option value="<?=$value?>" <?=$userFilters['user_status']===$value?'selected':''?>><?=$label?></option><?php endforeach; ?></select></label>
+
+<label>Tester status <select name="user_tester"><option value="">All users</option><option value="yes" <?=$userFilters['user_tester']==='yes'?'selected':''?>>Testers only</option><option value="no" <?=$userFilters['user_tester']==='no'?'selected':''?>>Non-testers</option></select></label>
 <label>Name or email <input type="search" name="user_q" maxlength="150" value="<?=H::e($userFilters['user_q'])?>"></label>
 <button>Filter users</button><a href="/admin/users">Reset</a>
 </form>
 <p>Showing <?=count($users)?> of <?=$userTotal?> users. Sellers includes admins with a seller profile.</p>
 <?php if(!$users): ?><p class="card">No users match these filters.</p><?php endif; ?>
-<div class="responsive-table"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Account Created</th><th>Account actions</th></tr></thead><tbody>
-<?php foreach($users as $user): $canonical=$canonicalOwnerId!==null&&(int)$user['id']===(int)$canonicalOwnerId; $grants=array_filter(explode(',',(string)$user['permission_keys'])); ?><tr><td><?=H::e($user['name'])?></td><td><?=H::e($user['email'])?></td><td><?=H::e($user['role'])?></td><td><?=H::e($user['status'])?></td><td><?=H::e(date('M j, Y g:i A', strtotime($user['created_at'])))?></td><td>
+<div class="responsive-table"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Tester</th><th>Account Created</th><th>Account actions</th></tr></thead><tbody>
+<?php foreach($users as $user): $canonical=$canonicalOwnerId!==null&&(int)$user['id']===(int)$canonicalOwnerId; $grants=array_filter(explode(',',(string)$user['permission_keys'])); ?><tr><td><?=H::e($user['name'])?></td><td><?=H::e($user['email'])?></td><td><?=H::e($user['role'])?></td><td><?=H::e($user['status'])?></td><td><?=!empty($user['is_tester'])?'<span class="badge ok">Yes</span>':'No'?></td><td><?=H::e(date('M j, Y g:i A', strtotime($user['created_at'])))?></td><td>
+<?php if($canManage): ?>
+<form method="post" action="<?=H::e($userAction)?>" style="display:inline-block;margin-bottom:.45rem;">
+<input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+<input type="hidden" name="action" value="save_tester">
+<input type="hidden" name="id" value="<?=(int)$user['id']?>">
+<input type="hidden" name="is_tester" value="<?=!empty($user['is_tester'])?'0':'1'?>">
+<button class="btn"><?=!empty($user['is_tester'])?'Remove Tester':'Mark as Tester'?></button>
+</form>
+<?php endif; ?>
 <?php if($canManage&&!$canonical&&($user['role']!=='admin'||$fullAccessAdmin)): ?>
 <form method="post" action="<?=H::e($userAction)?>" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:.45rem;">
 <input type="hidden" name="_csrf" value="<?=H::csrf()?>">

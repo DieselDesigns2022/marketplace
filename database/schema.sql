@@ -6,6 +6,7 @@ CREATE TABLE users
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('buyer','designer','admin') DEFAULT 'buyer',
     status ENUM('active','disabled') DEFAULT 'active',
+    is_tester TINYINT(1) NOT NULL DEFAULT 0,
     referral_code VARCHAR(40),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
