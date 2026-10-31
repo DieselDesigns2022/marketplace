@@ -1796,7 +1796,7 @@ final class CustomDesignService
             $brief[$key]=trim((string)($input[$key]??''));
         }
         $brief['answers']=$answers;
-        $billing=StripeService::normalizeBillingAddress(['line1'=>trim($input['billing_line1']??''),'line2'=>trim($input['billing_line2']??''),'city'=>trim($input['billing_city']??''),'state'=>trim($input['billing_state']??''),'postal_code'=>trim($input['billing_postal_code']??''),'country'=>strtoupper(trim($input['billing_country']??'US'))]);$checkout=new CheckoutOrderService;
+        $billing=StripeService::normalizeBillingAddress(['line1'=>trim($input['billing_line1']??''),'line2'=>trim($input['billing_line2']??''),'city'=>trim($input['billing_city']??''),'state'=>trim($input['billing_state']??''),'postal_code'=>trim($input['billing_postal_code']??''),'country'=>trim((string)($input['billing_country']??''))]);$checkout=new CheckoutOrderService;
         $selectedLicenses=$this->selectedServiceLicenses(
             (int)$service['id'],
             $input['license_type']??[]

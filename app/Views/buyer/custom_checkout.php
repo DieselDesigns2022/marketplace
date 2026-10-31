@@ -1,7 +1,7 @@
 <h1>Secure checkout</h1>
 
 <p class="notice warning">
-    Sales tax is calculated using your US billing address.
+    Sales tax is calculated using your billing address when required. All prices are in USD.
     Prize Credit applies to merchandise first. Store credit may then apply to the remaining merchandise and tax.
 </p>
 
@@ -77,7 +77,7 @@
 
     <fieldset>
 
-        <legend>US billing address for sales tax</legend>
+        <legend>Billing address for tax calculation</legend>
 
         <label>
             Address line 1
@@ -109,32 +109,46 @@
         </label>
 
         <label>
-            State
+            State / Province / Region
             <input
                 name="billing_state"
                 required
-                maxlength="2"
                 autocomplete="billing address-level1"
                 value="<?=H::e($_POST['billing_state'] ?? '')?>"
             >
         </label>
 
         <label>
-            ZIP code
+            Postal code
             <input
                 name="billing_postal_code"
                 required
-                inputmode="numeric"
                 autocomplete="billing postal-code"
                 value="<?=H::e($_POST['billing_postal_code'] ?? '')?>"
             >
         </label>
 
-        <input
-            type="hidden"
-            name="billing_country"
-            value="US"
-        >
+        <label>
+            Country
+            <select
+                name="billing_country"
+                required
+                autocomplete="billing country"
+            >
+                <option value="">Select country</option>
+                <?php
+                $billingCountry=\App\Services\StripeService::normalizeCountryCode(
+                    (string)($_POST['billing_country']??'US')
+                );
+                ?>
+                <?php foreach(\App\Services\StripeService::countryOptions() as $countryCode=>$countryName): ?>
+                    <option
+                        value="<?=H::e($countryCode)?>"
+                        <?=$billingCountry===$countryCode?'selected':''?>
+                    ><?=H::e($countryName)?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
 
     </fieldset>
 

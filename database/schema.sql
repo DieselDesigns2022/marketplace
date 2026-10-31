@@ -68,6 +68,8 @@ CREATE TABLE designers
     display_name VARCHAR(120),
     store_slug VARCHAR(140) UNIQUE,
     bio TEXT,
+    country_code CHAR(2) NULL,
+    region VARCHAR(120) NULL,
     banner_path VARCHAR(255),
     avatar_path VARCHAR(255),
     social_links TEXT,

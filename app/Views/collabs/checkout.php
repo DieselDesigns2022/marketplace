@@ -14,12 +14,25 @@
     <?php if($storefront):?><input type="hidden" name="storefront_designer_id" value="<?=(int)$storefront?>"><?php endif;?>
     <label>Platform coupon code (optional)<input name="coupon_code" value="<?=H::e($_POST['coupon_code'] ?? '')?>"></label>
     <fieldset>
-        <legend>US billing address for sales tax</legend>
+        <legend>Billing address for tax calculation</legend>
         <label>Address line 1<input required name="billing_line1" autocomplete="billing address-line1"></label>
         <label>Address line 2<input name="billing_line2" autocomplete="billing address-line2"></label>
         <label>City<input required name="billing_city" autocomplete="billing address-level2"></label>
-        <label>State<input required maxlength="2" name="billing_state" autocomplete="billing address-level1"></label>
-        <label>ZIP code<input required name="billing_postal_code" autocomplete="billing postal-code"></label>
+        <label>State / Province / Region<input name="billing_state" autocomplete="billing address-level1"></label>
+        <label>Postal code<input required name="billing_postal_code" autocomplete="billing postal-code"></label>
+        <label>Country
+            <select name="billing_country" required autocomplete="billing country">
+                <option value="">Select country</option>
+                <?php
+                $billingCountry=\App\Services\StripeService::normalizeCountryCode(
+                    (string)($_POST['billing_country']??'US')
+                );
+                ?>
+                <?php foreach(\App\Services\StripeService::countryOptions() as $countryCode=>$countryName): ?>
+                    <option value="<?=H::e($countryCode)?>" <?=$billingCountry===$countryCode?'selected':''?>><?=H::e($countryName)?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
     </fieldset>
     <label><input type="checkbox" name="use_credits" value="1" <?=((float)$balances['available'] > 0)?'':'disabled'?>> Use available store credit (<?=H::money($balances['available'])?>)</label>
     <button class="btn">Calculate tax and continue securely</button>

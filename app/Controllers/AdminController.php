@@ -73,13 +73,13 @@ class AdminController
             $existing=DB::row('select * from designers where user_id=?',[$a['user_id']]);
             if($existing)
            {
-               DB::exec('update designers set display_name=?,store_slug=?,bio=?,social_links=?,status="approved",creator_rank=coalesce(creator_rank,"Bronze"),rank_override=0,is_featured=0,updated_at=now() where id=?',[$a['display_name'],$a['desired_slug'],$a['bio'],$a['social_links'],$existing['id']]);
+               DB::exec('update designers set display_name=?,store_slug=?,bio=?,country_code=?,region=?,social_links=?,status="approved",creator_rank=coalesce(creator_rank,"Bronze"),rank_override=0,is_featured=0,updated_at=now() where id=?',[$a['display_name'],$a['desired_slug'],$a['bio'],StripeService::normalizeCountryCode((string)($a['country']??'')),trim((string)($a['region']??'')),$a['social_links'],$existing['id']]);
                 $designerId=$existing['id'];
 
            }
             else
            {
-               DB::exec('insert into designers (user_id,display_name,store_slug,bio,social_links,status,creator_rank,rank_override,is_featured) values (?,?,?,?,?,?,?,?,?)',[$a['user_id'],$a['display_name'],$a['desired_slug'],$a['bio'],$a['social_links'],'approved','Bronze',0,0]);
+               DB::exec('insert into designers (user_id,display_name,store_slug,bio,country_code,region,social_links,status,creator_rank,rank_override,is_featured) values (?,?,?,?,?,?,?,?,?,?,?)',[$a['user_id'],$a['display_name'],$a['desired_slug'],$a['bio'],StripeService::normalizeCountryCode((string)($a['country']??'')),trim((string)($a['region']??'')),$a['social_links'],'approved','Bronze',0,0]);
                 $designerId=DB::id();
 
            }

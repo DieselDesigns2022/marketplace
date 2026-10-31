@@ -1,7 +1,7 @@
 <h1>Secure checkout</h1>
 <?php if(!empty($pricing['notice'])): ?><p class="notice warning"><?=H::e($pricing['notice'])?></p><?php endif; ?>
 <p class="notice warning">
-Creative Moth calculates US sales tax before applying credits.
+Creative Moth calculates applicable sales tax before applying credits. All prices are in USD.
 Prize Credit applies to eligible merchandise only and never pays sales tax.
 Marketplace Credit is applied after Prize Credit. Stripe securely collects
 anything still due.
@@ -25,7 +25,7 @@ anything still due.
       <p>Regular subtotal: <strong><?=H::money(($pricing['regular_cents']??0)/100)?></strong></p>
       <?php if(!empty($pricing['sale_savings_cents'])): ?><p>Grand Opening Sale: <strong>-<?=H::money($pricing['sale_savings_cents']/100)?></strong></p><?php endif; ?>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
-      <p class="muted">Sales tax calculated at checkout when required. Creative Moth is currently available for US purchases only. International checkout will be added in a future expansion.</p>
+      <p class="muted">Sales tax is calculated at checkout when required for your billing location. All prices and charges are in USD.</p>
       <p>
         Tax:
         <strong>calculated as applicable</strong>
@@ -63,13 +63,25 @@ anything still due.
     <form method="post" class="form card">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
         <fieldset>
-          <legend>US billing address for sales tax</legend>
+          <legend>Billing address for tax calculation</legend>
           <label>Address line 1<input name="billing_line1" required autocomplete="billing address-line1" value="<?=H::e($_POST['billing_line1'] ?? '')?>"></label>
           <label>Address line 2<input name="billing_line2" autocomplete="billing address-line2" value="<?=H::e($_POST['billing_line2'] ?? '')?>"></label>
           <label>City<input name="billing_city" required autocomplete="billing address-level2" value="<?=H::e($_POST['billing_city'] ?? '')?>"></label>
-          <label>State<input name="billing_state" required maxlength="2" autocomplete="billing address-level1" value="<?=H::e($_POST['billing_state'] ?? '')?>"></label>
-          <label>ZIP code<input name="billing_postal_code" required autocomplete="billing postal-code" inputmode="numeric" value="<?=H::e($_POST['billing_postal_code'] ?? '')?>"></label>
-          <input type="hidden" name="billing_country" value="US">
+          <label>State / Province / Region<input name="billing_state" autocomplete="billing address-level1" value="<?=H::e($_POST['billing_state'] ?? '')?>"></label>
+          <label>Postal code<input name="billing_postal_code" required autocomplete="billing postal-code" value="<?=H::e($_POST['billing_postal_code'] ?? '')?>"></label>
+          <label>Country
+<select name="billing_country" required autocomplete="billing country">
+    <option value="">Select country</option>
+    <?php
+    $billingCountry=\App\Services\StripeService::normalizeCountryCode(
+        (string)($_POST['billing_country']??'US')
+    );
+    ?>
+    <?php foreach(\App\Services\StripeService::countryOptions() as $countryCode=>$countryName): ?>
+        <option value="<?=H::e($countryCode)?>" <?=$billingCountry===$countryCode?'selected':''?>><?=H::e($countryName)?></option>
+    <?php endforeach; ?>
+</select>
+</label>
         </fieldset>
         <label>
           <input

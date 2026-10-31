@@ -275,7 +275,7 @@ class CartController
                     'city' => trim((string)($_POST['billing_city'] ?? '')),
                     'state' => trim((string)($_POST['billing_state'] ?? '')),
                     'postal_code' => trim((string)($_POST['billing_postal_code'] ?? '')),
-                    'country' => strtoupper(trim((string)($_POST['billing_country'] ?? 'US'))),
+                    'country' => trim((string)($_POST['billing_country'] ?? '')),
                 ];
                 $billingAddress = StripeService::normalizeBillingAddress($billingAddress);
                 $taxableItems = [];

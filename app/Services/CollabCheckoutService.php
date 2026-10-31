@@ -52,7 +52,7 @@ final class CollabCheckoutService
         $billing = StripeService::normalizeBillingAddress([
             'line1'=>trim((string)($input['billing_line1']??'')), 'line2'=>trim((string)($input['billing_line2']??'')),
             'city'=>trim((string)($input['billing_city']??'')), 'state'=>trim((string)($input['billing_state']??'')),
-            'postal_code'=>trim((string)($input['billing_postal_code']??'')), 'country'=>'US',
+            'postal_code'=>trim((string)($input['billing_postal_code']??'')), 'country'=>trim((string)($input['billing_country']??'')),
         ]);
         $checkout = new CheckoutOrderService();
         $tax = $checkout->calculateTax([['id'=>$collabId,'total_price'=>CreditService::formatCents($merchandiseCents)]], $billing, 'collab-tax:'.$buyerId.':'.$collabId.':'.hash('sha256',json_encode($billing)));

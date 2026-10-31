@@ -81,4 +81,4 @@
 <a href="/admin/orders">Back to orders</a>
 </p>
 
-<h2>Order payment transactions</h2><table><tr><th>Type</th><th>Status</th><th>Amount</th><th>Message</th><th>Date</th></tr><?php foreach(($transactions ?? []) as $t):?><tr><td><?=H::e($t['transaction_type'])?></td><td><?=H::e($t['payment_status'])?></td><td><?=H::money($t['amount'])?> <?=H::e(strtoupper($t['currency']))?></td><td><?=H::e($t['message'] ?? '')?></td><td><?=$t['created_at']?></td></tr><?php endforeach;?></table>
+<h2>Order payment transactions</h2><table><tr><th>Type</th><th>Status</th><th>Amount</th><th>Message</th><th>Date</th></tr><?php foreach(($transactions ?? []) as $t):?><tr><td><?=H::e($t['transaction_type'])?></td><td><?=H::e($t['payment_status'])?></td><td><?=H::money($t['amount'])?></td><td><?=H::e($t['message'] ?? '')?></td><td><?=$t['created_at']?></td></tr><?php endforeach;?></table>

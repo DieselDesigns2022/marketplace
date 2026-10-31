@@ -28,51 +28,399 @@ class StripeService
     public static function configured(): bool { return self::secretKey() !== ''; }
     public static function cents($amount): int { return CreditService::parseCents((string)$amount); }
 
+    public static function countryOptions(): array
+    {
+        return [
+            'AD' => 'Andorra',
+            'AE' => 'United Arab Emirates',
+            'AF' => 'Afghanistan',
+            'AG' => 'Antigua & Barbuda',
+            'AI' => 'Anguilla',
+            'AL' => 'Albania',
+            'AM' => 'Armenia',
+            'AO' => 'Angola',
+            'AQ' => 'Antarctica',
+            'AR' => 'Argentina',
+            'AS' => 'Samoa (American)',
+            'AT' => 'Austria',
+            'AU' => 'Australia',
+            'AW' => 'Aruba',
+            'AX' => 'Åland Islands',
+            'AZ' => 'Azerbaijan',
+            'BA' => 'Bosnia & Herzegovina',
+            'BB' => 'Barbados',
+            'BD' => 'Bangladesh',
+            'BE' => 'Belgium',
+            'BF' => 'Burkina Faso',
+            'BG' => 'Bulgaria',
+            'BH' => 'Bahrain',
+            'BI' => 'Burundi',
+            'BJ' => 'Benin',
+            'BL' => 'St Barthelemy',
+            'BM' => 'Bermuda',
+            'BN' => 'Brunei',
+            'BO' => 'Bolivia',
+            'BQ' => 'Caribbean NL',
+            'BR' => 'Brazil',
+            'BS' => 'Bahamas',
+            'BT' => 'Bhutan',
+            'BV' => 'Bouvet Island',
+            'BW' => 'Botswana',
+            'BY' => 'Belarus',
+            'BZ' => 'Belize',
+            'CA' => 'Canada',
+            'CC' => 'Cocos (Keeling) Islands',
+            'CD' => 'Congo (Dem. Rep.)',
+            'CF' => 'Central African Rep.',
+            'CG' => 'Congo (Rep.)',
+            'CH' => 'Switzerland',
+            'CI' => 'Côte d’Ivoire',
+            'CK' => 'Cook Islands',
+            'CL' => 'Chile',
+            'CM' => 'Cameroon',
+            'CN' => 'China',
+            'CO' => 'Colombia',
+            'CR' => 'Costa Rica',
+            'CU' => 'Cuba',
+            'CV' => 'Cape Verde',
+            'CW' => 'Curaçao',
+            'CX' => 'Christmas Island',
+            'CY' => 'Cyprus',
+            'CZ' => 'Czech Republic',
+            'DE' => 'Germany',
+            'DJ' => 'Djibouti',
+            'DK' => 'Denmark',
+            'DM' => 'Dominica',
+            'DO' => 'Dominican Republic',
+            'DZ' => 'Algeria',
+            'EC' => 'Ecuador',
+            'EE' => 'Estonia',
+            'EG' => 'Egypt',
+            'EH' => 'Western Sahara',
+            'ER' => 'Eritrea',
+            'ES' => 'Spain',
+            'ET' => 'Ethiopia',
+            'FI' => 'Finland',
+            'FJ' => 'Fiji',
+            'FK' => 'Falkland Islands',
+            'FM' => 'Micronesia',
+            'FO' => 'Faroe Islands',
+            'FR' => 'France',
+            'GA' => 'Gabon',
+            'GB' => 'Britain (UK)',
+            'GD' => 'Grenada',
+            'GE' => 'Georgia',
+            'GF' => 'French Guiana',
+            'GG' => 'Guernsey',
+            'GH' => 'Ghana',
+            'GI' => 'Gibraltar',
+            'GL' => 'Greenland',
+            'GM' => 'Gambia',
+            'GN' => 'Guinea',
+            'GP' => 'Guadeloupe',
+            'GQ' => 'Equatorial Guinea',
+            'GR' => 'Greece',
+            'GS' => 'South Georgia & the South Sandwich Islands',
+            'GT' => 'Guatemala',
+            'GU' => 'Guam',
+            'GW' => 'Guinea-Bissau',
+            'GY' => 'Guyana',
+            'HK' => 'Hong Kong',
+            'HM' => 'Heard Island & McDonald Islands',
+            'HN' => 'Honduras',
+            'HR' => 'Croatia',
+            'HT' => 'Haiti',
+            'HU' => 'Hungary',
+            'ID' => 'Indonesia',
+            'IE' => 'Ireland',
+            'IL' => 'Israel',
+            'IM' => 'Isle of Man',
+            'IN' => 'India',
+            'IO' => 'British Indian Ocean Territory',
+            'IQ' => 'Iraq',
+            'IR' => 'Iran',
+            'IS' => 'Iceland',
+            'IT' => 'Italy',
+            'JE' => 'Jersey',
+            'JM' => 'Jamaica',
+            'JO' => 'Jordan',
+            'JP' => 'Japan',
+            'KE' => 'Kenya',
+            'KG' => 'Kyrgyzstan',
+            'KH' => 'Cambodia',
+            'KI' => 'Kiribati',
+            'KM' => 'Comoros',
+            'KN' => 'St Kitts & Nevis',
+            'KP' => 'Korea (North)',
+            'KR' => 'Korea (South)',
+            'KW' => 'Kuwait',
+            'KY' => 'Cayman Islands',
+            'KZ' => 'Kazakhstan',
+            'LA' => 'Laos',
+            'LB' => 'Lebanon',
+            'LC' => 'St Lucia',
+            'LI' => 'Liechtenstein',
+            'LK' => 'Sri Lanka',
+            'LR' => 'Liberia',
+            'LS' => 'Lesotho',
+            'LT' => 'Lithuania',
+            'LU' => 'Luxembourg',
+            'LV' => 'Latvia',
+            'LY' => 'Libya',
+            'MA' => 'Morocco',
+            'MC' => 'Monaco',
+            'MD' => 'Moldova',
+            'ME' => 'Montenegro',
+            'MF' => 'St Martin (French)',
+            'MG' => 'Madagascar',
+            'MH' => 'Marshall Islands',
+            'MK' => 'North Macedonia',
+            'ML' => 'Mali',
+            'MM' => 'Myanmar (Burma)',
+            'MN' => 'Mongolia',
+            'MO' => 'Macau',
+            'MP' => 'Northern Mariana Islands',
+            'MQ' => 'Martinique',
+            'MR' => 'Mauritania',
+            'MS' => 'Montserrat',
+            'MT' => 'Malta',
+            'MU' => 'Mauritius',
+            'MV' => 'Maldives',
+            'MW' => 'Malawi',
+            'MX' => 'Mexico',
+            'MY' => 'Malaysia',
+            'MZ' => 'Mozambique',
+            'NA' => 'Namibia',
+            'NC' => 'New Caledonia',
+            'NE' => 'Niger',
+            'NF' => 'Norfolk Island',
+            'NG' => 'Nigeria',
+            'NI' => 'Nicaragua',
+            'NL' => 'Netherlands',
+            'NO' => 'Norway',
+            'NP' => 'Nepal',
+            'NR' => 'Nauru',
+            'NU' => 'Niue',
+            'NZ' => 'New Zealand',
+            'OM' => 'Oman',
+            'PA' => 'Panama',
+            'PE' => 'Peru',
+            'PF' => 'French Polynesia',
+            'PG' => 'Papua New Guinea',
+            'PH' => 'Philippines',
+            'PK' => 'Pakistan',
+            'PL' => 'Poland',
+            'PM' => 'St Pierre & Miquelon',
+            'PN' => 'Pitcairn',
+            'PR' => 'Puerto Rico',
+            'PS' => 'Palestine',
+            'PT' => 'Portugal',
+            'PW' => 'Palau',
+            'PY' => 'Paraguay',
+            'QA' => 'Qatar',
+            'RE' => 'Réunion',
+            'RO' => 'Romania',
+            'RS' => 'Serbia',
+            'RU' => 'Russia',
+            'RW' => 'Rwanda',
+            'SA' => 'Saudi Arabia',
+            'SB' => 'Solomon Islands',
+            'SC' => 'Seychelles',
+            'SD' => 'Sudan',
+            'SE' => 'Sweden',
+            'SG' => 'Singapore',
+            'SH' => 'St Helena',
+            'SI' => 'Slovenia',
+            'SJ' => 'Svalbard & Jan Mayen',
+            'SK' => 'Slovakia',
+            'SL' => 'Sierra Leone',
+            'SM' => 'San Marino',
+            'SN' => 'Senegal',
+            'SO' => 'Somalia',
+            'SR' => 'Suriname',
+            'SS' => 'South Sudan',
+            'ST' => 'Sao Tome & Principe',
+            'SV' => 'El Salvador',
+            'SX' => 'St Maarten (Dutch)',
+            'SY' => 'Syria',
+            'SZ' => 'Eswatini (Swaziland)',
+            'TC' => 'Turks & Caicos Is',
+            'TD' => 'Chad',
+            'TF' => 'French S. Terr.',
+            'TG' => 'Togo',
+            'TH' => 'Thailand',
+            'TJ' => 'Tajikistan',
+            'TK' => 'Tokelau',
+            'TL' => 'East Timor',
+            'TM' => 'Turkmenistan',
+            'TN' => 'Tunisia',
+            'TO' => 'Tonga',
+            'TR' => 'Turkey',
+            'TT' => 'Trinidad & Tobago',
+            'TV' => 'Tuvalu',
+            'TW' => 'Taiwan',
+            'TZ' => 'Tanzania',
+            'UA' => 'Ukraine',
+            'UG' => 'Uganda',
+            'UM' => 'US minor outlying islands',
+            'US' => 'United States',
+            'UY' => 'Uruguay',
+            'UZ' => 'Uzbekistan',
+            'VA' => 'Vatican City',
+            'VC' => 'St Vincent',
+            'VE' => 'Venezuela',
+            'VG' => 'Virgin Islands (UK)',
+            'VI' => 'Virgin Islands (US)',
+            'VN' => 'Vietnam',
+            'VU' => 'Vanuatu',
+            'WF' => 'Wallis & Futuna',
+            'WS' => 'Samoa (western)',
+            'YE' => 'Yemen',
+            'YT' => 'Mayotte',
+            'ZA' => 'South Africa',
+            'ZM' => 'Zambia',
+            'ZW' => 'Zimbabwe',
+        ];
+    }
+
+    public static function normalizeCountryCode(string $country): string
+    {
+        $raw = trim($country);
+
+        if ($raw === '') {
+            return '';
+        }
+
+        $upper = strtoupper($raw);
+
+        $aliases = [
+            'USA' => 'US',
+            'U.S.' => 'US',
+            'U.S.A.' => 'US',
+            'UNITED STATES OF AMERICA' => 'US',
+            'UK' => 'GB',
+            'UNITED KINGDOM' => 'GB',
+            'GREAT BRITAIN' => 'GB',
+        ];
+
+        if (isset($aliases[$upper])) {
+            return $aliases[$upper];
+        }
+
+        $countries = self::countryOptions();
+
+        if (isset($countries[$upper])) {
+            return $upper;
+        }
+
+        foreach ($countries as $code => $name) {
+            if (strcasecmp($raw, $name) === 0) {
+                return $code;
+            }
+        }
+
+        return '';
+    }
+
     public static function calculateTax(array $items, array $address, string $idempotencyKey): array
     {
         if (!self::configured()) {
-            throw new \RuntimeException('Stripe is not configured for authoritative tax calculation.');
+            throw new \RuntimeException(
+                'Stripe is not configured for authoritative tax calculation.'
+            );
         }
-        $country = strtoupper(trim((string)($address['country'] ?? '')));
-        if ($country !== 'US') {
-            throw new \InvalidArgumentException('Creative Moth checkout is currently limited to US billing addresses.');
+
+        $country = self::normalizeCountryCode(
+            (string)($address['country'] ?? '')
+        );
+
+        if ($country === '') {
+            throw new \InvalidArgumentException(
+                'Please select a valid billing country.'
+            );
         }
-        foreach (['line1', 'city', 'state', 'postal_code'] as $field) {
+
+        foreach (['line1', 'city', 'postal_code'] as $field) {
             if (trim((string)($address[$field] ?? '')) === '') {
-                throw new \InvalidArgumentException('A complete US billing address is required.');
+                throw new \InvalidArgumentException(
+                    'A complete billing address is required.'
+                );
             }
         }
-        if (!preg_match('/^[A-Z]{2}$/', strtoupper(trim((string)$address['state']))) || !preg_match('/^\d{5}(?:-\d{4})?$/', trim((string)$address['postal_code']))) {
-            throw new \InvalidArgumentException('A valid US state and ZIP code are required.');
+
+        $state = strtoupper(
+            trim((string)($address['state'] ?? ''))
+        );
+
+        if ($country === 'US') {
+            if (
+                !preg_match('/^[A-Z]{2}$/', $state) ||
+                !preg_match(
+                    '/^\d{5}(?:-\d{4})?$/',
+                    trim((string)$address['postal_code'])
+                )
+            ) {
+                throw new \InvalidArgumentException(
+                    'A valid US state and ZIP code are required.'
+                );
+            }
         }
+
+        if ($country === 'CA' && $state === '') {
+            throw new \InvalidArgumentException(
+                'Province or territory is required for Canadian billing addresses.'
+            );
+        }
+
+        $address['country'] = $country;
+
         $lineItems = [];
+
         foreach ($items as $index => $item) {
             $lineItems[] = [
                 'amount' => self::cents((string)$item['total_price']),
                 'reference' => 'item_' . ($item['id'] ?? $index),
-                'tax_code' => (string)($_ENV['STRIPE_DIGITAL_TAX_CODE'] ?? 'txcd_10103000'),
+                'tax_code' => (string)(
+                    $_ENV['STRIPE_DIGITAL_TAX_CODE'] ?? 'txcd_10103000'
+                ),
             ];
         }
-        $calculation = self::request('POST', '/v1/tax/calculations', [
-            'currency' => self::currency(),
-            'customer_details' => [
-                'address' => [
-                    'line1' => trim((string)$address['line1']),
-                    'line2' => trim((string)($address['line2'] ?? '')),
-                    'city' => trim((string)$address['city']),
-                    'state' => strtoupper(trim((string)$address['state'])),
-                    'postal_code' => trim((string)$address['postal_code']),
-                    'country' => 'US',
+
+        $calculation = self::request(
+            'POST',
+            '/v1/tax/calculations',
+            [
+                'currency' => self::currency(),
+                'customer_details' => [
+                    'address' => [
+                        'line1' => trim((string)$address['line1']),
+                        'line2' => trim(
+                            (string)($address['line2'] ?? '')
+                        ),
+                        'city' => trim((string)$address['city']),
+                        'state' => $state,
+                        'postal_code' => trim(
+                            (string)$address['postal_code']
+                        ),
+                        'country' => $country,
+                    ],
+                    'address_source' => 'billing',
                 ],
-                'address_source' => 'billing',
+                'line_items' => $lineItems,
             ],
-            'line_items' => $lineItems,
-        ], $idempotencyKey);
+            $idempotencyKey
+        );
+
         return [
             'id' => $calculation['id'] ?? null,
-            'tax_cents' => (int)($calculation['tax_amount_exclusive'] ?? 0) + (int)($calculation['tax_amount_inclusive'] ?? 0),
+            'tax_cents' =>
+                (int)($calculation['tax_amount_exclusive'] ?? 0)
+                + (int)($calculation['tax_amount_inclusive'] ?? 0),
             'total_cents' => (int)($calculation['amount_total'] ?? 0),
-            'snapshot' => json_encode($calculation, JSON_UNESCAPED_SLASHES),
+            'snapshot' => json_encode(
+                $calculation,
+                JSON_UNESCAPED_SLASHES
+            ),
             'address' => $address,
         ];
     }
@@ -94,30 +442,48 @@ class StripeService
         $expected = self::normalizeBillingAddress($authoritative);
         $actual = self::normalizeBillingAddress($returned);
 
-        if ($expected['country'] !== 'US' || $actual['country'] !== 'US') {
+        if (
+            $expected['country'] === '' ||
+            $actual['country'] === '' ||
+            $expected['country'] !== $actual['country']
+        ) {
             return false;
         }
 
         if (
-            $expected['state'] === '' ||
-            $actual['state'] === '' ||
+            $expected['line1'] === '' ||
+            $actual['line1'] === '' ||
+            $expected['line1'] !== $actual['line1'] ||
+            $expected['city'] === '' ||
+            $actual['city'] === '' ||
+            $expected['city'] !== $actual['city']
+        ) {
+            return false;
+        }
+
+        if (
+            $expected['state'] !== '' &&
             $expected['state'] !== $actual['state']
         ) {
             return false;
         }
-        if ($expected['line1']==='' || $actual['line1']==='' || $expected['line1']!==$actual['line1'] || $expected['city']==='' || $actual['city']==='' || $expected['city']!==$actual['city']) return false;
 
-        $expectedZip = preg_replace('/\\D+/', '', $expected['postal_code']);
-        $actualZip = preg_replace('/\\D+/', '', $actual['postal_code']);
+        $expectedPostal = preg_replace(
+            '/[^A-Z0-9]+/',
+            '',
+            strtoupper($expected['postal_code'])
+        );
 
-        if (
-            strlen($expectedZip) < 5 ||
-            strlen($actualZip) < 5
-        ) {
-            return false;
-        }
+        $actualPostal = preg_replace(
+            '/[^A-Z0-9]+/',
+            '',
+            strtoupper($actual['postal_code'])
+        );
 
-        return substr($expectedZip, 0, 5) === substr($actualZip, 0, 5);
+        return
+            $expectedPostal !== '' &&
+            $actualPostal !== '' &&
+            $expectedPostal === $actualPostal;
     }
 
     public static function createTaxTransaction(string $calculationId, int $orderId): array
@@ -136,7 +502,7 @@ class StripeService
     {
         if (!self::configured()) throw new \RuntimeException('Stripe is not configured. Set STRIPE_SECRET_KEY before creating live checkout sessions.');
         $currency = self::currency();
-        if ($currency !== 'usd') throw new \RuntimeException('Creative Moth checkout is US-only at launch and requires USD Stripe Checkout.');
+        if ($currency !== 'usd') throw new \RuntimeException('Creative Moth checkout requires USD Stripe Checkout.');
         $remainingCents = CreditService::parseCents((string)$order['total'], false);
         if ($remainingCents <= 0) throw new \RuntimeException('Stripe Checkout requires a positive remaining total.');
         $lineItems = [[
@@ -202,14 +568,43 @@ class StripeService
 
     public static function createConnectedAccount(array $designer, array $user): array
     {
-        if (!self::configured()) throw new \RuntimeException('Stripe is not configured.');
-        return self::request('POST', '/v1/accounts', [
-            'type' => 'express',
-            'email' => $user['email'] ?? null,
-            'capabilities' => ['transfers' => ['requested' => 'true']],
-            'business_profile' => ['name' => $designer['display_name'] ?? 'Creative Moth seller'],
-            'metadata' => ['designer_id' => (string)$designer['id'], 'user_id' => (string)$user['id'], 'platform' => 'asset_moth'],
-        ], 'asset_moth_connect_designer_' . (int)$designer['id']);
+        if (!self::configured()) {
+            throw new \RuntimeException('Stripe is not configured.');
+        }
+
+        $country = self::normalizeCountryCode(
+            (string)($designer['country_code'] ?? '')
+        );
+
+        if ($country === '') {
+            throw new \InvalidArgumentException(
+                'Select your seller country before starting Stripe setup.'
+            );
+        }
+
+        return self::request(
+            'POST',
+            '/v1/accounts',
+            [
+                'type' => 'express',
+                'country' => $country,
+                'email' => $user['email'] ?? null,
+                'capabilities' => [
+                    'transfers' => ['requested' => 'true']
+                ],
+                'business_profile' => [
+                    'name' =>
+                        $designer['display_name']
+                        ?? 'Creative Moth seller'
+                ],
+                'metadata' => [
+                    'designer_id' => (string)$designer['id'],
+                    'user_id' => (string)$user['id'],
+                    'platform' => 'asset_moth'
+                ],
+            ],
+            'asset_moth_connect_designer_' . (int)$designer['id']
+        );
     }
 
     public static function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): array

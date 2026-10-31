@@ -329,8 +329,37 @@ class SellerController
         $d = $this->approvedDesigner();
         try {
             $accountId = $d['stripe_connect_account_id'] ?? '';
+
             if ($accountId === '') {
-                $account = StripeService::createConnectedAccount($d, H::user());
+                $submittedCountry = StripeService::normalizeCountryCode(
+                    (string)($_POST['country_code'] ?? '')
+                );
+
+                $country = $submittedCountry !== ''
+                    ? $submittedCountry
+                    : StripeService::normalizeCountryCode(
+                        (string)($d['country_code'] ?? '')
+                    );
+
+                if ($country === '') {
+                    throw new \InvalidArgumentException(
+                        'Select your seller country before starting Stripe setup.'
+                    );
+                }
+
+                if (($d['country_code'] ?? '') !== $country) {
+                    DB::exec(
+                        'update designers set country_code=?,updated_at=now() where id=?',
+                        [$country,(int)$d['id']]
+                    );
+
+                    $d['country_code'] = $country;
+                }
+
+                $account = StripeService::createConnectedAccount(
+                    $d,
+                    H::user()
+                );
                 $accountId = (string)($account['id'] ?? '');
                 StripeService::syncConnectedAccountStatus((int)$d['id'], $account);
             }

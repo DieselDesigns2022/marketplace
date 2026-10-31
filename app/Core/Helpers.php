@@ -43,7 +43,7 @@ class Helpers
     }
      public static function money($v): string
     {
-        return '$' . number_format((float)$v, 2);
+        return '$' . number_format((float)$v, 2) . ' USD';
 
     }
      public static function slug(string $v): string

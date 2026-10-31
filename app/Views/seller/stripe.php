@@ -10,7 +10,32 @@
     <?php if($readiness['payout']): ?>
         <p><span class="badge ok">Complete</span> Stripe connected and payout setup ready.</p>
     <?php else: ?>
-        <form method="post" action="/seller/stripe/connect"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn"><?=empty($d['stripe_connect_account_id']) ? 'Connect with Stripe' : 'Continue Stripe setup'?></button></form>
+        <form method="post" action="/seller/stripe/connect">
+            <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+
+            <?php if(empty($d['stripe_connect_account_id'])): ?>
+                <label>Seller country
+                    <select name="country_code" required autocomplete="country">
+                        <option value="">Select country</option>
+                        <?php
+                        $sellerCountry=\App\Services\StripeService::normalizeCountryCode(
+                            (string)($d['country_code']??'')
+                        );
+                        ?>
+                        <?php foreach(\App\Services\StripeService::countryOptions() as $countryCode=>$countryName): ?>
+                            <option value="<?=H::e($countryCode)?>" <?=$sellerCountry===$countryCode?'selected':''?>><?=H::e($countryName)?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <p class="muted">
+                    Stripe payout availability varies by country.
+                    Stripe will verify whether payouts are supported for your location.
+                </p>
+            <?php endif; ?>
+
+            <button class="btn"><?=empty($d['stripe_connect_account_id']) ? 'Connect with Stripe' : 'Continue Stripe setup'?></button>
+        </form>
     <?php endif; ?>
 </section>
 <section class="card page-section">

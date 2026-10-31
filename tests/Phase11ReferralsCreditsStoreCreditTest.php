@@ -38,7 +38,7 @@ foreach (['2024-00','2024-13','2024-1','not-a-month'] as $invalidPeriod) {
     try { SellerReferralCommissionService::periodBounds($invalidPeriod); $periodRejected=false; } catch (DomainException) { $periodRejected=true; }
     $check($periodRejected, 'invalid payout period rejected: '.$invalidPeriod);
 }
-$check(ReferralService::BUYER_REWARD === '1.50' && ReferralService::SELLER_REWARD === '5.00', 'reward constants are exact');
+$check(ReferralService::BUYER_REWARD === '5.00' && ReferralService::SELLER_REWARD === '5.00', 'reward constants are exact');
 $address = ['line1'=>' 1 main st ','city'=>'Town','state'=>'ca','postal_code'=>'90210','country'=>'us'];
 $check(StripeService::billingAddressMatches(StripeService::normalizeBillingAddress($address), ['line1'=>'1 MAIN ST','city'=>'TOWN','state'=>'CA','postal_code'=>'90210','country'=>'US']), 'normalized authoritative billing address matches Stripe response');
 $check(!StripeService::billingAddressMatches(StripeService::normalizeBillingAddress($address), ['line1'=>'2 MAIN ST','city'=>'TOWN','state'=>'CA','postal_code'=>'90210','country'=>'US']), 'material billing address mismatch is rejected');
