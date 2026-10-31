@@ -1,0 +1,61 @@
+CREATE TABLE IF NOT EXISTS analytics_daily_visitors (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    visit_date DATE NOT NULL,
+    visitor_hash CHAR(64) NOT NULL,
+    user_id BIGINT NULL,
+    visitor_type ENUM('guest','buyer','seller') NOT NULL DEFAULT 'guest',
+    first_path VARCHAR(500) NOT NULL,
+    last_path VARCHAR(500) NOT NULL,
+    first_seen_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL,
+    confirmed_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY analytics_daily_visitor_unique (visit_date, visitor_hash),
+    KEY analytics_daily_visitor_hash (visitor_hash, visit_date),
+    KEY analytics_daily_visitor_type (visit_date, visitor_type),
+    KEY analytics_daily_visitor_confirmed (visit_date, confirmed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS analytics_sessions (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    session_hash CHAR(64) NOT NULL,
+    visitor_hash CHAR(64) NOT NULL,
+    user_id BIGINT NULL,
+    visitor_type ENUM('guest','buyer','seller') NOT NULL DEFAULT 'guest',
+    started_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL,
+    confirmed_at DATETIME NULL,
+    landing_path VARCHAR(500) NOT NULL,
+    last_path VARCHAR(500) NOT NULL,
+    page_views INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY analytics_session_unique (session_hash),
+    KEY analytics_session_period (started_at),
+    KEY analytics_session_last_seen (last_seen_at),
+    KEY analytics_session_visitor (visitor_hash, started_at),
+    KEY analytics_session_type (visitor_type, started_at),
+    KEY analytics_session_confirmed (started_at, confirmed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS analytics_page_views (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    session_hash CHAR(64) NOT NULL,
+    visitor_hash CHAR(64) NOT NULL,
+    visit_date DATE NOT NULL,
+    user_id BIGINT NULL,
+    visitor_type ENUM('guest','buyer','seller') NOT NULL DEFAULT 'guest',
+    path VARCHAR(500) NOT NULL,
+    viewed_at DATETIME NOT NULL,
+    confirmed_at DATETIME NULL,
+    duration_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+    is_entry TINYINT(1) NOT NULL DEFAULT 0,
+    is_exit TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY analytics_page_view_period (viewed_at),
+    KEY analytics_page_view_date (visit_date),
+    KEY analytics_page_view_session (session_hash, viewed_at),
+    KEY analytics_page_view_visitor (visitor_hash, viewed_at),
+    KEY analytics_page_view_type (visitor_type, viewed_at),
+    KEY analytics_page_view_path (path(190), viewed_at),
+    KEY analytics_page_view_confirmed (viewed_at, confirmed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

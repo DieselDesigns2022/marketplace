@@ -170,3 +170,42 @@ document.addEventListener("dragstart", (event) => {
     event.preventDefault();
   }
 });
+
+
+/*
+ * Privacy-conscious visitor engagement analytics.
+ * The server stores only salted visitor hashes, never raw IP addresses.
+ */
+(() => {
+  const body = document.body;
+  if (!body) return;
+
+  const pageViewId = Number(body.dataset.analyticsPageView || 0);
+  const csrf = body.dataset.analyticsCsrf || '';
+
+  if (!pageViewId || !csrf || !navigator.sendBeacon) return;
+
+  const started = performance.now();
+  let longestSent = -1;
+
+  const sendEngagement = () => {
+    const seconds = Math.max(
+      0,
+      Math.min(21600, Math.round((performance.now() - started) / 1000))
+    );
+
+    if (seconds <= longestSent) return;
+    longestSent = seconds;
+
+    const payload = new URLSearchParams({
+      _csrf: csrf,
+      page_view_id: String(pageViewId),
+      duration_seconds: String(seconds),
+    });
+
+    navigator.sendBeacon('/analytics/engagement', payload);
+  };
+
+  setTimeout(sendEngagement, 1200);
+  window.addEventListener('pagehide', sendEngagement);
+})();

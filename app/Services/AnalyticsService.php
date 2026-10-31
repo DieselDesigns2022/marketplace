@@ -17,6 +17,11 @@ final class AnalyticsService
         $financials=$r->financials($f['from'],$f['to'],$designerId);$previous=$r->financials($f['previous_from'],$f['previous_to'],$designerId);
         $customers=$r->customers($f['from'],$f['to'],$designerId);$data=['filters'=>$f,'financials'=>$financials,'previous_financials'=>$previous,'comparisons'=>self::comparisons($financials,$previous),'products'=>$r->topProducts($f['from'],$f['to'],$designerId),'customers'=>$customers,'returning_customers'=>array_values(array_filter($customers,fn($row)=>(int)$row['order_count']>1)),'coupons'=>$r->coupons($f['from'],$f['to'],$designerId),'promos'=>$r->promos($f['from'],$f['to'],$designerId),'referrals'=>$r->referrals($f['from'],$f['to'],$designerId),'bundles'=>$r->bundles($f['from'],$f['to'],$designerId),'traffic_sources'=>$r->trafficSources($f['from'],$f['to'],$designerId),'sales_by_weekday'=>$r->salesByWeekday($f['from'],$f['to'],$designerId)];
         if($designerId===null){$growth=$r->growth($f['from'],$f['to']);$previousGrowth=$r->growth($f['previous_from'],$f['previous_to']);$data+=['sellers'=>$r->topSellers($f['from'],$f['to']),'growth'=>$growth,'previous_growth'=>$previousGrowth,'searches'=>$r->searchAnalytics($f['from'],$f['to']),'search_trends'=>$r->searchTrends($f['from'],$f['to']),'failures'=>$r->failures($f['from'],$f['to']),'health'=>$r->health()];foreach(['buyers','sellers'] as $key){$currentTotal=array_sum(array_column($growth,$key));$previousTotal=array_sum(array_column($previousGrowth,$key));$data['comparisons'][$key.'_growth']=self::comparison($currentTotal,$previousTotal);}}else{$data['scheduled']=$r->scheduledDrops($designerId);}
+        if($designerId===null){
+            $data['visitor_overview']=$r->visitorOverview($f['from'],$f['to']);
+            $data['visitor_daily']=$r->visitorDaily($f['from'],$f['to']);
+            $data['page_engagement']=$r->pageEngagement($f['from'],$f['to']);
+        }
         $data['insights']=self::insights($data,$designerId===null);return $data;
     }
     public static function comparisons(array $current,array $previous):array
@@ -35,7 +40,21 @@ final class AnalyticsService
     }
     private static function money(float $value):string{return '$'.number_format($value,2).' USD';}
     public static function csv(array $report):string
-    { $out=fopen('php://temp','r+');fputcsv($out,['Metric','Current period','Previous period','Difference','Percent change']);foreach($report['comparisons'] as $key=>$row)fputcsv($out,[ucwords(str_replace('_',' ',$key)),$row['current'],$row['previous'],$row['difference'],$row['percent']===null?'Not available (prior value is zero)':$row['percent'].'%']);self::csvSection($out,['Product','Seller','Units','Gross sales'],$report['products'],['title','display_name','units','gross_sales']);self::csvSection($out,['Customer','Qualifying completed orders','Last order'],$report['customers'],['name','order_count','last_order_at']);if(isset($report['returning_customers']))self::csvSection($out,['Returning customer','Qualifying completed orders','Last order'],$report['returning_customers'],['name','order_count','last_order_at']);self::csvSection($out,['Day','Qualifying orders'],$report['sales_by_weekday']??[],['weekday_name','orders']);self::csvSection($out,['Traffic source','Orders','Net revenue'],$report['traffic_sources'],['traffic_source','orders','net_revenue']);if(isset($report['searches'])){self::csvSection($out,['Search query','Searches','Successful searches','Zero-result searches'],$report['searches'],['normalized_query','searches','successful_searches','zero_result_searches']);self::csvSection($out,['Search date','Searches','Successful searches','Zero-result searches'],$report['search_trends']??[],['search_date','searches','successful_searches','zero_result_searches']);}rewind($out);return stream_get_contents($out); }
+    { $out=fopen('php://temp','r+');fputcsv($out,['Metric','Current period','Previous period','Difference','Percent change']);foreach($report['comparisons'] as $key=>$row)fputcsv($out,[ucwords(str_replace('_',' ',$key)),$row['current'],$row['previous'],$row['difference'],$row['percent']===null?'Not available (prior value is zero)':$row['percent'].'%']);self::csvSection($out,['Product','Seller','Units','Gross sales'],$report['products'],['title','display_name','units','gross_sales']);self::csvSection($out,['Customer','Qualifying completed orders','Last order'],$report['customers'],['name','order_count','last_order_at']);if(isset($report['returning_customers']))self::csvSection($out,['Returning customer','Qualifying completed orders','Last order'],$report['returning_customers'],['name','order_count','last_order_at']);self::csvSection($out,['Day','Qualifying orders'],$report['sales_by_weekday']??[],['weekday_name','orders']);self::csvSection($out,['Traffic source','Orders','Net revenue'],$report['traffic_sources'],['traffic_source','orders','net_revenue']);if(isset($report['searches'])){self::csvSection($out,['Search query','Searches','Successful searches','Zero-result searches'],$report['searches'],['normalized_query','searches','successful_searches','zero_result_searches']);self::csvSection($out,['Search date','Searches','Successful searches','Zero-result searches'],$report['search_trends']??[],['search_date','searches','successful_searches','zero_result_searches']);}if(isset($report['visitor_daily'])){
+            self::csvSection(
+                $out,
+                ['Date','Unique visitors','Guests','Buyers','Sellers','Page views'],
+                $report['visitor_daily'],
+                ['day','unique_visitors','guests','buyers','sellers','page_views']
+            );
+            self::csvSection(
+                $out,
+                ['Page','Page views','Unique visitors','Landing visits','Exit visits','Average seconds','Total seconds'],
+                $report['page_engagement']??[],
+                ['path','page_views','unique_visitors','landing_visits','exit_visits','avg_seconds','total_seconds']
+            );
+        }
+        rewind($out);return stream_get_contents($out); }
     private static function csvSection($out,array $headings,array $rows,array $keys):void { fputcsv($out,[]);fputcsv($out,$headings);foreach($rows as $row)fputcsv($out,array_map(fn($key)=>self::csvCell($row[$key]??''),$keys)); }
     public static function csvCell(mixed $value):mixed { if(!is_string($value))return $value;return preg_match('/^[=+\-@]/u',$value)?"'".$value:$value; }
 }

@@ -201,6 +201,7 @@ $router->post('/seller/collabs/{id}/file-update-requests/{request}/deny', [Colla
  $router->post('/checkout/retry/{id}', [StripeController::class, 'retry']);
  $router->post('/stripe/webhook', [StripeController::class, 'webhook']);
  $router->get('/admin', [AdminController::class, 'home']);
+ $router->post('/analytics/engagement', [AnalyticsController::class, 'engagement']);
  $router->get('/admin/analytics', [AnalyticsController::class, 'admin']);
  $router->get('/admin/analytics.csv', [AnalyticsController::class, 'adminCsv']);
  $router->get('/admin/collabs', [AdminCollabController::class, 'index']);

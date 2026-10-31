@@ -62,4 +62,146 @@ final class AnalyticsRepository
     { $p=[];$w=$this->period('o.paid_at',$p,$from,$to).' and o.payment_status in ("paid","partially_refunded")';if($designerId!==null){$w.=' and exists(select 1 from seller_payouts sp where sp.order_id=o.id and sp.designer_id=? and sp.gross_amount>0)';$p[]=$designerId;}return DB::rows("select weekday(o.paid_at) weekday_number,dayname(o.paid_at) weekday_name,count(distinct o.id) orders from orders o where $w group by weekday(o.paid_at),dayname(o.paid_at) order by weekday_number",$p); }
     public function failures(string $from,string $to):array { return ['payments'=>DB::rows('select id,payment_status,manual_review_required,created_at from orders where created_at between ? and ? and (payment_status in ("failed","manual_review") or manual_review_required=1) order by created_at desc limit 100',[$from.' 00:00:00',$to.' 23:59:59']),'webhooks'=>DB::rows('select stripe_event_id,event_type,processing_status,processing_error,created_at from stripe_events where created_at between ? and ? and (processing_status="failed" or processing_error is not null) order by created_at desc limit 100',[$from.' 00:00:00',$to.' 23:59:59'])]; }
     public function health():array { return DB::row('select (select count(*) from orders where payment_status in ("failed","manual_review") or manual_review_required=1) payment_issues,(select count(*) from stripe_events where (processing_status="failed" or processing_error is not null) and admin_resolved_at is null) webhook_issues,(select count(*) from seller_payouts where (payout_status="transfer_failed" or stripe_transfer_error is not null) and admin_resolved_at is null) payout_issues,(select count(*) from marketplace_refund_observations where allocation_status="needs_allocation") refunds_needing_allocation,(select count(*) from products where status="pending_review") products_pending_review')??[]; }
+
+    public function visitorOverview(string $from,string $to):array
+    {
+        $daily=DB::row(
+            'select
+                count(*) visitor_days,
+                count(distinct visitor_hash) distinct_visitors,
+                sum(visitor_type="guest") guests,
+                sum(visitor_type="buyer") buyers,
+                sum(visitor_type="seller") sellers
+             from analytics_daily_visitors
+             where visit_date between ? and ?
+               and confirmed_at is not null',
+            [$from,$to]
+        )??[];
+
+        $sessions=DB::row(
+            'select
+                count(*) sessions,
+                coalesce(sum(page_views),0) recorded_page_views
+             from analytics_sessions
+             where started_at between ? and ?
+               and confirmed_at is not null',
+            [$from.' 00:00:00',$to.' 23:59:59']
+        )??[];
+
+        $engagement=DB::row(
+            'select
+                coalesce(round(avg(session_seconds),1),0) avg_session_seconds,
+                coalesce(round(avg(page_count),2),0) avg_pages_per_session
+             from (
+                select
+                    session_hash,
+                    sum(duration_seconds) session_seconds,
+                    count(*) page_count
+                from analytics_page_views
+                where viewed_at between ? and ?
+                  and confirmed_at is not null
+                group by session_hash
+             ) x',
+            [$from.' 00:00:00',$to.' 23:59:59']
+        )??[];
+
+        $returning=DB::row(
+            'select
+                coalesce(sum(first_date between ? and ?),0) new_visitors,
+                coalesce(sum(first_date < ?),0) returning_visitors
+             from (
+                select selected.visitor_hash,min(all_visits.visit_date) first_date
+                from (
+                    select distinct visitor_hash
+                    from analytics_daily_visitors
+                    where visit_date between ? and ?
+                      and confirmed_at is not null
+                ) selected
+                join analytics_daily_visitors all_visits
+                  on all_visits.visitor_hash=selected.visitor_hash
+                 and all_visits.confirmed_at is not null
+                group by selected.visitor_hash
+             ) x',
+            [$from,$to,$from,$from,$to]
+        )??[];
+
+        $cutoff=(new \DateTimeImmutable(
+            'now',
+            new \DateTimeZone($_ENV['APP_TIMEZONE']??'America/Detroit')
+        ))->modify('-15 minutes')->format('Y-m-d H:i:s');
+
+        $active=(int)(
+            DB::row(
+                'select count(*) c
+                 from analytics_sessions
+                 where last_seen_at>=?
+                   and confirmed_at is not null',
+                [$cutoff]
+            )['c']??0
+        );
+
+        return [
+            'visitor_days'=>(int)($daily['visitor_days']??0),
+            'distinct_visitors'=>(int)($daily['distinct_visitors']??0),
+            'guests'=>(int)($daily['guests']??0),
+            'buyers'=>(int)($daily['buyers']??0),
+            'sellers'=>(int)($daily['sellers']??0),
+            'sessions'=>(int)($sessions['sessions']??0),
+            'page_views'=>(int)($sessions['recorded_page_views']??0),
+            'avg_session_seconds'=>(float)($engagement['avg_session_seconds']??0),
+            'avg_pages_per_session'=>(float)($engagement['avg_pages_per_session']??0),
+            'new_visitors'=>(int)($returning['new_visitors']??0),
+            'returning_visitors'=>(int)($returning['returning_visitors']??0),
+            'active_15m'=>$active,
+        ];
+    }
+
+    public function visitorDaily(string $from,string $to):array
+    {
+        return DB::rows(
+            'select
+                d.visit_date day,
+                count(*) unique_visitors,
+                sum(d.visitor_type="guest") guests,
+                sum(d.visitor_type="buyer") buyers,
+                sum(d.visitor_type="seller") sellers,
+                coalesce(p.page_views,0) page_views
+             from analytics_daily_visitors d
+             left join (
+                select visit_date,count(*) page_views
+                from analytics_page_views
+                where visit_date between ? and ?
+                  and confirmed_at is not null
+                group by visit_date
+             ) p on p.visit_date=d.visit_date
+             where d.visit_date between ? and ?
+               and d.confirmed_at is not null
+             group by d.visit_date,p.page_views
+             order by d.visit_date',
+            [$from,$to,$from,$to]
+        );
+    }
+
+    public function pageEngagement(string $from,string $to):array
+    {
+        return DB::rows(
+            'select
+                path,
+                count(*) page_views,
+                count(distinct concat(visit_date,":",visitor_hash)) unique_visitors,
+                sum(is_entry=1) landing_visits,
+                sum(is_exit=1) exit_visits,
+                coalesce(round(avg(case when duration_seconds>0 then duration_seconds end),1),0) avg_seconds,
+                coalesce(sum(duration_seconds),0) total_seconds
+             from analytics_page_views
+             where viewed_at between ? and ?
+               and confirmed_at is not null
+             group by path
+             order by page_views desc,avg_seconds desc,path
+             limit 100',
+            [$from.' 00:00:00',$to.' 23:59:59']
+        );
+    }
+
+
 }

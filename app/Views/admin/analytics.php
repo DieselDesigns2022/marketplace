@@ -15,6 +15,170 @@ form.card{padding:.8rem 1rem;margin-bottom:.85rem}
 <?php if($error):?><div class="alert error"><?=H::e($error)?></div><?php else:?>
 <form class="card" method="get"><label>From <input type="date" name="from" value="<?=H::e($report['filters']['from'])?>"></label><label>To <input type="date" name="to" value="<?=H::e($report['filters']['to'])?>"></label><label>Compare with <select name="comparison"><option value="previous" <?=$report['filters']['comparison']==='previous'?'selected':''?>>Previous equivalent period</option><option value="year_over_year" <?=$report['filters']['comparison']==='year_over_year'?'selected':''?>>Same dates last year</option></select></label><button>Apply</button> <a class="btn" href="/admin/analytics.csv?<?=http_build_query(['from'=>$report['filters']['from'],'to'=>$report['filters']['to'],'comparison'=>$report['filters']['comparison']])?>">Export CSV</a></form>
 <?php $labels=['gross_sales'=>'Gross sales','net_sales'=>'Net sales','platform_commission'=>'Platform commission','seller_earnings'=>'Seller earnings','discounts'=>'Discounts','refunds'=>'Refunds','tax_collected'=>'Tax collected','orders'=>'Orders'];?><section><h2>Marketplace overview</h2><div class="dashboard-grid"><?php foreach($labels as $key=>$label):?><div class="card"><strong><?=$key==='orders'?number_format($report['financials'][$key]):H::money($report['financials'][$key])?></strong><span><?=H::e($label)?></span></div><?php endforeach;?></div></section>
+
+<?php
+$visitor=$report['visitor_overview']??[];
+$visitorDaily=$report['visitor_daily']??[];
+$pageEngagement=$report['page_engagement']??[];
+
+$durationLabel=static function(float|int $seconds):string{
+    $seconds=max(0,(int)round($seconds));
+    if($seconds<60)return $seconds.' sec';
+    $minutes=intdiv($seconds,60);
+    $remaining=$seconds%60;
+    if($minutes<60)return $minutes.'m '.$remaining.'s';
+    $hours=intdiv($minutes,60);
+    return $hours.'h '.($minutes%60).'m';
+};
+?>
+
+<section>
+<h2>Visitor &amp; Engagement Analytics</h2>
+
+<p class="muted">
+Unique visitors are counted once per IP address per calendar day.
+Creative Moth stores only a salted one-way visitor hash — not the raw IP address.
+Admin traffic and common automated bots are excluded.
+</p>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <strong><?=number_format((int)($visitor['visitor_days']??0))?></strong>
+        <span>Daily unique visitors</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['distinct_visitors']??0))?></strong>
+        <span>Distinct visitors</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['active_15m']??0))?></strong>
+        <span>Active in last 15 min</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['guests']??0))?></strong>
+        <span>Guest shoppers</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['buyers']??0))?></strong>
+        <span>Buyers</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['sellers']??0))?></strong>
+        <span>Sellers</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['new_visitors']??0))?></strong>
+        <span>New visitors</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['returning_visitors']??0))?></strong>
+        <span>Returning visitors</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['sessions']??0))?></strong>
+        <span>Visits / sessions</span>
+    </div>
+
+    <div class="card">
+        <strong><?=number_format((int)($visitor['page_views']??0))?></strong>
+        <span>Page views</span>
+    </div>
+
+    <div class="card">
+        <strong><?=H::e($durationLabel($visitor['avg_session_seconds']??0))?></strong>
+        <span>Avg. visit time</span>
+    </div>
+
+    <div class="card">
+        <strong><?=H::e(number_format((float)($visitor['avg_pages_per_session']??0),2))?></strong>
+        <span>Avg. pages / visit</span>
+    </div>
+</div>
+</section>
+
+<section class="card">
+<h2>Visitors by Day</h2>
+
+<?php if(!$visitorDaily):?>
+<p class="muted">Visitor tracking has not recorded traffic for this period yet.</p>
+<?php else:?>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Unique Visitors</th>
+<th>Guest Shoppers</th>
+<th>Buyers</th>
+<th>Sellers</th>
+<th>Page Views</th>
+</tr>
+</thead>
+<tbody>
+<?php foreach($visitorDaily as $row):?>
+<tr>
+<td><?=H::e((string)$row['day'])?></td>
+<td><?=number_format((int)$row['unique_visitors'])?></td>
+<td><?=number_format((int)$row['guests'])?></td>
+<td><?=number_format((int)$row['buyers'])?></td>
+<td><?=number_format((int)$row['sellers'])?></td>
+<td><?=number_format((int)$row['page_views'])?></td>
+</tr>
+<?php endforeach;?>
+</tbody>
+</table>
+</div>
+<?php endif;?>
+</section>
+
+<section class="card">
+<h2>Page Engagement</h2>
+
+<p class="muted">
+Shows where visitors are going and how long they stay.
+Landing visits are sessions that began on the page; exit visits are sessions whose last recorded page was that page.
+</p>
+
+<?php if(!$pageEngagement):?>
+<p class="muted">No page engagement has been recorded for this period yet.</p>
+<?php else:?>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Views</th>
+<th>Unique Visitors</th>
+<th>Avg. Time</th>
+<th>Landing Visits</th>
+<th>Exit Visits</th>
+</tr>
+</thead>
+<tbody>
+<?php foreach($pageEngagement as $row):?>
+<tr>
+<td><code><?=H::e((string)$row['path'])?></code></td>
+<td><?=number_format((int)$row['page_views'])?></td>
+<td><?=number_format((int)$row['unique_visitors'])?></td>
+<td><?=H::e($durationLabel($row['avg_seconds']??0))?></td>
+<td><?=number_format((int)$row['landing_visits'])?></td>
+<td><?=number_format((int)$row['exit_visits'])?></td>
+</tr>
+<?php endforeach;?>
+</tbody>
+</table>
+</div>
+<?php endif;?>
+</section>
+
 <section class="card"><h2>What this means</h2><ul><?php foreach($report['insights'] as $insight):?><li><?=H::e($insight)?></li><?php endforeach;?></ul></section>
 <section class="card"><h2>Period comparison</h2><p class="muted"><strong><?=$report['filters']['comparison']==='year_over_year'?'Same dates last year':'Previous equivalent period'?>:</strong> <?=H::e($report['filters']['from'])?>–<?=H::e($report['filters']['to'])?> compared with <?=H::e($report['filters']['previous_from'])?>–<?=H::e($report['filters']['previous_to'])?>.</p><div class="table-wrap"><table><thead><tr><th>Metric</th><th>Current</th><th>Previous</th><th>Difference</th><th>Change</th></tr></thead><tbody><?php foreach($labels+['buyers_growth'=>'New buyers','sellers_growth'=>'New sellers'] as $key=>$label):$c=$report['comparisons'][$key];?><tr><th><?=H::e($label)?></th><td><?=H::e((string)$c['current'])?></td><td><?=H::e((string)$c['previous'])?></td><td><?=H::e((string)$c['difference'])?></td><td><?=$c['percent']===null?'Not available — prior value is zero':H::e((string)$c['percent']).'%'?></td></tr><?php endforeach;?></tbody></table></div></section>
 <section class="card"><h2>Marketplace health</h2><div class="dashboard-grid"><?php foreach($report['health'] as $key=>$value):?><div><strong><?=number_format((int)$value)?></strong><br><?=H::e(ucwords(str_replace('_',' ',$key)))?></div><?php endforeach;?></div></section>

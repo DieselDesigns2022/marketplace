@@ -26,6 +26,7 @@
  session_name('design_marketplace');
  session_start();
  if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') \App\Services\TrafficAttributionService::capture($_GET,$_SERVER['HTTP_REFERER']??null,$_SERVER['HTTP_HOST']??null);
+\App\Services\VisitorAnalyticsService::captureRequest();
  function app_path(string $path = ''): string
 {
      return dirname(__DIR__) . ($path ? '/' . ltrim($path, '/') : '');

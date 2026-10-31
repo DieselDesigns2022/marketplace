@@ -79,7 +79,10 @@ if ($json && json_decode($json) !== null):
 <link rel="stylesheet" href="/assets/css/app.css?v=<?=filemtime(public_path('assets/css/app.css'))?>">
 <script defer src="/assets/js/app.js?v=<?=filemtime(public_path('assets/js/app.js'))?>"></script>
 </head>
-<body>
+<body<?php if(!empty($_SESSION['_visitor_analytics_page_view_id'])): ?>
+ data-analytics-page-view="<?= (int)$_SESSION['_visitor_analytics_page_view_id'] ?>"
+ data-analytics-csrf="<?= H::e(H::csrf()) ?>"
+<?php endif; ?>>
 <header class="top">
     <a class="brand brand-logo" href="/" aria-label="Creative Moth home">
         <img src="/assets/img/creative-moth-logo.png" alt="Creative Moth" width="190" height="42" style="display:block;max-height:42px;width:auto;max-width:190px;object-fit:contain;" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
