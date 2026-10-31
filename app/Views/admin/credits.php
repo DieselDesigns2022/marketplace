@@ -20,7 +20,7 @@
     <th>Marketplace Credit</th>
     <th>Advertising Credit</th>
     <th>Prize Credit</th>
-    <th>Seller</th>
+    <th>Approved Seller?</th>
     <th>Review</th>
 </tr>
 </thead>
@@ -31,8 +31,8 @@
     <td><?=H::money($user['available_balance'])?> available</td>
     <td><?=H::money($user['advertising_available_balance'])?> available</td>
     <td><?=H::money($user['prize_available_balance'])?> available</td>
-    <td><?=$user['approved_seller']?'Approved':'No'?></td>
-    <td><a href="/admin/credits?user_id=<?=(int)$user['id']?>">Review account</a></td>
+    <td><?=$user['approved_seller']?'Yes':'No'?></td>
+    <td><a href="/admin/credits?user_id=<?=(int)$user['id']?>#credit-account-review">Review account</a></td>
 </tr>
 <?php endforeach;?>
 <?php if(!$users):?>
@@ -49,7 +49,7 @@
 </nav>
 
 <?php if($selected):?>
-<section class="card">
+<section class="card" id="credit-account-review" tabindex="-1">
     <h2><?=H::e($selected['name'])?></h2>
     <p><?=H::e($selected['email'])?></p>
 
