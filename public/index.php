@@ -188,6 +188,7 @@ $router->post('/seller/collabs/{id}/file-update-requests/{request}/deny', [Colla
  $router->match(['GET','POST'], '/seller/coupons/{id}', [SellerController::class, 'coupons']);
  $router->match(['GET','POST'], '/seller/coupons', [SellerController::class, 'coupons']);
  $router->get('/seller/referrals', [SellerController::class, 'referrals']);
+ $router->get('/seller/grand-opening', [SellerController::class, 'grandOpening']);
  $router->get('/seller/rank', [SellerController::class, 'rank']);
  $router->get('/cart', [CartController::class, 'show']);
  $router->post('/cart/add/{id}', [CartController::class, 'add']);

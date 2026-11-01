@@ -75,7 +75,7 @@
     <button class="btn">Save Store Settings</button>
 </form>
 <section class="card page-section">
-    <h2>Grand Opening Creative Moth Giveaways</h2>
+    <h2 id="grand-opening-giveaways">Grand Opening Creative Moth Giveaways</h2>
 
     <p>
         Opt into Creative Moth giveaways, including the Grand Opening

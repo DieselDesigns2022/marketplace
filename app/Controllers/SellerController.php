@@ -2693,6 +2693,19 @@ class SellerController
         $item=DB::row('select oi.*,o.user_id buyer_id,o.status order_status,o.payment_status,o.created_at order_created,u.email buyer_email,u.name buyer_name,sp.recovery_reserved_amount,sp.recovery_applied_amount,sp.transfer_amount_after_recovery,sp.stripe_transfer_id,(select co.id from custom_orders co where co.order_item_id=oi.id) custom_order_id from order_items oi join orders o on o.id=oi.order_id join users u on u.id=o.user_id left join seller_payouts sp on sp.order_id=oi.order_id and sp.designer_id=oi.designer_id where oi.id=? and oi.designer_id=? and o.payment_status in ("paid","partially_refunded")',[(int)$id,$d['id']]) ?? H::abort(404);
         H::view('seller/order_item',['item'=>$item]);
     }
+    public function grandOpening(): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+
+        H::view(
+            'seller/grand_opening',
+            [
+                'pageTitle' => 'Grand Opening',
+            ]
+        );
+    }
+
     public function referrals()
     {
         $this->requireOnboardingComplete();

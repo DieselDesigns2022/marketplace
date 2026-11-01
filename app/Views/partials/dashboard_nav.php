@@ -183,22 +183,24 @@ if ($area === 'buyer') {
             ],
         ],
 
+        'Grand Opening' => [
+            [
+                '/seller/grand-opening',
+                'Grand Opening Hub',
+                [
+                    '/seller/grand-opening',
+                    '/seller/grand-opening-sale',
+                    '/seller/battle-of-the-designers',
+                    '/seller/prize-donations'
+                ]
+            ],
+        ],
+
         'Promotions / Ads' => [
-            ['/seller/grand-opening-sale', 'Grand Opening Sale', ['/seller/grand-opening-sale']],
             [
                 '/seller/promos',
                 'Manage Promotions',
                 ['/seller/promos']
-            ],
-            [
-                '/seller/prize-donations',
-                'Prize Donations',
-                ['/seller/prize-donations', '/seller/prize-donations/']
-            ],
-            [
-                '/seller/battle-of-the-designers',
-                'Battle of the Designers',
-                ['/seller/battle-of-the-designers']
             ],
             ['/seller/social-publishing', 'Social Publishing', ['/seller/social-publishing', '/seller/social/']],
         ],
