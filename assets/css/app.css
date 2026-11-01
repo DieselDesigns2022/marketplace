@@ -2987,3 +2987,15 @@ img[src*="/uploads/custom_designs/examples/"] {
         flex-direction:column;
     }
 }
+
+/* Keep license help previews visible inside tables. */
+table .license-help-text {
+  top: 130%;
+  bottom: auto;
+}
+
+/* Bottom license rows open upward so the preview stays on-screen. */
+table tr:nth-last-child(-n+4) .license-help-text {
+  top: auto;
+  bottom: 130%;
+}
