@@ -52,6 +52,71 @@
     white-space: normal;
 }
 
+.battle-live-results {
+    margin: 20px 0 26px;
+    padding: 20px;
+    border: 1px solid currentColor;
+    border-radius: 16px;
+}
+
+.battle-results-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.battle-results-heading strong {
+    font-size: 1.05rem;
+}
+
+.battle-result-row {
+    margin: 14px 0;
+}
+
+.battle-result-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 7px;
+    font-weight: 700;
+}
+
+.battle-result-bar {
+    height: 18px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #ececec;
+    border: 1px solid rgba(0, 0, 0, .15);
+}
+
+.battle-result-fill {
+    display: block;
+    height: 100%;
+    background: currentColor;
+    min-width: 0;
+}
+
+.battle-result-status {
+    margin: 16px 0 0;
+    text-align: center;
+    font-weight: 800;
+}
+
+.battle-result-status.tie {
+    font-weight: 700;
+}
+
+@media (max-width: 520px) {
+    .battle-results-heading,
+    .battle-result-label {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
 .battle-voting-banner {
     padding: 24px;
     margin-bottom: 28px;
@@ -185,6 +250,14 @@ foreach($rounds as $battleStatusRound){
         button under the designer you want to support.
     </p>
 
+    <p class="battle-vote-limit-notice">
+        <strong>🗳️ Voting limit:</strong>
+        Each account may vote
+        <strong>once per matchup during each 24-hour voting period.</strong>
+        If a matchup ends in a tie and enters a fresh 24-hour re-battle,
+        everyone may vote once again.
+    </p>
+
     <?php if(!empty($battleOpenRound['voting_closes_at'])): ?>
         <p>
             Voting closes:
@@ -315,12 +388,190 @@ if(
     <?php foreach($round['matchups'] as $matchup): ?>
         <article class="card battle-matchup-card">
         <?php include app_path('app/Views/partials/battle_phase.php'); ?>
+        <?php
+        $battleOneVotes =
+            (int)($matchup['participant_one_votes'] ?? 0);
+
+        $battleTwoVotes =
+            (int)($matchup['participant_two_votes'] ?? 0);
+
+        $battleTotalVotes =
+            $battleOneVotes + $battleTwoVotes;
+
+        $battleOnePercent =
+            $battleTotalVotes > 0
+                ? round(
+                    ($battleOneVotes / $battleTotalVotes) * 100,
+                    1
+                )
+                : 0;
+
+        $battleTwoPercent =
+            $battleTotalVotes > 0
+                ? round(
+                    ($battleTwoVotes / $battleTotalVotes) * 100,
+                    1
+                )
+                : 0;
+
+        $battleShowResults =
+            !empty($matchup['participant_one_id']) &&
+            !empty($matchup['participant_two_id']) &&
+            in_array(
+                $matchup['status'],
+                ['open', 'tied', 'completed'],
+                true
+            );
+        ?>
 
             <p>
                 <strong>
                     Matchup #<?=number_format((int)$matchup['bracket_position'])?>
                 </strong>
             </p>
+
+            <?php if($battleShowResults): ?>
+                <div
+                    class="battle-live-results"
+                    aria-label="Current Battle vote totals"
+                >
+                    <div class="battle-results-heading">
+                        <strong>
+                            <?=$matchup['status']==='completed'
+                                ? 'Final Vote Results'
+                                : '🔥 Live Vote Results'?>
+                        </strong>
+
+                        <span>
+                            <?=number_format($battleTotalVotes)?>
+                            vote<?=$battleTotalVotes===1?'':'s'?> cast
+                        </span>
+                    </div>
+
+                    <div class="battle-result-row">
+                        <div class="battle-result-label">
+                            <span>
+                                <?=H::e($matchup['participant_one_name'])?>
+                            </span>
+
+                            <span>
+                                <?=number_format($battleOneVotes)?>
+                                vote<?=$battleOneVotes===1?'':'s'?>
+                                ·
+                                <?=H::e(
+                                    number_format(
+                                        $battleOnePercent,
+                                        $battleOnePercent == floor($battleOnePercent)
+                                            ? 0
+                                            : 1
+                                    )
+                                )?>%
+                            </span>
+                        </div>
+
+                        <div
+                            class="battle-result-bar"
+                            role="progressbar"
+                            aria-label="<?=H::e(
+                                $matchup['participant_one_name'].
+                                ' vote percentage'
+                            )?>"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="<?=H::e(
+                                (string)$battleOnePercent
+                            )?>"
+                        >
+                            <span
+                                class="battle-result-fill"
+                                style="width:<?=H::e(
+                                    (string)$battleOnePercent
+                                )?>%"
+                            ></span>
+                        </div>
+                    </div>
+
+                    <div class="battle-result-row">
+                        <div class="battle-result-label">
+                            <span>
+                                <?=H::e($matchup['participant_two_name'])?>
+                            </span>
+
+                            <span>
+                                <?=number_format($battleTwoVotes)?>
+                                vote<?=$battleTwoVotes===1?'':'s'?>
+                                ·
+                                <?=H::e(
+                                    number_format(
+                                        $battleTwoPercent,
+                                        $battleTwoPercent == floor($battleTwoPercent)
+                                            ? 0
+                                            : 1
+                                    )
+                                )?>%
+                            </span>
+                        </div>
+
+                        <div
+                            class="battle-result-bar"
+                            role="progressbar"
+                            aria-label="<?=H::e(
+                                $matchup['participant_two_name'].
+                                ' vote percentage'
+                            )?>"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="<?=H::e(
+                                (string)$battleTwoPercent
+                            )?>"
+                        >
+                            <span
+                                class="battle-result-fill"
+                                style="width:<?=H::e(
+                                    (string)$battleTwoPercent
+                                )?>%"
+                            ></span>
+                        </div>
+                    </div>
+
+                    <?php if($battleTotalVotes===0): ?>
+                        <p class="battle-result-status tie">
+                            No votes yet — be the first!
+                        </p>
+
+                    <?php elseif(
+                        $battleOneVotes === $battleTwoVotes
+                    ): ?>
+                        <p class="battle-result-status tie">
+                            🤝 Currently tied
+                        </p>
+
+                    <?php elseif(
+                        $matchup['status'] === 'open'
+                    ): ?>
+                        <p class="battle-result-status">
+                            🔥 Currently leading:
+                            <?=H::e(
+                                $battleOneVotes > $battleTwoVotes
+                                    ? $matchup['participant_one_name']
+                                    : $matchup['participant_two_name']
+                            )?>
+                        </p>
+
+                    <?php elseif(
+                        $matchup['status'] === 'completed'
+                    ): ?>
+                        <p class="battle-result-status">
+                            🏆 Winner:
+                            <?=H::e(
+                                $battleOneVotes > $battleTwoVotes
+                                    ? $matchup['participant_one_name']
+                                    : $matchup['participant_two_name']
+                            )?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
 
             <div class="battle-head-to-head">
                 <div class="battle-designer-option">
