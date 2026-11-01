@@ -149,7 +149,38 @@ class PublicController
                 ? $wheelService->participatingStores()
                 : [];
 
-        $schema = ['@context'=>'https://schema.org','@type'=>'WebSite','name'=>'Creative Moth','url'=>H::baseUrl(),'potentialAction'=>['@type'=>'SearchAction','target'=>H::canonical('/browse').'?q={search_term_string}','query-input'=>'required name=search_term_string']];
+        $organizationId = H::canonical('/').'#organization';
+        $websiteId = H::canonical('/').'#website';
+
+        $schema = [
+            '@context'=>'https://schema.org',
+            '@graph'=>[
+                [
+                    '@type'=>'Organization',
+                    '@id'=>$organizationId,
+                    'name'=>'Creative Moth',
+                    'url'=>H::baseUrl(),
+                    'description'=>H::DEFAULT_DESCRIPTION,
+                ],
+                [
+                    '@type'=>'WebSite',
+                    '@id'=>$websiteId,
+                    'name'=>'Creative Moth',
+                    'url'=>H::baseUrl(),
+                    'publisher'=>[
+                        '@id'=>$organizationId,
+                    ],
+                    'potentialAction'=>[
+                        '@type'=>'SearchAction',
+                        'target'=>
+                            H::canonical('/browse').
+                            '?q={search_term_string}',
+                        'query-input'=>
+                            'required name=search_term_string',
+                    ],
+                ],
+            ],
+        ];
 
         H::view(
             'public/home',
@@ -681,9 +712,41 @@ class PublicController
         $defaultLicense = $licenses[0] ?? ['price' => (float)($p['price'] ?? 0), 'license_key' => 'personal'];
         foreach ($licenses as $license) if (!empty($license['is_default'])) $defaultLicense = $license;
         $productUrl = H::canonical('/product/'.$p['slug']);
-        $schema = ['@context'=>'https://schema.org','@type'=>'Product','name'=>$p['title'],'description'=>$description,'url'=>$productUrl];
-        if ($preview) $schema['image'] = H::assetUrl($preview);
-        if ($p['price'] !== null) $schema['offers'] = ['@type'=>'Offer','price'=>(string)$p['price'],'priceCurrency'=>'USD','url'=>$productUrl];
+        $schema = [
+            '@context'=>'https://schema.org',
+            '@type'=>'Product',
+            'name'=>$p['title'],
+            'description'=>$description,
+            'url'=>$productUrl,
+        ];
+
+        if (!empty($p['category_name'])) {
+            $schema['category']=$p['category_name'];
+        }
+
+        if ($preview) {
+            $schema['image']=H::assetUrl($preview);
+        }
+
+        if ($p['price'] !== null) {
+            $schema['offers']=[
+                '@type'=>'Offer',
+                'price'=>(string)$p['price'],
+                'priceCurrency'=>'USD',
+                'url'=>$productUrl,
+                'availability'=>
+                    'https://schema.org/InStock',
+                'itemCondition'=>
+                    'https://schema.org/NewCondition',
+                'seller'=>[
+                    '@type'=>'Organization',
+                    'name'=>$p['display_name'],
+                    'url'=>H::canonical(
+                        '/store/'.$p['store_slug']
+                    ),
+                ],
+            ];
+        }
         $owned = H::user() ? (bool)DB::row('select oi.id from order_items oi join orders o on o.id=oi.order_id where o.user_id=? and oi.product_id=? and o.payment_status="paid" limit 1', [H::user()['id'], $p['id']]) : false;
         H::view('public/product', ['p'=>$p,'owned'=>$owned,'licenses'=>$licenses,'defaultLicense'=>$defaultLicense,'files'=>H::user()&&$owned?DB::rows('select id,original_name from product_files where product_id=? order by id',[$p['id']]):[],'images'=>$images,'tags'=>DB::rows('select t.* from tags t join product_tags pt on pt.tag_id=t.id where pt.product_id=? order by t.name',[$p['id']]),'more'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,d.average_rating,d.review_count,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" and d.status="approved" and p.id<>? order by p.updated_at desc,p.id desc limit 4',[$p['designer_id'],$p['id']]),'related'=>DB::rows('select p.id,p.title,p.slug,p.price,p.ai_disclosure,p.is_hand_drawn,p.pod_allowed,p.commercial_license_enabled,p.file_types,p.is_featured,p.created_at,d.display_name,d.store_slug,d.average_rating,d.review_count,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image,(case when p.category_id <=> ? then 20 else 0 end + (select count(*)*10 from product_tags pt where pt.product_id=p.id and pt.tag_id in (select tag_id from product_tags where product_id=?))) related_score from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.status="approved" and d.status="approved" and p.id<>? and (p.category_id <=> ? or exists (select 1 from product_tags pt2 where pt2.product_id=p.id and pt2.tag_id in (select tag_id from product_tags where product_id=?))) order by related_score desc,p.updated_at desc,p.id desc limit 4',[$p['category_id'],$p['id'],$p['id'],$p['category_id'],$p['id']]),'shareUrl'=>$productUrl,'shareText'=>$p['title'].' on Creative Moth','meta'=>$this->pageMeta($title, $description, '/product/'.$p['slug'], $schema, ['og_type'=>'product','og_image'=>$preview,'twitter_image'=>$preview,'twitter_card'=>'summary_large_image'])]);
     }
@@ -752,9 +815,41 @@ class PublicController
         $title = $d['seo_title'] ?: ($d['display_name'].' Digital Design Store');
         $description = $d['seo_description'] ?: ('Shop approved digital design files from '.$d['display_name'].' on Creative Moth.');
         $image = $d['banner_path'] ?: $d['avatar_path'];
-        $schema = ['@context'=>'https://schema.org','@type'=>'ProfilePage','name'=>$d['display_name'],'description'=>$description,'url'=>H::canonical('/store/'.$d['store_slug'])];
-        if ($image) $schema['image'] = H::assetUrl($image);
+        $storeUrl=
+            H::canonical('/store/'.$d['store_slug']);
+
+        $schema = [
+            '@context'=>'https://schema.org',
+            '@type'=>'ProfilePage',
+            'name'=>$d['display_name'],
+            'description'=>$description,
+            'url'=>$storeUrl,
+            'mainEntity'=>[
+                '@type'=>'Organization',
+                '@id'=>$storeUrl.'#store',
+                'name'=>$d['display_name'],
+                'url'=>$storeUrl,
+                'description'=>$description,
+            ],
+        ];
+
+        if ($image) {
+            $schema['image']=H::assetUrl($image);
+            $schema['mainEntity']['image']=
+                H::assetUrl($image);
+        }
+
         $socialLinks = $this->designerSocialLinks($d);
+
+        if ($socialLinks) {
+            $schema['mainEntity']['sameAs']=
+                array_values(
+                    array_column(
+                        $socialLinks,
+                        'url'
+                    )
+                );
+        }
         $reviews = DB::rows('select sr.*,rr.reply_text,rr.created_at reply_created_at,rr.updated_at reply_updated_at,rr.moderation_status reply_moderation_status from seller_reviews sr left join seller_review_replies rr on rr.review_id=sr.id where sr.designer_id=? and sr.moderation_status="published" order by sr.reviewed_at desc',[$d['id']]);
         $prizeWheelService=new \App\Services\PrizeWheelService();
         $prizeWheelVisible=$prizeWheelService->storefrontVisible($d);
@@ -841,11 +936,46 @@ class PublicController
     public function sitemap(): never
     {
         header('Content-Type: application/xml; charset=utf-8');
-        $urls = ['/', '/browse', '/custom-designs', '/sell', '/about', '/contact', '/terms', '/privacy', '/data-deletion', '/licensing-help', '/buyer-faq', '/seller-faq'];
+        $urls = [
+            '/',
+            '/browse',
+            '/custom-designs',
+            '/sell',
+            '/about',
+            '/contact',
+            '/terms',
+            '/privacy',
+            '/data-deletion',
+            '/licensing-help',
+            '/buyer-faq',
+            '/seller-faq',
+            '/battle-of-the-designers',
+        ];
         foreach ($this->visibleCategories() as $c) $urls[] = '/category/'.$c['slug'];
         foreach (DB::rows('select slug from products where status="approved" order by updated_at desc') as $p) $urls[] = '/product/'.$p['slug'];
         foreach (DB::rows('select s.slug from custom_design_services s join designers d on d.id=s.designer_id where s.is_active=1 and d.status="approved" order by s.updated_at desc') as $s) $urls[] = '/custom-design/'.$s['slug'];
         foreach (DB::rows('select store_slug from designers where status="approved" order by updated_at desc') as $d) $urls[] = '/store/'.$d['store_slug'];
+
+        foreach (
+            DB::rows(
+                'select slug
+                   from battle_events
+                  where slug is not null
+                    and slug<>""
+                    and status in (
+                        "signup",
+                        "seeded",
+                        "active",
+                        "completed"
+                    )
+                  order by id desc'
+            )
+            as $battle
+        ) {
+            $urls[] =
+                '/battle-of-the-designers/'.
+                $battle['slug'];
+        }
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         foreach (array_unique($urls) as $url) echo '  <url><loc>'.H::e(H::canonical($url))."</loc></url>\n";
         echo "</urlset>\n";

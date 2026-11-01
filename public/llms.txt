@@ -1,0 +1,103 @@
+# Creative Moth
+
+> Creative Moth is an online marketplace for downloadable digital designs and creative files from independent designers.
+
+Creative Moth helps buyers discover digital products and gives independent designers reviewed storefronts for selling downloadable creative work.
+
+## Main marketplace
+
+- Homepage: https://creativemoth.com/
+- Browse digital designs: https://creativemoth.com/browse
+- Sitemap: https://creativemoth.com/sitemap.xml
+- About Creative Moth: https://creativemoth.com/about
+
+## Marketplace content
+
+Public marketplace content includes:
+
+- SVG files
+- PNG and sublimation designs
+- seamless patterns and digital papers
+- clipart and lineart
+- fonts
+- Procreate brushes and stamps
+- templates
+- mockups
+- printables
+- embroidery and laser files
+- digital services
+- custom designs
+- designer collaborations
+- other downloadable creative files
+
+Categories are available under:
+
+https://creativemoth.com/category/
+
+Individual products are available under:
+
+https://creativemoth.com/product/
+
+Independent designer storefronts are available under:
+
+https://creativemoth.com/store/
+
+Custom design listings are available under:
+
+https://creativemoth.com/custom-designs
+
+## Battle of the Designers
+
+Creative Moth hosts public designer competitions where marketplace users can follow and vote in head-to-head designer matchups.
+
+- Battle hub: https://creativemoth.com/battle-of-the-designers
+- Grand Opening Battle: https://creativemoth.com/battle-of-the-designers/grand-opening
+
+## Marketplace information
+
+- Buyer FAQ: https://creativemoth.com/buyer-faq
+- Seller FAQ: https://creativemoth.com/seller-faq
+- Licensing help: https://creativemoth.com/licensing-help
+- Sell on Creative Moth: https://creativemoth.com/sell
+- Contact: https://creativemoth.com/contact
+- Terms: https://creativemoth.com/terms
+- Privacy: https://creativemoth.com/privacy
+
+## Product and creator information
+
+Product pages may include:
+
+- product title and description
+- digital file type
+- product category
+- pricing
+- licensing information
+- POD permissions
+- AI-use disclosure
+- preview images
+- creator/store information
+- related products
+
+Storefront pages may include:
+
+- designer or shop name
+- shop description
+- products
+- custom services
+- collaborations
+- reviews
+- public social and website links
+
+## Crawling
+
+Public marketplace, product, category, storefront, informational, and competition pages are intended for public discovery.
+
+Private account, seller-management, checkout, download, dashboard, and administrative areas are not public discovery pages.
+
+Crawler directives are published at:
+
+https://creativemoth.com/robots.txt
+
+Canonical public URLs and discoverable marketplace pages are published in:
+
+https://creativemoth.com/sitemap.xml

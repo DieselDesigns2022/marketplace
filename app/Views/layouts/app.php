@@ -15,6 +15,33 @@ if ($metaDescription === '') {
     $metaDescription = $defaultDescription;
 }
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+
+if (
+    $pageTitle === H::SITE_NAME &&
+    (
+        $path === '/battle-of-the-designers' ||
+        str_starts_with($path, '/battle-of-the-designers/')
+    )
+) {
+    if ($path === '/battle-of-the-designers/grand-opening') {
+        $pageTitle =
+            'Grand Opening Battle of the Designers | ' .
+            H::SITE_NAME;
+
+        $metaDescription =
+            "Vote in Creative Moth's Grand Opening Battle of the Designers. ".
+            'Support independent digital designers, follow each 24-hour matchup, '.
+            'and see who advances.';
+    } else {
+        $pageTitle =
+            'Battle of the Designers | ' .
+            H::SITE_NAME;
+
+        $metaDescription =
+            'Follow Creative Moth Battle of the Designers competitions, '.
+            'vote in live designer matchups, and support independent digital creators.';
+    }
+}
 $canonical = $meta['canonical'] ?? H::canonical($path === '/browse' ? '/browse' : $path);
 $noindexPrefixes = ['/admin', '/dashboard', '/seller', '/account', '/cart', '/checkout', '/download', '/login', '/register', '/forgot-password', '/apply'];
 $robots = $meta['robots'] ?? null;
@@ -24,6 +51,13 @@ foreach ($noindexPrefixes as $prefix) {
         break;
     }
 }
+
+if ($robots === null) {
+    $robots =
+        'index,follow,max-image-preview:large,'.
+        'max-snippet:-1,max-video-preview:-1';
+}
+
 $ogTitle = trim($meta['og_title'] ?? $pageTitle);
 $ogDescription = trim($meta['og_description'] ?? $metaDescription);
 $ogImage = H::assetUrl($meta['og_image'] ?? '');
