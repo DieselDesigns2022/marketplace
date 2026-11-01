@@ -95,7 +95,7 @@ $check(
         $service,
         'voting_minutes'
     ),
-    'every Battle round is exactly 24 hours'
+    'every Battle matchup is exactly 24 hours'
 );
 
 $check(

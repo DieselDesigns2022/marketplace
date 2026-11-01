@@ -1,13 +1,24 @@
 <?php use App\Core\Helpers as H; ?>
 
 <style>
+.battle-round-section {
+    margin-bottom: 28px;
+}
+
+.battle-matchup-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
 .battle-matchup-card {
     padding: 28px;
+    min-width: 0;
 }
 
 .battle-head-to-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr);
+    grid-template-columns: minmax(190px, 1fr) 64px minmax(190px, 1fr);
     gap: 28px;
     align-items: center;
 }
@@ -18,7 +29,7 @@
 }
 
 .battle-designer-logo {
-    width: min(100%, 320px);
+    width: min(100%, 220px);
     aspect-ratio: 1 / 1;
     object-fit: contain;
     display: block;
@@ -28,6 +39,35 @@
 
 .battle-designer-option h3 {
     margin: 0 0 16px;
+    font-size: 1.15rem;
+    line-height: 1.3;
+    word-break: normal;
+    overflow-wrap: normal;
+    hyphens: none;
+}
+
+.battle-designer-option .btn {
+    width: 100%;
+    max-width: 260px;
+    white-space: normal;
+}
+
+.battle-voting-banner {
+    padding: 24px;
+    margin-bottom: 28px;
+    text-align: center;
+    border: 2px solid currentColor;
+}
+
+.battle-voting-banner h2 {
+    margin-top: 0;
+}
+
+.battle-preopen-vote {
+    width: 100%;
+    max-width: 260px;
+    opacity: .7;
+    cursor: not-allowed;
 }
 
 .battle-vs {
@@ -55,13 +95,28 @@
     border-radius: 14px;
 }
 
+@media (max-width: 980px) {
+    .battle-matchup-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 720px) {
+    .battle-matchup-card {
+        padding: 20px;
+    }
+
     .battle-head-to-head {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
 
     .battle-vs {
         padding: 6px 0;
+    }
+
+    .battle-designer-logo {
+        width: min(100%, 200px);
     }
 }
 </style>
@@ -83,12 +138,85 @@
         </p>
     </div>
 
-    <?php if(H::user() && H::hasApprovedDesigner()): ?>
+    <?php if(
+        \App\Services\BattleService::signupOpen($event) &&
+        H::user() &&
+        H::hasApprovedDesigner()
+    ): ?>
         <a class="btn" href="/seller/battle-of-the-designers">
             Seller Battle Signup
         </a>
     <?php endif; ?>
 </header>
+
+<?php
+$battleNow = time();
+
+$battleFirstOpen = !empty($event['first_round_opens_at'])
+    ? strtotime($event['first_round_opens_at'].' UTC')
+    : null;
+
+$battlePreVoting =
+    $battleFirstOpen &&
+    $battleFirstOpen > $battleNow &&
+    in_array($event['status'], ['seeded','active'], true);
+
+$battleOpenRound = null;
+
+foreach($rounds as $battleStatusRound){
+    if(($battleStatusRound['status'] ?? '') === 'open'){
+        $battleOpenRound = $battleStatusRound;
+        break;
+    }
+}
+?>
+
+<?php if($battleOpenRound): ?>
+
+<section class="card battle-voting-banner">
+    <h2>🗳️ VOTING IS LIVE!</h2>
+
+    <p>
+        Choose your favorite designer in each matchup below.
+    </p>
+
+    <p>
+        Click the <strong>Vote for [Designer]</strong>
+        button under the designer you want to support.
+    </p>
+
+    <?php if(!empty($battleOpenRound['voting_closes_at'])): ?>
+        <p>
+            Voting closes:
+            <strong><?=H::e(
+                \App\Services\BattleService::eastern(
+                    $battleOpenRound['voting_closes_at']
+                )
+            )?></strong>
+        </p>
+    <?php endif; ?>
+</section>
+
+<?php elseif($battlePreVoting): ?>
+
+<section class="card battle-voting-banner">
+    <h2>🕛 Round 1 Voting Opens Today</h2>
+
+    <p>
+        Voting opens at
+        <strong><?=H::e(
+            \App\Services\BattleService::eastern(
+                $event['first_round_opens_at']
+            )
+        )?></strong>.
+    </p>
+
+    <p>
+        Vote buttons are disabled until voting officially opens.
+    </p>
+</section>
+
+<?php endif; ?>
 
 <?php if(\App\Services\BattleService::signupOpen($event)): ?>
 <section class="card">
@@ -156,7 +284,16 @@
 <?php endif; ?>
 
 <?php foreach($rounds as $round): ?>
-<section class="card">
+<?php
+if(
+    $event['status'] !== 'completed' &&
+    (int)$round['round_number'] > 1 &&
+    ($round['status'] ?? '') === 'pending'
+){
+    continue;
+}
+?>
+<section class="card battle-round-section">
     <h2>
         Round <?=number_format((int)$round['round_number'])?>
     </h2>
@@ -174,7 +311,7 @@
         </p>
     <?php endif; ?>
 
-    <div class="dashboard-grid">
+    <div class="battle-matchup-grid">
     <?php foreach($round['matchups'] as $matchup): ?>
         <article class="card battle-matchup-card">
         <?php include app_path('app/Views/partials/battle_phase.php'); ?>
@@ -197,6 +334,27 @@
                         <h3>
                             <?=H::e($matchup['participant_one_name'])?>
                         </h3>
+
+                        <?php if(
+                            $battlePreVoting &&
+                            (int)$round['round_number'] === 1 &&
+                            $matchup['status'] === 'pending'
+                        ): ?>
+
+                            <button
+                                class="btn battle-preopen-vote"
+                                type="button"
+                                disabled
+                            >
+                                Vote for <?=H::e($matchup['participant_one_name'])?>
+                                — Opens <?=H::e(
+                                    \App\Services\BattleService::eastern(
+                                        $matchup['voting_opens_at']
+                                    )
+                                )?>
+                            </button>
+
+                        <?php endif; ?>
 
                         <?php if(
                             $matchup['status']==='open'
@@ -236,7 +394,7 @@
                                     >
 
                                     <button class="btn">
-                                        Vote
+                                        Vote for <?=H::e($matchup['participant_one_name'])?>
                                     </button>
                                 </form>
                             <?php endif; ?>
@@ -262,6 +420,27 @@
                         <h3>
                             <?=H::e($matchup['participant_two_name'])?>
                         </h3>
+
+                        <?php if(
+                            $battlePreVoting &&
+                            (int)$round['round_number'] === 1 &&
+                            $matchup['status'] === 'pending'
+                        ): ?>
+
+                            <button
+                                class="btn battle-preopen-vote"
+                                type="button"
+                                disabled
+                            >
+                                Vote for <?=H::e($matchup['participant_two_name'])?>
+                                — Opens <?=H::e(
+                                    \App\Services\BattleService::eastern(
+                                        $matchup['voting_opens_at']
+                                    )
+                                )?>
+                            </button>
+
+                        <?php endif; ?>
 
                         <?php if(
                             $matchup['status']==='open'
@@ -301,7 +480,7 @@
                                     >
 
                                     <button class="btn">
-                                        Vote
+                                        Vote for <?=H::e($matchup['participant_two_name'])?>
                                     </button>
                                 </form>
                             <?php endif; ?>
