@@ -126,6 +126,29 @@
     <p class="notice warning" data-category-guidance="freebies" hidden>Freebies is an active category, but $0.00 checkout is not supported yet. Existing paid checkout rules still apply.</p>
     <p class="notice warning" data-category-guidance="digital-services" hidden>Digital Services must use the existing downloadable or Google Drive / manual-delivery choice.</p>
     <p class="notice warning" data-category-guidance="customs-personalized" hidden>Customs / Personalized products must use the existing downloadable or Google Drive / manual-delivery choice.</p>
+
+    <?php $selectedStoreSection=$_POST['store_section_id']??$p['store_section_id']??''; ?>
+
+    <label>
+        Shop Section
+        <select name="store_section_id">
+            <option value="">All Listings / No Section</option>
+
+            <?php foreach(($shopSections??[]) as $section): ?>
+                <option
+                    value="<?=(int)$section['id']?>"
+                    <?=(string)$selectedStoreSection===(string)$section['id']?'selected':''?>
+                >
+                    <?=H::e($section['name'])?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+
+    <p class="help-text">
+        Optional. Customers can click shop sections on your public storefront
+        to view only the products inside that section.
+    </p>
     <label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>">
     </label>
 <label>AI Disclosure<select name="ai_disclosure"<?=in_array('ai',$importReviewKeys??[],true)?'':' required'?>>

@@ -292,6 +292,36 @@ class SellerController
         return DB::rows('select * from categories where is_active=1 and slug not in (?, ?) and not (lower(name) in (?, ?) and slug<>?) order by sort_order,name', ['sublimation','png','png','png files','png-files']);
     }
 
+    private function shopSectionRows(int $designerId): array
+    {
+        return DB::rows(
+            'select s.*,
+                    (select count(*) from products p where p.store_section_id=s.id and p.status<>"deleted") product_count
+             from store_sections s
+             where s.designer_id=?
+             order by s.sort_order,s.name,s.id',
+            [$designerId]
+        );
+    }
+
+    private function uniqueShopSectionSlug(int $designerId,string $name): string
+    {
+        $base=H::slug($name) ?: 'section';
+        $base=mb_substr($base,0,90);
+        $slug=$base;
+        $i=2;
+
+        while(DB::row(
+            'select id from store_sections where designer_id=? and slug=? limit 1',
+            [$designerId,$slug]
+        )){
+            $suffix='-'.$i++;
+            $slug=mb_substr($base,0,100-mb_strlen($suffix)).$suffix;
+        }
+
+        return $slug;
+    }
+
     private function renderProductForm(?array $p, array $errors, array $d, ?array $ipRiskOverride = null): void
     {
         $productId = $p['id'] ?? 0;
@@ -300,6 +330,7 @@ class SellerController
             'd' => $d,
             'errors' => $errors,
             'cats' => $this->productCategoryRows(),
+            'shopSections' => $this->shopSectionRows((int)$d['id']),
             'images' => $productId ? DB::rows('select * from product_images where product_id=? order by sort_order,id', [$productId]) : [],
             'files' => $productId ? DB::rows('select * from product_files where product_id=? order by created_at desc', [$productId]) : [],
             'tagText' => $productId ? $this->tagText((int)$productId) : '',
@@ -558,6 +589,118 @@ class SellerController
         $errors = [];
         if ($_POST)
         {
+            if (($_POST['settings_section'] ?? 'store') === 'shop_sections') {
+                H::verifyCsrf();
+
+                $action=(string)($_POST['section_action']??'');
+                $sectionId=(int)($_POST['section_id']??0);
+                $name=trim((string)($_POST['section_name']??''));
+
+                if($action==='create'){
+                    if($name===''){
+                        $errors[]='Section name is required.';
+                    } elseif(mb_strlen($name)>80){
+                        $errors[]='Section names must be 80 characters or fewer.';
+                    } elseif(DB::row(
+                        'select id from store_sections where designer_id=? and name=? limit 1',
+                        [(int)$d['id'],$name]
+                    )){
+                        $errors[]='You already have a section with that name.';
+                    } else {
+                        $count=(int)(DB::row(
+                            'select count(*) c from store_sections where designer_id=?',
+                            [(int)$d['id']]
+                        )['c']??0);
+
+                        if($count>=30){
+                            $errors[]='Stores may have up to 30 shop sections.';
+                        } else {
+                            DB::exec(
+                                'insert into store_sections (designer_id,name,slug,sort_order) values (?,?,?,?)',
+                                [
+                                    (int)$d['id'],
+                                    $name,
+                                    $this->uniqueShopSectionSlug((int)$d['id'],$name),
+                                    $count+1
+                                ]
+                            );
+
+                            H::flash('success','Shop section created.');
+                            H::redirect('/seller/store#shop-sections');
+                        }
+                    }
+                } elseif($action==='rename'){
+                    $section=DB::row(
+                        'select id from store_sections where id=? and designer_id=?',
+                        [$sectionId,(int)$d['id']]
+                    );
+
+                    if(!$section){
+                        H::abort(404);
+                    }
+
+                    if($name===''){
+                        $errors[]='Section name is required.';
+                    } elseif(mb_strlen($name)>80){
+                        $errors[]='Section names must be 80 characters or fewer.';
+                    } elseif(DB::row(
+                        'select id from store_sections where designer_id=? and name=? and id<>? limit 1',
+                        [(int)$d['id'],$name,$sectionId]
+                    )){
+                        $errors[]='You already have a section with that name.';
+                    } else {
+                        DB::exec(
+                            'update store_sections set name=?,updated_at=now() where id=? and designer_id=?',
+                            [$name,$sectionId,(int)$d['id']]
+                        );
+
+                        H::flash('success','Shop section renamed.');
+                        H::redirect('/seller/store#shop-sections');
+                    }
+                } elseif($action==='delete'){
+                    $section=DB::row(
+                        'select id from store_sections where id=? and designer_id=?',
+                        [$sectionId,(int)$d['id']]
+                    );
+
+                    if(!$section){
+                        H::abort(404);
+                    }
+
+                    DB::begin();
+
+                    try{
+                        DB::exec(
+                            'update products set store_section_id=null where store_section_id=? and designer_id=?',
+                            [$sectionId,(int)$d['id']]
+                        );
+
+                        DB::exec(
+                            'delete from store_sections where id=? and designer_id=?',
+                            [$sectionId,(int)$d['id']]
+                        );
+
+                        DB::commit();
+                    } catch(Throwable $e){
+                        if(DB::pdo()->inTransaction())DB::rollBack();
+                        throw $e;
+                    }
+
+                    H::flash('success','Shop section deleted. Its products now appear under All Listings.');
+                    H::redirect('/seller/store#shop-sections');
+                } else {
+                    H::abort(400);
+                }
+
+                H::view('seller/store',[
+                    'd'=>$this->d(),
+                    'errors'=>$errors,
+                    'shopSections'=>$this->shopSectionRows((int)$d['id']),
+                    'licenseTypes'=>LicenseService::platformTypes(),
+                    'licensePresets'=>LicenseService::sellerPresets((int)$d['id']),
+                ]);
+                return;
+            }
             if (($_POST['settings_section'] ?? 'store') === 'prize_wheel') {
                 $optIn=isset($_POST['prize_wheel_opt_in']) ? 1 : 0;
 
@@ -629,6 +772,7 @@ class SellerController
                         'licensePresets'=>LicenseService::sellerPresets(
                             (int)$d['id']
                         ),
+                        'shopSections'=>$this->shopSectionRows((int)$d['id']),
                     ]
                 );
 
@@ -638,7 +782,7 @@ class SellerController
             if (($_POST['settings_section'] ?? 'store') === 'licenses') {
                 $errors = LicenseService::syncSellerPresets((int)$d['id'], $_POST);
                 if (!$errors) { H::flash('success', 'License presets updated.'); H::redirect('/seller/store'); }
-                H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'licenseTypes' => LicenseService::platformTypes(), 'licensePresets' => LicenseService::sellerPresets((int)$d['id']), ]);
+                H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'licenseTypes' => LicenseService::platformTypes(), 'licensePresets' => LicenseService::sellerPresets((int)$d['id']), 'shopSections'=>$this->shopSectionRows((int)$d['id']), ]);
                 return;
             }
             $display = trim($_POST['display_name'] ?? '');
@@ -691,7 +835,7 @@ class SellerController
                     $this->removeStoreBanner($banner);
                     $errors[]='Store settings could not be saved.';
                 }
-                if ($errors) { H::view('seller/store', [ 'd'=>$this->d(), 'errors'=>$errors, 'licenseTypes'=>LicenseService::platformTypes(), 'licensePresets'=>LicenseService::sellerPresets((int)$d['id']) ]); return; }
+                if ($errors) { H::view('seller/store', [ 'd'=>$this->d(), 'errors'=>$errors, 'licenseTypes'=>LicenseService::platformTypes(), 'licensePresets'=>LicenseService::sellerPresets((int)$d['id']), 'shopSections'=>$this->shopSectionRows((int)$d['id']) ]); return; }
                 if ($banner) $this->removeStoreBanner($d['banner_path']??null);
                 H::flash('success', 'Store settings updated.');
                 H::redirect('/seller/store');
@@ -699,7 +843,7 @@ class SellerController
            }
 
         }
-        H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'licenseTypes' => LicenseService::platformTypes(), 'licensePresets' => LicenseService::sellerPresets((int)$d['id']), ]);
+        H::view('seller/store', [ 'd' => $this->d(), 'errors' => $errors, 'licenseTypes' => LicenseService::platformTypes(), 'licensePresets' => LicenseService::sellerPresets((int)$d['id']), 'shopSections'=>$this->shopSectionRows((int)$d['id']), ]);
 
     }
     private function productValues(array $existing = []): array
@@ -707,7 +851,7 @@ class SellerController
         $price = array_key_exists('price', $_POST) ? $_POST['price'] : (array_key_exists('price', $existing) ? $existing['price'] : '0.00');
         $commercialEnabled = isset($_POST['license_enabled']['commercial']);
         $commercialLicensePrice = $_POST['license_price']['commercial'] ?? ($existing['commercial_license_price'] ?? '0.00');
-        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'is_hand_drawn' => isset($_POST['is_hand_drawn']) ? 1 : 0, 'extra_protection_watermark' => isset($_POST['extra_protection_watermark']) ? 1 : 0, 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
+        return [ 'title' => trim($_POST['title'] ?? $existing['title'] ?? ''), 'slug' => trim((string)($existing['slug'] ?? '')), 'short_description' => trim($_POST['short_description'] ?? $existing['short_description'] ?? ''), 'description' => trim($_POST['description'] ?? $existing['description'] ?? ''), 'price' => $price, 'fulfillment_type' => in_array(($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')), ['downloadable','google_drive'], true) ? ($_POST['fulfillment_type'] ?? ($existing['fulfillment_type'] ?? 'downloadable')) : 'downloadable', 'manual_delivery_instructions' => trim($_POST['manual_delivery_instructions'] ?? ($existing['manual_delivery_instructions'] ?? '')), 'category_id' => ($_POST['category_id'] ?? ($existing['category_id'] ?? '')) ?: null, 'store_section_id' => ($_POST['store_section_id'] ?? ($existing['store_section_id'] ?? '')) ?: null, 'tags' => trim($_POST['tags'] ?? ''), 'file_types' => [], 'commercial_license_enabled' => $commercialEnabled ? 1 : 0, 'commercial_license_price' => $commercialLicensePrice, 'pod_allowed' => isset($_POST['pod_allowed']) || isset($_POST['license_enabled']['pod']) ? 1 : 0, 'ai_disclosure' => trim($_POST['ai_disclosure'] ?? $existing['ai_disclosure'] ?? ''), 'is_hand_drawn' => isset($_POST['is_hand_drawn']) ? 1 : 0, 'extra_protection_watermark' => isset($_POST['extra_protection_watermark']) ? 1 : 0, 'seo_title' => trim($_POST['seo_title'] ?? $existing['seo_title'] ?? ''), 'seo_description' => trim($_POST['seo_description'] ?? $existing['seo_description'] ?? ''), ];
 
     }
 
@@ -2132,6 +2276,22 @@ class SellerController
 
             }
             $values = $this->productValues($p ?: []);
+
+            $values['store_section_id']=$values['store_section_id']
+                ? (int)$values['store_section_id']
+                : null;
+
+            if(
+                $values['store_section_id']
+                && !DB::row(
+                    'select id from store_sections where id=? and designer_id=? limit 1',
+                    [$values['store_section_id'],(int)$d['id']]
+                )
+            ){
+                $errors[]='Choose a valid shop section.';
+                $values['store_section_id']=null;
+            }
+
             $openImportKeys=$p?(new ProductImportReviewService())->openKeys((int)$p['id']):[];
             if(in_array('price',$openImportKeys,true)&&$values['price']==='')$values['price']=null;
             if(in_array('ai',$openImportKeys,true)&&$values['ai_disclosure']==='')$values['ai_disclosure']=null;
@@ -2206,6 +2366,10 @@ class SellerController
                     try {
                         DB::begin();
                         DB::exec( 'update products set title=?,slug=?,short_description=?,description=?,price=?,fulfillment_type=?,manual_delivery_instructions=?,category_id=?,tags_text=null,file_types=?,commercial_license_enabled=?,commercial_license_price=?,pod_allowed=?,digital_resale_prohibited=1,ai_disclosure=?,is_hand_drawn=?,extra_protection_watermark=?,seo_title=?,seo_description=?,status=?,rejection_reason=case when ?="pending_review" then null else rejection_reason end,updated_at=now() where id=?', [ $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], $values['category_id'], $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], $values['ai_disclosure'], $values['is_hand_drawn'], $values['extra_protection_watermark'], $values['seo_title'], $values['seo_description'], $status, $status, $p['id'], ] );
+                        DB::exec(
+                            'update products set store_section_id=? where id=? and designer_id=?',
+                            [$values['store_section_id'],$productId,(int)$d['id']]
+                        );
                         DB::exec('update products set scheduled_publish_at=?,publication_timezone=?,schedule_error=null,schedule_checked_at=null where id=?',[$scheduleAt,$scheduleZone,$productId]);
                         if($scheduleZone)DB::exec('update designers set timezone=? where id=?',[$scheduleZone,$d['id']]);
                         $this->syncTags($productId, $values['tags']);
@@ -2260,6 +2424,10 @@ class SellerController
                     try {
                         DB::exec( 'insert into products (designer_id,category_id,title,slug,short_description,description,price,fulfillment_type,manual_delivery_instructions,tags_text,file_types,commercial_license_enabled,commercial_license_price,pod_allowed,digital_resale_prohibited,ai_disclosure,is_hand_drawn,extra_protection_watermark,seo_title,seo_description,status) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [ $d['id'], $values['category_id'], $values['title'], $values['slug'], $values['short_description'], $values['description'], $values['price'], $values['fulfillment_type'], $values['manual_delivery_instructions'], null, $fileTypes, $values['commercial_license_enabled'], $values['commercial_license_price'], $values['pod_allowed'], 1, $values['ai_disclosure'], $values['is_hand_drawn'], $values['extra_protection_watermark'], $values['seo_title'], $values['seo_description'], $status, ] );
                         $productId = (int)DB::id();
+                    DB::exec(
+                        'update products set store_section_id=? where id=? and designer_id=?',
+                        [$values['store_section_id'],$productId,(int)$d['id']]
+                    );
                         DB::exec('update products set scheduled_publish_at=?,publication_timezone=?,schedule_error=null,schedule_checked_at=null where id=?',[$scheduleAt,$scheduleZone,$productId]);
                         if($scheduleZone)DB::exec('update designers set timezone=? where id=?',[$scheduleZone,$d['id']]);
                         $this->syncTags($productId, $values['tags']);
@@ -2420,6 +2588,10 @@ class SellerController
                 $d['id'], $source['category_id'], $copyTitle, $slug, $source['short_description'], $source['description'], $source['price'], $source['fulfillment_type'], $source['manual_delivery_instructions'], null, $source['file_types'], $source['commercial_license_enabled'], $source['commercial_license_price'], $source['pod_allowed'], $source['digital_resale_prohibited'], $source['ai_disclosure'], $source['is_hand_drawn'], $source['seo_title'], $source['seo_description'],
             ]);
             $newId = (int)DB::id();
+            DB::exec(
+                'update products set store_section_id=? where id=? and designer_id=?',
+                [$source['store_section_id']??null,$newId,(int)$d['id']]
+            );
             foreach (DB::rows('select tag_id from product_tags where product_id=?', [(int)$source['id']]) as $tag) {
                 DB::exec('insert ignore into product_tags (product_id,tag_id) values (?,?)', [$newId, $tag['tag_id']]);
             }

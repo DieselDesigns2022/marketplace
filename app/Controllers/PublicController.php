@@ -762,7 +762,84 @@ class PublicController
                     (int)$d['id']
                 );
         }
-        $products = DB::rows('select p.*,d.display_name,d.store_slug,d.average_rating,d.review_count,c.name category_name,c.slug category_slug,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) preview_image from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.designer_id=? and p.status="approved" order by p.created_at desc', [$d['id']]);
+        $productCount=(int)(
+            DB::row(
+                'select count(*) c
+                 from products
+                 where designer_id=?
+                   and status="approved"',
+                [(int)$d['id']]
+            )['c']??0
+        );
+
+        $sections=DB::rows(
+            'select
+                s.id,
+                s.name,
+                s.slug,
+                s.sort_order,
+                count(p.id) product_count
+             from store_sections s
+             left join products p
+               on p.store_section_id=s.id
+              and p.status="approved"
+             where s.designer_id=?
+             group by s.id,s.name,s.slug,s.sort_order
+             order by s.sort_order,s.name,s.id',
+            [(int)$d['id']]
+        );
+
+        $activeSection=trim((string)($_GET['section']??''));
+        $activeSectionRow=null;
+
+        if($activeSection!==''){
+            $activeSectionRow=DB::row(
+                'select id,name,slug
+                 from store_sections
+                 where designer_id=?
+                   and slug=?
+                 limit 1',
+                [(int)$d['id'],$activeSection]
+            );
+
+            if(!$activeSectionRow){
+                $activeSection='';
+            }
+        }
+
+        $productSql=
+            'select
+                p.*,
+                d.display_name,
+                d.store_slug,
+                d.average_rating,
+                d.review_count,
+                c.name category_name,
+                c.slug category_slug,
+                (
+                    select image_path
+                    from product_images pi
+                    where pi.product_id=p.id
+                    order by pi.sort_order,pi.id
+                    limit 1
+                ) preview_image
+             from products p
+             join designers d on d.id=p.designer_id
+             left join categories c on c.id=p.category_id
+             where p.designer_id=?
+               and p.status="approved"';
+
+        $productParams=[(int)$d['id']];
+
+        if($activeSectionRow){
+            $productSql.=' and p.store_section_id=?';
+            $productParams[]=(int)$activeSectionRow['id'];
+        }
+
+        $products=DB::rows(
+            $productSql.' order by p.created_at desc',
+            $productParams
+        );
         $customServices = DB::rows('select s.*,(select image_path from custom_service_images csi where csi.custom_service_id=s.id order by csi.sort_order,csi.id limit 1) preview_image from custom_design_services s where s.designer_id=? and s.is_active=1 order by s.created_at desc,s.id desc', [$d['id']]);
         $collabs = (new \App\Repositories\CollabRepository())->publicForDesigner((int)$d['id']);
 
@@ -887,6 +964,10 @@ class PublicController
                 'd'=>$d,
                 'socialLinks'=>$socialLinks,
                 'products'=>$products,
+                'productCount'=>$productCount,
+                'sections'=>$sections,
+                'activeSection'=>$activeSection,
+                'activeSectionRow'=>$activeSectionRow,
                 'customServices'=>$customServices,
                 'collabs'=>$collabs,
                 'followers'=>$followerCount,

@@ -2999,3 +2999,91 @@ table tr:nth-last-child(-n+4) .license-help-text {
   top: auto;
   bottom: 130%;
 }
+
+
+/* Shop sections */
+.shop-section-manager {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.shop-section-manager-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+}
+
+.shop-section-rename {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex: 1;
+}
+
+.shop-section-rename input {
+    flex: 1;
+    min-width: 180px;
+}
+
+.store-listings {
+    margin-top: 28px;
+}
+
+.store-section-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 24px;
+}
+
+.store-section-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    text-decoration: none;
+}
+
+.store-section-tab span {
+    opacity: .65;
+    font-size: .88em;
+}
+
+.store-section-tab.active {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+    font-weight: 700;
+}
+
+@media (max-width: 650px) {
+    .shop-section-manager-row,
+    .shop-section-rename {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .shop-section-manager-row form,
+    .shop-section-manager-row button {
+        width: 100%;
+    }
+
+    .store-section-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 6px;
+    }
+
+    .store-section-tab {
+        flex: 0 0 auto;
+    }
+}

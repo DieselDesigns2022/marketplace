@@ -74,6 +74,80 @@
     <p class="help-text"><strong>Recommended banner size: 2400 × 800 px (3:1).</strong> Place important text and graphics in the center area because the banner is shown responsively.</p>
     <button class="btn">Save Store Settings</button>
 </form>
+<section class="card page-section" id="shop-sections">
+    <h2>Shop Sections</h2>
+
+    <p class="help-text">
+        Organize your storefront into sections so customers can quickly browse
+        the type of products they want. Products do not have to be placed in a section.
+    </p>
+
+    <form method="post" class="form">
+        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <input type="hidden" name="settings_section" value="shop_sections">
+        <input type="hidden" name="section_action" value="create">
+
+        <label>
+            New section name
+            <input
+                type="text"
+                name="section_name"
+                maxlength="80"
+                required
+                placeholder="Example: Procreate Stamps"
+            >
+        </label>
+
+        <button class="btn">Add Shop Section</button>
+    </form>
+
+    <?php if(empty($shopSections)): ?>
+        <p class="muted">No shop sections have been created yet.</p>
+    <?php else: ?>
+        <div class="shop-section-manager">
+            <?php foreach($shopSections as $section): ?>
+                <div class="shop-section-manager-row">
+                    <form method="post" class="shop-section-rename">
+                        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                        <input type="hidden" name="settings_section" value="shop_sections">
+                        <input type="hidden" name="section_action" value="rename">
+                        <input type="hidden" name="section_id" value="<?=(int)$section['id']?>">
+
+                        <input
+                            type="text"
+                            name="section_name"
+                            maxlength="80"
+                            required
+                            value="<?=H::e($section['name'])?>"
+                        >
+
+                        <span class="muted">
+                            <?=(int)$section['product_count']?>
+                            product<?=((int)$section['product_count']===1)?'':'s'?>
+                        </span>
+
+                        <button class="btn secondary">Rename</button>
+                    </form>
+
+                    <form method="post">
+                        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                        <input type="hidden" name="settings_section" value="shop_sections">
+                        <input type="hidden" name="section_action" value="delete">
+                        <input type="hidden" name="section_id" value="<?=(int)$section['id']?>">
+
+                        <button
+                            class="btn danger"
+                            onclick="return confirm('Delete this shop section? Products inside it will return to All Listings.')"
+                        >
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
 <section class="card page-section">
     <h2 id="grand-opening-giveaways">Grand Opening Creative Moth Giveaways</h2>
 

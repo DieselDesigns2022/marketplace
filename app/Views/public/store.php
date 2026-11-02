@@ -2,8 +2,7 @@
     <nav class="store-links">
         <a href="/browse">← Browse designs</a>
         <a href="#custom-designs">Custom Designs</a>
-        <a href="#newest-products">Newest products</a>
-        <a href="#store-categories">Store categories</a>
+        <a href="#store-listings">Listings</a>
     </nav>
     <section class="storefront-hero">
         <div class="storefront-banner" <?php if(!empty($d['banner_path'])):?>style="background-image:url('<?=H::e($d['banner_path'])?>')"<?php endif; ?>>
@@ -535,41 +534,65 @@
     <?php endif; ?>
 </section>
 
-<section id="featured-products">
-    <h2>Featured products</h2>
+<section id="store-listings" class="store-listings">
+    <div class="store-listings-heading">
+        <div>
+            <h2>
+                <?=!empty($activeSectionRow)
+                    ? H::e($activeSectionRow['name'])
+                    : 'All Listings'?>
+            </h2>
+
+            <?php if(!empty($activeSectionRow)): ?>
+                <p class="muted">
+                    Showing products in <?=H::e($activeSectionRow['name'])?>.
+                </p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php if(!empty($sections)): ?>
+        <nav class="store-section-tabs" aria-label="Shop sections">
+            <a
+                href="/store/<?=H::e($d['store_slug'])?>#store-listings"
+                class="store-section-tab <?=empty($activeSection)?'active':''?>"
+            >
+                All Listings
+                <span><?=(int)$productCount?></span>
+            </a>
+
+            <?php foreach($sections as $section): ?>
+                <a
+                    href="/store/<?=H::e($d['store_slug'])?>?section=<?=H::e($section['slug'])?>#store-listings"
+                    class="store-section-tab <?=($activeSection??'')===$section['slug']?'active':''?>"
+                >
+                    <?=H::e($section['name'])?>
+                    <span><?=(int)$section['product_count']?></span>
+                </a>
+            <?php endforeach; ?>
+        </nav>
+    <?php endif; ?>
+
     <?php if(empty($products)): ?>
-    <div class="card empty-state">
-        <p>This approved storefront does not have public products right now. Browse other designers while new products are reviewed.</p>
-    </div>
-<?php else: ?>
-    <?php include app_path('app/Views/public/product_grid.php');?>
-<?php endif; ?>
-</section>
-<section id="newest-products">
-    <h2>Newest products</h2>
-    <?php if(empty($products)): ?>
-    <div class="card empty-state">
-        <p>This store has no approved products available at the moment.</p>
-    </div>
-<?php else: ?>
-    <?php include app_path('app/Views/public/product_grid.php');?>
-<?php endif; ?>
-</section>
-<section id="store-categories">
-    <h2>Store categories</h2>
-    <?php $cats=[]; foreach($products as $p){ if(!empty($p['category_slug'])) $cats[$p['category_slug']]=$p['category_name']; } if(!$cats): ?>
-    <div class="card empty-state">
-        <p>Store category links appear after products are approved for this designer.</p>
-    </div>
-<?php else: ?>
-    <div class="grid">
-        <?php foreach($cats as $slug=>$name):?>
-           <a class="card" href="/category/<?=H::e($slug)?>">
-           <?=H::e($name)?>
-           </a>
-        <?php endforeach;?>
-    </div>
-<?php endif; ?>
+        <div class="card empty-state">
+            <?php if(!empty($activeSectionRow)): ?>
+                <p>There are currently no approved products in this section.</p>
+
+                <p>
+                    <a
+                        class="btn secondary"
+                        href="/store/<?=H::e($d['store_slug'])?>#store-listings"
+                    >
+                        View All Listings
+                    </a>
+                </p>
+            <?php else: ?>
+                <p>This store has no approved products available at the moment.</p>
+            <?php endif; ?>
+        </div>
+    <?php else: ?>
+        <?php include app_path('app/Views/public/product_grid.php');?>
+    <?php endif; ?>
 </section>
 </article>
 <section id="seller-reviews" class="card"><h2>Seller Reviews</h2>
