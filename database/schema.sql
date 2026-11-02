@@ -159,6 +159,7 @@ CREATE TABLE products
     status ENUM('draft','pending_review','scheduled','approved','published','rejected','disabled','archived','deleted') DEFAULT 'draft',
     rejection_reason TEXT,
     is_featured BOOLEAN DEFAULT 0,
+    store_featured BOOLEAN NOT NULL DEFAULT 0,
     sales_count INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -2503,3 +2504,9 @@ ALTER TABLE products
     ADD CONSTRAINT products_store_section_fk
         FOREIGN KEY(store_section_id) REFERENCES store_sections(id)
         ON DELETE SET NULL;
+
+
+-- Seller-controlled storefront featured products.
+-- Separate from platform-wide products.is_featured.
+CREATE INDEX IF NOT EXISTS idx_products_store_featured
+    ON products (designer_id,store_featured,status,created_at);

@@ -807,6 +807,36 @@ class PublicController
             }
         }
 
+        $listingCountSql=
+            'select count(*) c
+             from products
+             where designer_id=?
+               and status="approved"';
+
+        $listingCountParams=[(int)$d['id']];
+
+        if($activeSectionRow){
+            $listingCountSql.=' and store_section_id=?';
+            $listingCountParams[]=(int)$activeSectionRow['id'];
+        }
+
+        $listingCount=(int)(
+            DB::row(
+                $listingCountSql,
+                $listingCountParams
+            )['c']??0
+        );
+
+        $listingPage=max(1,(int)($_GET['page']??1));
+        $listingPerPage=24;
+        $listingPages=max(
+            1,
+            (int)ceil($listingCount/$listingPerPage)
+        );
+
+        $listingPage=min($listingPage,$listingPages);
+        $listingOffset=($listingPage-1)*$listingPerPage;
+
         $productSql=
             'select
                 p.*,
@@ -837,9 +867,44 @@ class PublicController
         }
 
         $products=DB::rows(
-            $productSql.' order by p.created_at desc',
+            $productSql.
+            ' order by p.created_at desc,p.id desc
+              limit '.$listingPerPage.'
+              offset '.$listingOffset,
             $productParams
         );
+
+        $featuredProducts=[];
+
+        if($listingPage===1){
+            $featuredProducts=DB::rows(
+                'select
+                    p.*,
+                    d.display_name,
+                    d.store_slug,
+                    d.average_rating,
+                    d.review_count,
+                    c.name category_name,
+                    c.slug category_slug,
+                    (
+                        select image_path
+                        from product_images pi
+                        where pi.product_id=p.id
+                        order by pi.sort_order,pi.id
+                        limit 1
+                    ) preview_image
+                 from products p
+                 join designers d on d.id=p.designer_id
+                 left join categories c on c.id=p.category_id
+                 where p.designer_id=?
+                   and p.status="approved"
+                   and p.store_featured=1
+                 order by p.updated_at desc,p.id desc
+                 limit 4',
+                [(int)$d['id']]
+            );
+        }
+
         $customServices = DB::rows('select s.*,(select image_path from custom_service_images csi where csi.custom_service_id=s.id order by csi.sort_order,csi.id limit 1) preview_image from custom_design_services s where s.designer_id=? and s.is_active=1 order by s.created_at desc,s.id desc', [$d['id']]);
         $collabs = (new \App\Repositories\CollabRepository())->publicForDesigner((int)$d['id']);
 
@@ -964,7 +1029,11 @@ class PublicController
                 'd'=>$d,
                 'socialLinks'=>$socialLinks,
                 'products'=>$products,
+                'featuredProducts'=>$featuredProducts,
                 'productCount'=>$productCount,
+                'listingCount'=>$listingCount,
+                'listingPage'=>$listingPage,
+                'listingPages'=>$listingPages,
                 'sections'=>$sections,
                 'activeSection'=>$activeSection,
                 'activeSectionRow'=>$activeSectionRow,
@@ -973,7 +1042,6 @@ class PublicController
                 'followers'=>$followerCount,
                 'isFollowing'=>$isFollowing,
                 'isOwner'=>$isOwner,
-                'productCount'=>count($products),
                 'salesCount'=>$salesCount,
                 'prizeWheelVisible'=>$prizeWheelVisible,
                 'prizeWheelSettings'=>$prizeWheelSettings,

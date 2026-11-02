@@ -1,8 +1,17 @@
 <article class="storefront" itemscope itemtype="https://schema.org/ProfilePage">
-    <nav class="store-links">
-        <a href="/browse">← Browse designs</a>
-        <a href="#custom-designs">Custom Designs</a>
-        <a href="#store-listings">Listings</a>
+    <nav class="store-links storefront-tabs" aria-label="Store navigation">
+        <a class="store-back-link" href="/browse">← Browse Marketplace</a>
+
+        <?php if(!empty($prizeWheelVisible)): ?>
+            <a href="#creative-moth-prize-wheel">🎡 Prize Wheel</a>
+        <?php endif; ?>
+
+        <a href="#store-about">About Seller</a>
+        <a href="#seller-reviews">Reviews</a>
+
+        <?php if(H::user() && !$isOwner): ?>
+            <a href="#message-seller">Message Seller</a>
+        <?php endif; ?>
     </nav>
     <section class="storefront-hero">
         <div class="storefront-banner" <?php if(!empty($d['banner_path'])):?>style="background-image:url('<?=H::e($d['banner_path'])?>')"<?php endif; ?>>
@@ -68,10 +77,60 @@
         <span>Seller rating</span>
     </div>
 </section>
+
+<section class="store-shop-navigation" aria-label="Browse this shop">
+    <div class="store-shop-navigation-heading">
+        <div>
+            <span class="store-eyebrow">Browse This Shop</span>
+            <strong>Shop Sections</strong>
+        </div>
+    </div>
+
+    <nav class="store-section-tabs">
+        <a
+            href="/store/<?=H::e($d['store_slug'])?>#store-listings"
+            class="store-section-tab <?=empty($activeSection)?'active':''?>"
+        >
+            All Listings
+            <span><?=(int)$productCount?></span>
+        </a>
+
+        <?php foreach(($sections??[]) as $section): ?>
+            <a
+                href="/store/<?=H::e($d['store_slug'])?>?section=<?=H::e($section['slug'])?>#store-listings"
+                class="store-section-tab <?=($activeSection??'')===$section['slug']?'active':''?>"
+            >
+                <?=H::e($section['name'])?>
+                <span><?=(int)$section['product_count']?></span>
+            </a>
+        <?php endforeach; ?>
+
+        <?php if(!empty($customServices)): ?>
+            <a
+                href="/store/<?=H::e($d['store_slug'])?>#custom-designs"
+                class="store-section-tab store-special-section"
+            >
+                Custom Designs
+                <span><?=count($customServices)?></span>
+            </a>
+        <?php endif; ?>
+
+        <?php if(!empty($collabs)): ?>
+            <a
+                href="/store/<?=H::e($d['store_slug'])?>#collab-bundles"
+                class="store-section-tab store-special-section"
+            >
+                Collabs
+                <span><?=count($collabs)?></span>
+            </a>
+        <?php endif; ?>
+    </nav>
+</section>
+
 <?php if(!empty($prizeWheelVisible)): ?>
 <section
     id="creative-moth-prize-wheel"
-    class="card page-section prize-wheel-storefront"
+    class="card page-section prize-wheel-storefront store-panel<?=!empty($prizeWheelResult)?' is-result':''?>"
 >
     <h2>
         <?=H::e(
@@ -445,7 +504,7 @@
     </p>
 </section>
 <?php endif; ?>
-<section class="card" itemprop="about">
+<section id="store-about" class="card store-panel" itemprop="about">
     <h2>About this designer</h2>
     <p>
     <?=nl2br(H::e($d['bio'] ?: 'This approved designer has not added a public bio yet. Browse their available digital products below.'))?>
@@ -465,24 +524,18 @@
         </p>
     <?php endif; ?>
 </section>
-<?php if(H::user() && !$isOwner):?><form method="post" action="/messages/start/store/<?=$d['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="btn secondary">Message seller</button></form><?php endif;?>
-<?php if(!empty($collabs)):?>
-<section id="collab-bundles" class="page-section">
-    <h2>Active Collab Bundles</h2>
-
-    <div class="grid products">
-        <?php foreach($collabs as $c):?>
-            <?php
-            $collabStorefrontId = (int)$d['id'];
-            include app_path(
-                'app/Views/public/collab_card.php'
-            );
-            ?>
-        <?php endforeach;?>
-    </div>
-</section>
+<?php if(H::user() && !$isOwner):?>
+<div id="message-seller" class="store-panel card">
+    <h2>Message Seller</h2>
+    <p class="muted">Have a question about this shop or one of its products?</p>
+    <form method="post" action="/messages/start/store/<?=$d['id']?>">
+        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <button class="btn secondary">Message Seller</button>
+    </form>
+</div>
 <?php endif;?>
-<section id="custom-designs">
+
+<section id="custom-designs" class="store-panel store-custom-section">
     <h2>Custom Designs</h2>
     <?php if(empty($customServices)): ?>
     <div class="card empty-state">
@@ -534,13 +587,50 @@
     <?php endif; ?>
 </section>
 
+<?php if(empty($activeSection) && !empty($featuredProducts)): ?>
+<section id="featured-products" class="store-featured-products">
+    <div class="store-section-title">
+        <div>
+            <span class="store-eyebrow">Seller Picks</span>
+            <h2>⭐ Featured Products</h2>
+        </div>
+
+        <a href="#store-listings">View all listings →</a>
+    </div>
+
+    <?php
+    $originalProducts=$products;
+    $products=$featuredProducts;
+    include app_path('app/Views/public/product_grid.php');
+    $products=$originalProducts;
+    ?>
+</section>
+<?php endif; ?>
+
+<?php if(empty($activeSection) && !empty($collabs)):?>
+<section id="collab-bundles" class="page-section store-collab-section">
+    <h2>Active Collab Bundles</h2>
+
+    <div class="grid products">
+        <?php foreach($collabs as $c):?>
+            <?php
+            $collabStorefrontId = (int)$d['id'];
+            include app_path(
+                'app/Views/public/collab_card.php'
+            );
+            ?>
+        <?php endforeach;?>
+    </div>
+</section>
+<?php endif;?>
+
 <section id="store-listings" class="store-listings">
     <div class="store-listings-heading">
         <div>
             <h2>
                 <?=!empty($activeSectionRow)
                     ? H::e($activeSectionRow['name'])
-                    : 'All Listings'?>
+                    : 'Shop All Products'?>
             </h2>
 
             <?php if(!empty($activeSectionRow)): ?>
@@ -548,30 +638,16 @@
                     Showing products in <?=H::e($activeSectionRow['name'])?>.
                 </p>
             <?php endif; ?>
+
+            <p class="muted store-listing-count">
+                <?=number_format((int)($listingCount??0))?>
+                listing<?=((int)($listingCount??0)===1)?'':'s'?>
+                <?php if(($listingPages??1)>1): ?>
+                    · Page <?=(int)$listingPage?> of <?=(int)$listingPages?>
+                <?php endif; ?>
+            </p>
         </div>
     </div>
-
-    <?php if(!empty($sections)): ?>
-        <nav class="store-section-tabs" aria-label="Shop sections">
-            <a
-                href="/store/<?=H::e($d['store_slug'])?>#store-listings"
-                class="store-section-tab <?=empty($activeSection)?'active':''?>"
-            >
-                All Listings
-                <span><?=(int)$productCount?></span>
-            </a>
-
-            <?php foreach($sections as $section): ?>
-                <a
-                    href="/store/<?=H::e($d['store_slug'])?>?section=<?=H::e($section['slug'])?>#store-listings"
-                    class="store-section-tab <?=($activeSection??'')===$section['slug']?'active':''?>"
-                >
-                    <?=H::e($section['name'])?>
-                    <span><?=(int)$section['product_count']?></span>
-                </a>
-            <?php endforeach; ?>
-        </nav>
-    <?php endif; ?>
 
     <?php if(empty($products)): ?>
         <div class="card empty-state">
@@ -592,10 +668,128 @@
         </div>
     <?php else: ?>
         <?php include app_path('app/Views/public/product_grid.php');?>
+
+        <?php if(($listingPages??1)>1): ?>
+            <?php
+            $pageUrl=function(int $target) use($d,$activeSection): string {
+                $params=['page'=>$target];
+
+                if(!empty($activeSection)){
+                    $params['section']=$activeSection;
+                }
+
+                return '/store/'.
+                    rawurlencode($d['store_slug']).
+                    '?'.http_build_query($params).
+                    '#store-listings';
+            };
+
+            $visiblePages=[];
+
+            for(
+                $n=max(1,$listingPage-2);
+                $n<=min($listingPages,$listingPage+2);
+                $n++
+            ){
+                $visiblePages[]=$n;
+            }
+
+            if(!in_array(1,$visiblePages,true)){
+                array_unshift($visiblePages,1);
+            }
+
+            if(!in_array($listingPages,$visiblePages,true)){
+                $visiblePages[]=$listingPages;
+            }
+            ?>
+
+            <nav class="store-pagination" aria-label="Store listing pages">
+                <?php if($listingPage>1): ?>
+                    <a
+                        class="btn secondary"
+                        href="<?=H::e($pageUrl($listingPage-1))?>"
+                    >
+                        ← Previous
+                    </a>
+                <?php endif; ?>
+
+                <?php $previousShown=null; ?>
+
+                <?php foreach($visiblePages as $pageNumber): ?>
+                    <?php if($previousShown!==null && $pageNumber>$previousShown+1): ?>
+                        <span class="store-page-gap">…</span>
+                    <?php endif; ?>
+
+                    <a
+                        class="store-page-link <?=$pageNumber===$listingPage?'active':''?>"
+                        href="<?=H::e($pageUrl($pageNumber))?>"
+                        <?=$pageNumber===$listingPage?'aria-current="page"':''?>
+                    >
+                        <?=$pageNumber?>
+                    </a>
+
+                    <?php $previousShown=$pageNumber; ?>
+                <?php endforeach; ?>
+
+                <?php if($listingPage<$listingPages): ?>
+                    <a
+                        class="btn secondary"
+                        href="<?=H::e($pageUrl($listingPage+1))?>"
+                    >
+                        Next →
+                    </a>
+                <?php endif; ?>
+            </nav>
+        <?php endif; ?>
     <?php endif; ?>
 </section>
+
+<?php if(!empty($activeSection)): ?>
+
+    <?php if(!empty($featuredProducts)): ?>
+    <section id="featured-products" class="store-featured-products">
+        <div class="store-section-title">
+            <div>
+                <span class="store-eyebrow">Seller Picks</span>
+                <h2>⭐ Featured Products</h2>
+            </div>
+
+            <a href="/store/<?=H::e($d['store_slug'])?>#store-listings">
+                View all listings →
+            </a>
+        </div>
+
+        <?php
+        $originalProducts=$products;
+        $products=$featuredProducts;
+        include app_path('app/Views/public/product_grid.php');
+        $products=$originalProducts;
+        ?>
+    </section>
+    <?php endif; ?>
+
+    <?php if(!empty($collabs)):?>
+    <section id="collab-bundles" class="page-section store-collab-section">
+        <h2>Active Collab Bundles</h2>
+
+        <div class="grid products">
+            <?php foreach($collabs as $c):?>
+                <?php
+                $collabStorefrontId=(int)$d['id'];
+
+                include app_path(
+                    'app/Views/public/collab_card.php'
+                );
+                ?>
+            <?php endforeach;?>
+        </div>
+    </section>
+    <?php endif; ?>
+
+<?php endif; ?>
+
 </article>
-<section id="seller-reviews" class="card"><h2>Seller Reviews</h2>
+<section id="seller-reviews" class="card store-panel"><h2>Seller Reviews</h2>
 <?php if(empty($reviews)):?><p>No reviews yet</p><?php else:?><p><strong aria-label="<?=number_format((float)$d['average_rating'],1)?> out of 5 stars"><?=str_repeat('★',(int)round($d['average_rating']))?> <?=number_format((float)$d['average_rating'],1)?> (<?=(int)$d['review_count']?> reviews)</strong></p>
 <div class="rating-distribution"><?php for($n=5;$n>=1;$n--):?><p><?=$n?> stars: <?=(int)$d['rating_'.$n.'_count']?></p><?php endfor;?></div>
 <?php foreach($reviews as $r):?><article id="review-<?=(int)$r['id']?>"><h3><?=str_repeat('★',(int)$r['rating'])?> <span class="sr-only"><?=(int)$r['rating']?> out of 5</span></h3><p><?=H::e($r['buyer_name_snapshot'])?> · <strong>Verified Purchase</strong> · <?=H::e($r['product_title_snapshot'])?></p><?php if($r['review_text']):?><p><?=nl2br(H::e($r['review_text']))?></p><?php endif;?><small><?=H::e($r['reviewed_at'])?><?=$r['edited_at']?' · Edited':''?></small><?php if($r['reply_text']&&$r['reply_moderation_status']==='published'):?><aside><strong>Seller Response</strong><p><?=nl2br(H::e($r['reply_text']))?></p><small><?=H::e($r['reply_created_at'])?><?php if(strtotime($r['reply_updated_at'])>strtotime($r['reply_created_at'])):?> · Edited<?php endif;?></small></aside><?php endif;?></article><?php endforeach;?><?php endif;?></section>

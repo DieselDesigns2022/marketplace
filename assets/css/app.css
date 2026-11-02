@@ -3087,3 +3087,778 @@ table tr:nth-last-child(-n+4) .license-help-text {
         flex: 0 0 auto;
     }
 }
+
+
+/* Storefront redesign 2026-11-02 */
+
+.storefront-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px;
+    margin-bottom: 14px;
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+}
+
+.storefront-tabs a {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.storefront-tabs a:hover,
+.storefront-tabs a:focus {
+    background: #f3edff;
+}
+
+.store-panel:not(:target):not(.is-result) {
+    display: none;
+}
+
+.store-panel:target,
+.store-panel.is-result {
+    display: block;
+    scroll-margin-top: 90px;
+}
+
+.store-featured-products,
+.store-listings {
+    scroll-margin-top: 90px;
+}
+
+.store-featured-products {
+    margin: 24px 0 32px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: #fff;
+}
+
+.store-section-title {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.store-section-title h2 {
+    margin: 2px 0 0;
+}
+
+.store-eyebrow {
+    display: block;
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .68;
+}
+
+.store-listing-count {
+    margin-top: 4px;
+}
+
+.store-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 28px 0 8px;
+}
+
+.store-page-link {
+    min-width: 42px;
+    min-height: 42px;
+    display: inline-grid;
+    place-items: center;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.store-page-link.active {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+}
+
+.store-page-gap {
+    padding: 0 3px;
+    opacity: .6;
+}
+
+.seller-featured-help {
+    margin: 16px 0;
+}
+
+.seller-featured-help p {
+    margin-bottom: 0;
+}
+
+@media (max-width: 650px) {
+    .storefront-tabs {
+        border-radius: 12px;
+    }
+
+    .store-section-title {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .store-pagination .btn {
+        width: auto;
+    }
+}
+
+
+/* Storefront compact hierarchy cleanup 2026-11-02 */
+
+/* Main storefront should feel tighter and more like an actual shop. */
+.storefront {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Strong utility navigation so it cannot disappear into the page. */
+.storefront-tabs {
+    position: relative;
+    top: auto;
+    z-index: 1;
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    gap: 6px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--ink);
+    box-shadow: 0 8px 22px rgba(49, 28, 74, .15);
+}
+
+.storefront-tabs a {
+    padding: 7px 11px;
+    color: #fff;
+    font-size: .88rem;
+    font-weight: 800;
+    border-radius: 9px;
+    opacity: .92;
+}
+
+.storefront-tabs a:hover,
+.storefront-tabs a:focus {
+    color: var(--ink);
+    background: #fff;
+    opacity: 1;
+}
+
+.storefront-tabs .store-back-link {
+    margin-right: auto;
+}
+
+/* Compact the huge store header. */
+.storefront-hero {
+    margin-bottom: 10px;
+}
+
+.storefront-banner {
+    min-height: 0 !important;
+    height: clamp(135px, 17vw, 220px) !important;
+    border-radius: 18px 18px 0 0;
+    background-position: center;
+    background-size: cover;
+}
+
+.storefront-profile {
+    min-height: 0;
+    padding: 12px 18px !important;
+    gap: 12px !important;
+}
+
+.storefront-profile .avatar.large {
+    width: 76px !important;
+    height: 76px !important;
+    min-width: 76px;
+    margin-top: -36px;
+    border-width: 4px;
+}
+
+.storefront-title h1 {
+    margin: 0 0 5px;
+    font-size: clamp(1.35rem, 2.2vw, 1.9rem);
+    line-height: 1.05;
+}
+
+.storefront-title .badge {
+    padding: 3px 7px;
+    font-size: .72rem;
+}
+
+.follow-box {
+    gap: 5px !important;
+}
+
+.follow-box small {
+    font-size: .75rem;
+}
+
+/* Stats become a compact information strip instead of four giant cards. */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0 8px;
+}
+
+.stats-row .card {
+    min-height: 0;
+    padding: 9px 12px;
+    border-radius: 12px;
+    box-shadow: none;
+    text-align: center;
+}
+
+.stats-row strong {
+    display: block;
+    font-size: 1.05rem;
+    line-height: 1.15;
+}
+
+.stats-row span {
+    display: block;
+    margin-top: 2px;
+    font-size: .72rem;
+    line-height: 1.15;
+    opacity: .72;
+}
+
+/* PRIMARY store navigation sits directly below stats. */
+.store-shop-navigation {
+    margin: 8px 0 18px;
+    padding: 12px 14px;
+    border: 1px solid #d8cbea;
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, #faf7ff 0%, #fff 65%);
+    box-shadow: 0 7px 20px rgba(70, 44, 105, .07);
+}
+
+.store-shop-navigation-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.store-shop-navigation-heading strong {
+    display: block;
+    margin-top: 1px;
+    font-size: 1rem;
+}
+
+.store-shop-navigation .store-eyebrow {
+    font-size: .64rem;
+}
+
+.store-section-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 0;
+}
+
+.store-section-tab {
+    gap: 6px;
+    padding: 6px 10px;
+    border-color: #d6cbe4;
+    border-radius: 10px;
+    font-size: .84rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.store-section-tab span {
+    min-width: 19px;
+    padding: 2px 5px;
+    border-radius: 999px;
+    background: rgba(74, 49, 95, .08);
+    text-align: center;
+    font-size: .72rem;
+    opacity: .8;
+}
+
+.store-section-tab.active {
+    background: var(--ink);
+    color: #fff;
+}
+
+.store-section-tab.active span {
+    background: rgba(255,255,255,.18);
+    opacity: 1;
+}
+
+.store-section-tab.store-special-section {
+    border-style: dashed;
+    background: #fffaf0;
+}
+
+.store-section-tab.store-special-section:hover {
+    border-style: solid;
+}
+
+/* Announcement should not eat half the page. */
+.storefront .announcement {
+    margin: 10px 0 16px;
+    padding: 12px 15px;
+}
+
+.storefront .announcement h2 {
+    margin: 0 0 5px;
+    font-size: 1rem;
+}
+
+.storefront .announcement p {
+    margin: 0;
+    font-size: .9rem;
+    line-height: 1.4;
+}
+
+/* Featured products now sit directly beneath shop navigation/announcement. */
+.store-featured-products {
+    margin: 16px 0 20px;
+    padding: 14px;
+    border-radius: 16px;
+}
+
+.store-featured-products .store-section-title {
+    margin-bottom: 10px;
+}
+
+.store-featured-products .store-section-title h2 {
+    font-size: 1.2rem;
+}
+
+/* Compact featured product cards. */
+.store-featured-products .grid.products {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.store-featured-products .product.card {
+    padding: 9px;
+    border-radius: 13px;
+}
+
+.store-featured-products .product .thumb {
+    aspect-ratio: 1 / 1;
+    height: auto;
+    border-radius: 10px;
+}
+
+.store-featured-products .product h3 {
+    margin: 7px 0 4px;
+    font-size: .9rem;
+    line-height: 1.15;
+}
+
+.store-featured-products .product-card-badges {
+    gap: 3px;
+    margin-top: 5px;
+}
+
+.store-featured-products .product-card-badges .badge {
+    padding: 2px 4px;
+    font-size: .62rem;
+}
+
+.store-featured-products .product-meta {
+    font-size: .86rem;
+}
+
+/* Collabs stay visible directly below featured products. */
+.store-collab-section {
+    margin: 16px 0 20px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+}
+
+.store-collab-section h2 {
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+}
+
+.store-collab-section .grid.products {
+    gap: 10px;
+}
+
+/* Main listings should start cleanly without repeating the section menu. */
+.store-listings {
+    margin-top: 18px;
+}
+
+.store-listings-heading {
+    margin-bottom: 12px;
+}
+
+.store-listings-heading h2 {
+    margin: 0 0 3px;
+    font-size: 1.3rem;
+}
+
+.store-listing-count {
+    margin: 0;
+    font-size: .82rem;
+}
+
+/* Secondary screens appear only when selected from navigation. */
+.store-panel {
+    margin: 18px 0;
+}
+
+.store-panel:target,
+.store-panel.is-result {
+    padding: 16px;
+    border-radius: 16px;
+}
+
+/* Custom Designs should feel like a shop category when opened. */
+.store-custom-section .grid.products {
+    gap: 12px;
+}
+
+.store-custom-section h2 {
+    margin-top: 0;
+}
+
+/* Reviews can be long — constrain their first view. */
+#seller-reviews.store-panel {
+    max-width: 1000px;
+}
+
+/* Prize wheel itself can stay fun, but its container is tighter. */
+.prize-wheel-storefront.store-panel {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Mobile */
+@media (max-width: 800px) {
+    .stats-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+    }
+
+    .stats-row .card {
+        padding: 7px 5px;
+    }
+
+    .stats-row strong {
+        font-size: .9rem;
+    }
+
+    .stats-row span {
+        font-size: .62rem;
+    }
+
+    .store-featured-products .grid.products {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 650px) {
+    .storefront-tabs {
+        padding: 7px;
+        border-radius: 11px;
+    }
+
+    .storefront-tabs .store-back-link {
+        margin-right: 0;
+    }
+
+    .storefront-banner {
+        height: 120px !important;
+    }
+
+    .storefront-profile {
+        padding: 10px 12px !important;
+        align-items: center !important;
+    }
+
+    .storefront-profile .avatar.large {
+        width: 62px !important;
+        height: 62px !important;
+        min-width: 62px;
+        margin-top: -28px;
+    }
+
+    .storefront-title h1 {
+        font-size: 1.25rem;
+    }
+
+    .store-shop-navigation {
+        padding: 10px;
+        border-radius: 13px;
+    }
+
+    .store-section-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+
+    .store-section-tab {
+        flex: 0 0 auto;
+        padding: 6px 9px;
+    }
+
+    .store-featured-products,
+    .store-collab-section {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 430px) {
+    .stats-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .store-featured-products .grid.products {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Storefront mobile containment fix 2026-11-02 */
+@media (max-width: 760px) {
+
+    /* Never allow the storefront or its major sections to exceed the phone. */
+    .storefront,
+    .storefront > *,
+    .storefront-hero,
+    .storefront-profile,
+    .storefront-title,
+    .follow-box,
+    .stats-row,
+    .store-shop-navigation,
+    .store-featured-products,
+    .store-collab-section,
+    .store-listings,
+    .store-panel {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .storefront {
+        overflow: hidden;
+        gap: 14px;
+    }
+
+    /* Show the ENTIRE uploaded banner instead of cropping it. */
+    .storefront-banner {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        aspect-ratio: 3 / 1;
+        background-size: contain !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-color: #fff;
+        border-radius: 14px 14px 0 0;
+    }
+
+    /* Force profile content into one clean centered mobile column. */
+    .storefront-profile {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        justify-items: center;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 10px 12px 14px !important;
+        text-align: center;
+        overflow: hidden;
+    }
+
+    .storefront-profile .avatar.large {
+        width: 62px !important;
+        height: 62px !important;
+        min-width: 0 !important;
+        max-width: 62px;
+        margin: -30px auto 0 !important;
+    }
+
+    .storefront-title {
+        width: 100%;
+        min-width: 0;
+        text-align: center;
+    }
+
+    .storefront-title h1 {
+        max-width: 100%;
+        margin: 0 0 6px;
+        font-size: 1.25rem;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+    }
+
+    .storefront-title .badge {
+        display: inline-flex;
+        margin: 2px;
+        white-space: normal;
+    }
+
+    .follow-box {
+        display: grid;
+        justify-items: center;
+        text-align: center !important;
+    }
+
+    .follow-box form {
+        max-width: 100%;
+        margin: 0;
+    }
+
+    .follow-box .btn,
+    .follow-box button {
+        width: auto;
+        max-width: 100%;
+        white-space: normal;
+    }
+
+    .follow-box small {
+        max-width: 100%;
+        line-height: 1.3;
+    }
+
+    /* Utility menu wraps instead of disappearing off the right side. */
+    .storefront-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        overflow: visible;
+        width: 100%;
+        max-width: 100%;
+        gap: 5px;
+        padding: 7px;
+        border-radius: 11px;
+    }
+
+    .storefront-tabs a {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 7px 8px;
+        font-size: .78rem;
+        text-align: center;
+        overflow-wrap: anywhere;
+    }
+
+    .storefront-tabs .store-back-link {
+        flex-basis: 100%;
+        margin-right: 0;
+    }
+
+    /* Keep all four stats compact without forcing page width. */
+    .stats-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 6px;
+    }
+
+    .stats-row .card {
+        min-width: 0;
+        padding: 8px 5px;
+    }
+
+    .stats-row strong,
+    .stats-row a {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    /* Shop sections may scroll INSIDE their own box, never the page. */
+    .store-shop-navigation {
+        overflow: hidden;
+        padding: 10px;
+    }
+
+    .store-section-tabs {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-inline: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .store-section-tab {
+        flex: 0 0 auto;
+        max-width: 85vw;
+        white-space: nowrap;
+    }
+
+    /* Cards/grids must shrink with the viewport. */
+    .storefront .grid.products {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .storefront .product.card,
+    .storefront .product,
+    .storefront .product a,
+    .storefront .product-meta {
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .storefront .product .thumb,
+    .storefront .product img {
+        display: block;
+        max-width: 100%;
+    }
+
+    .storefront .product h3,
+    .storefront .product p {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .store-collab-section {
+        overflow: hidden;
+    }
+
+    .store-pagination {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 420px) {
+    .storefront .grid.products {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .store-featured-products,
+    .store-collab-section,
+    .store-listings {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+}

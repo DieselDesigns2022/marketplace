@@ -176,6 +176,7 @@ $router->post('/seller/collabs/{id}/file-update-requests/{request}/deny', [Colla
  $router->match(['GET','POST'], '/seller/product/{id}', [SellerController::class, 'editProduct']);
  $router->post('/seller/product/{id}/submit', [SellerController::class, 'submitProduct']);
  $router->post('/seller/product/{id}/duplicate', [SellerController::class, 'duplicateProduct']);
+$router->post('/seller/product/{id}/store-featured', [SellerController::class, 'toggleStoreFeatured']);
  $router->post('/seller/product/{id}/disable', [SellerController::class, 'disableProduct']);
  $router->post('/seller/product/{id}/archive', [SellerController::class, 'archiveProduct']);
  $router->post('/seller/product/{id}/restore', [SellerController::class, 'restoreProduct']);

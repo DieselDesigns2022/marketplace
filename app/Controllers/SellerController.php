@@ -2570,6 +2570,75 @@ class SellerController
     }
 
 
+    public function toggleStoreFeatured($id): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+        H::verifyCsrf();
+
+        $d=$this->d();
+
+        $product=DB::row(
+            'select id,title,status,store_featured
+             from products
+             where id=?
+               and designer_id=?
+               and status<>"deleted"
+             limit 1',
+            [(int)$id,(int)$d['id']]
+        ) ?? H::abort(404);
+
+        if(!in_array($product['status'],['approved','published'],true)){
+            H::flash(
+                'error',
+                'Only published products can be featured on your storefront.'
+            );
+            H::redirect('/seller/products');
+        }
+
+        $makeFeatured=empty($product['store_featured']);
+
+        if($makeFeatured){
+            $featuredCount=(int)(
+                DB::row(
+                    'select count(*) c
+                     from products
+                     where designer_id=?
+                       and store_featured=1
+                       and status in ("approved","published")',
+                    [(int)$d['id']]
+                )['c']??0
+            );
+
+            if($featuredCount>=4){
+                H::flash(
+                    'error',
+                    'You can feature up to 4 products on your storefront. Remove one before featuring another.'
+                );
+                H::redirect('/seller/products');
+            }
+        }
+
+        DB::exec(
+            'update products
+             set store_featured=?,
+                 updated_at=now()
+             where id=?
+               and designer_id=?',
+            [$makeFeatured?1:0,(int)$product['id'],(int)$d['id']]
+        );
+
+        H::flash(
+            'success',
+            $makeFeatured
+                ? 'Product added to your storefront Featured Products.'
+                : 'Product removed from your storefront Featured Products.'
+        );
+
+        H::redirect('/seller/products');
+    }
+
+
     public function duplicateProduct($id)
     {
         $this->requireOnboardingComplete();

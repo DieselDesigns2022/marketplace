@@ -1,6 +1,14 @@
 <h1>Seller Dashboard → Products</h1>
 <p><a class="btn" href="/seller/product/new">Create Product</a> <a class="btn" href="/seller/product-batches">Bulk Upload / Create Multiple Products</a> <a class="btn" href="/seller/products/import">Import Products</a></p>
 <p class="muted">Archive hides a product from public browsing while preserving order history. Permanent delete is only available for draft/test products with no completed orders.</p>
+
+<div class="card seller-featured-help">
+    <strong>⭐ Storefront Featured Products</strong>
+    <p>
+        Choose up to 4 published products to feature at the top of your public store.
+        This does not affect Creative Moth marketplace search or ranking.
+    </p>
+</div>
 <form method="get" action="/seller/products" class="card">
     <?php if(($status??'all')!=='all'): ?>
         <input type="hidden" name="status" value="<?=H::e($status)?>">
@@ -60,20 +68,39 @@
     </form>
 
     <div class="responsive-table"><table>
-        <tr><th>Select</th><th>Thumbnail</th><th>Product Name</th><th>Status</th><th>Orders</th><th>Price</th><th>Category</th><th>Updated Date</th><th>Actions</th></tr>
+        <tr><th>Select</th><th>Thumbnail</th><th>Product Name</th><th>Status</th><th>Store Featured</th><th>Orders</th><th>Price</th><th>Category</th><th>Updated Date</th><th>Actions</th></tr>
         <?php foreach($products as $p): $safeDelete = ((int)($p['completed_order_count'] ?? 0) === 0) && in_array($p['status'], ['draft','rejected','archived','disabled','deleted'], true); ?>
            <tr>
                <td><input class="bulk-product-pick" type="checkbox" name="product_ids[]" value="<?=(int)$p['id']?>" form="bulk-product-form" aria-label="Select <?=H::e($p['title'])?>"></td>
                <td><?php if($p['thumbnail']):?><img class="thumb" src="<?=H::e($p['thumbnail'])?>" alt="<?=H::e($p['title'])?> thumbnail"><?php else:?><span class="thumb">No image</span><?php endif;?></td>
                <td><?=H::e($p['title'])?><?php if($p['rejection_reason']):?><br><small>Rejected: <?=H::e($p['rejection_reason'])?></small><?php endif;?><?php if((int)($p['completed_order_count'] ?? 0)>0):?><br><small class="muted">Cannot be permanently deleted because completed orders reference it.</small><?php endif;?></td>
                <td><span class="badge"><?=H::e(($p['status']==='approved'||$p['status']==='published')?'Published':ucwords(str_replace('_',' ',$p['status'])))?></span><?php if(!empty($p['scheduled_publish_at'])):?><br><small><?=H::e((new \DateTimeImmutable($p['scheduled_publish_at'],new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone($p['publication_timezone']?:'UTC'))->format('Y-m-d H:i T'))?></small><?php endif;?><?php if(!empty($p['schedule_error'])):?><br><small class="notice warning"><?=H::e($p['schedule_error'])?></small><?php endif;?></td>
-               <td><?= (int)($p['completed_order_count'] ?? 0) ?></td>
+               <td>
+                  <?php if(!empty($p['store_featured'])): ?>
+                      <span class="badge ok">⭐ Featured</span>
+                  <?php elseif(in_array($p['status'],['approved','published'],true)): ?>
+                      <span class="muted">Not featured</span>
+                  <?php else: ?>
+                      <span class="muted">Publish first</span>
+                  <?php endif; ?>
+              </td>
+              <td><?= (int)($p['completed_order_count'] ?? 0) ?></td>
                <td><?=$p['price']===null?'Needs review':H::money($p['price'])?></td>
                <td><?=H::e($p['category_name']??'Uncategorized')?></td>
                <td><?=H::e($p['updated_at'])?></td>
                <td>
                    <div class="product-actions">
                    <a class="btn" href="/seller/product/<?=$p['id']?>">Edit</a>
+                  <?php if(in_array($p['status'],['approved','published'],true)): ?>
+                  <form method="post" action="/seller/product/<?=$p['id']?>/store-featured">
+                      <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+                      <button>
+                          <?=!empty($p['store_featured'])
+                              ? 'Remove Featured'
+                              : 'Feature on Store'?>
+                      </button>
+                  </form>
+                  <?php endif; ?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/duplicate" onsubmit="return confirm('Create a draft copy of this product? Product files and preview images will not be copied.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Duplicate</button></form>
                    <?php if(in_array($p['status'], ['approved','published'], true)):?><a class="btn" href="/product/<?=H::e($p['slug'])?>">View Public Page</a><?php endif;?>
                    <?php if(!in_array($p['status'], ['archived','deleted'], true)):?>
