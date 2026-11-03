@@ -148,7 +148,21 @@ final class OrderFinalizationService
              * Prize Credit is seller-funded and must never create
              * a platform-credit payout hold.
              */
-            $platformFunded = $creditCents > 0;
+            // Use the buyer's Stripe charge when it can cover all seller
+            // payouts after reserving the full tax amount.
+            // Older underfunded credit orders retain their platform hold.
+            $sellerDue = (float)(DB::row(
+                'select coalesce(sum(seller_payout_amount),0) amount from order_items where order_id=?',
+                [$orderId]
+            )['amount'] ?? 0);
+            $stripeAvailable = max(0,
+                CreditService::parseCents((string)($order['stripe_paid_amount'] ?? '0.00'))
+                - CreditService::parseCents((string)($order['tax_amount'] ?? '0.00'))
+            );
+            $platformFunded = $creditCents > 0 && (
+                $internal ||
+                CreditService::parseCents((string)number_format($sellerDue, 2, '.', '')) > $stripeAvailable
+            );
             $this->prepareFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->prepareCollabFinancialLedgers($orderId, (string)($order['stripe_currency'] ?: StripeService::currency()), $platformFunded);
             $this->referrals->qualifyBuyer($orderId, $eventKey . ':buyer');

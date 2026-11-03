@@ -566,6 +566,28 @@ class CartController
                     H::redirect('/cart');
                 }
 
+
+                // Apply Marketplace Credit to merchandise before calculating
+                // seller fees. Any remaining credit covers tax.
+                $creditBases = [];
+                foreach ($valid as $idx => $p) {
+                    $afterCoupon = max(0,
+                        CreditService::parseCents((string)$p['line_total'])
+                        - CreditService::parseCents(
+                            (string)($allocations[$idx] ?? '0.00'), false
+                        )
+                    );
+                    $creditBases[$idx] = max(0, $afterCoupon
+                        - (int)($prizeAllocation['item_cents'][$idx] ?? 0));
+                }
+                if (array_sum($creditBases) !== $merchandiseAfterPrizeCents) {
+                    throw new \RuntimeException('Merchandise allocation mismatch.');
+                }
+                $creditByLine = CreditService::allocateMerchandiseCredit(
+                    $creditBases, $creditCents
+                );
+                $plannedCreditCents = $creditCents;
+
                 $commissionRate = StripeService::commissionRate();
                 $feeInput = [];
 
@@ -590,7 +612,7 @@ class CartController
                         'seller_id' => (int)$p['designer_id'],
                         'gross_cents' => max(
                             0,
-                            $discountedLineCents - $itemPrizeCents
+                            $discountedLineCents - $itemPrizeCents - ($creditByLine[$idx] ?? 0)
                         ),
                     ];
                 }
@@ -685,6 +707,11 @@ class CartController
                     );
 
                     $creditCents = CreditService::parseCents($credits);
+                    if ($creditCents !== $plannedCreditCents) {
+                        throw new \RuntimeException(
+                            'Marketplace Credit changed during checkout.'
+                        );
+                    }
 
                     $totalCents = max(
                         0,
@@ -725,7 +752,11 @@ class CartController
                    $receipt=DB::row('select receipt_note,receipt_image_path from designers where id=?',[(int)$p['designer_id']])??[];
                    $receiptSnapshot=SellerReceiptService::snapshotFromSeller($receipt);
                    $lineDiscount = (float)($allocations[$idx] ?? 0);
-                   $discountedLine = max(0, round((float)$p['line_total'] - $lineDiscount, 2));
+                   $discountedLine = CreditService::formatCents(max(0,
+                        CreditService::parseCents((string)$p['line_total'])
+                        - CreditService::parseCents((string)$lineDiscount, false)
+                        - ($creditByLine[$idx] ?? 0)
+                    ));
                    $fee=$sellerFees[(int)$p['designer_id']]['items'][$idx+1];
                    $customPrizeCents=(int)(
                        $prizeAllocation['item_cents'][$idx]

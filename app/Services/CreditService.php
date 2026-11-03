@@ -49,6 +49,40 @@ final class CreditService
         return ['subtotal_cents' => $subtotalCents, 'discount_cents' => $discountCents, 'tax_cents' => $taxCents, 'credit_cents' => $credit, 'final_cents' => $beforeCredit - $credit];
     }
 
+
+    public static function allocateMerchandiseCredit(array $bases, int $creditCents): array
+    {
+        if ($creditCents < 0) {
+            throw new InvalidArgumentException('Negative credit allocation.');
+        }
+        foreach ($bases as $base) {
+            if (!is_int($base) || $base < 0) {
+                throw new InvalidArgumentException('Invalid merchandise amount.');
+            }
+        }
+        $total = array_sum($bases);
+        $amount = min($creditCents, $total);
+        $result = array_fill_keys(array_keys($bases), 0);
+        if ($amount === 0 || $total === 0) return $result;
+
+        $assigned = 0;
+        $remainders = [];
+        foreach ($bases as $index => $base) {
+            $numerator = $amount * $base;
+            $result[$index] = intdiv($numerator, $total);
+            $assigned += $result[$index];
+            $remainders[] = ['index' => $index, 'remainder' => $numerator % $total];
+        }
+        usort($remainders, static fn($a, $b) =>
+            ($b['remainder'] <=> $a['remainder'])
+            ?: ($a['index'] <=> $b['index'])
+        );
+        for ($i = 0; $i < $amount - $assigned; $i++) {
+            $result[$remainders[$i]['index']]++;
+        }
+        return $result;
+    }
+
     public function balances(int $userId): array
     {
         $row = DB::row('select total_balance,reserved_balance from marketplace_credits where user_id=?', [$userId]);
