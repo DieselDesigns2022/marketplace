@@ -390,7 +390,7 @@ $globalLicenseTerms = str_replace(
 
 
             <button class="btn" type="submit">
-                Continue to Secure Checkout
+                Add to Cart
             </button>
         </form>
 

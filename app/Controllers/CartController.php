@@ -14,6 +14,7 @@ use App\Services\MarketplaceFeeService;
 use Throwable;
 
 use App\Services\CheckoutOrderService;
+use App\Services\CustomDesignService;
 class CartController
 {
     private function owned(int $productId): bool
@@ -55,21 +56,168 @@ class CartController
 
     private function items(): array
     {
-        if (H::user()) {
+        if(H::user()){
             $this->mergeGuestCart();
-            return DB::rows('select ci.id cart_item_id,ci.license_type,ci.price_snapshot,ci.license_price_snapshot,ci.total_snapshot,p.*,d.display_name,d.store_slug,d.prize_credit_mode,d.receipt_note,d.receipt_image_path,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from cart_items ci join products p on p.id=ci.product_id join designers d on d.id=p.designer_id where ci.user_id=? and p.status="approved" order by ci.created_at desc',[H::user()['id']]);
+
+            $userId=(int)H::user()['id'];
+
+            $products=DB::rows(
+                'select
+                    ci.id cart_item_id,
+                    ci.license_type,
+                    ci.price_snapshot,
+                    ci.license_price_snapshot,
+                    ci.total_snapshot,
+                    ci.created_at cart_created_at,
+                    p.*,
+                    d.display_name,
+                    d.store_slug,
+                    d.prize_credit_mode,
+                    d.receipt_note,
+                    d.receipt_image_path,
+                    (
+                        select image_path
+                        from product_images pi
+                        where pi.product_id=p.id
+                        order by sort_order,id
+                        limit 1
+                    ) thumbnail
+                 from cart_items ci
+                 join products p
+                   on p.id=ci.product_id
+                 join designers d
+                   on d.id=p.designer_id
+                 where ci.user_id=?
+                   and ci.product_id is not null
+                   and p.status="approved"
+                 order by ci.created_at desc',
+                [$userId]
+            );
+
+            foreach($products as &$product){
+                $product['listing_type']='product';
+            }
+            unset($product);
+
+            $customRows=DB::rows(
+                'select
+                    ci.id cart_item_id,
+                    ci.custom_checkout_token,
+                    ci.created_at cart_created_at,
+                    s.id,
+                    s.designer_id,
+                    s.slug,
+                    s.title,
+                    s.price,
+                    s.turnaround_min_days,
+                    s.turnaround_days,
+                    s.included_revisions,
+                    s.buyer_instructions,
+                    s.brief_fields,
+                    d.display_name,
+                    d.store_slug,
+                    d.prize_credit_mode,
+                    d.receipt_note,
+                    d.receipt_image_path,
+                    (
+                        select image_path
+                        from custom_service_images csi
+                        where csi.custom_service_id=s.id
+                        order by csi.sort_order,csi.id
+                        limit 1
+                    ) thumbnail
+                 from cart_items ci
+                 join custom_design_services s
+                   on s.id=ci.custom_service_id
+                 join designers d
+                   on d.id=s.designer_id
+                 where ci.user_id=?
+                   and ci.custom_service_id is not null
+                   and s.is_active=1
+                   and d.status="approved"
+                 order by ci.created_at desc',
+                [$userId]
+            );
+
+            $api=new CustomDesignService;
+            $custom=[];
+
+            foreach($customRows as $row){
+                $item=$api->preparedCartItem(
+                    $row,
+                    $userId,
+                    (string)$row['custom_checkout_token']
+                );
+
+                $item['cart_item_id']=
+                    (int)$row['cart_item_id'];
+
+                $item['cart_created_at']=
+                    $row['cart_created_at'];
+
+                $custom[]=$item;
+            }
+
+            $items=array_merge(
+                $products,
+                $custom
+            );
+
+            usort(
+                $items,
+                static function(array $a,array $b):int{
+                    return strcmp(
+                        (string)($b['cart_created_at']??''),
+                        (string)($a['cart_created_at']??'')
+                    );
+                }
+            );
+
+            return $items;
         }
 
-        $items = [];
-        foreach ($this->guestCart() as $cartId => $cartItem) {
-            $p = DB::row('select p.*,d.display_name,d.store_slug,d.receipt_note,d.receipt_image_path,(select image_path from product_images pi where pi.product_id=p.id order by sort_order,id limit 1) thumbnail from products p join designers d on d.id=p.designer_id where p.id=? and p.status="approved"',[(int)($cartItem['product_id'] ?? 0)]);
-            if (!$p) continue;
-            $p['cart_item_id'] = (int)$cartId;
-            $p['license_type'] = (string)($cartItem['license_type'] ?? 'personal');
-            $items[] = $p;
+        $items=[];
+
+        foreach(
+            $this->guestCart()
+            as $cartId=>$cartItem
+        ){
+            $p=DB::row(
+                'select
+                    p.*,
+                    d.display_name,
+                    d.store_slug,
+                    d.prize_credit_mode,
+                    d.receipt_note,
+                    d.receipt_image_path,
+                    (
+                        select image_path
+                        from product_images pi
+                        where pi.product_id=p.id
+                        order by sort_order,id
+                        limit 1
+                    ) thumbnail
+                 from products p
+                 join designers d
+                   on d.id=p.designer_id
+                 where p.id=?
+                   and p.status="approved"',
+                [(int)($cartItem['product_id']??0)]
+            );
+
+            if(!$p){
+                continue;
+            }
+
+            $p['cart_item_id']=$cartId;
+            $p['license_type']=
+                $cartItem['license_type']??'personal';
+            $p['listing_type']='product';
+
+            $items[]=$p;
         }
+
         return $items;
-
     }
 
     private array $pricing = [];
@@ -143,15 +291,53 @@ class CartController
 
     public function remove($id)
     {
-        if (H::user()) {
-            DB::exec('delete from cart_items where id=? and user_id=?',[(int)$id,H::user()['id']]);
-        } else {
-            $cart = $this->guestCart();
-            unset($cart[(int)$id]);
-            $_SESSION['guest_cart'] = $cart;
-        }
-        H::redirect('/cart');
+        if(H::user()){
 
+            $row=DB::row(
+                'select custom_checkout_token
+                 from cart_items
+                 where id=?
+                   and user_id=?',
+                [
+                    (int)$id,
+                    (int)H::user()['id']
+                ]
+            );
+
+            if(
+                $row
+                && !empty(
+                    $row['custom_checkout_token']
+                )
+            ){
+                (new CustomDesignService)
+                    ->cleanupCheckout(
+                        (string)$row[
+                            'custom_checkout_token'
+                        ]
+                    );
+            }
+
+            DB::exec(
+                'delete from cart_items
+                 where id=?
+                   and user_id=?',
+                [
+                    (int)$id,
+                    (int)H::user()['id']
+                ]
+            );
+
+        }else{
+
+            $cart=$this->guestCart();
+
+            unset($cart[(int)$id]);
+
+            $_SESSION['guest_cart']=$cart;
+        }
+
+        H::redirect('/cart');
     }
 
     public function update()
@@ -281,7 +467,9 @@ class CartController
                 $taxableItems = [];
                 foreach ($valid as $index => $product) {
                     $taxableItems[] = [
-                        'id' => $product['id'],
+                        'id' => (($product['listing_type'] ?? 'product') === 'custom_design')
+                            ? 'custom-' . (int)$product['custom_service_id'] . '-' . (int)$product['cart_item_id']
+                            : $product['id'],
                         'total_price' => CreditService::formatCents(
                             CreditService::parseCents((string)$product['line_total'])
                             - CreditService::parseCents((string)($allocations[$index] ?? '0.00'))
@@ -527,6 +715,10 @@ class CartController
                         ]
                     );
                 }
+                $customCheckoutTokens=[];
+                $customCartItemIds=[];
+                $customStoredFiles=[];
+
                 foreach($valid as $idx=>$p)
                {
                    // Read receipt settings authoritatively inside this transaction; cart/request values are never trusted.
@@ -535,6 +727,76 @@ class CartController
                    $lineDiscount = (float)($allocations[$idx] ?? 0);
                    $discountedLine = max(0, round((float)$p['line_total'] - $lineDiscount, 2));
                    $fee=$sellerFees[(int)$p['designer_id']]['items'][$idx+1];
+                   $customPrizeCents=(int)(
+                       $prizeAllocation['item_cents'][$idx]
+                       ??0
+                   );
+
+                   if(
+                       ($p['listing_type']??'product')
+                       ==='custom_design'
+                   ){
+                       $attached=
+                           (new CustomDesignService)
+                           ->attachPreparedCartItemToOrder(
+                               $p,
+                               (int)$order,
+                               (int)H::user()['id'],
+                               CreditService::formatCents(
+                                   CreditService::parseCents(
+                                       (string)$discountedLine,
+                                       false
+                                   )
+                               ),
+                               $lineDiscount,
+                               $fee,
+                               $customPrizeCents,
+                               $coupon,
+                               $commissionRate,
+                               $receiptSnapshot,
+                               !empty(
+                                   $sellerFees[
+                                       (int)$p['designer_id']
+                                   ]['capped']
+                               )
+                           );
+
+                       if(
+                           !empty(
+                               $attached['checkout_token']
+                           )
+                       ){
+                           $customCheckoutTokens[]=
+                               (string)$attached[
+                                   'checkout_token'
+                               ];
+                       }
+
+                       if(
+                           !empty(
+                               $attached['cart_item_id']
+                           )
+                       ){
+                           $customCartItemIds[]=
+                               (int)$attached[
+                                   'cart_item_id'
+                               ];
+                       }
+
+                       foreach(
+                           (array)(
+                               $attached['stored_paths']
+                               ??[]
+                           )
+                           as $storedPath
+                       ){
+                           $customStoredFiles[]=
+                               (string)$storedPath;
+                       }
+
+                       continue;
+                   }
+
                     $manualEmail = trim($_POST['google_drive_email'] ?? '');
                     $isManualDelivery = ($p['fulfillment_type'] ?? 'downloadable') === 'google_drive';
                     $itemGoogleDriveEmail = $isManualDelivery ? ($manualEmail ?: null) : null;
@@ -590,6 +852,48 @@ class CartController
                     $finalizer->finalize((int)$order, 'internal-credit-order:' . $order, true);
                     unset($_SESSION['coupon_code']);
                     DB::commit();
+
+                    foreach(
+                        array_unique($customCheckoutTokens)
+                        as $customToken
+                    ){
+                        (new CustomDesignService)
+                            ->cleanupCheckout(
+                                $customToken
+                            );
+                    }
+
+                    if($customCartItemIds){
+
+                        $uniqueCustomCartItemIds=
+                            array_values(
+                                array_unique(
+                                    $customCartItemIds
+                                )
+                            );
+
+                        $marks=implode(
+                            ',',
+                            array_fill(
+                                0,
+                                count(
+                                    $uniqueCustomCartItemIds
+                                ),
+                                '?'
+                            )
+                        );
+
+                        DB::exec(
+                            'delete from cart_items
+                             where user_id=?
+                               and id in ('.$marks.')',
+                            array_merge(
+                                [(int)H::user()['id']],
+                                $uniqueCustomCartItemIds
+                            )
+                        );
+                    }
+
                     $finalizer->settlePlatformCreditPayoutsAfterCommit((int)$order);
                     $finalizer->communicate((int)$order);
                     H::redirect('/dashboard/order/' . (int)$order);
@@ -598,6 +902,48 @@ class CartController
                 DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?', [$session['id'] ?? null, $order]);
                 unset($_SESSION['coupon_code']);
                 DB::commit();
+
+                foreach(
+                    array_unique($customCheckoutTokens)
+                    as $customToken
+                ){
+                    (new CustomDesignService)
+                        ->cleanupCheckout(
+                            $customToken
+                        );
+                }
+
+                if($customCartItemIds){
+
+                    $uniqueCustomCartItemIds=
+                        array_values(
+                            array_unique(
+                                $customCartItemIds
+                            )
+                        );
+
+                    $marks=implode(
+                        ',',
+                        array_fill(
+                            0,
+                            count(
+                                $uniqueCustomCartItemIds
+                            ),
+                            '?'
+                        )
+                    );
+
+                    DB::exec(
+                        'delete from cart_items
+                         where user_id=?
+                           and id in ('.$marks.')',
+                        array_merge(
+                            [(int)H::user()['id']],
+                            $uniqueCustomCartItemIds
+                        )
+                    );
+                }
+
                 header('Location: ' . $session['url'], true, 303);
                 exit;
 
@@ -605,6 +951,21 @@ class CartController
             catch(Throwable $e)
            {
                if (DB::pdo()->inTransaction()) DB::rollBack();
+
+               foreach(
+                   array_unique(
+                       $customStoredFiles ?? []
+                   )
+                   as $storedPath
+               ){
+                   if(
+                       is_string($storedPath)
+                       && $storedPath!==''
+                       && is_file($storedPath)
+                   ){
+                       @unlink($storedPath);
+                   }
+               }
                 error_log('Grand Opening checkout pricing: '.get_class($e).': '.$e->getMessage());
                 H::flash('error','Checkout failed. Please try again. If this persists, ask an admin to verify Stripe environment configuration.');
                 H::redirect('/cart');

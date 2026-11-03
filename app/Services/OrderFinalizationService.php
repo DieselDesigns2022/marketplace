@@ -125,10 +125,19 @@ final class OrderFinalizationService
                 'delete ci
                    from cart_items ci
                    join order_items oi
-                     on oi.product_id=ci.product_id
-                    and oi.order_id=?
-                  where ci.user_id=?
-                    and oi.product_id is not null',
+                     on oi.order_id=?
+                    and (
+                        (
+                            oi.product_id is not null
+                            and oi.product_id=ci.product_id
+                        )
+                        or
+                        (
+                            oi.custom_service_id is not null
+                            and oi.custom_service_id=ci.custom_service_id
+                        )
+                    )
+                  where ci.user_id=?',
                 [$orderId, (int)$order['user_id']]
             );
 

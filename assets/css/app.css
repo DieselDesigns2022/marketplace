@@ -3862,3 +3862,13 @@ table tr:nth-last-child(-n+4) .license-help-text {
         padding-right: 8px;
     }
 }
+
+/* Mobile storefront avatar placement fix 2026-11-02 */
+@media (max-width: 760px) {
+    .storefront-profile .avatar.large {
+        position: relative;
+        z-index: 2;
+        margin: 8px auto 0 !important;
+        transform: none !important;
+    }
+}

@@ -114,74 +114,367 @@ final class GrandOpeningPricingService
         if ($code!=='') DB::row('select id from coupons where code=? for update',[CouponService::normalizeCode($code)]);
     }
 
-    public function cart(array $input,string $code='',int $userId=0,bool $lock=false): array
+    public function cart(
+        array $input,
+        string $code='',
+        int $userId=0,
+        bool $lock=false
+    ):array
     {
-        if (self::$homepagePreview) throw new DomainException('Preview pricing cannot be used for checkout.');
-        $ids=array_values(array_unique(array_map(static fn(array $p):int=>(int)$p['id'],$input)));
+        if(self::$homepagePreview){
+            throw new DomainException(
+                'Preview pricing cannot be used for checkout.'
+            );
+        }
+
+        $ids=array_values(
+            array_unique(
+                array_map(
+                    static fn(array $p):int =>
+                        (($p['listing_type']??'product')==='product')
+                            ?(int)$p['id']
+                            :0,
+                    $input
+                )
+            )
+        );
+
+        $ids=array_values(
+            array_filter(
+                $ids,
+                static fn(int $id):bool => $id>0
+            )
+        );
+
         sort($ids);
-        if ($lock) $this->lockSources($ids,$code);
+
+        if($lock){
+            $this->lockSources(
+                $ids,
+                $code
+            );
+        }
+
         $fresh=$this->products($ids);
-        $items=[];$regular=0;$saleSavings=0;
-        foreach ($input as $old) {
-            $p=$fresh[(int)$old['id']]??null;
-            if (!$p) {
-                if ($lock) throw new DomainException('A product or seller is no longer available.');
+
+        $items=[];
+        $regular=0;
+        $saleSavings=0;
+
+        foreach($input as $old){
+
+            if(
+                ($old['listing_type']??'product')
+                !=='product'
+            ){
+                $p=$old;
+
+                $lineCents=CreditService::parseCents(
+                    (string)($p['line_total']??'0.00'),
+                    false
+                );
+
+                $p['go_regular_price']=
+                    $p['go_regular_price']
+                    ??($p['price']??'0.00');
+
+                $p['go_regular_line_total']=
+                    $p['go_regular_line_total']
+                    ??CreditService::formatCents(
+                        $lineCents
+                    );
+
+                $p['go_regular_licenses']=
+                    $p['go_regular_licenses']??[];
+
+                $p['go_paid_licenses']=
+                    $p['go_paid_licenses']??[];
+
+                $p['go_sale_licenses']=
+                    $p['go_sale_licenses']??[];
+
+                $p['go_points']=0;
+                $p['go_applied_points']=0;
+                $p['go_candidate_savings']=0;
+                $p['go_pricing_mode']='none';
+                $p['go_priced_at']=gmdate(
+                    'Y-m-d H:i:s'
+                );
+
+                $regular+=$lineCents;
+                $items[]=$p;
+
                 continue;
             }
-            $p=array_merge($old,$p);
-            $licenses=LicenseService::selectedLicenses($p,$old['license_type']);
-            $p['licenses']=LicenseService::productLicenses($p);
-            $p['selected_license_keys']=array_column($licenses,'license_key');
+
+            $p=$fresh[(int)$old['id']]??null;
+
+            if(!$p){
+                if($lock){
+                    throw new DomainException(
+                        'A product or seller is no longer available.'
+                    );
+                }
+
+                continue;
+            }
+
+            $p=array_merge(
+                $old,
+                $p
+            );
+
+            $licenses=
+                LicenseService::selectedLicenses(
+                    $p,
+                    $old['license_type']
+                );
+
+            $p['licenses']=
+                LicenseService::productLicenses($p);
+
+            $p['selected_license_keys']=
+                array_column(
+                    $licenses,
+                    'license_key'
+                );
+
             $p['license_invalid']=!$licenses;
-            if (!$licenses && $lock) throw new DomainException('A selected license is no longer available.');
-            $p['license_key']=$licenses ? LicenseService::keyList($licenses) : (string)$old['license_type'];
-            $p['license_name']=$licenses ? LicenseService::nameList($licenses) : 'Unavailable license';
-            $p['license_description']=$licenses ? LicenseService::descriptionList($licenses) : 'Please choose available licenses.';
-            $p['fulfillment_type']=$p['fulfillment_type']??'downloadable';
-            $p['fulfillment_label']=$p['fulfillment_type']==='google_drive' ? 'Google Drive / Manual Delivery' : 'Downloadable Product';
+
+            if(!$licenses && $lock){
+                throw new DomainException(
+                    'A selected license is no longer available.'
+                );
+            }
+
+            $p['license_key']=$licenses
+                ?LicenseService::keyList($licenses)
+                :(string)$old['license_type'];
+
+            $p['license_name']=$licenses
+                ?LicenseService::nameList($licenses)
+                :'Unavailable license';
+
+            $p['license_description']=$licenses
+                ?LicenseService::descriptionList($licenses)
+                :'Please choose available licenses.';
+
+            $p['fulfillment_type']=
+                $p['fulfillment_type']
+                ??'downloadable';
+
+            $p['fulfillment_label']=
+                $p['fulfillment_type']==='google_drive'
+                ?'Google Drive / Manual Delivery'
+                :'Downloadable Product';
+
             $p['go_regular_price']=$p['price'];
             $p['go_regular_licenses']=$licenses;
             $p['go_paid_licenses']=$licenses;
-            $p['license_price']=$licenses ? LicenseService::priceTotal($licenses) : 0.0;
-            $p['line_total']=$licenses ? CreditService::formatCents(CreditService::parseCents((string)$p['price'],false)+CreditService::parseCents((string)$p['license_price'],false)) : '0.00';
-            $p['go_regular_line_total']=$p['line_total'];
-            $p['go_sale_base']=self::component(CreditService::parseCents((string)$p['price'],false),(int)$p['go_points']);
+
+            $p['license_price']=$licenses
+                ?LicenseService::priceTotal($licenses)
+                :0.0;
+
+            $p['line_total']=$licenses
+                ?CreditService::formatCents(
+                    CreditService::parseCents(
+                        (string)$p['price'],
+                        false
+                    )
+                    +CreditService::parseCents(
+                        (string)$p['license_price'],
+                        false
+                    )
+                )
+                :'0.00';
+
+            $p['go_regular_line_total']=
+                $p['line_total'];
+
+            $p['go_sale_base']=self::component(
+                CreditService::parseCents(
+                    (string)$p['price'],
+                    false
+                ),
+                (int)$p['go_points']
+            );
+
             $p['go_sale_licenses']=$licenses;
-            foreach ($p['go_sale_licenses'] as &$license) {
-                $license['price']=CreditService::formatCents(self::component(CreditService::parseCents((string)$license['price'],false),(int)$p['go_points']));
+
+            foreach(
+                $p['go_sale_licenses']
+                as &$license
+            ){
+                $license['price']=
+                    CreditService::formatCents(
+                        self::component(
+                            CreditService::parseCents(
+                                (string)$license['price'],
+                                false
+                            ),
+                            (int)$p['go_points']
+                        )
+                    );
             }
+
             unset($license);
-            $p['go_sale_line']=$licenses ? $p['go_sale_base']+CreditService::parseCents((string)LicenseService::priceTotal($p['go_sale_licenses']),false) : 0;
-            $p['go_candidate_savings']=CreditService::parseCents((string)$p['line_total'],false)-$p['go_sale_line'];
-            $saleSavings+=$p['go_candidate_savings'];
-            $regular+=CreditService::parseCents((string)$p['line_total'],false);
+
+            $p['go_sale_line']=$licenses
+                ?$p['go_sale_base']
+                    +CreditService::parseCents(
+                        (string)LicenseService::priceTotal(
+                            $p['go_sale_licenses']
+                        ),
+                        false
+                    )
+                :0;
+
+            $p['go_candidate_savings']=
+                CreditService::parseCents(
+                    (string)$p['line_total'],
+                    false
+                )
+                -$p['go_sale_line'];
+
+            $saleSavings+=
+                $p['go_candidate_savings'];
+
+            $regular+=CreditService::parseCents(
+                (string)$p['line_total'],
+                false
+            );
+
             $items[]=$p;
         }
-        $candidate=($code!=='' && $userId>0) ? CouponService::validate($code,$items,$userId) : null;
-        $couponCents=!empty($candidate['ok']) ? CreditService::parseCents((string)$candidate['discount'],false) : 0;
-        $mode=self::winner($saleSavings,$couponCents);
-        $appliedCoupon=$mode==='coupon' ? $candidate : null;
+
+        $candidate=
+            ($code!=='' && $userId>0)
+            ?CouponService::validate(
+                $code,
+                $items,
+                $userId
+            )
+            :null;
+
+        $couponCents=
+            !empty($candidate['ok'])
+            ?CreditService::parseCents(
+                (string)$candidate['discount'],
+                false
+            )
+            :0;
+
+        $mode=self::winner(
+            $saleSavings,
+            $couponCents
+        );
+
+        $appliedCoupon=
+            $mode==='coupon'
+            ?$candidate
+            :null;
+
         $subtotal=0;
-        foreach ($items as &$p) {
-            $p['go_applied_points']=$mode==='sale' ? (int)$p['go_points'] : 0;
-            if ($mode==='sale' && !empty($p['go_points']) && !$p['license_invalid']) {
-                $p['price']=CreditService::formatCents($p['go_sale_base']);
-                $p['go_paid_licenses']=$p['go_sale_licenses'];
-                $p['license_price']=LicenseService::priceTotal($p['go_paid_licenses']);
-                $p['line_total']=CreditService::formatCents($p['go_sale_line']);
+
+        foreach($items as &$p){
+
+            $isProduct=
+                ($p['listing_type']??'product')
+                ==='product';
+
+            $p['go_applied_points']=
+                $isProduct && $mode==='sale'
+                ?(int)($p['go_points']??0)
+                :0;
+
+            if(
+                $isProduct
+                && $mode==='sale'
+                && !empty($p['go_points'])
+                && empty($p['license_invalid'])
+            ){
+                $p['price']=
+                    CreditService::formatCents(
+                        $p['go_sale_base']
+                    );
+
+                $p['go_paid_licenses']=
+                    $p['go_sale_licenses'];
+
+                $p['license_price']=
+                    LicenseService::priceTotal(
+                        $p['go_paid_licenses']
+                    );
+
+                $p['line_total']=
+                    CreditService::formatCents(
+                        $p['go_sale_line']
+                    );
             }
-            $p['go_pricing_mode']=$mode;
-            $p['go_priced_at']=gmdate('Y-m-d H:i:s');
-            $subtotal+=CreditService::parseCents((string)$p['line_total'],false);
+
+            $p['go_pricing_mode']=
+                $isProduct
+                ?$mode
+                :'none';
+
+            $p['go_priced_at']=
+                gmdate('Y-m-d H:i:s');
+
+            $subtotal+=
+                CreditService::parseCents(
+                    (string)$p['line_total'],
+                    false
+                );
         }
+
         unset($p);
+
         $notice='';
-        if ($candidate && empty($candidate['ok'])) $notice=$candidate['error'];
-        elseif ($candidate && $mode==='sale') $notice='The Grand Opening Sale saves '.CreditService::formatCents($saleSavings).' USD, compared with '.CreditService::formatCents($couponCents).' USD using your coupon. The sale is applied; your coupon is not used.';
-        elseif ($candidate && $mode==='coupon' && $saleSavings>0) $notice='Your coupon saves more than the Grand Opening Sale and replaces the sale discount for this cart.';
-        return ['items'=>$items,'subtotal_cents'=>$subtotal,'regular_cents'=>$regular,
-            'sale_savings_cents'=>$mode==='sale'?$saleSavings:0,'sale_candidate_cents'=>$saleSavings,
-            'coupon_candidate'=>$candidate,'coupon_result'=>$appliedCoupon,'notice'=>$notice,'mode'=>$mode];
+
+        if($candidate && empty($candidate['ok'])){
+            $notice=$candidate['error'];
+
+        }elseif(
+            $candidate
+            && $mode==='sale'
+        ){
+            $notice=
+                'The Grand Opening Sale saves '.
+                CreditService::formatCents(
+                    $saleSavings
+                ).
+                ' USD, compared with '.
+                CreditService::formatCents(
+                    $couponCents
+                ).
+                ' USD using your coupon. The sale is applied; your coupon is not used.';
+
+        }elseif(
+            $candidate
+            && $mode==='coupon'
+            && $saleSavings>0
+        ){
+            $notice=
+                'Your coupon saves more than the Grand Opening Sale and replaces the sale discount for this cart.';
+        }
+
+        return [
+            'items'=>$items,
+            'subtotal_cents'=>$subtotal,
+            'regular_cents'=>$regular,
+
+            'sale_savings_cents'=>
+                $mode==='sale'
+                ?$saleSavings
+                :0,
+
+            'sale_candidate_cents'=>$saleSavings,
+            'coupon_candidate'=>$candidate,
+            'coupon_result'=>$appliedCoupon,
+            'notice'=>$notice,
+            'mode'=>$mode
+        ];
     }
 
     public function snapshot(int $itemId,array $p,int $couponCents=0): void

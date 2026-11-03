@@ -1546,6 +1546,750 @@ final class CustomDesignService
         return $token;
     }
 
+    public function preparedCartItem(
+        array $service,
+        int $buyerId,
+        string $token
+    ):array
+    {
+        $this->cleanupExpiredCheckouts();
+
+        $serviceId=(int)($service['id']??0);
+
+        $payload=
+            $_SESSION['custom_design_checkout'][$token]
+            ??null;
+
+        $payloadValid=
+            is_array($payload)
+            && (int)($payload['buyer_id']??0)===$buyerId
+            && (int)($payload['service_id']??0)===$serviceId;
+
+        $availableLicenses=$this->serviceLicenses($serviceId);
+        $selectedLicenses=[];
+
+        if($payloadValid){
+            $selectedLicenses=$this->selectedServiceLicenses(
+                $serviceId,
+                $payload['input']['license_type']??[]
+            );
+        }
+
+        $licenseInvalid=
+            !$payloadValid
+            || !$selectedLicenses;
+
+        $basePrice=CreditService::formatCents(
+            CreditService::parseCents(
+                (string)($service['price']??'0.00')
+            )
+        );
+
+        $licensePrice=$licenseInvalid
+            ?'0.00'
+            :CreditService::formatCents(
+                CreditService::parseCents(
+                    number_format(
+                        self::serviceLicensePriceTotal(
+                            $selectedLicenses
+                        ),
+                        2,
+                        '.',
+                        ''
+                    )
+                )
+            );
+
+        $lineTotal=$licenseInvalid
+            ?'0.00'
+            :CreditService::formatCents(
+                CreditService::parseCents($basePrice)
+                +CreditService::parseCents($licensePrice)
+            );
+
+        $licenseName=$selectedLicenses
+            ?mb_substr(
+                implode(
+                    ', ',
+                    array_column(
+                        $selectedLicenses,
+                        'name'
+                    )
+                ),
+                0,
+                120
+            )
+            :'Unavailable';
+
+        $licenseDescription=$selectedLicenses
+            ?self::serviceLicenseDescriptionList(
+                $selectedLicenses
+            )
+            :'Custom Design request details are no longer available. Remove this item and add it again.';
+
+        return [
+            'listing_type'=>'custom_design',
+
+            // Prevent product-only coupon restrictions from
+            // mistaking a Custom Design ID for a product ID.
+            'id'=>0,
+            'product_id'=>null,
+
+            'custom_service_id'=>$serviceId,
+            'custom_checkout_token'=>$token,
+            'custom_checkout_valid'=>$payloadValid,
+
+            'title'=>(string)($service['title']??'Custom Design'),
+            'slug'=>(string)($service['slug']??''),
+
+            'designer_id'=>(int)($service['designer_id']??0),
+            'display_name'=>(string)($service['display_name']??''),
+            'store_slug'=>(string)($service['store_slug']??''),
+
+            'prize_credit_mode'=>
+                (string)($service['prize_credit_mode']??'none'),
+
+            'receipt_note'=>$service['receipt_note']??null,
+            'receipt_image_path'=>
+                $service['receipt_image_path']??null,
+
+            'thumbnail'=>$service['thumbnail']??null,
+
+            'price'=>$basePrice,
+            'license_price'=>$licensePrice,
+            'line_total'=>$lineTotal,
+
+            'license_type'=>'custom-design',
+            'license_key'=>$selectedLicenses
+                ?implode(
+                    ',',
+                    array_column(
+                        $selectedLicenses,
+                        'license_key'
+                    )
+                )
+                :'custom-design',
+
+            'license_name'=>$licenseName,
+            'license_description'=>$licenseDescription,
+
+            'license_snapshot'=>$selectedLicenses
+                ?self::serviceLicenseSnapshot(
+                    $selectedLicenses
+                )
+                :'[]',
+
+            'licenses'=>$availableLicenses,
+
+            'selected_license_keys'=>$selectedLicenses
+                ?array_column(
+                    $selectedLicenses,
+                    'license_key'
+                )
+                :[],
+
+            'license_invalid'=>$licenseInvalid,
+
+            'fulfillment_type'=>'custom_design',
+            'fulfillment_label'=>'Custom Design',
+
+            'pod_allowed'=>0,
+            'ai_disclosure'=>'Not applicable',
+            'is_hand_drawn'=>0,
+
+            // Custom Designs are not product listings and
+            // are not changed by product-only GO pricing.
+            'go_regular_price'=>$basePrice,
+            'go_regular_line_total'=>$lineTotal,
+            'go_regular_licenses'=>$selectedLicenses,
+            'go_paid_licenses'=>$selectedLicenses,
+            'go_sale_licenses'=>$selectedLicenses,
+            'go_points'=>0,
+            'go_applied_points'=>0,
+            'go_candidate_savings'=>0,
+            'go_pricing_mode'=>'none',
+            'go_priced_at'=>gmdate('Y-m-d H:i:s'),
+
+            'custom_checkout_error'=>$payloadValid
+                ?null
+                :'Your saved Custom Design request has expired. Remove this item and add the Custom Design again.'
+        ];
+    }
+
+    public function attachPreparedCartItemToOrder(
+        array $cartItem,
+        int $orderId,
+        int $buyerId,
+        string $discountedLine,
+        float $lineDiscount,
+        array $fee,
+        int $itemPrizeCents,
+        ?array $coupon,
+        float $commissionRate,
+        array $receiptSnapshot,
+        bool $sellerFeeCapped
+    ):array
+    {
+        if(!DB::pdo()->inTransaction()){
+            throw new \DomainException(
+                'Custom Design order attachment requires an active checkout transaction.'
+            );
+        }
+
+        $serviceId=(int)($cartItem['custom_service_id']??0);
+        $token=trim(
+            (string)($cartItem['custom_checkout_token']??'')
+        );
+
+        if(
+            $serviceId<=0
+            || !preg_match('/^[a-f0-9]{48}$/',$token)
+        ){
+            throw new \DomainException(
+                'Custom Design cart data is no longer valid. Remove the item and add it again.'
+            );
+        }
+
+        $this->cleanupExpiredCheckouts();
+
+        $payload=
+            $_SESSION['custom_design_checkout'][$token]
+            ??null;
+
+        if(
+            !is_array($payload)
+            || (int)($payload['buyer_id']??0)!==$buyerId
+            || (int)($payload['service_id']??0)!==$serviceId
+        ){
+            throw new \DomainException(
+                'Your saved Custom Design request expired. Remove the item and add it again.'
+            );
+        }
+
+        $fresh=DB::row(
+            'select
+                s.*,
+                d.display_name,
+                d.user_id seller_user_id,
+                d.prize_credit_mode
+             from custom_design_services s
+             join designers d
+               on d.id=s.designer_id
+             where s.id=?
+               and s.is_active=1
+               and d.status="approved"
+             for update',
+            [$serviceId]
+        );
+
+        if(!$fresh){
+            throw new \DomainException(
+                'This Custom Design is no longer available.'
+            );
+        }
+
+        if($buyerId===(int)$fresh['seller_user_id']){
+            throw new \DomainException(
+                'You cannot purchase your own Custom Design.'
+            );
+        }
+
+        $input=(array)($payload['input']??[]);
+
+        $selectedLicenses=$this->selectedServiceLicenses(
+            $serviceId,
+            $input['license_type']??[]
+        );
+
+        if(!$selectedLicenses){
+            throw new \DomainException(
+                'The selected Custom Design license is no longer available.'
+            );
+        }
+
+        $basePrice=CreditService::formatCents(
+            CreditService::parseCents(
+                (string)$fresh['price']
+            )
+        );
+
+        $licensePrice=CreditService::formatCents(
+            CreditService::parseCents(
+                number_format(
+                    self::serviceLicensePriceTotal(
+                        $selectedLicenses
+                    ),
+                    2,
+                    '.',
+                    ''
+                )
+            )
+        );
+
+        $originalPrice=CreditService::formatCents(
+            CreditService::parseCents($basePrice)
+            +CreditService::parseCents($licensePrice)
+        );
+
+        $cartPrice=CreditService::formatCents(
+            CreditService::parseCents(
+                (string)($cartItem['line_total']??'0.00')
+            )
+        );
+
+        if($originalPrice!==$cartPrice){
+            throw new \DomainException(
+                'The Custom Design price or license changed. Remove the item and add it again.'
+            );
+        }
+
+        $licenseSnapshot=
+            self::serviceLicenseSnapshot(
+                $selectedLicenses
+            );
+
+        if(
+            isset($cartItem['license_snapshot'])
+            && (string)$cartItem['license_snapshot']!==''
+            && json_decode(
+                (string)$cartItem['license_snapshot'],
+                true
+            ) !== json_decode($licenseSnapshot,true)
+        ){
+            throw new \DomainException(
+                'The Custom Design license changed. Remove the item and add it again.'
+            );
+        }
+
+        $briefConfig=json_decode(
+            (string)($fresh['brief_fields']??'[]'),
+            true
+        );
+
+        if(!is_array($briefConfig)){
+            $briefConfig=[];
+        }
+
+        $contextKeys=array_values(
+            array_filter(
+                array_map(
+                    static fn(array $reference):string =>
+                        (string)($reference['context_key']??''),
+                    (array)($payload['references']??[])
+                )
+            )
+        );
+
+        $brief=[];
+        $errors=[];
+
+        foreach($briefConfig as $field){
+            $key=(string)($field['key']??'');
+
+            if(!isset(self::BRIEF_FIELDS[$key])){
+                continue;
+            }
+
+            $answer=trim(
+                (string)($input[$key]??'')
+            );
+
+            if(
+                !empty($field['required'])
+                && $answer===''
+            ){
+                $errors[]=
+                    self::BRIEF_FIELDS[$key].
+                    ': text response is required.';
+            }
+
+            if(
+                !empty($field['upload_required'])
+                && !in_array(
+                    'brief:'.$key,
+                    $contextKeys,
+                    true
+                )
+            ){
+                $errors[]=
+                    self::BRIEF_FIELDS[$key].
+                    ': file upload is required.';
+            }
+
+            $brief[$key]=$answer;
+        }
+
+        $answers=[];
+
+        foreach(
+            DB::rows(
+                'select *
+                 from custom_service_questions
+                 where custom_service_id=?
+                 order by sort_order,id',
+                [$serviceId]
+            ) as $question
+        ){
+            $questionId=(int)$question['id'];
+
+            $answer=trim(
+                (string)(
+                    $input['answers'][$questionId]
+                    ??''
+                )
+            );
+
+            if(
+                !empty($question['is_required'])
+                && $answer===''
+            ){
+                $errors[]=
+                    $question['question_text'].
+                    ': text response is required.';
+            }
+
+            if(
+                !empty($question['upload_required'])
+                && !in_array(
+                    'question:'.$questionId,
+                    $contextKeys,
+                    true
+                )
+            ){
+                $errors[]=
+                    $question['question_text'].
+                    ': file upload is required.';
+            }
+
+            $answers[]=[
+                'question_id'=>$questionId,
+                'question'=>$question['question_text'],
+                'required'=>
+                    (bool)$question['is_required'],
+                'allow_upload'=>
+                    (bool)$question['allow_upload'],
+                'upload_required'=>
+                    (bool)$question['upload_required'],
+                'answer'=>$answer
+            ];
+        }
+
+        if($errors){
+            throw new \DomainException(
+                implode(' ',$errors)
+            );
+        }
+
+        $brief['answers']=$answers;
+
+        $licenseName=mb_substr(
+            implode(
+                ', ',
+                array_column(
+                    $selectedLicenses,
+                    'name'
+                )
+            ),
+            0,
+            120
+        );
+
+        $licenseDescription=
+            self::serviceLicenseDescriptionList(
+                $selectedLicenses
+            );
+
+        $checkout=new CheckoutOrderService;
+
+        $orderItemId=$checkout->addItem([
+            'order_id'=>$orderId,
+            'custom_service_id'=>$serviceId,
+            'title'=>$fresh['title'],
+            'slug'=>$fresh['slug'],
+            'designer_id'=>$fresh['designer_id'],
+            'seller_name'=>$fresh['display_name'],
+            'license_type'=>'custom-design',
+            'license_name'=>$licenseName,
+            'license_price'=>$licensePrice,
+            'license_description'=>$licenseDescription,
+            'license_snapshot'=>$licenseSnapshot,
+            'fulfillment_type'=>'custom_design',
+            'unit_price'=>$basePrice,
+            'total_price'=>$discountedLine,
+            'commission_rate'=>$commissionRate
+        ]);
+
+        DB::exec(
+            'update order_items
+             set coupon_id=?,
+                 coupon_code=?,
+                 coupon_discount=?,
+                 prize_credit_applied=?,
+                 prize_credit_mode_snapshot=?,
+                 platform_commission_amount=?,
+                 marketplace_percentage_fee_amount=?,
+                 marketplace_fixed_fee_amount=?,
+                 seller_payout_amount=?,
+                 seller_receipt_note_snapshot=?,
+                 seller_receipt_image_path_snapshot=?
+             where id=?',
+            [
+                $coupon['id']??null,
+                $coupon['code']??null,
+                $lineDiscount,
+                CreditService::formatCents(
+                    $itemPrizeCents
+                ),
+                (string)(
+                    $fresh['prize_credit_mode']
+                    ??'none'
+                ),
+                CreditService::formatCents(
+                    $fee['fee_cents']
+                ),
+                CreditService::formatCents(
+                    $fee['percentage_fee_cents']
+                ),
+                CreditService::formatCents(
+                    $fee['fixed_fee_cents']
+                ),
+                CreditService::formatCents(
+                    $fee['seller_earnings_cents']
+                ),
+                $receiptSnapshot['note']??null,
+                $receiptSnapshot['image_path']??null,
+                $orderItemId
+            ]
+        );
+
+        DB::exec(
+            'insert into custom_orders
+            (
+                order_id,
+                order_item_id,
+                custom_service_id,
+                buyer_user_id,
+                designer_id,
+                status,
+                service_snapshot,
+                brief_snapshot,
+                agreed_price,
+                turnaround_min_days,
+                turnaround_days,
+                included_revisions
+            )
+            values
+            (?,?,?,?,?,"new",?,?,?,?,?,?)',
+            [
+                $orderId,
+                $orderItemId,
+                $serviceId,
+                $buyerId,
+                (int)$fresh['designer_id'],
+                json_encode(
+                    [
+                        'title'=>$fresh['title'],
+                        'description'=>
+                            $fresh['description'],
+                        'buyer_instructions'=>
+                            $fresh['buyer_instructions'],
+                        'brief_fields'=>$briefConfig,
+                        'licenses'=>json_decode(
+                            $licenseSnapshot,
+                            true
+                        )
+                    ],
+                    JSON_THROW_ON_ERROR
+                ),
+                json_encode(
+                    $brief,
+                    JSON_THROW_ON_ERROR
+                ),
+                $originalPrice,
+                $fresh['turnaround_min_days']
+                    ??$fresh['turnaround_days'],
+                $fresh['turnaround_days'],
+                $fresh['included_revisions']
+            ]
+        );
+
+        $customOrderId=(int)DB::id();
+
+        $preparedFiles=
+            $this->preparedCheckoutFiles(
+                $payload
+            );
+
+        $uploads=$this->validateUploads(
+            $preparedFiles['references']??[],
+            'image_or_pdf'
+        );
+
+        $stored=[];
+
+        try{
+            foreach(
+                $uploads
+                as $uploadIndex=>$upload
+            ){
+                $storedPath=$this->store(
+                    $upload,
+                    'references',
+                    true
+                );
+
+                $stored[]=
+                    app_path(
+                        'storage/protected_uploads/'.
+                        $storedPath
+                    );
+
+                $context=
+                    (array)(
+                        $input['reference_contexts']
+                        [$uploadIndex]
+                        ??[]
+                    );
+
+                if(!$context){
+                    $reference=
+                        (array)(
+                            $payload['references']
+                            [$uploadIndex]
+                            ??[]
+                        );
+
+                    $context=[
+                        'key'=>
+                            $reference['context_key']
+                            ??'',
+                        'label'=>
+                            $reference['context_label']
+                            ??''
+                    ];
+                }
+
+                DB::exec(
+                    'insert into custom_order_files
+                    (
+                        custom_order_id,
+                        uploader_user_id,
+                        file_kind,
+                        original_name,
+                        storage_path,
+                        mime_type,
+                        file_size,
+                        reference_context_key,
+                        reference_context_label
+                    )
+                    values
+                    (?,?,"reference",?,?,?,?,?,?)',
+                    [
+                        $customOrderId,
+                        $buyerId,
+                        $upload['original_name'],
+                        $storedPath,
+                        $upload['mime'],
+                        $upload['size'],
+                        mb_substr(
+                            (string)(
+                                $context['key']
+                                ??''
+                            ),
+                            0,
+                            190
+                        ) ?: null,
+                        mb_substr(
+                            (string)(
+                                $context['label']
+                                ??''
+                            ),
+                            0,
+                            500
+                        ) ?: null
+                    ]
+                );
+            }
+
+            DB::exec(
+                'insert into seller_earnings
+                (
+                    order_id,
+                    product_id,
+                    designer_id,
+                    buyer_id,
+                    gross_sale,
+                    marketplace_commission,
+                    seller_earning,
+                    status
+                )
+                values
+                (?,null,?,?,?, ?,?,"pending_payment")',
+                [
+                    $orderId,
+                    (int)$fresh['designer_id'],
+                    $buyerId,
+                    CreditService::formatCents(
+                        $fee['gross_cents']
+                    ),
+                    CreditService::formatCents(
+                        $fee['fee_cents']
+                    ),
+                    CreditService::formatCents(
+                        $fee['seller_earnings_cents']
+                    )
+                ]
+            );
+
+            if($sellerFeeCapped){
+                DB::exec(
+                    'insert ignore into seller_financial_adjustments
+                    (
+                        order_id,
+                        designer_id,
+                        adjustment_type,
+                        event_key,
+                        note
+                    )
+                    values
+                    (
+                        ?,
+                        ?,
+                        "fee_cap_warning",
+                        ?,
+                        ?
+                    )',
+                    [
+                        $orderId,
+                        (int)$fresh['designer_id'],
+                        'fee-cap:order:'.
+                            $orderId.
+                            ':seller:'.
+                            (int)$fresh['designer_id'],
+                        'Marketplace fee was capped at seller gross; seller earnings were not negative.'
+                    ]
+                );
+            }
+
+        }catch(\Throwable $e){
+
+            foreach($stored as $absolute){
+                @unlink($absolute);
+            }
+
+            throw $e;
+        }
+
+        return [
+            'order_item_id'=>$orderItemId,
+            'custom_order_id'=>$customOrderId,
+            'checkout_token'=>$token,
+            'stored_paths'=>$stored,
+            'cart_item_id'=>
+                (int)($cartItem['cart_item_id']??0)
+        ];
+    }
+
     public function checkoutPayload(
         string $token,
         int $buyerId,

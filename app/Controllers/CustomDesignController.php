@@ -13,7 +13,6 @@ final class CustomDesignController {
      $api=new CustomDesignService;
 
      try{
-
          $token=$api->prepareCheckout(
              $service,
              (int)H::user()['id'],
@@ -21,12 +20,53 @@ final class CustomDesignController {
              $_FILES
          );
 
-         H::redirect(
-             '/custom-design/'.
-             rawurlencode($service['slug']).
-             '/checkout?token='.
-             rawurlencode($token)
+         $existing=DB::row(
+             'select id
+              from cart_items
+              where user_id=?
+                and custom_service_id is not null
+              limit 1',
+             [(int)H::user()['id']]
          );
+
+         if($existing){
+             $api->cleanupCheckout($token);
+
+             H::flash(
+                 'warning',
+                 'Your cart already contains a Custom Design. Complete or remove it before adding another Custom Design.'
+             );
+
+             H::redirect('/cart');
+         }
+
+         DB::exec(
+             'insert into cart_items
+             (
+                 user_id,
+                 product_id,
+                 custom_service_id,
+                 custom_checkout_token,
+                 license_type,
+                 quantity,
+                 fulfillment_type_snapshot
+             )
+             values
+             (?,null,?,?,?,1,"custom_design")',
+             [
+                 (int)H::user()['id'],
+                 (int)$service['id'],
+                 $token,
+                 'custom-design'
+             ]
+         );
+
+         H::flash(
+             'success',
+             'Custom Design added to your cart.'
+         );
+
+         H::redirect('/cart');
 
      }catch(\InvalidArgumentException $e){
 
@@ -37,9 +77,16 @@ final class CustomDesignController {
 
      }catch(\Throwable $e){
 
+         error_log(
+             'Custom Design add-to-cart: '.
+             get_class($e).
+             ': '.
+             $e->getMessage()
+         );
+
          H::flash(
              'error',
-             'Secure checkout could not be prepared.'
+             'Custom Design could not be added to your cart.'
          );
 
          H::redirect(

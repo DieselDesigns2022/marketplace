@@ -32,14 +32,18 @@
            <th>Actions</th>
         </tr>
         <?php foreach($items as $p):?>
+           <?php $isCustom=(($p['listing_type']??'product')==='custom_design'); ?>
            <tr>
                <td>
                <?php if($p['thumbnail']):?>
                    <img class="thumb" src="<?=H::e($p['thumbnail'])?>" alt="<?=H::e($p['title'])?>">
                <?php endif;?>
-               <a href="/product/<?=H::e($p['slug'])?>">
+               <a href="<?=$isCustom?'/custom-design/':'/product/'?><?=H::e($p['slug'])?>">
                <?=H::e($p['title'])?>
                </a>
+               <?php if($isCustom):?>
+                   <br><span class="badge">Custom Design</span>
+               <?php endif;?>
                </td>
                <td>
                <a href="/store/<?=H::e($p['store_slug'])?>">
@@ -50,6 +54,26 @@
                <?php if(!empty($p['license_invalid'])):?><span class="muted">Unavailable</span><?php else:?><?php if((float)($p['go_regular_price']??$p['price'])>(float)$p['price']): ?><del><?=H::money($p['go_regular_price'])?></del> <?php endif; ?><?=H::money($p['price'])?><?php endif;?>
                </td>
                <td>
+               <?php if($isCustom):?>
+                   <strong><?=H::e($p['license_name'] ?? 'Personal Use')?></strong>
+
+                   <?php if((float)($p['license_price']??0)>0):?>
+                       <br>
+                       <span class="muted">
+                           License add-ons:
+                           <?=H::money($p['license_price'])?>
+                       </span>
+                   <?php endif;?>
+
+                   <?php if(!empty($p['license_invalid'])):?>
+                       <p class="notice error">
+                           <?=H::e(
+                               $p['custom_checkout_error']
+                               ??'This Custom Design request is no longer available. Remove it and add it again.'
+                           )?>
+                       </p>
+                   <?php endif;?>
+               <?php else:?>
                <form method="post" action="/cart/update">
                    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
                    <p class="help-text license-help-note">Hover over ? for a quick preview or click ? to open the full license details.</p>
@@ -60,9 +84,15 @@
                    <?php if(!empty($p['license_invalid'])):?><p class="notice error">This license is no longer available. Please choose another license.</p><?php endif;?>
                    <button>Update</button>
                </form>
+               <?php endif;?>
                </td>
                <td><?=H::e($p['fulfillment_label'] ?? 'Downloadable Product')?></td>
                <td>
+               <?php if($isCustom):?>
+                   <span class="muted">
+                       Made to order
+                   </span>
+               <?php else:?>
                <?=$p['pod_allowed']?'POD allowed':'POD not allowed'?>
                <br>
                <span class="badge ai">
@@ -71,6 +101,7 @@
                <?php if(!empty($p['is_hand_drawn'])):?>
                <br>
                <span class="badge hand-drawn">✏️ Hand Drawn</span>
+               <?php endif;?>
                <?php endif;?>
                </td>
                <td>
