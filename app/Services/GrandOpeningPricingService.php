@@ -348,32 +348,7 @@ final class GrandOpeningPricingService
             $items[]=$p;
         }
 
-        $candidate=
-            ($code!=='' && $userId>0)
-            ?CouponService::validate(
-                $code,
-                $items,
-                $userId
-            )
-            :null;
-
-        $couponCents=
-            !empty($candidate['ok'])
-            ?CreditService::parseCents(
-                (string)$candidate['discount'],
-                false
-            )
-            :0;
-
-        $mode=self::winner(
-            $saleSavings,
-            $couponCents
-        );
-
-        $appliedCoupon=
-            $mode==='coupon'
-            ?$candidate
-            :null;
+        $mode=$saleSavings>0?'sale':'none';
 
         $subtotal=0;
 
@@ -430,33 +405,25 @@ final class GrandOpeningPricingService
 
         unset($p);
 
-        $notice='';
+        $candidate=
+            ($code!=='' && $userId>0)
+            ?CouponService::validate(
+                $code,
+                $items,
+                $userId
+            )
+            :null;
 
-        if($candidate && empty($candidate['ok'])){
-            $notice=$candidate['error'];
-
-        }elseif(
-            $candidate
-            && $mode==='sale'
-        ){
-            $notice=
-                'The Grand Opening Sale saves '.
-                CreditService::formatCents(
-                    $saleSavings
-                ).
-                ' USD, compared with '.
-                CreditService::formatCents(
-                    $couponCents
-                ).
-                ' USD using your coupon. The sale is applied; your coupon is not used.';
-
-        }elseif(
-            $candidate
-            && $mode==='coupon'
-            && $saleSavings>0
-        ){
-            $notice=
-                'Your coupon saves more than the Grand Opening Sale and replaces the sale discount for this cart.';
+        $appliedCoupon=!empty($candidate['ok'])?$candidate:null;
+        $notice=$candidate && empty($candidate['ok'])?$candidate['error']:'';
+        if($mode==='none' && $appliedCoupon){
+            $mode='coupon';
+            foreach($items as &$p){
+                if(($p['listing_type']??'product')==='product'){
+                    $p['go_pricing_mode']='coupon';
+                }
+            }
+            unset($p);
         }
 
         return [

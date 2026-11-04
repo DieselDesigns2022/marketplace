@@ -1543,6 +1543,9 @@ final class CustomDesignService
             'references'=>$stored
         ];
 
+        CustomCheckoutDraftService::save(
+            $token,$_SESSION['custom_design_checkout'][$token]
+        );
         return $token;
     }
 
@@ -1556,9 +1559,7 @@ final class CustomDesignService
 
         $serviceId=(int)($service['id']??0);
 
-        $payload=
-            $_SESSION['custom_design_checkout'][$token]
-            ??null;
+        $payload=CustomCheckoutDraftService::load($token,$buyerId,$serviceId);
 
         $payloadValid=
             is_array($payload)
@@ -1712,7 +1713,7 @@ final class CustomDesignService
 
             'custom_checkout_error'=>$payloadValid
                 ?null
-                :'Your saved Custom Design request has expired. Remove this item and add the Custom Design again.'
+                :'The saved details for this Custom Design are unavailable. Please add this request again.'
         ];
     }
 
@@ -1752,9 +1753,7 @@ final class CustomDesignService
 
         $this->cleanupExpiredCheckouts();
 
-        $payload=
-            $_SESSION['custom_design_checkout'][$token]
-            ??null;
+        $payload=CustomCheckoutDraftService::load($token,$buyerId,$serviceId);
 
         if(
             !is_array($payload)
@@ -1762,7 +1761,7 @@ final class CustomDesignService
             || (int)($payload['service_id']??0)!==$serviceId
         ){
             throw new \DomainException(
-                'Your saved Custom Design request expired. Remove the item and add it again.'
+                'The saved details for this Custom Design are unavailable. Please add this request again.'
             );
         }
 
@@ -2298,9 +2297,7 @@ final class CustomDesignService
     {
         $this->cleanupExpiredCheckouts();
 
-        $payload=
-            $_SESSION['custom_design_checkout'][$token]
-            ??null;
+        $payload=CustomCheckoutDraftService::load($token,$buyerId,$serviceId);
 
         if(
             !$payload ||
@@ -2341,9 +2338,9 @@ final class CustomDesignService
             return;
         }
 
-        $payload=
-            $_SESSION['custom_design_checkout'][$token]
-            ??null;
+        $buyerId=(int)(H::user()['id']??0);
+        $payload=CustomCheckoutDraftService::load($token,$buyerId);
+        if(!$payload) return;
 
         if($payload){
 
@@ -2367,6 +2364,7 @@ final class CustomDesignService
             @rmdir($dir);
         }
 
+        CustomCheckoutDraftService::forget($token,$buyerId);
         unset(
             $_SESSION['custom_design_checkout'][$token]
         );
@@ -2374,20 +2372,8 @@ final class CustomDesignService
 
     private function cleanupExpiredCheckouts():void
     {
-        foreach(
-            (array)($_SESSION['custom_design_checkout']??[])
-            as $token=>$payload
-        ){
-            if(
-                time()-
-                (int)($payload['created_at']??0)
-                >7200
-            ){
-                $this->cleanupCheckout(
-                    (string)$token
-                );
-            }
-        }
+        // Saved custom requests do not expire. Explicit cart removal or
+        // successful checkout performs owner-checked cleanup.
     }
 
     private function isPreparedCheckoutFile(string $path):bool
@@ -2703,7 +2689,7 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                 'fulfillment_type'=>'custom_design',
                 'unit_price'=>$basePrice,
                 'total_price'=>$price,
-                'commission_rate'=>$rate
+                'commission_rate'=>StripeService::commissionRate()
             ]);
             $itemFee=$fee['items'][1];DB::exec('update order_items set prize_credit_applied=?,prize_credit_mode_snapshot=?,platform_commission_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($prizeCreditCents),(string)($fresh['prize_credit_mode']??'none'),CreditService::formatCents($itemFee['fee_cents']),CreditService::formatCents($itemFee['percentage_fee_cents']),CreditService::formatCents($itemFee['fixed_fee_cents']),CreditService::formatCents($itemFee['seller_earnings_cents']),$item]);
             DB::exec('insert into custom_orders(order_id,order_item_id,custom_service_id,buyer_user_id,designer_id,status,service_snapshot,brief_snapshot,agreed_price,turnaround_min_days,turnaround_days,included_revisions) values(?,?,?,?,?,"new",?,?,?,?,?,?)',[$order,$item,$fresh['id'],$buyerId,$fresh['designer_id'],json_encode(['title'=>$fresh['title'],'description'=>$fresh['description'],'buyer_instructions'=>$fresh['buyer_instructions'],'brief_fields'=>$briefConfig,'licenses'=>json_decode($licenseSnapshot,true)],JSON_THROW_ON_ERROR),json_encode($brief,JSON_THROW_ON_ERROR),$price,$fresh['turnaround_min_days']??$fresh['turnaround_days'],$fresh['turnaround_days'],$fresh['included_revisions']]);$custom=(int)DB::id();
@@ -2751,7 +2737,7 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
                         ) ?: null
                     ]
                 );
-            }DB::exec('insert into seller_earnings(order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,null,?,?,?,?,?,"pending_payment")',[$order,$fresh['designer_id'],$buyerId,CreditService::formatCents($fee['gross_cents']),CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);if($fee['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$fresh['designer_id'],'fee-cap:order:'.$order.':seller:'.$fresh['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);$created=DB::row('select * from orders where id=?',[$order]);$items=DB::rows('select * from order_items where order_id=?',[$order]);if(CreditService::parseCents($total)===0){$finalizer=new OrderFinalizationService;$finalizer->finalize($order,'internal-credit-order:'.$order,true);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);$finalizer->settlePlatformCreditPayoutsAfterCommit($order);$finalizer->communicate($order);H::redirect('/dashboard/order/'.$order);}$session=$checkout->checkout($created,$items);DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?',[$session['id']??null,$order]);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);header('Location: '.$session['url'],true,303);exit;
+            }DB::exec('insert into seller_earnings(order_id,product_id,designer_id,buyer_id,gross_sale,marketplace_commission,seller_earning,status) values (?,null,?,?,?,?,?,"pending_payment")',[$order,$fresh['designer_id'],$buyerId,CreditService::formatCents($fee['gross_cents']),CreditService::formatCents($fee['fee_cents']),CreditService::formatCents($fee['seller_earnings_cents'])]);if($fee['capped'])DB::exec('insert ignore into seller_financial_adjustments(order_id,designer_id,adjustment_type,event_key,note) values (?,? ,"fee_cap_warning",?,?)',[$order,$fresh['designer_id'],'fee-cap:order:'.$order.':seller:'.$fresh['designer_id'],'Marketplace fee was capped at seller gross; seller earnings were not negative.']);OrderFundingSnapshotService::capture((int)$order);$created=DB::row('select * from orders where id=?',[$order]);$items=DB::rows('select * from order_items where order_id=?',[$order]);if(CreditService::parseCents($total)===0){$finalizer=new OrderFinalizationService;$finalizer->finalize($order,'internal-credit-order:'.$order,true);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);$finalizer->settlePlatformCreditPayoutsAfterCommit($order);$finalizer->communicate($order);H::redirect('/dashboard/order/'.$order);}$session=$checkout->checkout($created,$items);DB::exec('update orders set stripe_checkout_session_id=?,stripe_payment_status="pending" where id=?',[$session['id']??null,$order]);DB::commit();if(!empty($input['checkout_token']))$this->cleanupCheckout((string)$input['checkout_token']);header('Location: '.$session['url'],true,303);exit;
         }catch(\Throwable $e){if(DB::pdo()->inTransaction())DB::rollBack();foreach($stored as $path)@unlink($path);throw$e;}
     }
 
@@ -2833,7 +2819,36 @@ $identity='custom-tax:'.$buyerId.':'.hash('sha256',json_encode([(int)$service['i
 
     public function systemTransitionByOrder(int $orderId,string $to,string $source):bool
     {
-        if(!in_array($to,['cancelled','refunded'],true)||!in_array($source,['stripe_cancel','stripe_expired','stripe_refund'],true))throw new \InvalidArgumentException('Invalid system transition.');$owns=!DB::pdo()->inTransaction();if($owns)DB::begin();try{$o=DB::row('select * from custom_orders where order_id=? for update',[$orderId]);if(!$o){if($owns)DB::commit();return false;}$from=$o['status'];if(in_array($from,['cancelled','refunded'],true)&&$from!==$to||$from==='completed'&&$to!=='refunded'){if($owns)DB::commit();return false;}$changed=$from!==$to;if($changed)DB::exec('update custom_orders set status=? where id=? and status=?',[$to,$o['id'],$from]);$key=$source.':'.$to;DB::exec('insert ignore into custom_order_status_history(custom_order_id,from_status,to_status,actor_user_id,transition_source,system_event_key,note) values(?,?,?,null,?,?,?)',[$o['id'],$from,$to,$source,$key,'Payment lifecycle transition.']);$historyAdded=(int)DB::pdo()->query('select row_count()')->fetchColumn()===1;if($owns)DB::commit();return $changed||$historyAdded;}catch(\Throwable $e){if($owns&&DB::pdo()->inTransaction())DB::rollBack();throw$e;}
+        if(!in_array($to,['cancelled','refunded'],true)
+            || !in_array($source,['stripe_cancel','stripe_expired','stripe_refund'],true)){
+            throw new \InvalidArgumentException('Invalid system transition.');
+        }
+        $owns=!DB::pdo()->inTransaction();
+        if($owns)DB::begin();
+        try{
+            DB::row('select id from orders where id=? for update',[$orderId]);
+            $rows=DB::rows('select * from custom_orders where order_id=? order by id for update',[$orderId]);
+            $any=false;
+            foreach($rows as $o){
+                $from=$o['status'];
+                if((in_array($from,['cancelled','refunded'],true)&&$from!==$to)
+                    || ($from==='completed'&&$to!=='refunded'))continue;
+                $changed=$from!==$to;
+                if($changed)DB::exec('update custom_orders set status=? where id=? and status=?',
+                    [$to,$o['id'],$from]);
+                DB::exec('insert ignore into custom_order_status_history
+                    (custom_order_id,from_status,to_status,actor_user_id,transition_source,system_event_key,note)
+                    values(?,?,?,null,?,?,?)',
+                    [$o['id'],$from,$to,$source,$source.':'.$to,'Payment lifecycle transition.']);
+                $historyAdded=(int)DB::pdo()->query('select row_count()')->fetchColumn()===1;
+                $any=$any||$changed||$historyAdded;
+            }
+            if($owns)DB::commit();
+            return $any;
+        }catch(\Throwable $e){
+            if($owns&&DB::pdo()->inTransaction())DB::rollBack();
+            throw $e;
+        }
     }
 
     public function order(int $id,int $userId,?string $side=null):array

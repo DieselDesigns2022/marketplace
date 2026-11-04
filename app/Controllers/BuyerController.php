@@ -59,8 +59,14 @@ class BuyerController
         unset($item);
         $collabItems=DB::rows('select oi.*,c.title,c.slug,c.final_zip_path,c.final_zip_sha256,d.display_name storefront_name,d.store_slug storefront_slug,coalesce((select sum(a.merchandise_refund_cents) from marketplace_refund_allocations a where a.order_item_id=oi.id),0) refunded_cents from order_items oi join collab_events c on c.id=oi.collab_id left join designers d on d.id=oi.collab_storefront_designer_id where oi.order_id=?',[$order['id']]);
         foreach($collabItems as &$collabItem)$collabItem['download_eligible']=\App\Services\CollabService::itemDownloadable((string)$order['payment_status'],\App\Services\CreditService::parseCents((string)$collabItem['total_price'],false),(int)$collabItem['refunded_cents']);unset($collabItem);
-        $customOrder=DB::row('select * from custom_orders where order_id=? and buyer_user_id=?',[$order['id'],H::user()['id']]);
-        $customFinals=$customOrder&&$customOrder['status']==='completed'&&in_array($order['payment_status'],['paid','partially_refunded'],true)?DB::rows('select * from custom_order_files where custom_order_id=? and file_kind="final" order by id',[$customOrder['id']]):[];
+        $customOrders=DB::rows('select * from custom_orders where order_id=? and buyer_user_id=? order by id',[$order['id'],H::user()['id']]);
+        $customOrdersByItem=[];
+        foreach($customOrders as $customRow)$customOrdersByItem[(int)$customRow['order_item_id']]=$customRow;
+        $customOrder=$customOrders[0]??null;
+        foreach($customOrders as $customRow){
+            if($customRow['status']==='cancelled'){$customOrder=$customRow;break;}
+        }
+        $customFinals=in_array($order['payment_status'],['paid','partially_refunded'],true)?DB::rows('select f.* from custom_order_files f join custom_orders co on co.id=f.custom_order_id where co.order_id=? and co.buyer_user_id=? and co.status="completed" and f.file_kind="final" order by co.order_item_id,f.id',[$order['id'],H::user()['id']]):[];
         $prizeWheelUnlocks=[];
 
         if(($order['payment_status']??'')==='paid'){
@@ -87,6 +93,7 @@ class BuyerController
                     )
                 ),
                 'customOrder'=>$customOrder,
+                'customOrdersByItem'=>$customOrdersByItem,
                 'customFinals'=>$customFinals,
                 'prizeWheelUnlocks'=>$prizeWheelUnlocks,
             ]

@@ -21,7 +21,10 @@ class Router
     }
     public function dispatch(string $method,string $path): void
     {
-        Helpers::verifyCsrf();
+        // Stripe authenticates this server-to-server request with its signature.
+        if ($method !== 'POST' || $path !== '/stripe/webhook') {
+            Helpers::verifyCsrf();
+        }
         $routeMethod = $method === 'HEAD' ? 'GET' : $method;
         foreach ($this->routes as $r) if (in_array($routeMethod,$r['m'],true))
         {

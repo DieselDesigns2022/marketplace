@@ -53,13 +53,20 @@ class Helpers
     }
      public static function csrf(): string
     {
-        $_SESSION['_csrf'] ??= bin2hex(random_bytes(32));
+        if (!is_string($_SESSION['_csrf'] ?? null) || $_SESSION['_csrf'] === '') {
+            $_SESSION['_csrf'] = bin2hex(random_bytes(32));
+        }
         return $_SESSION['_csrf'];
 
     }
      public static function verifyCsrf(): void
     {
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['_csrf'] ?? '', $_POST['_csrf'] ?? '') )
+        $expected = $_SESSION['_csrf'] ?? null;
+        $submitted = $_POST['_csrf'] ?? null;
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+            && (!is_string($expected) || $expected === ''
+                || !is_string($submitted) || $submitted === ''
+                || !hash_equals($expected, $submitted)))
         {
             self::abort(419);
 

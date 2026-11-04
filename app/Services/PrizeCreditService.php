@@ -1147,7 +1147,7 @@ final class PrizeCreditService
 
         try {
             $order = DB::row(
-                'select id,user_id
+                'select id,user_id,financial_snapshot_version
                  from orders
                  where id=?
                  for update',
@@ -1185,12 +1185,16 @@ final class PrizeCreditService
                 return 0;
             }
 
+            $fullCreditRefund = (int)($order['financial_snapshot_version'] ?? 0) === 1
+                && FullCreditRefundService::authorized($orderId);
+
             $target = 0;
 
             $items = DB::rows(
                 'select
                     oi.id,
                     oi.total_price,
+                    oi.cash_merchandise_amount,
                     oi.prize_credit_applied,
                     coalesce(
                         (
@@ -1219,7 +1223,24 @@ final class PrizeCreditService
                     false
                 );
 
-                $basis = max(0, $price - $prize);
+                if ($fullCreditRefund) {
+                    $target += $prize;
+                    continue;
+                }
+
+                if ((int)($order['financial_snapshot_version'] ?? 0) === 1) {
+                    if ($item['cash_merchandise_amount'] === null) {
+                        throw new DomainException('Prize refund cash snapshot is unavailable.');
+                    }
+                    $basis = CreditService::parseCents(
+                        (string)$item['cash_merchandise_amount'], false
+                    );
+                    if ((int)$item['refunded_cents'] > $basis) {
+                        throw new DomainException('Prize refund exceeds the cash snapshot.');
+                    }
+                } else {
+                    $basis = max(0, $price - $prize);
+                }
 
                 $target += self::refundedPrizeTargetCents(
                     $prize,

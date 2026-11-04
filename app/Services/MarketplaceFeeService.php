@@ -47,8 +47,23 @@ final class MarketplaceFeeService
             // Preserve percentage first and cap the fixed component to the remaining gross.
             $percentage = min($percentage, $fee);
             $fixed = $fee - $percentage;
-            $percentageAllocations = self::allocate($percentage, $sellerItems);
-            $fixedAllocations = self::allocate($fixed, $sellerItems);
+            // Allocate the capped total first so no item fee exceeds its gross.
+            $totalAllocations = self::allocate($fee, $sellerItems);
+            $feeWeights = [];
+            foreach ($sellerItems as $item) {
+                $feeWeights[] = [
+                    'id' => $item['id'],
+                    'gross_cents' => $totalAllocations[$item['id']],
+                ];
+            }
+            // Split components within each item's already allocated fee.
+            $percentageAllocations = self::allocate($percentage, $feeWeights);
+            $fixedAllocations = [];
+            foreach ($sellerItems as $item) {
+                $id = $item['id'];
+                $fixedAllocations[$id] =
+                    $totalAllocations[$id] - $percentageAllocations[$id];
+            }
             $allocatedItems = [];
             foreach ($sellerItems as $item) {
                 $id = $item['id'];

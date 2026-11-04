@@ -20,26 +20,6 @@ final class CustomDesignController {
              $_FILES
          );
 
-         $existing=DB::row(
-             'select id
-              from cart_items
-              where user_id=?
-                and custom_service_id is not null
-              limit 1',
-             [(int)H::user()['id']]
-         );
-
-         if($existing){
-             $api->cleanupCheckout($token);
-
-             H::flash(
-                 'warning',
-                 'Your cart already contains a Custom Design. Complete or remove it before adding another Custom Design.'
-             );
-
-             H::redirect('/cart');
-         }
-
          DB::exec(
              'insert into cart_items
              (

@@ -158,7 +158,7 @@
       <?php if(!empty($_SESSION['coupon_code'])): ?>
         <form method="post" action="/cart/coupon/remove"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button class="coupon-action">Remove coupon</button></form>
       <?php endif; ?>
-      <p>Sale and coupon discounts do not stack. We apply the highest total savings.</p>
+      <p>Sale prices apply first. You can use one eligible coupon on top of the sale price.</p>
       <p><a class="btn" href="/checkout">Checkout</a></p>
     </div>
     </div>

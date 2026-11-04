@@ -82,3 +82,18 @@
 </p>
 
 <h2>Order payment transactions</h2><table><tr><th>Type</th><th>Status</th><th>Amount</th><th>Message</th><th>Date</th></tr><?php foreach(($transactions ?? []) as $t):?><tr><td><?=H::e($t['transaction_type'])?></td><td><?=H::e($t['payment_status'])?></td><td><?=H::money($t['amount'])?></td><td><?=H::e($t['message'] ?? '')?></td><td><?=$t['created_at']?></td></tr><?php endforeach;?></table>
+
+
+<?php if((int)($order['financial_snapshot_version']??0)===1
+    && ((float)($order['credits_applied']??0)>0 || (float)($order['prize_credit_applied']??0)>0)
+    && H::canAdmin('orders.manage') && (H::user()['role']??'')==='admin'): ?>
+<section class="card">
+  <h2>Complete a full credit refund</h2>
+  <p>Restore any remaining Marketplace Credit and Prize Credit and mark this entire order refunded. Download access and further delivery will close. Any cash payment must already be fully refunded and reconciled.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+    <input type="hidden" name="action" value="complete_full_credit_refund">
+    <button type="submit">Complete full credit refund</button>
+  </form>
+</section>
+<?php endif; ?>

@@ -35,7 +35,7 @@
 
 <section class="card">
     <h2>Marketplace money summary</h2>
-    <p class="muted">Commission shown here counts live Stripe paid orders only and shows the Creative Moth marketplace commission snapshot before Stripe processing fees. Stripe fees may reduce the final amount paid out to the platform bank account.</p>
+    <p class="muted">Commission shown here counts live Stripe paid orders only and shows the Creative Moth marketplace commission snapshot before Stripe processing fees. Recorded processing fees include paid, partially refunded and fully refunded live Stripe orders. Missing fees are not zero. This summary is not a net-profit calculation and does not include all platform costs.</p>
     <div style="overflow-x:auto; max-width:100%;"><div class="money-scroll"><table>
         <tr>
             <th>Paid Orders</th>
@@ -43,7 +43,7 @@
             <th>Order Tax Collected</th>
             <th>Creative Moth Commission</th>
             <th>Seller Payouts Owed</th>
-            <th>Stripe Fees Recorded</th>
+            <th>Known Stripe Processing Fees</th>
             <th>Seller Transfers Sent</th>
             <th>Seller Transfers Failed</th>
         </tr>
@@ -53,7 +53,18 @@
             <td><?= H::money($summary['tax_collected'] ?? 0) ?></td>
             <td><strong><?= H::money($summary['marketplace_commission'] ?? 0) ?></strong></td>
             <td><?= H::money($summary['seller_payouts'] ?? 0) ?></td>
-            <td><?= H::money($summary['stripe_fees_recorded'] ?? 0) ?></td>
+            <td>
+                <?php if (($summary['stripe_fees_recorded'] ?? null) === null): ?>
+                    <strong>Not recorded</strong>
+                <?php else: ?>
+                    <?= H::money($summary['stripe_fees_recorded']) ?>
+                <?php endif; ?>
+                <br><span class="muted money-small">
+                    <?= (int)($summary['stripe_fees_known'] ?? 0) ?> orders recorded;
+                    <?= (int)($summary['stripe_fees_missing'] ?? 0) ?> missing.
+                    Includes fully refunded orders. Missing fees are unknown.
+                </span>
+            </td>
             <td><?= H::money($summary['seller_transfers_sent'] ?? 0) ?></td>
             <td><?= H::money($summary['seller_transfers_failed'] ?? 0) ?></td>
         </tr>

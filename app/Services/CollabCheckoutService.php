@@ -111,6 +111,7 @@ final class CollabCheckoutService
                 $coupon['id']??null,$coupon['code']??null,CreditService::formatCents($discountCents),CreditService::formatCents((int)$fee['fee_cents']),
                 CreditService::formatCents((int)$fee['percentage_fee_cents']),CreditService::formatCents((int)$fee['fixed_fee_cents']),CreditService::formatCents((int)$fee['seller_earnings_cents']),$itemId,
             ]);
+            OrderFundingSnapshotService::capture($orderId);
             $order = DB::row('select * from orders where id=?', [$orderId]);
             if ($breakdown['final_cents'] === 0) {
                 $finalizer = new OrderFinalizationService();

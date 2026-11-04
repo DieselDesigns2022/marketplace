@@ -44,43 +44,37 @@ final class CreditService
         $discountCents = self::parseCents($discount, false);
         $taxCents = self::parseCents($tax, false);
         $availableCents = self::parseCents($availableCredit, false);
-        $beforeCredit = max(0, $subtotalCents - $discountCents + $taxCents);
-        $credit = $useCredit ? min($availableCents, $beforeCredit) : 0;
+        $merchandiseCents = max(0, $subtotalCents - $discountCents);
+        $beforeCredit = $merchandiseCents + $taxCents;
+        $credit = $useCredit ? min($availableCents, $merchandiseCents) : 0;
+        if ($credit > 0 && $beforeCredit > $credit) {
+            // Estimate processing from the observed USD card fee schedule.
+            // Use one seller's commission as the lower bound for a mixed cart.
+            // Two cents of headroom cover integer rounding at both boundaries.
+            $minimumMerchandise = max(
+                32,
+                intdiv(290 * $taxCents + 20000 + 609, 610),
+                50 - $taxCents
+            );
+            $credit = min($credit, max(0, $merchandiseCents - $minimumMerchandise));
+        }
+
         return ['subtotal_cents' => $subtotalCents, 'discount_cents' => $discountCents, 'tax_cents' => $taxCents, 'credit_cents' => $credit, 'final_cents' => $beforeCredit - $credit];
     }
 
-
-    public static function allocateMerchandiseCredit(array $bases, int $creditCents): array
+    public static function allocateMerchandiseCredit(array $lineCents, int $creditCents): array
     {
         if ($creditCents < 0) {
-            throw new InvalidArgumentException('Negative credit allocation.');
+            throw new \InvalidArgumentException('Credit cannot be negative.');
         }
-        foreach ($bases as $base) {
-            if (!is_int($base) || $base < 0) {
-                throw new InvalidArgumentException('Invalid merchandise amount.');
+        foreach ($lineCents as $cents) {
+            if (!is_int($cents) || $cents < 0) {
+                throw new \InvalidArgumentException('Merchandise must be nonnegative integer cents.');
             }
         }
-        $total = array_sum($bases);
-        $amount = min($creditCents, $total);
-        $result = array_fill_keys(array_keys($bases), 0);
-        if ($amount === 0 || $total === 0) return $result;
-
-        $assigned = 0;
-        $remainders = [];
-        foreach ($bases as $index => $base) {
-            $numerator = $amount * $base;
-            $result[$index] = intdiv($numerator, $total);
-            $assigned += $result[$index];
-            $remainders[] = ['index' => $index, 'remainder' => $numerator % $total];
-        }
-        usort($remainders, static fn($a, $b) =>
-            ($b['remainder'] <=> $a['remainder'])
-            ?: ($a['index'] <=> $b['index'])
+        return CheckoutFundingService::allocate(
+            $lineCents, min($creditCents, array_sum($lineCents))
         );
-        for ($i = 0; $i < $amount - $assigned; $i++) {
-            $result[$remainders[$i]['index']]++;
-        }
-        return $result;
     }
 
     public function balances(int $userId): array
@@ -193,6 +187,161 @@ final class CreditService
         }
         $this->insertEntry($userId, $cents, 'release', 'released', $key, $orderId, null, null, (int)$reservation['id'], 'Checkout credit released');
         return true;
+    }
+
+
+    /**
+     * Restore Marketplace Credit against durable cash-refund allocations.
+     * Zero-cash components require a separate explicit refund action.
+     */
+    public function restoreRefundedCredit(int $userId, int $orderId): int
+    {
+        $owns = !DB::pdo()->inTransaction();
+        if ($owns) DB::begin();
+
+        try {
+            $order = DB::row(
+                'select * from orders where id=? for update',
+                [$orderId]
+            );
+            if (!$order || (int)$order['user_id'] !== $userId) {
+                throw new DomainException('Credit refund owner does not match the order.');
+            }
+            if ((int)($order['financial_snapshot_version'] ?? 0) !== 1) {
+                if ($owns) DB::commit();
+                return 0;
+            }
+
+            $credit = self::parseCents((string)$order['credits_applied'], false);
+            if ($credit === 0) {
+                if ($owns) DB::commit();
+                return 0;
+            }
+            if (empty($order['finalization_key'])
+                || $order['credit_payment_status'] !== 'finalized'
+                || !in_array($order['payment_status'], ['paid','partially_refunded','refunded'], true)) {
+                throw new DomainException('Credit refund requires a finalized paid order.');
+            }
+
+            $this->lock($userId);
+            $redemptions = DB::rows(
+                'select * from credit_transactions
+                 where user_id=? and order_id=?
+                   and type="redemption" and status="finalized"
+                 order by id for update',
+                [$userId, $orderId]
+            );
+            if (count($redemptions) !== 1
+                || self::parseCents((string)$redemptions[0]['amount']) !== -$credit) {
+                throw new DomainException('Credit refund does not match the original redemption.');
+            }
+            $redemptionId = (int)$redemptions[0]['id'];
+
+            $share = static function(int $funded, int $basis, int $refunded): int {
+                foreach ([$funded, $basis, $refunded] as $value) {
+                    if ($value < 0 || $value > 1000000000) {
+                        throw new DomainException('Credit refund amount is outside the snapshot range.');
+                    }
+                }
+                if ($refunded > $basis) {
+                    throw new DomainException('Refund exceeds the stored cash component.');
+                }
+                if ($funded === 0 || $refunded === 0 || $basis === 0) return 0;
+                return min($funded, intdiv(
+                    $funded * $refunded + intdiv($basis, 2), $basis
+                ));
+            };
+
+            $items = DB::rows(
+                'select oi.id,oi.marketplace_credit_applied,oi.cash_merchandise_amount,
+                    coalesce((
+                        select sum(a.merchandise_refund_cents)
+                        from marketplace_refund_allocations a
+                        join marketplace_refund_observations ob
+                          on ob.id=a.refund_observation_id
+                        where a.order_item_id=oi.id
+                          and ob.allocation_status in ("allocated","reconciled")
+                    ),0) refunded_cents
+                 from order_items oi where oi.order_id=?
+                 order by oi.id for update',
+                [$orderId]
+            );
+            if (!$items) throw new DomainException('Credit refund items are unavailable.');
+
+            $target = 0;
+            $itemCredit = 0;
+            $itemCash = 0;
+            foreach ($items as $item) {
+                if ($item['cash_merchandise_amount'] === null) {
+                    throw new DomainException('Cash funding snapshot is unavailable.');
+                }
+                $funded = self::parseCents((string)$item['marketplace_credit_applied'], false);
+                $basis = self::parseCents((string)$item['cash_merchandise_amount'], false);
+                $itemCredit += $funded;
+                $itemCash += $basis;
+                $target += $share($funded, $basis, (int)$item['refunded_cents']);
+            }
+
+            $taxCredit = self::parseCents((string)$order['marketplace_credit_tax'], false);
+            $tax = self::parseCents((string)$order['tax_amount'], false);
+            $taxCash = $tax - $taxCredit;
+            if ($taxCash < 0 || $itemCredit + $taxCredit !== $credit
+                || $itemCredit !== self::parseCents((string)$order['marketplace_credit_merchandise'], false)
+                || $itemCash + $taxCash !== self::parseCents((string)$order['total'], false)) {
+                throw new DomainException('Credit refund funding totals do not match.');
+            }
+
+            $taxRefunded = (int)(DB::row(
+                'select coalesce(sum(tax_refund_cents),0) cents
+                 from marketplace_refund_observations
+                 where order_id=? and allocation_status in ("allocated","reconciled")',
+                [$orderId]
+            )['cents'] ?? 0);
+            $target += $share($taxCredit, $taxCash, $taxRefunded);
+            if (FullCreditRefundService::authorized($orderId)) $target = $credit;
+
+            $prefix = 'order:'.$orderId.':marketplace-credit:refund:';
+            $restored = self::parseCents((string)(DB::row(
+                'select coalesce(sum(amount),0) amount
+                 from credit_transactions
+                 where user_id=? and order_id=? and related_transaction_id=?
+                   and type="grant" and status="finalized"
+                   and idempotency_key like ?',
+                [$userId, $orderId, $redemptionId, $prefix.'%']
+            )['amount'] ?? '0.00'), false);
+
+            if ($target > $credit || $restored > $credit || $restored > $target) {
+                throw new DomainException('Credit refund exceeds its recorded entitlement.');
+            }
+            $delta = $target - $restored;
+            if ($delta === 0) {
+                if ($owns) DB::commit();
+                return 0;
+            }
+
+            $key = $prefix.$target;
+            if (DB::row('select id from credit_transactions where idempotency_key=?', [$key])) {
+                throw new DomainException('Credit refund ledger key conflict.');
+            }
+            $amount = self::formatCents($delta);
+            if ($this->guardedUpdate(
+                'update marketplace_credits set total_balance=total_balance+?
+                 where user_id=? and total_balance+?<=?',
+                [$amount, $userId, $amount, self::formatCents(self::MAX_CENTS)]
+            ) !== 1) {
+                throw new DomainException('Credit refund balance update failed.');
+            }
+            $this->insertEntry(
+                $userId, $delta, 'grant', 'finalized', $key, $orderId,
+                null, null, $redemptionId,
+                'Marketplace Credit restored from allocated cash refund'
+            );
+            if ($owns) DB::commit();
+            return $delta;
+        } catch (\Throwable $error) {
+            if ($owns && DB::pdo()->inTransaction()) DB::rollBack();
+            throw $error;
+        }
     }
 
     public function grant(int $userId, string|int $amount, string $key, array $meta = []): bool

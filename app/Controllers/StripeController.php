@@ -43,6 +43,7 @@ class StripeController
         $refundService=new MarketplaceRefundService();
         $allocated=$refundService->allocations($orderId);
         $allocatedTotal=array_sum(array_map(static fn(array $r):int=>(int)$r['refunded_cents'],$allocated));
+        (new CreditService())->restoreRefundedCredit((int)$order['user_id'],$orderId);
         if($allocatedTotal<=0){if($owns)DB::commit();return;}
 
         (new \App\Services\PrizeCreditService())
@@ -52,14 +53,14 @@ class StripeController
             );
 
         $collabItem=DB::row('select oi.* from order_items oi where oi.order_id=? and oi.collab_id is not null limit 1',[$orderId]);
-        if($collabItem){$this->reconcileCollabRefund($order,$collabItem,$allocated,$refundService);(new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();return;}
+        if($collabItem){$this->reconcileCollabRefund($order,$collabItem,$allocated,$refundService);\App\Services\RefundLedgerService::sync($orderId);(new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();return;}
         if(($order['marketplace_fee_model']??'legacy_percentage')!=='percentage_plus_fixed'){
             $legacy=[];foreach($allocated as $item){$rate=(float)(DB::row('select commission_rate from order_items where id=?',[$item['id']])['commission_rate']??0);$remaining=max(0,StripeService::cents($item['total_price'])-(int)$item['refunded_cents']);$fee=(int)round($remaining*$rate);$seller=$remaining-$fee;DB::exec('update order_items set platform_commission_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($fee),CreditService::formatCents($seller),$item['id']]);$designer=(int)$item['designer_id'];$legacy[$designer]['gross']=($legacy[$designer]['gross']??0)+$remaining;$legacy[$designer]['fee']=($legacy[$designer]['fee']??0)+$fee;$legacy[$designer]['seller']=($legacy[$designer]['seller']??0)+$seller;}
             foreach($legacy as $designer=>$amount){$payout=DB::row('select * from seller_payouts where order_id=? and designer_id=?',[$orderId,$designer]);if(!$payout)continue;$refundService->resetUnattemptedPayoutPlan((int)$payout['id']);DB::exec('update seller_payouts set gross_amount=?,platform_commission_amount=?,seller_payout_amount=? where id=?',[CreditService::formatCents($amount['gross']),CreditService::formatCents($amount['fee']),CreditService::formatCents($amount['seller']),$payout['id']]);if(in_array($payout['payout_status'],['transferred','recovery_applied'],true)){$baseline=$payout['completed_economic_value_amount']!==null?StripeService::cents($payout['completed_economic_value_amount']):StripeService::cents($payout['original_seller_payout_amount']??$payout['seller_payout_amount']);$refundService->recordRecovery($orderId,$designer,max(0,$baseline-$amount['seller']));}}
             (new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();return;
         }
         $payoutSnapshots=[];foreach(DB::rows('select * from seller_payouts where order_id=?',[$orderId]) as $p)$payoutSnapshots[(int)$p['designer_id']]=$p;
-        $grouped=[];foreach($allocated as $item)$grouped[(int)$item['designer_id']][]=['id'=>(int)$item['id'],'seller_id'=>(int)$item['designer_id'],'gross_cents'=>max(0,StripeService::cents($item['total_price'])-CreditService::parseCents((string)($item['prize_credit_applied']??'0.00'),false)-(int)$item['refunded_cents'])];
+        $grouped=[];foreach($allocated as $item)$grouped[(int)$item['designer_id']][]=['id'=>(int)$item['id'],'seller_id'=>(int)$item['designer_id'],'gross_cents'=>max(0,($item['cash_merchandise_amount']!==null?StripeService::cents($item['cash_merchandise_amount']):StripeService::cents($item['total_price'])-CreditService::parseCents((string)($item['prize_credit_applied']??'0.00'),false))-(int)$item['refunded_cents'])];
         foreach($grouped as $designer=>$sellerItems){
             $payout=$payoutSnapshots[$designer]??null;if(!$payout)continue;
             $calculator=new MarketplaceFeeService((int)round((float)$payout['commission_rate_snapshot']*10000),(int)$payout['fixed_fee_cents_snapshot']);
@@ -69,6 +70,7 @@ class StripeController
             DB::exec('update seller_payouts set gross_amount=?,marketplace_percentage_fee_amount=?,marketplace_fixed_fee_amount=?,platform_commission_amount=?,seller_payout_amount=?,updated_at=now() where id=?',[CreditService::formatCents($snapshot['gross_cents']),CreditService::formatCents($snapshot['percentage_fee_cents']),CreditService::formatCents($snapshot['fixed_fee_cents']),CreditService::formatCents($snapshot['fee_cents']),CreditService::formatCents($snapshot['seller_earnings_cents']),$payout['id']]);
             if(in_array($payout['payout_status'],['transferred','recovery_applied'],true)){$baseline=$payout['completed_economic_value_amount']!==null?StripeService::cents($payout['completed_economic_value_amount']):StripeService::cents($payout['original_seller_payout_amount']);$refundService->recordRecovery($orderId,$designer,max(0,$baseline-$snapshot['seller_earnings_cents']));}
         }
+        \App\Services\RefundLedgerService::sync($orderId);
         (new SellerReferralCommissionService)->reconcileRefund($orderId,$allocatedTotal);if($owns)DB::commit();
         }catch(Throwable $e){if($owns&&DB::pdo()->inTransaction())DB::rollBack();throw $e;}
     }
@@ -82,7 +84,7 @@ class StripeController
                 break;
             }
         }
-        $remaining = max(0, StripeService::cents($item['total_price']) - $refunded);
+        $remaining = max(0, StripeService::cents($item['cash_merchandise_amount'] ?? $item['total_price']) - $refunded);
         $rows = DB::rows('select * from collab_order_allocations where order_item_id=? order by designer_id', [$item['id']]);
         if (!$rows) return;
         $ids = array_map('intval', array_column($rows, 'designer_id'));
@@ -155,7 +157,7 @@ class StripeController
     {
         H::requireLogin();
         $order = $this->buyerOrder((int)$id);
-        $customStatus=DB::row('select status from custom_orders where order_id=?',[$order['id']])['status']??null;if(!CustomDesignService::retryEligible($customStatus)){H::flash('warning','This custom request was cancelled. Submit a new request if you still want this service.');H::redirect('/dashboard/order/'.(int)$order['id']);}
+        $customStatus=DB::row('select status from custom_orders where order_id=? and status<>"new" order by id limit 1',[$order['id']])['status']??null;if(!CustomDesignService::retryEligible($customStatus)){H::flash('warning','This custom request was cancelled. Submit a new request if you still want this service.');H::redirect('/dashboard/order/'.(int)$order['id']);}
         $paymentStatus = $order['payment_status'] ?? $order['status'];
         if ($paymentStatus === 'manual_review') {
             H::flash('warning', 'This payment needs admin review before another payment attempt can be made.');
@@ -245,6 +247,10 @@ class StripeController
         elseif ($type === 'payment_intent.succeeded') $this->markPaidByIntent($object, $eventId);
         elseif (in_array($type, ['charge.refunded','charge.updated'], true)) $this->processChargeRefund($object, $eventId, $type);
         elseif ($type === 'account.updated') $this->processAccountUpdated($object);
+        if (in_array($type,['charge.updated','charge.refunded','charge.succeeded'],true)) {
+            $this->communicationAttempt('stripe_fee_capture',
+                fn()=>\App\Services\StripeFeeService::capture($object));
+        }
     }
 
     private function processPromo(array $object,string $type,int $id): void
@@ -475,7 +481,7 @@ class StripeController
         StripeService::logTransaction((int)$order['id'],$eventId,$refunded<$total?'partial_refund':'refund',$refunded<$total?'partially_refunded':'refunded',$refunded/100,strtolower($charge['currency'] ?? StripeService::currency()),['charge'=>$charge['id'] ?? null,'intent'=>$charge['payment_intent'] ?? null],$decision['meaningful']?'Refund status received from Stripe.':'Refund observation recorded without a state transition.');
         $refundService=new MarketplaceRefundService();$observation=$refundService->observe((int)$order['id'],$eventId,$refunded);$reconciled=$observation['allocation_status']==='reconciled';
         if($observation['allocation_status']==='allocated'){$this->reconcileRefundPayouts((int)$order['id']);$refundService->markReconciled((int)$observation['id']);$refundService->clearReviewWhenFullyReconciled((int)$order['id']);$reconciled=true;}
-        elseif($observation['allocation_status']==='needs_allocation'&&(int)$observation['refund_delta_cents']>0&&$refunded>=$total&&StripeService::cents($order['credits_applied']??0)===0){$itemAllocation=[];$merchandise=0;foreach($refundService->allocations((int)$order['id']) as $item){$remaining=max(0,StripeService::cents($item['total_price'])-(int)$item['refunded_cents']);if($remaining>0)$itemAllocation[(int)$item['id']]=$remaining;$merchandise+=$remaining;}$tax=max(0,(int)$observation['refund_delta_cents']-$merchandise);$refundService->completeAllocation((int)$observation['id'],$itemAllocation,$tax,'stripe_full_order');$this->reconcileRefundPayouts((int)$order['id']);$refundService->markReconciled((int)$observation['id']);$refundService->clearReviewWhenFullyReconciled((int)$order['id']);$reconciled=true;}
+        elseif($observation['allocation_status']==='needs_allocation'&&(int)$observation['refund_delta_cents']>0&&$refunded>=$total&&StripeService::cents($order['credits_applied']??0)===0){$itemAllocation=[];$merchandise=0;foreach($refundService->allocations((int)$order['id']) as $item){$remaining=max(0,StripeService::cents($item['cash_merchandise_amount'] ?? $item['total_price'])-(int)$item['refunded_cents']);if($remaining>0)$itemAllocation[(int)$item['id']]=$remaining;$merchandise+=$remaining;}$tax=max(0,(int)$observation['refund_delta_cents']-$merchandise);$refundService->completeAllocation((int)$observation['id'],$itemAllocation,$tax,'stripe_full_order');$this->reconcileRefundPayouts((int)$order['id']);$refundService->markReconciled((int)$observation['id']);$refundService->clearReviewWhenFullyReconciled((int)$order['id']);$reconciled=true;}
         elseif($observation['allocation_status']==='needs_allocation')$refundService->ensureAllocationReview($observation);
         if($reconciled&&($decision['meaningful']||$decision['communication_recovery']))$this->recalculateRecognitionForRefund((int)$order['id'],$status,$refunded);
         if($decision['meaningful']||$decision['communication_recovery'])$this->communicationAttempt('refund_status',fn()=>$this->notifyRefundTransition(array_merge($order,['payment_status'=>$status]),$status,$refunded));

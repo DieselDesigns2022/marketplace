@@ -72,7 +72,7 @@
     <?php foreach($group['items'] as $i):?>
         <tr>
            <td>
-           <?php if(!empty($i['product_id'])):?><?php if(!empty($i['preview_image'])):?><a href="/product/<?=H::e($i['slug'])?>"><img src="<?=H::assetUrl($i['preview_image'])?>" alt="<?=H::e($i['title'])?>" style="width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin-bottom:8px;"></a><?php endif;?><a href="/product/<?=H::e($i['slug'])?>"><?=H::e($i['title'])?></a><?php else:?><strong><?=H::e($i['title'])?></strong><br><a href="/buyer/custom-orders/<?=(int)$customOrder['id']?>">View custom-design workflow</a><?php endif;?>
+           <?php if(!empty($i['product_id'])):?><?php if(!empty($i['preview_image'])):?><a href="/product/<?=H::e($i['slug'])?>"><img src="<?=H::assetUrl($i['preview_image'])?>" alt="<?=H::e($i['title'])?>" style="width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin-bottom:8px;"></a><?php endif;?><a href="/product/<?=H::e($i['slug'])?>"><?=H::e($i['title'])?></a><?php else:?><strong><?=H::e($i['title'])?></strong><br><a href="/buyer/custom-orders/<?=(int)($customOrdersByItem[(int)$i['id']]['id']??0)?>">View custom-design workflow</a><?php endif;?>
            </td>
            <td>
            <?=H::e($i['license_name'] ?: $i['license_type'])?><?php if(!empty($i['license_description'])):?><br><span class="muted"><?=H::e($i['license_description'])?></span><?php endif;?>
@@ -93,7 +93,7 @@
            <?php endif;?>
            <?php if(!empty($i['review_id'])):?><br><a href="/dashboard/reviews/<?=(int)$i['review_id']?>">View/Edit Review</a><?php elseif(!empty($i['review_eligible_at'])):?><br><a href="/dashboard/reviews/new/<?=(int)$i['id']?>">Leave a Review</a><?php endif;?>
            </td>
-        <td><?php if(in_array(($order['payment_status']??$order['status']),['paid','partially_refunded'],true)):?><form method="post" action="<?=($i['fulfillment_type']??'')==='custom_design'?'/messages/start/custom-order/'.(int)$customOrder['id']:'/messages/start/buyer-order-item/'.(int)$i['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Message seller</button></form><?php else:?><span class="muted">Available after eligible payment</span><?php endif;?></td>
+        <td><?php if(in_array(($order['payment_status']??$order['status']),['paid','partially_refunded'],true)):?><form method="post" action="<?=($i['fulfillment_type']??'')==='custom_design'?'/messages/start/custom-order/'.(int)($customOrdersByItem[(int)$i['id']]['id']??0):'/messages/start/buyer-order-item/'.(int)$i['id']?>"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Message seller</button></form><?php else:?><span class="muted">Available after eligible payment</span><?php endif;?></td>
         </tr>
     <?php endforeach;?>
 </table></div></section><?php endforeach;?>
