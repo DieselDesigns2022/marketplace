@@ -10,7 +10,7 @@
     <div class="notice error"><?=H::e($error)?></div>
 <?php endforeach; ?>
 
-<form method="post" action="/feedback" class="card">
+<form method="post" action="/feedback" enctype="multipart/form-data" class="card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <input type="hidden" name="context_url" value="<?=H::e($context??'')?>">
 
@@ -30,6 +30,11 @@
             maxlength="5000"
             required
         ><?=H::e($message)?></textarea>
+    </label>
+
+    <label>Optional attachments (up to 3, 8 MB each)
+        <input type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf">
+        <small>JPG, PNG, WEBP, or PDF files.</small>
     </label>
 
     <button class="btn" type="submit">Send to Creative Moth</button>

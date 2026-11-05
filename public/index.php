@@ -221,6 +221,7 @@ $router->post('/seller/product/{id}/store-featured', [SellerController::class, '
  $router->post('/admin/promo-library/{id}/archive', [AdminPromoGraphicController::class, 'archive']);
  $router->match(['GET','POST'], '/admin/reviews', [ReviewController::class, 'admin']);
  $router->get('/admin/feedback', [FeedbackController::class, 'adminIndex']);
+ $router->get('/admin/feedback/{id}/attachments/{attachmentId}', [FeedbackController::class, 'downloadAttachment']);
  $router->match(['GET','POST'], '/admin/feedback/{id}', [FeedbackController::class, 'adminShow']);
  $router->get('/admin/message-reports', [MessagingController::class, 'adminReports']);
  $router->get('/admin/message-reports/{id}', [MessagingController::class, 'adminReports']);

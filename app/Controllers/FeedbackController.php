@@ -6,6 +6,7 @@ use App\Core\Database as DB;
 use App\Core\Helpers as H;
 use App\Services\AdminPermissionService;
 use App\Services\NotificationService;
+use App\Services\FeedbackAttachmentService;
 
 final class FeedbackController
 {
@@ -83,21 +84,20 @@ final class FeedbackController
             }
 
             if(!$errors){
-                DB::exec(
-                    'insert into feedback_submissions
-                    (user_id,user_name_snapshot,user_email_snapshot,submission_type,message,context_url)
-                    values (?,?,?,?,?,?)',
-                    [
-                        (int)$user['id'],
-                        (string)$user['name'],
-                        (string)$user['email'],
-                        $type,
-                        $message,
-                        $context
-                    ]
-                );
+                try {
+                    $id=FeedbackAttachmentService::createSubmission(
+                        $user,$type,$message,$context,
+                        $_FILES['attachments']??[]
+                    );
+                }catch(\InvalidArgumentException $e){
+                    $errors[]=$e->getMessage();
+                }catch(\Throwable $e){
+                    error_log('Feedback attachment submission: '.$e->getMessage());
+                    $errors[]='Submission could not be saved. Please try again.';
+                }
+            }
 
-                $id=(int)DB::id();
+            if(!$errors){
                 $permissions=new AdminPermissionService();
 
                 foreach(DB::rows(
@@ -277,6 +277,38 @@ final class FeedbackController
         }
     }
 
+    public function downloadAttachment($id,$attachmentId): void
+    {
+        H::requireAdminPermission('feedback.view');
+
+        $file=DB::row(
+            'select * from feedback_attachments
+             where id=? and feedback_submission_id=?',
+            [(int)$attachmentId,(int)$id]
+        );
+        if(!$file)H::abort(404);
+
+        $base=realpath(app_path('storage/protected_uploads/feedback'));
+        $path=realpath(app_path(
+            'storage/protected_uploads/feedback/'.$file['stored_name']
+        ));
+
+        if(!$base||!$path||
+           !str_starts_with($path,$base.DIRECTORY_SEPARATOR)||
+           !is_file($path)||!is_readable($path)){
+            H::abort(404);
+        }
+
+        header('Content-Type: application/octet-stream');
+        header('Content-Length: '.filesize($path));
+        header("Content-Disposition: attachment; filename*=UTF-8''".
+            rawurlencode($file['original_name']));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        readfile($path);
+        exit;
+    }
+
     public function adminShow($id): void
     {
         H::requireAdminPermission(
@@ -356,6 +388,11 @@ final class FeedbackController
                 [(int)$conversation['id']]
               )
             : [];
-        H::view('admin/feedback_detail',compact('submission','conversation','replyMessages'));
+        $attachments=DB::rows(
+            'select id,original_name,mime_type,byte_size
+             from feedback_attachments where feedback_submission_id=? order by id',
+            [(int)$id]
+        );
+        H::view('admin/feedback_detail',compact('submission','conversation','replyMessages','attachments'));
     }
 }

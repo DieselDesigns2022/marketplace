@@ -33,6 +33,20 @@
     <hr>
 
     <p><?=nl2br(H::e($submission['message']))?></p>
+
+    <?php if(!empty($attachments)): ?>
+    <h3>Attachments</h3>
+    <ul>
+        <?php foreach($attachments as $file): ?>
+        <li>
+            <a href="/admin/feedback/<?=(int)$submission['id']?>/attachments/<?=(int)$file['id']?>">
+                <?=H::e($file['original_name'])?>
+            </a>
+            (<?=number_format($file['byte_size']/1024,1)?> KB)
+        </li>
+        <?php endforeach; ?>
+    </ul>
+    <?php endif; ?>
 </section>
 
 <?php if(H::canAdmin('feedback.manage')): ?>
