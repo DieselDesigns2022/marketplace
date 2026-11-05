@@ -16,9 +16,10 @@ class CouponService
         $sellerIds = self::restrictionIds((int)$coupon['id'], 'seller');
         $productIds = self::restrictionIds((int)$coupon['id'], 'product');
         $categoryIds = self::restrictionIds((int)$coupon['id'], 'category');
+        $collectionIds = self::restrictionIds((int)$coupon['id'], 'collection');
         $sum = 0.0;
         foreach ($items as $item) {
-            if (self::itemEligible($coupon, $item, $sellerIds, $productIds, $categoryIds)) {
+            if (self::itemEligible($coupon, $item, $sellerIds, $productIds, $categoryIds, $collectionIds)) {
                 $sum += (float)($item['line_total'] ?? $item['total_price'] ?? 0);
             }
         }
@@ -86,9 +87,10 @@ class CouponService
         $sellerIds = self::restrictionIds((int)$coupon['id'], 'seller');
         $productIds = self::restrictionIds((int)$coupon['id'], 'product');
         $categoryIds = self::restrictionIds((int)$coupon['id'], 'category');
+        $collectionIds = self::restrictionIds((int)$coupon['id'], 'collection');
         $eligibleTotal = self::eligibleSubtotal($coupon, $items);
         $allocations = []; $remaining = $discount; $eligibleKeys = [];
-        foreach ($items as $i => $item) if (self::itemEligible($coupon, $item, $sellerIds, $productIds, $categoryIds)) $eligibleKeys[] = $i;
+        foreach ($items as $i => $item) if (self::itemEligible($coupon, $item, $sellerIds, $productIds, $categoryIds, $collectionIds)) $eligibleKeys[] = $i;
         foreach ($eligibleKeys as $pos => $i) {
             $line = (float)($items[$i]['line_total'] ?? $items[$i]['total_price'] ?? 0);
             $amount = ($pos === count($eligibleKeys) - 1) ? $remaining : round($discount * ($line / max($eligibleTotal, 0.01)), 2);
@@ -111,12 +113,13 @@ class CouponService
         return array_map('intval', array_column(DB::rows('select restrictable_id from coupon_restrictions where coupon_id=? and restrictable_type=?', [$couponId,$type]), 'restrictable_id'));
     }
 
-    private static function itemEligible(array $coupon, array $item, array $sellerIds, array $productIds, array $categoryIds): bool
+    private static function itemEligible(array $coupon, array $item, array $sellerIds, array $productIds, array $categoryIds, array $collectionIds): bool
     {
         if (($coupon['scope'] ?? '') === 'seller' && (int)($item['designer_id'] ?? 0) !== (int)$coupon['seller_id']) return false;
         if ($sellerIds && !in_array((int)($item['designer_id'] ?? 0), $sellerIds, true)) return false;
         if ($productIds && !in_array((int)($item['id'] ?? $item['product_id'] ?? 0), $productIds, true)) return false;
         if ($categoryIds && !in_array((int)($item['category_id'] ?? 0), $categoryIds, true)) return false;
+        if ($collectionIds && !in_array((int)($item['store_section_id'] ?? 0), $collectionIds, true)) return false;
         return true;
     }
 }

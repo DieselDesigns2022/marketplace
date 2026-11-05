@@ -3198,19 +3198,103 @@ class SellerController
 
     private function sellerCouponRestrictions(int $id): array
     {
-        $out = ['product'=>'','category'=>''];
+        $out = ['product'=>'','category'=>'','collection'=>''];
         foreach (DB::rows('select restrictable_type, group_concat(restrictable_id order by restrictable_id) ids from coupon_restrictions where coupon_id=? group by restrictable_type', [$id]) as $r) $out[$r['restrictable_type']] = $r['ids'];
         return $out;
     }
 
-    private function saveSellerRestrictions(int $couponId, int $designerId): void
+    private function sellerCouponTargetRestrictions(int $designerId): array
+    {
+        $mode = (string)($_POST['target_mode'] ?? 'shop');
+        $validModes = ['shop','products','collection','category'];
+        if (!in_array($mode, $validModes, true)) {
+            throw new \InvalidArgumentException('Choose a valid coupon target.');
+        }
+
+        if ($mode === 'shop') return [];
+
+        if ($mode === 'collection') {
+            $raw = (string)($_POST['collection_id'] ?? '');
+            if (!ctype_digit($raw) || (int)$raw < 1) {
+                throw new \InvalidArgumentException('Choose a shop collection.');
+            }
+            $id = (int)$raw;
+            if (!DB::row(
+                'select id from store_sections where id=? and designer_id=?',
+                [$id,$designerId]
+            )) {
+                throw new \InvalidArgumentException('Invalid shop collection.');
+            }
+            return [['collection',$id]];
+        }
+
+        if ($mode === 'products') {
+            $rawIds = $_POST['product_ids'] ?? [];
+            if (!is_array($rawIds)) {
+                throw new \InvalidArgumentException('Invalid product selection.');
+            }
+            $ids = [];
+            foreach ($rawIds as $raw) {
+                if (!is_scalar($raw) ||
+                    !ctype_digit((string)$raw) ||
+                    (int)$raw < 1) {
+                    throw new \InvalidArgumentException('Invalid product selection.');
+                }
+                $ids[(int)$raw] = (int)$raw;
+            }
+            if (!$ids) {
+                throw new \InvalidArgumentException('Select at least one product.');
+            }
+            $result = [];
+            foreach ($ids as $id) {
+                if (!DB::row(
+                    'select id from products
+                     where id=? and designer_id=? and status<>"deleted"',
+                    [$id,$designerId]
+                )) {
+                    throw new \InvalidArgumentException('Invalid product selection.');
+                }
+                $result[] = ['product',$id];
+            }
+            return $result;
+        }
+
+        // Legacy marketplace-category restrictions remain editable.
+        $raw = trim((string)($_POST['category_ids'] ?? ''));
+        $ids = [];
+        foreach (preg_split('/\s*,\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY) as $value) {
+            if (!ctype_digit($value) || (int)$value < 1) {
+                throw new \InvalidArgumentException('Invalid category IDs.');
+            }
+            $ids[(int)$value] = (int)$value;
+        }
+        if (!$ids) {
+            throw new \InvalidArgumentException('Enter at least one category ID.');
+        }
+        $result = [];
+        foreach ($ids as $id) {
+            if (!DB::row(
+                'select id from products
+                 where category_id=? and designer_id=? limit 1',
+                [$id,$designerId]
+            )) {
+                throw new \InvalidArgumentException('Invalid category ID.');
+            }
+            $result[] = ['category',$id];
+        }
+        return $result;
+    }
+
+    private function saveSellerRestrictions(int $couponId, array $targets): void
     {
         DB::exec('delete from coupon_restrictions where coupon_id=?', [$couponId]);
-        foreach (array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($_POST['product_ids'] ?? ''), -1, PREG_SPLIT_NO_EMPTY))) as $pid) {
-            if (DB::row('select id from products where id=? and designer_id=?', [$pid,$designerId])) DB::exec('insert ignore into coupon_restrictions (coupon_id,restrictable_type,restrictable_id) values (?,"product",?)', [$couponId,$pid]);
-        }
-        foreach (array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($_POST['category_ids'] ?? ''), -1, PREG_SPLIT_NO_EMPTY))) as $cid) {
-            if (DB::row('select id from products where category_id=? and designer_id=? limit 1', [$cid,$designerId])) DB::exec('insert ignore into coupon_restrictions (coupon_id,restrictable_type,restrictable_id) values (?,"category",?)', [$couponId,$cid]);
+        foreach ($targets as [$type,$id]) {
+            DB::exec(
+                'insert into coupon_restrictions
+                 (coupon_id,restrictable_type,restrictable_id)
+                 values (?,?,?)',
+                [$couponId,$type,$id]
+            );
         }
     }
 
@@ -3222,7 +3306,14 @@ class SellerController
         $ownedCoupon = $id ? DB::row('select * from coupons where id=? and seller_id=? and scope="seller"', [(int)$id,$d['id']]) : null;
         if ($id && !$ownedCoupon) H::abort(404);
         if ($_POST) {
+            H::verifyCsrf();
             $errors = [];
+            try {
+                $couponTargets = $this->sellerCouponTargetRestrictions((int)$d['id']);
+            } catch (\InvalidArgumentException $e) {
+                $errors[] = $e->getMessage();
+                $couponTargets = [];
+            }
             $code = \App\Services\CouponService::normalizeCode($_POST['code'] ?? '');
             $type = in_array($_POST['discount_type'] ?? '', ['percent','fixed'], true) ? $_POST['discount_type'] : 'percent';
             $value = (float)($_POST['discount_value'] ?? 0);
@@ -3240,10 +3331,10 @@ class SellerController
             else { try { DB::begin();
                 if ($id) DB::exec('update coupons set code=?,discount_type=?,discount_value=?,starts_at=?,ends_at=?,is_active=?,min_cart_amount=?,usage_limit=?,per_user_limit=? where id=? and seller_id=? and scope="seller"', [$code,$type,max(0.01,$value),$starts,$ends,isset($_POST['is_active'])?1:0,max(0,(float)($_POST['min_cart_amount'] ?? 0)),$usageLimit,$perUserLimit,(int)$id,$d['id']]);
                 else { DB::exec('insert into coupons (code,scope,seller_id,discount_type,discount_value,starts_at,ends_at,is_active,min_cart_amount,usage_limit,per_user_limit,created_by) values (?,"seller",?,?,?,?,?,?,?,?,?,?)', [$code,$d['id'],$type,max(0.01,$value),$starts,$ends,isset($_POST['is_active'])?1:0,max(0,(float)($_POST['min_cart_amount'] ?? 0)),$usageLimit,$perUserLimit,H::user()['id']]); $id=DB::id(); }
-                $this->saveSellerRestrictions((int)$id,(int)$d['id']); DB::commit(); H::flash('success','Coupon saved.'); H::redirect('/seller/coupons');
+                $this->saveSellerRestrictions((int)$id,$couponTargets); DB::commit(); H::flash('success','Coupon saved.'); H::redirect('/seller/coupons');
             } catch (Throwable $e) { DB::rollBack(); H::flash('error','Coupon code already exists or could not be saved.'); } }
         }
-        if ($creating || $id) H::view('seller/coupon_form',['coupon'=>$id ? ($ownedCoupon ?: DB::row('select * from coupons where id=? and seller_id=? and scope="seller"',[(int)$id,$d['id']]) ?? H::abort(404)) : [],'restrictions'=>$id ? $this->sellerCouponRestrictions((int)$id) : ['product'=>'','category'=>'']]);
+        if ($creating || $id) H::view('seller/coupon_form',['coupon'=>$id ? ($ownedCoupon ?: DB::row('select * from coupons where id=? and seller_id=? and scope="seller"',[(int)$id,$d['id']]) ?? H::abort(404)) : [],'restrictions'=>$id ? $this->sellerCouponRestrictions((int)$id) : ['product'=>'','category'=>'','collection'=>''],'couponProducts'=>DB::rows('select id,title,status from products where designer_id=? and status<>"deleted" order by title,id',[(int)$d['id']]),'shopSections'=>$this->shopSectionRows((int)$d['id'])]);
         else H::view('seller/coupons',['coupons'=>DB::rows('select c.*,(select group_concat(concat(restrictable_type,":",restrictable_id) separator ", ") from coupon_restrictions cr where cr.coupon_id=c.id) restriction_summary from coupons c where c.seller_id=? and c.scope="seller" order by c.created_at desc',[$d['id']])]);
     }
 
