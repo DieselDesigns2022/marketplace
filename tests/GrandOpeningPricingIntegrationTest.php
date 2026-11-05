@@ -56,14 +56,14 @@ $check($sale['sale_savings_cents']===1050,'Seller-specific percentages add corre
 $check((string)$sale['items'][0]['price']==='8.00','Discounted base price');
 $check((float)$sale['items'][0]['license_price']===4.0,'Discounted paid license');
 $low=$engine->cart($input,'LOW',1);
-$check($low['mode']==='sale' && $low['coupon_result']===null,'Smaller coupon cannot stack or be consumed');
+$check($low['mode']==='sale' && (float)$low['coupon_result']['discount']===3.45,'Sale and smaller coupon can combine');
 $check($low['subtotal_cents']===3450,'Smaller coupon leaves sale total intact');
 $high=$engine->cart($input,'HIGH',1);
-$check($high['mode']==='coupon' && $high['sale_savings_cents']===0,'Larger coupon replaces all sale discounts');
-$check($high['subtotal_cents']===4500 && (float)$high['coupon_result']['discount']===13.5,'Coupon uses regular prices');
-$check((float)$high['items'][0]['price']===10.0 && (float)$high['items'][0]['license_price']===5.0,'Coupon path restores base and licenses');
+$check($high['mode']==='sale' && $high['sale_savings_cents']===1050,'Sale remains active alongside larger coupon');
+$check($high['subtotal_cents']===3450 && (float)$high['coupon_result']['discount']===10.35,'Coupon uses sale-discounted prices');
+$check((float)$high['items'][0]['price']===8.0 && (float)$high['items'][0]['license_price']===4.0,'Coupon preserves discounted base and licenses');
 $tie=$engine->cart($input,'TIE',1);
-$check($tie['mode']==='sale' && $tie['coupon_result']===null,'Equal savings retain sale without consuming coupon');
+$check($tie['mode']==='sale' && (float)$tie['coupon_result']['discount']===10.5,'Fixed coupon combines with sale');
 $scoped=$engine->cart($input,'SELLER',1);
 $check($scoped['mode']==='sale','Seller coupon compares actual scoped savings with full sale');
 $invalid=$engine->cart($input,'MISSING',1);
@@ -117,7 +117,7 @@ $prize=PrizeCreditService::allocateCart($sale['items'],[],99999,true);
 $check($prize['seller_cents'][1]===500,'Prize Credit seller cap follows sale');
 $check($prize['seller_cents'][2]===562,'Percentage Prize Credit uses discounted merchandise');
 $credits=CreditService::checkoutBreakdown('34.50','0.00','2.07','100.00',true);
-$check($credits['credit_cents']===3657,'Marketplace Credit follows sale and includes tax');
+$check($credits['credit_cents']===3318,'Marketplace Credit preserves processing-fee headroom');
 
 $renderHome=static function(array $event) use ($engine): string {
     $openingEvent=$event;
@@ -185,8 +185,8 @@ $commercial=array_values(array_filter($licenseSnapshot,static fn(array $l):bool=
 $check((float)$commercial[0]['price']===4.0,'Purchased license snapshot preserves discounted price');
 [$couponOrder,$couponCalls]=$runCheckout('HIGH');
 $couponItem=DB::row('select * from order_items where order_id=?',[$couponOrder['id']]);
-$check((float)$couponOrder['subtotal']===15.0 && (float)$couponOrder['coupon_discount']===4.5 && (float)$couponItem['total_price']===10.5,'Real checkout applies larger coupon alone');
-$check($couponCalls[0]['params']['line_items'][0]['amount']===1050 && $couponCalls[1]['params']['line_items'][0]['price_data']['unit_amount']===1113,'Coupon-only tax and charge match final merchandise');
+$check((float)$couponOrder['subtotal']===12.0 && (float)$couponOrder['coupon_discount']===3.6 && (float)$couponItem['total_price']===8.4,'Real checkout combines sale and coupon');
+$check($couponCalls[0]['params']['line_items'][0]['amount']===840 && $couponCalls[1]['params']['line_items'][0]['price_data']['unit_amount']===890,'Combined sale and coupon tax and charge match final merchandise');
 DB::exec('update grand_opening_events set ends_at=utc_timestamp() where id=1');
 $check((float)DB::row('select total_price from order_items where id=?',[$saleItem['id']])['total_price']===12.0,'Event expiry preserves past order prices');
 $refunds=new MarketplaceRefundService();
