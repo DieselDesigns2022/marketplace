@@ -90,7 +90,19 @@
                <td><?=H::e($p['updated_at'])?></td>
                <td>
                    <div class="product-actions">
-                   <a class="btn" href="/seller/product/<?=$p['id']?>">Edit</a>
+                    <a class="btn" href="/seller/product/<?=$p['id']?>">Edit</a>
+                    <?php if(in_array($p['status'],['approved','published','scheduled'],true)):?>
+                        <form method="post"
+                              action="/seller/product/<?=(int)$p['id']?>/unpublish"
+                              onsubmit="return confirm('Unpublish this product and save it as a draft? It will no longer be available for new purchases.');">
+                            <input type="hidden"
+                                   name="_csrf"
+                                   value="<?=H::csrf()?>">
+                            <button type="submit">
+                                Unpublish → Draft
+                            </button>
+                        </form>
+                    <?php endif;?>
                   <?php if(in_array($p['status'],['approved','published'],true)): ?>
                   <form method="post" action="/seller/product/<?=$p['id']?>/store-featured">
                       <input type="hidden" name="_csrf" value="<?=H::csrf()?>">

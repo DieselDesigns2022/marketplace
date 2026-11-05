@@ -179,6 +179,7 @@ $router->post('/seller/collabs/{id}/file-update-requests/{request}/deny', [Colla
  $router->post('/seller/product/{id}/duplicate', [SellerController::class, 'duplicateProduct']);
 $router->post('/seller/product/{id}/store-featured', [SellerController::class, 'toggleStoreFeatured']);
  $router->post('/seller/product/{id}/disable', [SellerController::class, 'disableProduct']);
+ $router->post('/seller/product/{id}/unpublish', [SellerController::class, 'unpublishProduct']);
  $router->post('/seller/product/{id}/archive', [SellerController::class, 'archiveProduct']);
  $router->post('/seller/product/{id}/restore', [SellerController::class, 'restoreProduct']);
  $router->post('/seller/product/{id}/delete', [SellerController::class, 'deleteProduct']);

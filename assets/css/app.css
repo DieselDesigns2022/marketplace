@@ -3875,3 +3875,63 @@ table tr:nth-last-child(-n+4) .license-help-text {
 
 /* Feedback: improve promotional button readability */
 .btn.alt.feedback-contrast { color: #231942; }
+
+
+/* Seller product preview image ordering */
+.seller-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+    margin: 15px 0;
+}
+.seller-preview-card {
+    min-width: 0;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    cursor: grab;
+}
+.seller-preview-card.is-dragging {
+    opacity: .45;
+    border: 2px dashed var(--ink);
+}
+.seller-preview-photo {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #f7f5fa;
+}
+.seller-preview-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: 0;
+}
+.seller-preview-position {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.seller-preview-drag-handle {
+    cursor: grab;
+    user-select: none;
+}
+.seller-preview-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+.seller-preview-actions button {
+    width: auto;
+    padding: 5px 7px;
+    font-size: 11px;
+    line-height: 1.3;
+}

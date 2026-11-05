@@ -21,15 +21,143 @@
     </textarea>
     </label>
     <h2>Product Preview Images</h2>
-    <?php foreach($images as $img):?>
-        <div class="inline">
-           <img class="thumb" src="<?=H::e($img['image_path'])?>" alt="<?=H::e($img['alt_text']??'Product preview')?>">
-           <span><?=H::e($img['alt_text']??'')?> · <?=H::e($img['watermark_status'] ?? 'legacy preview')?></span>
-           <?php if(!empty($img['original_image_path'])):?><button name="regenerate_image" value="<?=$img['id']?>">Regenerate watermark</button><?php endif;?>
-           <button name="delete_image" value="<?=$img['id']?>">Delete image</button>
-           <?php if(!empty($img['watermark_error'])):?><small class="help-text">Watermark note: <?=H::e($img['watermark_error'])?></small><?php endif;?>
+
+    <?php if($images):?>
+        <p class="help-text">
+            Drag thumbnails to arrange their order.
+            The first image becomes the main product image.
+        </p>
+
+        <div class="seller-preview-grid" data-image-sort-grid>
+            <?php foreach($images as $index=>$img):?>
+                <div class="seller-preview-card"
+                     data-image-card
+                     data-image-id="<?=(int)$img['id']?>"
+                     draggable="true">
+
+                    <div class="seller-preview-photo">
+                        <img
+                            src="<?=H::e($img['image_path'])?>"
+                            alt="<?=H::e($img['alt_text']??'Product preview')?>"
+                            draggable="false"
+                        >
+                    </div>
+
+                    <div class="seller-preview-position">
+                        <span data-image-position>
+                            <?=($index+1)?>
+                        </span>
+                        <span class="seller-preview-drag-handle">
+                            ☰ Drag
+                        </span>
+                    </div>
+
+                    <div class="seller-preview-actions">
+                        <?php if(!empty($img['original_image_path'])):?>
+                            <button type="submit"
+                                    name="regenerate_image"
+                                    value="<?=(int)$img['id']?>"
+                                    formnovalidate>
+                                Regenerate
+                            </button>
+                        <?php endif;?>
+
+                        <button type="submit"
+                                name="delete_image"
+                                value="<?=(int)$img['id']?>"
+                                formnovalidate
+                                onclick="return confirm('Delete this preview image?');">
+                            Delete
+                        </button>
+                    </div>
+
+                    <?php if(!empty($img['watermark_error'])):?>
+                        <small class="help-text">
+                            <?=H::e($img['watermark_error'])?>
+                        </small>
+                    <?php endif;?>
+                </div>
+            <?php endforeach;?>
         </div>
-    <?php endforeach;?>
+
+        <input type="hidden"
+               name="image_order"
+               data-image-order
+               value="<?=H::e(implode(',',array_column($images,'id')))?>">
+
+        <?php if(count($images)>1):?>
+            <button type="submit"
+                    class="btn"
+                    name="save_image_order"
+                    value="1"
+                    formnovalidate>
+                Save Image Order
+            </button>
+        <?php endif;?>
+    <?php endif;?>
+
+    <script>
+    (() => {
+        const grid=document.querySelector('[data-image-sort-grid]');
+        const field=document.querySelector('[data-image-order]');
+        if(!grid || !field)return;
+
+        let dragging=null;
+
+        function sync() {
+            const cards=[...grid.querySelectorAll('[data-image-card]')];
+            field.value=cards.map(card=>card.dataset.imageId).join(',');
+            cards.forEach((card,index)=>{
+                card.querySelector('[data-image-position]').textContent=
+                    String(index+1);
+            });
+        }
+
+        grid.querySelectorAll('[data-image-card]').forEach(card=>{
+            card.addEventListener('dragstart',event=>{
+                if(event.target.closest('button')){
+                    event.preventDefault();
+                    return;
+                }
+
+                dragging=card;
+                card.classList.add('is-dragging');
+                event.dataTransfer.effectAllowed='move';
+                event.dataTransfer.setData(
+                    'text/plain',
+                    card.dataset.imageId
+                );
+            });
+
+            card.addEventListener('dragover',event=>{
+                if(!dragging || dragging===card)return;
+                event.preventDefault();
+
+                const rect=card.getBoundingClientRect();
+                const after=event.clientX>rect.left+rect.width/2;
+
+                if(after)card.after(dragging);
+                else card.before(dragging);
+
+                sync();
+            });
+
+            card.addEventListener('drop',event=>{
+                event.preventDefault();
+                sync();
+            });
+
+            card.addEventListener('dragend',()=>{
+                card.classList.remove('is-dragging');
+                dragging=null;
+                sync();
+            });
+        });
+
+        sync();
+    })();
+    </script>
+
     <p class="help-text">Public preview images are watermarked automatically. JPG, PNG, or WEBP up to 25MB each. Purchased/downloadable files below are never watermarked or altered.</p>
     <?php
     $extraProtectionChecked =

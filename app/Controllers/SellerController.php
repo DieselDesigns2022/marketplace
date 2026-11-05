@@ -2257,6 +2257,73 @@ class SellerController
         }
         if ($_POST)
         {
+            if (isset($_POST['save_image_order'])) {
+                H::verifyCsrf();
+                if (!$p) H::abort(404);
+
+                $raw=(string)($_POST['image_order']??'');
+                $parts=explode(',',$raw);
+
+                if (!$raw || count($parts)!==count(array_unique($parts))) {
+                    H::abort(422);
+                }
+
+                foreach ($parts as $part) {
+                    if (!preg_match('/^[1-9][0-9]*$/D',$part)) {
+                        H::abort(422);
+                    }
+                }
+
+                $ids=array_map('intval',$parts);
+
+                try {
+                    DB::begin();
+
+                    $rows=DB::rows(
+                        'select id from product_images where product_id=?
+                         order by sort_order,id for update',
+                        [(int)$p['id']]
+                    );
+
+                    $existing=array_map(
+                        'intval',
+                        array_column($rows,'id')
+                    );
+
+                    $submitted=$ids;
+                    sort($submitted,SORT_NUMERIC);
+                    sort($existing,SORT_NUMERIC);
+
+                    if ($submitted!==$existing) {
+                        DB::rollBack();
+                        H::flash(
+                            'error',
+                            'Image list changed. Refresh and try again.'
+                        );
+                        H::redirect('/seller/product/'.(int)$p['id']);
+                    }
+
+                    foreach ($ids as $position=>$imageId) {
+                        DB::exec(
+                            'update product_images set sort_order=?
+                             where id=? and product_id=?',
+                            [$position,$imageId,(int)$p['id']]
+                        );
+                    }
+
+                    DB::commit();
+                    H::flash('success','Preview image order saved.');
+                } catch (Throwable $e) {
+                    if (DB::pdo()->inTransaction()) DB::rollBack();
+                    error_log(
+                        'Product image ordering failed: '.$e->getMessage()
+                    );
+                    H::flash('error','Image order could not be saved.');
+                }
+
+                H::redirect('/seller/product/'.(int)$p['id']);
+            }
+
             if (($_POST['delete_image'] ?? ''))
            {
                 $this->deletePreviewImage((int) $_POST['delete_image'], (int) $p['id']);
@@ -2676,6 +2743,54 @@ class SellerController
             H::flash('error', 'Product could not be duplicated. Please try again.');
             H::redirect('/seller/products');
         }
+    }
+
+    public function unpublishProduct($id): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+        H::verifyCsrf();
+
+        $d=$this->d();
+        $productId=(int)$id;
+
+        $p=DB::row(
+            'select id,status from products where id=? and designer_id=?',
+            [$productId,(int)$d['id']]
+        ) ?? H::abort(404);
+
+        if (!in_array(
+            $p['status'],
+            ['approved','published','scheduled'],
+            true
+        )) {
+            H::flash(
+                'error',
+                'Only published or scheduled products can be set to draft.'
+            );
+            H::redirect('/seller/products');
+        }
+
+        DB::exec(
+            'update products
+             set status="draft",
+                 scheduled_publish_at=null,
+                 schedule_error=null,
+                 schedule_checked_at=null,
+                 store_featured=0,
+                 updated_at=now()
+             where id=? and designer_id=?
+               and status in ("approved","published","scheduled")',
+            [$productId,(int)$d['id']]
+        );
+
+        H::flash(
+            'success',
+            'Product unpublished and saved as a draft. '
+            .'Its images, files, and order history are preserved.'
+        );
+
+        H::redirect('/seller/products?status=draft');
     }
 
     public function archiveProduct($id)

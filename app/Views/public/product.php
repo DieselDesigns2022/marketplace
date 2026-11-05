@@ -3,10 +3,29 @@
 <?=H::e($p['title'])?>
 </h1>
 <div class="detail">
-    <div class="gallery">
-        <?php foreach($images as $i):?>
-           <img src="<?=H::e($i['image_path'])?>" alt="<?=H::e($i['alt_text']??$p['title'])?>">
-        <?php endforeach;?>
+    <div class="gallery custom-design-gallery">
+        <?php if($images):?>
+            <div class="custom-design-main-preview">
+                <img id="product-main-preview"
+                     src="<?=H::e($images[0]['image_path'])?>"
+                     alt="<?=H::e($images[0]['alt_text']?:$p['title'])?>">
+            </div>
+            <?php if(count($images)>1):?>
+                <div class="custom-design-preview-thumbs"
+                     aria-label="Product preview images">
+                    <?php foreach($images as $index=>$image):?>
+                        <button type="button"
+                            class="custom-design-preview-thumb <?=$index===0?'active':''?>"
+                            data-product-preview="<?=H::e($image['image_path'])?>"
+                            data-product-alt="<?=H::e($image['alt_text']?:$p['title'])?>"
+                            aria-label="View preview <?=($index+1)?>"
+                            aria-pressed="<?=$index===0?'true':'false'?>">
+                            <img src="<?=H::e($image['image_path'])?>" alt="">
+                        </button>
+                    <?php endforeach;?>
+                </div>
+            <?php endif;?>
+        <?php endif;?>
         <?php if(!$images):?>
            <div class="thumb big">Preview images are not available for this digital product yet.</div>
         <?php endif;?>
@@ -127,4 +146,20 @@
 <h2>Related products</h2>
 <?php if(!$related):?><div class="card empty-state"><p>No related approved products are available yet. Try browsing all digital designs.</p><a class="btn" href="/browse">Browse Digital Designs</a></div><?php else: $products=$related; include app_path('app/Views/public/product_grid.php'); endif;?>
 
+<script>
+document.querySelectorAll('[data-product-preview]').forEach(function(button) {
+    button.addEventListener('click',function() {
+        const main=document.getElementById('product-main-preview');
+        if(!main)return;
+        main.src=button.dataset.productPreview;
+        main.alt=button.dataset.productAlt;
+        document.querySelectorAll('[data-product-preview]').forEach(function(item) {
+            item.classList.remove('active');
+            item.setAttribute('aria-pressed','false');
+        });
+        button.classList.add('active');
+        button.setAttribute('aria-pressed','true');
+    });
+});
+</script>
 <?php require __DIR__.'/../partials/license_help_modal.php'; ?>
