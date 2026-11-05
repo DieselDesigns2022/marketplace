@@ -137,7 +137,7 @@ final class MessagingController
                 'conversation'=>$c,
                 'messages'=>$messages,
                 'attachments'=>$this->service->attachments($messages),
-                'blocked'=>$this->service->blocked($uid,$other),
+                'blocked'=>(($c['conversation_type']??'standard')==='support'?false:$this->service->blocked($uid,$other)),
                 'myBlock'=>(bool)DB::row(
                     'select id
                      from message_blocks

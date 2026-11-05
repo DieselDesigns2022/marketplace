@@ -259,14 +259,55 @@ foreach($rounds as $battleStatusRound){
     </p>
 
     <?php if(!empty($battleOpenRound['voting_closes_at'])): ?>
-        <p>
-            Voting closes:
-            <strong><?=H::e(
-                \App\Services\BattleService::eastern(
-                    $battleOpenRound['voting_closes_at']
-                )
-            )?></strong>
-        </p>
+        <?php
+$currentBattleMatchup = \App\Core\Database::row(
+    'select id,voting_closes_at,bracket_position
+     from battle_matchups
+     where round_id=? and status="open"
+     order by bracket_position
+     limit 1',
+    [(int)$battleOpenRound['id']]
+);
+
+$nextBattleMatchup = \App\Core\Database::row(
+    'select id,voting_opens_at,bracket_position
+     from battle_matchups
+     where round_id=? and status="pending"
+       and voting_opens_at is not null
+     order by voting_opens_at,bracket_position
+     limit 1',
+    [(int)$battleOpenRound['id']]
+);
+?>
+
+<?php if($currentBattleMatchup): ?>
+<p>
+    <strong>
+        Current matchup #<?= (int)$currentBattleMatchup['bracket_position'] ?>
+        voting closes:
+    </strong>
+    <?=H::e(\App\Services\BattleService::eastern(
+        $currentBattleMatchup['voting_closes_at']
+    ))?>
+</p>
+
+<?php if($nextBattleMatchup): ?>
+<p>
+    <strong>Next matchup begins:</strong>
+    <?=H::e(\App\Services\BattleService::eastern(
+        $nextBattleMatchup['voting_opens_at']
+    ))?>
+</p>
+<?php endif; ?>
+
+<?php elseif($nextBattleMatchup): ?>
+<p>
+    <strong>Next matchup begins:</strong>
+    <?=H::e(\App\Services\BattleService::eastern(
+        $nextBattleMatchup['voting_opens_at']
+    ))?>
+</p>
+<?php endif; ?>
     <?php endif; ?>
 </section>
 
@@ -372,12 +413,50 @@ if(
     </h2>
 
     <?php if($round['status']==='open'): ?>
-        <p>
-            Voting closes:
-            <strong>
-                <?=H::e(($round['voting_closes_at']?\App\Services\BattleService::eastern($round['voting_closes_at']):'Overtime — waiting for the first new valid vote'))?>
-            </strong>
-        </p>
+        <?php
+        $headingCurrentMatchup = null;
+        $headingNextMatchup = null;
+
+        foreach($round['matchups'] as $headingMatchup){
+            if(($headingMatchup['status'] ?? '') === 'open'){
+                $headingCurrentMatchup = $headingMatchup;
+            }elseif(
+                ($headingMatchup['status'] ?? '') === 'pending' &&
+                !empty($headingMatchup['voting_opens_at']) &&
+                (
+                    $headingNextMatchup === null ||
+                    strcmp(
+                        $headingMatchup['voting_opens_at'],
+                        $headingNextMatchup['voting_opens_at']
+                    ) < 0
+                )
+            ){
+                $headingNextMatchup = $headingMatchup;
+            }
+        }
+        ?>
+
+        <?php if($headingCurrentMatchup): ?>
+            <p>
+                <strong>
+                    Current matchup voting closes:
+                </strong>
+                <?=H::e(
+                    \App\Services\BattleService::eastern(
+                        $headingCurrentMatchup['voting_closes_at']
+                    )
+                )?>
+            </p>
+        <?php elseif($headingNextMatchup): ?>
+            <p>
+                <strong>Next matchup begins:</strong>
+                <?=H::e(
+                    \App\Services\BattleService::eastern(
+                        $headingNextMatchup['voting_opens_at']
+                    )
+                )?>
+            </p>
+        <?php endif; ?>
     <?php elseif($round['status']==='tied'): ?>
         <p>
             Tied matchups require a re-battle before advancement.

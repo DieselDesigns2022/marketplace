@@ -1,3 +1,53 @@
+<?php
+if (isset($d) && !empty($d['id'])):
+    $ipWarnings = \App\Core\Database::rows(
+        'select w.*,p.title product_title
+         from seller_ip_warnings w
+         join products p on p.id=w.product_id
+         where w.designer_id=?
+         order by w.warning_number desc',
+        [(int)$d['id']]
+    );
+    if ($ipWarnings):
+        $ipWarningGroups = [];
+        foreach ($ipWarnings as $warningRow) {
+            $number = (int)$warningRow['warning_number'];
+            if (!isset($ipWarningGroups[$number])) {
+                $ipWarningGroups[$number] = $warningRow;
+                $ipWarningGroups[$number]['products'] = [];
+            }
+            $ipWarningGroups[$number]['products'][] = $warningRow;
+        }
+?>
+<section class="card" style="border:2px solid #b45309;margin-bottom:1rem;">
+    <h2>Official IP Warnings — <?= count($ipWarningGroups) ?></h2>
+    <p>
+        Using alternate names, spellings, or disguised references
+        to bypass protected-content rules is prohibited.
+        Further confirmed violations may lead to suspension
+        or permanent removal from Creative Moth.
+    </p>
+    <ul>
+        <?php foreach($ipWarningGroups as $w): ?>
+        <li>
+            <strong>Warning #<?= (int)$w['warning_number'] ?></strong>
+            — <?php foreach($w['products'] as $affected): ?>
+                <?= \App\Core\Helpers::e($affected['product_title']) ?>
+                (#<?= (int)$affected['product_id'] ?>);
+                <?php endforeach; ?>
+            — <?= \App\Core\Helpers::e($w['issued_at']) ?>
+            <p><?= nl2br(\App\Core\Helpers::e($w['reason'])) ?></p>
+            <small>
+                <?= $w['resolved_at']===null
+                    ? 'Product restricted from publication'
+                    : 'Restriction cleared; warning remains on record' ?>
+            </small>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+</section>
+<?php endif; endif; ?>
+
 <?php use App\Core\Helpers as H; $stripeLabels=['not_connected'=>'Not connected','onboarding_started'=>'Onboarding started','information_required'=>'Information required','connected'=>'Connected','payout_ready'=>'Payout-ready','payout_issue'=>'Payout issue']; ?>
 <header class="dashboard-heading"><div><h1>Seller dashboard</h1><p class="muted">Welcome, <?=H::e($d['display_name'])?>. All figures below are restricted to your store.</p></div><a class="btn" href="/seller/product/new">New product</a></header>
 <?php if($stripeState!=='payout_ready'):?><section class="card attention-panel"><h2>Required action</h2><p>Your Stripe status is <strong><?=H::e($stripeLabels[$stripeState])?></strong>. Complete the outstanding payout step.</p><a class="btn" href="/seller/stripe">Review Stripe status</a></section><?php endif;?>

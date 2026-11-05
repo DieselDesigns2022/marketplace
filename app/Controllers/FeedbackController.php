@@ -199,6 +199,84 @@ final class FeedbackController
         );
     }
 
+
+    private function sendSupportReply(array $submission,string $body,string $token):bool
+    {
+        $body=trim($body);
+        if($body===''||mb_strlen($body)>10000)
+            throw new \InvalidArgumentException('Enter a response of 10,000 characters or fewer.');
+        if(!preg_match('/^[a-f0-9]{32}$/D',$token))
+            throw new \InvalidArgumentException('Invalid reply request. Refresh the page.');
+
+        $adminId=(int)H::user()['id'];
+        $buyerId=(int)($submission['user_id']??0);
+        $buyer=$buyerId>0?DB::row('select id,status from users where id=?',[$buyerId]):null;
+
+        if(!$buyer||$buyer['status']!=='active')
+            throw new \InvalidArgumentException('The submitter no longer has an active account.');
+        if($buyerId===$adminId)
+            throw new \InvalidArgumentException('You cannot respond to your own account.');
+
+        DB::begin();
+        try{
+            $stmt=DB::pdo()->prepare(
+                'insert ignore into feedback_reply_requests(reply_token,feedback_submission_id) values (?,?)'
+            );
+            $stmt->execute([$token,(int)$submission['id']]);
+            if($stmt->rowCount()===0){
+                DB::commit();
+                return false;
+            }
+
+            $key='feedback-support:'.(int)$submission['id'];
+            DB::exec(
+                'insert ignore into message_conversations
+                 (buyer_user_id,seller_user_id,designer_id,context_label,context_key,conversation_type,feedback_submission_id)
+                 values (?,?,null,?,?,"support",?)',
+                [$buyerId,$adminId,'Creative Moth Support - Feedback #'.(int)$submission['id'],$key,(int)$submission['id']]
+            );
+
+            $c=DB::row(
+                'select id,buyer_user_id,conversation_type from message_conversations
+                 where context_key=? for update',
+                [$key]
+            );
+            if(!$c||(int)$c['buyer_user_id']!==$buyerId||$c['conversation_type']!=='support')
+                throw new \RuntimeException('Support conversation could not be verified.');
+
+            DB::exec(
+                'insert into conversation_messages(conversation_id,sender_user_id,body) values (?,?,?)',
+                [(int)$c['id'],$adminId,$body]
+            );
+            $messageId=(int)DB::id();
+
+            DB::exec(
+                'update feedback_reply_requests set message_id=? where reply_token=?',
+                [$messageId,$token]
+            );
+            DB::exec(
+                'update message_conversations
+                 set last_message_at=now(),buyer_archived_at=null,seller_archived_at=null,
+                 seller_last_read_message_id=? where id=?',
+                [$messageId,(int)$c['id']]
+            );
+
+            \App\Services\NotificationService::create(
+                $buyerId,'internal_message','buyer',
+                'Creative Moth Support replied',
+                'We responded to your feedback #'.(int)$submission['id'].'.',
+                'internal-message:'.$messageId.':recipient:'.$buyerId,
+                '/buyer/messages/'.(int)$c['id']
+            );
+
+            DB::commit();
+            return true;
+        }catch(\Throwable $e){
+            if(DB::pdo()->inTransaction())DB::rollBack();
+            throw $e;
+        }
+    }
+
     public function adminShow($id): void
     {
         H::requireAdminPermission(
@@ -220,6 +298,21 @@ final class FeedbackController
 
         if($_SERVER['REQUEST_METHOD']==='POST'){
             H::verifyCsrf();
+
+            if(($_POST['action']??'')==='reply'){
+                try{
+                    $sent=$this->sendSupportReply(
+                        $submission,
+                        (string)($_POST['body']??''),
+                        (string)($_POST['reply_token']??'')
+                    );
+                    H::flash('success',$sent?'Support response sent.':'Reply already submitted.');
+                }catch(\InvalidArgumentException $e){
+                    H::flash('warning',$e->getMessage());
+                }
+                H::redirect('/admin/feedback/'.(int)$id);
+            }
+
 
             $status=(string)($_POST['status']??'');
 
@@ -251,6 +344,18 @@ final class FeedbackController
             H::redirect('/admin/feedback/'.(int)$id);
         }
 
-        H::view('admin/feedback_detail',compact('submission'));
+        $conversation=DB::row(
+            'select id from message_conversations
+             where feedback_submission_id=? and conversation_type="support"',
+            [(int)$id]
+        );
+        $replyMessages=$conversation
+            ? DB::rows(
+                'select m.id,m.sender_user_id,m.body,m.created_at
+                 from conversation_messages m where m.conversation_id=? order by m.id',
+                [(int)$conversation['id']]
+              )
+            : [];
+        H::view('admin/feedback_detail',compact('submission','conversation','replyMessages'));
     }
 }

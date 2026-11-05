@@ -299,6 +299,7 @@ if ($area === 'buyer') {
         ],
 
         'Users & Safety' => [
+            ['/admin/ip-audit', 'IP Audit & Warnings', ['/admin/ip-audit']],
             [
                 '/admin/users',
                 'Users',
@@ -375,7 +376,7 @@ if ($area === 'buyer') {
         '/admin/grand-opening'=>'homepage.view',
         '/admin'=>'dashboard.view','/admin/analytics'=>'dashboard.view','/admin/homepage'=>'homepage.view','/admin/ads'=>'promotions.view','/admin/social-publishing'=>'promotions.view','/admin/promo-library'=>'promotions.view','/admin/waitlist'=>'waitlist.view',
         '/admin/orders'=>'orders.view','/admin/custom-orders'=>'custom_orders.view','/admin/products'=>'products.view','/admin/collabs'=>'products.view','/admin/categories'=>'categories.view','/admin/coupons'=>'coupons.view','/admin/prize-donations'=>'prizes.view','/admin/battles'=>'prizes.view','/admin/prize-wheel'=>'prizes.view',
-        '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/reviews'=>'reviews.view','/admin/message-reports'=>'messages.view','/admin/feedback'=>'feedback.view','/admin/ip-risk-terms'=>'ip_risk.view',
+        '/admin/users'=>'users.view','/admin/applications'=>'applications.view','/admin/designers'=>'designers.view','/admin/reviews'=>'reviews.view','/admin/message-reports'=>'messages.view','/admin/feedback'=>'feedback.view','/admin/ip-audit'=>'ip_risk.view','/admin/ip-risk-terms'=>'ip_risk.view',
         '/admin/payment-logs'=>'payments.view','/admin/downloads'=>'downloads.view','/admin/referrals'=>'referrals.view','/admin/credits'=>'credits.view','/admin/email-campaigns'=>'email_campaigns.view',
     ];
     foreach ($groups as $groupName => $links) {
