@@ -155,7 +155,8 @@ $router->post('/seller/collabs/{id}/file-update-requests/{request}/deny', [Colla
  $router->match(['GET','POST'], '/seller/custom-designs/{id}', [CustomDesignController::class, 'sellerEdit']);
  $router->get('/seller/custom-orders', [CustomDesignController::class, 'sellerOrders']);
  $router->match(['GET','POST'], '/seller/custom-orders/{id}', [CustomDesignController::class, 'sellerOrder']);
- $router->post('/seller/products/bulk-archive', [SellerController::class, 'bulkArchiveProducts']);
+ $router->post('/seller/products/bulk-section', [SellerController::class, 'bulkAssignShopSection']);
+$router->post('/seller/products/bulk-archive', [SellerController::class, 'bulkArchiveProducts']);
  $router->post('/seller/products/bulk-delete', [SellerController::class, 'bulkDeleteProducts']);
  $router->match(['GET','POST'], '/seller/products/import', [SellerController::class, 'importProducts']);
  $router->post('/seller/products/import/map', [SellerController::class, 'mapProductImport']);

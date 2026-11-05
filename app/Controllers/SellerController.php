@@ -1377,6 +1377,22 @@ class SellerController
         if (mb_strlen($q) > 120) $q = mb_substr($q, 0, 120);
         $params = [$d['id']];
         $where = 'where p.designer_id=? and p.status<>"deleted"';
+
+        $shopSections = $this->shopSectionRows((int)$d['id']);
+        $section = (string)($_GET['section'] ?? '');
+        $validSections = array_map(
+            static fn($row) => (string)$row['id'],
+            $shopSections
+        );
+
+        if ($section === 'unassigned') {
+            $where .= ' and p.store_section_id is null';
+        } elseif (in_array($section, $validSections, true)) {
+            $where .= ' and p.store_section_id=?';
+            $params[] = (int)$section;
+        } else {
+            $section = '';
+        }
         if (in_array($status, $allowed, true))
         {
             $where .= ' and p.status=?';
@@ -1397,7 +1413,7 @@ class SellerController
             $params[] = '%'.$escaped.'%';
 
         }
-        H::view('seller/products', [ 'status' => $status, 'q' => $q, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
+        H::view('seller/products', [ 'status' => $status, 'q' => $q, 'section' => $section, 'shopSections' => $shopSections, 'products' => DB::rows( 'select p.*,c.name category_name,(select count(*) from order_items oi join orders o on o.id=oi.order_id where oi.product_id=p.id and o.payment_status in ("paid","partially_refunded")) completed_order_count,(select image_path from product_images pi where pi.product_id=p.id order by pi.sort_order,pi.id limit 1) thumbnail from products p left join categories c on c.id=p.category_id ' . $where . ' order by p.updated_at desc', $params ), ]);
 
     }
 
@@ -2823,6 +2839,77 @@ class SellerController
         DB::exec('update products set status="draft",updated_at=now() where id=? and designer_id=? and status in ("archived","deleted")', [$productId, $d['id']]);
         H::flash('success', 'Product restored as a draft. Submit it for review before publishing again.');
         H::redirect('/seller/products?status=draft');
+    }
+
+    public function bulkAssignShopSection(): void
+    {
+        $this->requireOnboardingComplete();
+        H::requireSeller();
+        H::verifyCsrf();
+
+        $d = $this->d();
+        $section = (string)($_POST['section_id'] ?? '');
+
+        if ($section !== '' &&
+            !preg_match('/^[1-9][0-9]*$/D', $section)) {
+            H::abort(422);
+        }
+
+        $sectionId = $section === '' ? null : (int)$section;
+
+        if ($sectionId !== null &&
+            !DB::row(
+                'select id from store_sections
+                 where id=? and designer_id=?',
+                [$sectionId, (int)$d['id']]
+            )) {
+            H::abort(403);
+        }
+
+        $rawIds = $_POST['product_ids'] ?? [];
+        if (!is_array($rawIds)) H::abort(422);
+
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $rawIds),
+            static fn($id) => $id > 0
+        )));
+
+        if (!$ids) {
+            H::flash('error', 'Select at least one product.');
+            H::redirect('/seller/products');
+        }
+
+        $updated = 0;
+        try {
+            DB::begin();
+            foreach ($ids as $id) {
+                $product = DB::row(
+                    'select id from products
+                     where id=? and designer_id=? and status<>"deleted"',
+                    [$id, (int)$d['id']]
+                );
+                if (!$product) continue;
+
+                DB::exec(
+                    'update products set store_section_id=?
+                     where id=? and designer_id=?',
+                    [$sectionId, $id, (int)$d['id']]
+                );
+                $updated++;
+            }
+            DB::commit();
+
+            H::flash(
+                'success',
+                $updated.' product(s) assigned to the selected collection.'
+            );
+        } catch (Throwable $e) {
+            if (DB::pdo()->inTransaction()) DB::rollBack();
+            error_log('Bulk shop section assignment: '.$e->getMessage());
+            H::flash('error', 'Collections could not be updated.');
+        }
+
+        H::redirect('/seller/products');
     }
 
     public function bulkArchiveProducts(): void

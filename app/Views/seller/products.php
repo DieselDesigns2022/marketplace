@@ -17,7 +17,23 @@
         Search your products
         <input type="search" name="q" value="<?=H::e($q??'')?>" placeholder="Search products or tags">
     </label>
-    <button class="btn" type="submit">Search</button>
+    <label>
+        Collection / Shop Section
+        <select name="section">
+            <option value="">All Collections</option>
+            <option value="unassigned"
+                <?=($section??'')==='unassigned'?'selected':''?>>
+                Unassigned Products
+            </option>
+            <?php foreach(($shopSections??[]) as $shopSection):?>
+                <option value="<?=(int)$shopSection['id']?>"
+                    <?=(string)($section??'')===(string)$shopSection['id']?'selected':''?>>
+                    <?=H::e($shopSection['name'])?>
+                </option>
+            <?php endforeach;?>
+        </select>
+    </label>
+    <button class="btn" type="submit">Filter Products</button>
     <?php if(($q??'')!==''): ?>
         <a class="btn alt" href="/seller/products<?=($status??'all')==='all'?'':'?status='.rawurlencode($status)?>">Clear Search</a>
     <?php endif; ?>
@@ -28,6 +44,7 @@
         $tabParams=[];
         if($key!=='all')$tabParams['status']=$key;
         if(($q??'')!=='')$tabParams['q']=$q;
+        if(($section??'')!=='')$tabParams['section']=$section;
         $tabUrl='/seller/products'.($tabParams?'?'.http_build_query($tabParams):'');
     ?>
     <a class="<?=($status??'all')===$key?'active':''?>" href="<?=H::e($tabUrl)?>"><?=H::e($label)?></a>
@@ -36,9 +53,60 @@
 <?php if(!$products): ?>
 <div class="card empty"><h2>No products found.</h2><p><?=($q??'')!==''?'No products match your search and selected status filter.':'Create a product draft and submit it for review when it is ready.'?></p><?php if(($q??'')===''):?><a class="btn" href="/seller/product/new">Create Product</a><?php endif;?></div>
 <?php else: ?>
+
+<style>
+.bulk-collection-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 16px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+}
+.bulk-collection-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.bulk-collection-buttons button {
+    margin: 0;
+}
+.bulk-collection-controls {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+.bulk-collection-controls label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.bulk-collection-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.bulk-collection-inputs select {
+    width: auto;
+    flex: 1 1 160px;
+    min-width: 0;
+    margin: 0;
+}
+.bulk-collection-inputs button {
+    margin: 0;
+    white-space: nowrap;
+}
+</style>
+
     <form id="bulk-product-form" method="post" action="/seller/products/bulk-delete">
         <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
-        <p>
+        <div class="bulk-collection-toolbar">
+        <div class="bulk-collection-buttons">
             <button
                 type="button"
                 onclick="document.querySelectorAll('.bulk-product-pick').forEach(x=>x.checked=true)"
@@ -60,9 +128,36 @@
                 formaction="/seller/products/bulk-delete"
                 onclick="const n=document.querySelectorAll('.bulk-product-pick:checked').length;if(!n){alert('Select at least one product to delete.');return false;}return confirm('Permanently delete all eligible products from the '+n+' selected product'+(n===1?'':'s')+'? Products that are not eligible for permanent deletion will be skipped.');"
             >Permanent Delete Selected</button>
-        </p>
+        </div>
+
+        <div class="bulk-collection-controls">
+            <label for="bulk-section-select">Move selected to collection</label>
+            <div class="bulk-collection-inputs">
+                <select id="bulk-section-select" name="section_id">
+                    <option value="">All Listings / No Collection</option>
+                    <?php foreach(($shopSections??[]) as $shopSection):?>
+                        <option value="<?=(int)$shopSection['id']?>">
+                            <?=H::e($shopSection['name'])?>
+                        </option>
+                    <?php endforeach;?>
+                </select>
+            <button type="submit"
+                    formaction="/seller/products/bulk-section"
+                    onclick="const n=document.querySelectorAll('.bulk-product-pick:checked').length;if(!n){alert('Select at least one product.');return false;}return confirm('Update the collection for '+n+' selected product(s)?');">
+                Apply Collection
+            </button>
+            </div>
+        </div>
+        </div>
 
         <p class="muted">
+            Check the boxes beside products below, then choose a bulk action.
+            Applying a collection only changes the selected products' shop section.
+            Archive hides selected products from public listings, and permanent
+            delete only removes eligible products.
+        </p>
+
+        <p class="muted" hidden>
             Select any products for bulk actions. Archive hides selected products from public listings. Permanent delete only removes eligible draft/test products with no completed orders.
         </p>
     </form>
