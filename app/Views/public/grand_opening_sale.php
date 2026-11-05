@@ -14,7 +14,7 @@
 <?php if(!empty($goSeller['avatar_path'])): ?><img src="<?=H::e(H::assetUrl($goSeller['avatar_path']))?>" alt="<?=H::e($goSeller['display_name'])?> logo" width="72" height="72" style="object-fit:contain;border-radius:12px" loading="lazy"><?php endif; ?>
 <h3><a href="/store/<?=H::e($goSeller['store_slug'])?>"><?=H::e($goSeller['display_name'])?></a></h3>
 <p><?=number_format((int)$goSeller['discount_basis_points']/100,2)?>% off <?=$goSeller['product_scope']==='shop'?'their shop':'selected products'?></p>
-<a class="btn alt" href="/browse?grand_opening=1&amp;creator=<?=H::e(rawurlencode($goSeller['store_slug']))?>">Shop Their Sale</a>
+<a class="btn alt feedback-contrast" href="/browse?grand_opening=1&amp;creator=<?=H::e(rawurlencode($goSeller['store_slug']))?>">Shop Their Sale</a>
 </article>
 <?php endforeach; ?>
 </div>

@@ -3872,3 +3872,6 @@ table tr:nth-last-child(-n+4) .license-help-text {
         transform: none !important;
     }
 }
+
+/* Feedback: improve promotional button readability */
+.btn.alt.feedback-contrast { color: #231942; }

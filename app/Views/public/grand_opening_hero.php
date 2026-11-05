@@ -10,7 +10,7 @@ $goDate=static function(string $utc): string {
 <?php if($openingState==='live'): ?>
 <p>Shop Grand Opening deals from participating designers, discover new favorites, and join the celebration.</p>
 <p><strong>Ends <?=H::e($goDate($openingEvent['ends_at']))?></strong></p>
-<p><a class="btn" href="/browse?grand_opening=1">Shop the Grand Opening Sale</a> <a class="btn alt" href="/dashboard/passport">Get Your Passport</a></p>
+<p><a class="btn" href="/browse?grand_opening=1">Shop the Grand Opening Sale</a> <a class="btn alt feedback-contrast" href="/dashboard/passport">Get Your Passport</a></p>
 <p><a href="/battle-of-the-designers/grand-opening">Battle of the Designers</a><?php if(!empty($partySellers)): ?> · <a href="#party-sellers">Prize Wheel Shops</a><?php endif; ?></p>
 <?php else: ?>
 <p>Save the date for independent designers, digital designs, opening deals, and a little Creative Moth magic.</p>
