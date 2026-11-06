@@ -967,7 +967,21 @@ class CartController
                    }
                }
                 error_log('Grand Opening checkout pricing: '.get_class($e).': '.$e->getMessage());
-                H::flash('error','Checkout failed. Please try again. If this persists, ask an admin to verify Stripe environment configuration.');
+                $checkoutMessage = 'Checkout could not be completed. Please try again. If this continues, contact Creative Moth support.';
+
+                if (
+                    $e instanceof \InvalidArgumentException
+                    && str_contains($e->getMessage(), 'A valid US state and ZIP code are required')
+                ) {
+                    $checkoutMessage = 'Please check your billing address. For US addresses, enter your two-letter state code (example: MI) and a valid 5-digit ZIP code.';
+                } elseif (
+                    $e instanceof \DomainException
+                    && str_contains($e->getMessage(), 'text response is required')
+                ) {
+                    $checkoutMessage = 'This custom design needs updated personalization answers. Return to your cart, remove the affected custom design, then open its listing and add it again with all required questions completed. If you see a pending payment, contact Creative Moth support before trying again.';
+                }
+
+                H::flash('error', $checkoutMessage);
                 H::redirect('/cart');
 
            }

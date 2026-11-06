@@ -95,6 +95,7 @@ $router->get('/dashboard/passport', [BuyerController::class, 'passport']);
  $router->match(['GET','POST'], '/apply', [SellerController::class, 'apply']);
  $router->get('/seller', [SellerController::class, 'home']);
  $router->get('/seller/analytics', [AnalyticsController::class, 'seller']);
+ $router->get('/seller/followers', [\App\Controllers\SellerAudienceController::class, 'index']);
  $router->get('/seller/analytics.csv', [AnalyticsController::class, 'sellerCsv']);
  $router->get('/seller/promos', [PromoController::class, 'index']);
  $router->post('/seller/promos/checkout', [PromoController::class, 'checkout']);
@@ -175,7 +176,8 @@ $router->post('/seller/products/bulk-archive', [SellerController::class, 'bulkAr
  $router->get('/seller/product-batch/{id}', [SellerController::class, 'productBatch']);
  $router->post('/seller/product-batch/{id}', [SellerController::class, 'mutateProductBatch']);
  $router->match(['GET','POST'], '/seller/product/new', [SellerController::class, 'editProduct']);
- $router->match(['GET','POST'], '/seller/product/{id}', [SellerController::class, 'editProduct']);
+ $router->match(['GET','POST'], '/seller/product/{id}/sale', [\App\Controllers\ProductSaleController::class, 'manage']);
+$router->match(['GET','POST'], '/seller/product/{id}', [SellerController::class, 'editProduct']);
  $router->post('/seller/product/{id}/submit', [SellerController::class, 'submitProduct']);
  $router->post('/seller/product/{id}/duplicate', [SellerController::class, 'duplicateProduct']);
 $router->post('/seller/product/{id}/store-featured', [SellerController::class, 'toggleStoreFeatured']);

@@ -59,7 +59,20 @@
     <?php else:?>Uncategorized<?php endif;?>
         </p>
         <h2><?php if((float)($p['go_regular_price']??$p['price'])>(float)$p['price']): ?><del><?=H::money($p['go_regular_price'])?></del> <?php endif; ?><?=H::money($p['price'])?></h2>
-        <?php if(!empty($p['go_points'])): ?><p class="notice success">Grand Opening Sale: <?=number_format((int)$p['go_points']/100,2)?>% off this product and paid license add-ons. Checkout automatically applies whichever saves more: the sale or your coupon.</p><?php endif; ?>
+        <?php if(($p['sale_source']??'')==='individual'): ?>
+            <p class="notice success">
+                Individual Product Sale:
+                <?php if(($p['individual_sale_type']??'')==='percent'): ?>
+                    <?=H::e($p['individual_sale_value'])?>% off
+                    the product and paid license add-ons.
+                <?php else: ?>
+                    $<?=H::e($p['individual_sale_value'])?> off
+                    the product base price.
+                <?php endif; ?>
+                One eligible coupon may also apply.
+            </p>
+            <?php endif; ?>
+            <?php if(!empty($p['go_points'])): ?><p class="notice success">Grand Opening Sale: <?=number_format((int)$p['go_points']/100,2)?>% off this product and paid license add-ons. One eligible coupon can also apply to your sale price.</p><?php endif; ?>
         <p>
         <span class="badge ai">
         <?=H::e($p['ai_disclosure'])?>

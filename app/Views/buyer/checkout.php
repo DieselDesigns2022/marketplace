@@ -23,7 +23,7 @@ anything still due.
     </table>
     <div class="card">
       <p>Regular subtotal: <strong><?=H::money(($pricing['regular_cents']??0)/100)?></strong></p>
-      <?php if(!empty($pricing['sale_savings_cents'])): ?><p>Grand Opening Sale: <strong>-<?=H::money($pricing['sale_savings_cents']/100)?></strong></p><?php endif; ?>
+      <?php if(!empty($pricing['sale_savings_cents'])): ?><p>Sale savings: <strong>-<?=H::money($pricing['sale_savings_cents']/100)?></strong></p><?php endif; ?>
       <?php if(!empty($couponResult) && !empty($couponResult['ok'])):?><p>Coupon <?=H::e($couponResult['coupon']['code'])?>: <strong>-<?=H::money($discount)?></strong></p><?php endif;?>
       <p class="muted">Sales tax is calculated at checkout when required for your billing location. All prices and charges are in USD.</p>
       <p>
@@ -51,7 +51,7 @@ anything still due.
       </p>
 
       <h2>
-        Subtotal after sale or coupon − Prize Credit + tax − Marketplace Credit
+        Subtotal after sale and any eligible coupon − Prize Credit + tax − Marketplace Credit
         = final total
       </h2>
 
@@ -67,7 +67,7 @@ anything still due.
           <label>Address line 1<input name="billing_line1" required autocomplete="billing address-line1" value="<?=H::e($_POST['billing_line1'] ?? '')?>"></label>
           <label>Address line 2<input name="billing_line2" autocomplete="billing address-line2" value="<?=H::e($_POST['billing_line2'] ?? '')?>"></label>
           <label>City<input name="billing_city" required autocomplete="billing address-level2" value="<?=H::e($_POST['billing_city'] ?? '')?>"></label>
-          <label>State / Province / Region<input name="billing_state" autocomplete="billing address-level1" value="<?=H::e($_POST['billing_state'] ?? '')?>"></label>
+          <label>State / Province / Region (US: enter two-letter code, such as MI)<input name="billing_state" autocomplete="billing address-level1" value="<?=H::e($_POST['billing_state'] ?? '')?>"></label>
           <label>Postal code<input name="billing_postal_code" required autocomplete="billing postal-code" value="<?=H::e($_POST['billing_postal_code'] ?? '')?>"></label>
           <label>Country
 <select name="billing_country" required autocomplete="billing country">
@@ -132,3 +132,6 @@ anything still due.
         <button class="btn">Calculate tax and complete checkout</button>
     </form>
 <?php endif;?>
+
+
+<?php require __DIR__.'/../partials/billing_address_helper.php'; ?>

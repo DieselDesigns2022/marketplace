@@ -43,6 +43,54 @@
                </a>
                <?php if($isCustom):?>
                    <br><span class="badge">Custom Design</span>
+                    <?php
+                    $missingCustomAnswers = null;
+                    if (
+                        !empty($p['custom_service_id']) &&
+                        !empty($p['custom_checkout_token']) &&
+                        H::user()
+                    ) {
+                        try {
+                            $missingCustomAnswers =
+                                \App\Services\CustomCartReadinessService::missingAnswers(
+                                    (int)H::user()['id'],
+                                    (int)$p['custom_service_id'],
+                                    (string)$p['custom_checkout_token']
+                                );
+                        } catch (\Throwable $readinessError) {
+                            error_log(
+                                'Custom cart readiness: '.
+                                $readinessError->getMessage()
+                            );
+                        }
+                    }
+                    ?>
+                    <?php if (
+                        $missingCustomAnswers === null ||
+                        $missingCustomAnswers > 0
+                    ): ?>
+                        <div class="notice warning">
+                            <strong>Action needed before checkout</strong>
+                            <p>
+                                <?php if ($missingCustomAnswers !== null): ?>
+                                    This custom design is missing
+                                    <?=(int)$missingCustomAnswers?>
+                                    required answer(s).
+                                <?php else: ?>
+                                    The saved details for this custom design
+                                    could not be verified.
+                                <?php endif; ?>
+                            </p>
+                            <p>
+                                Remove this item, reopen its listing,
+                                complete all required questions,
+                                and add it to your cart again.
+                            </p>
+                            <a href="/custom-design/<?=H::e($p['slug'])?>">
+                                Open custom-design listing
+                            </a>
+                        </div>
+                    <?php endif; ?>
                <?php endif;?>
                </td>
                <td>

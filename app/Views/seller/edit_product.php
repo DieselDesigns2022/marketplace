@@ -1,3 +1,38 @@
+
+<style>
+/* Larger, wrapping product fields for phone and tablet editing. */
+.seller-mobile-editor {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+    resize: vertical;
+}
+@media (max-width: 767px) {
+    .seller-mobile-title {
+        min-height: 7rem;
+    }
+    .seller-mobile-short {
+        min-height: 9rem;
+    }
+    .seller-mobile-full {
+        min-height: 15rem;
+    }
+    .seller-mobile-tags {
+        min-height: 10rem;
+    }
+    .seller-mobile-editor {
+        font-size: 16px;
+        padding: 0.85rem;
+        overflow-x: hidden;
+    }
+}
+</style>
+
 <h1>
 <?= $p?'Edit':'Create' ?> Product</h1>
 <?php foreach($errors??[] as $error):?>
@@ -9,14 +44,14 @@
 <form method="post" enctype="multipart/form-data" class="form card">
     <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
     <h2>Basic Information</h2>
-    <label>Product Title<input name="title" required maxlength="190" value="<?=H::e($_POST['title']??$p['title']??'') ?>" data-slug-source data-character-counter>
+    <label>Product Title<textarea name="title" required maxlength="190" rows="3" data-slug-source data-character-counter class="seller-mobile-editor seller-mobile-title"><?=H::e($_POST['title']??$p['title']??'') ?></textarea>
     </label>
     <p class="help-text">The public product URL is generated automatically from the product title.</p>
-    <label>Short Description<textarea name="short_description">
+    <label>Short Description<textarea name="short_description" rows="5" class="seller-mobile-editor seller-mobile-short">
     <?=H::e($_POST['short_description']??$p['short_description']??'')?>
     </textarea>
     </label>
-    <label>Full Description<textarea name="description" required>
+    <label>Full Description<textarea name="description" required rows="10" class="seller-mobile-editor seller-mobile-full">
     <?=H::e($_POST['description']??$p['description']??'')?>
     </textarea>
     </label>
@@ -207,6 +242,13 @@
     <label>Protected downloadable files<input type="file" name="product_files[]" multiple>
     </label>
     <h2>Pricing and Licenses</h2>
+    <?php if(!empty($p['id'])): ?>
+    <p>
+        <a class="btn" href="/seller/product/<?=(int)$p['id']?>/sale">
+            Manage Individual Product Sale
+        </a>
+    </p>
+    <?php endif; ?>
     <?php $priceValue=array_key_exists('price',$_POST)?$_POST['price']:($p?(($p['price']??null)===null?'':$p['price']):'5.00'); ?>
     <label>Base Price<input type="number" step="0.01" min="0" name="price" value="<?=H::e($priceValue)?>">
     </label>
@@ -277,7 +319,7 @@
         Optional. Customers can click shop sections on your public storefront
         to view only the products inside that section.
     </p>
-    <label>Tags<input name="tags" value="<?=H::e($_POST['tags']??$tagText??'')?>">
+    <label>Tags<textarea name="tags" rows="4" class="seller-mobile-editor seller-mobile-tags"><?=H::e($_POST['tags']??$tagText??'')?></textarea>
     </label>
 <label>AI Disclosure<select name="ai_disclosure"<?=in_array('ai',$importReviewKeys??[],true)?'':' required'?>>
 <option value="">Choose AI disclosure</option>

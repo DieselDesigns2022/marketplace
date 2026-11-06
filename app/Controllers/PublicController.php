@@ -706,7 +706,30 @@ class PublicController
         $licenses = LicenseService::productLicenses($p);
         foreach ($licenses as &$openingLicense) {
             $openingLicense['regular_price']=$openingLicense['price'];
-            $openingLicense['price']=\App\Services\CreditService::formatCents(OpeningPricing::component(\App\Services\CreditService::parseCents((string)$openingLicense['price'],false),(int)($p['go_points']??0)));
+            $licenseCents=\App\Services\CreditService::parseCents(
+                (string)$openingLicense['price'],
+                false
+            );
+
+            if (
+                ($p['sale_source']??'')==='individual' &&
+                ($p['individual_sale_type']??'')==='percent'
+            ) {
+                $licenseCents=\App\Services\ProductSaleService::discountedBaseCents(
+                    $licenseCents,
+                    'percent',
+                    (string)$p['individual_sale_value']
+                );
+            } else {
+                $licenseCents=OpeningPricing::component(
+                    $licenseCents,
+                    (int)($p['go_points']??0)
+                );
+            }
+
+            $openingLicense['price']=\App\Services\CreditService::formatCents(
+                $licenseCents
+            );
         }
         unset($openingLicense);
         $defaultLicense = $licenses[0] ?? ['price' => (float)($p['price'] ?? 0), 'license_key' => 'personal'];

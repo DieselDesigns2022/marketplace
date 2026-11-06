@@ -8,6 +8,28 @@ final class GrandOpeningPricingService
 {
     private static bool $homepagePreview = false;
 
+    /*
+     * Safety switch: OFF until live activation is approved
+     * after isolated integration and checkout testing.
+     */
+    private const LIVE_INDIVIDUAL_SALES = true;
+
+    private static function individualSalesEnabled(): bool
+    {
+        if (self::LIVE_INDIVIDUAL_SALES) {
+            return true;
+        }
+
+        // Only allow test activation in CLI against an isolated
+        // database. Never allow this override in web requests.
+        return PHP_SAPI === 'cli'
+            && getenv('CM_INDIVIDUAL_SALES_TEST') === '1'
+            && preg_match(
+                '/^mysql:host=localhost;dbname=cm_sale_test_[0-9]{14}$/D',
+                (string)getenv('CM_SALE_TEST_DSN')
+            ) === 1;
+    }
+
     public static function isHomepagePreview(): bool
     {
         return self::$homepagePreview;
@@ -47,7 +69,14 @@ final class GrandOpeningPricingService
     public static function priceSql(string $alias='p'): string
     {
         $points=self::pointsSql($alias);
-        return '(case when '.$alias.'.price>0 then greatest(0.01,'.$alias.'.price-round('.$alias.'.price*('.$points.')/10000,2)) else 0 end)';
+        $grand='(case when '.$alias.'.price>0 then greatest(0.01,'.$alias.'.price-round('.$alias.'.price*('.$points.')/10000,2)) else 0 end)';
+
+        if (!self::individualSalesEnabled()) {
+            return $grand;
+        }
+
+        return 'LEAST('.$grand.','.
+            ProductSaleQuoteService::individualPriceSql($alias).')';
     }
 
     public static function component(int $cents,int $points): int
@@ -75,6 +104,36 @@ final class GrandOpeningPricingService
             $p['go_regular_price']=$q['price'];
             $p['go_points']=(int)$q['go_points'];
             $p['price']=CreditService::formatCents(self::component(CreditService::parseCents((string)$q['price'],false),$p['go_points']));
+
+            $p['sale_source']=$p['go_points']>0
+                ? 'grand_opening' : 'none';
+
+            if (self::individualSalesEnabled()) {
+                $individual=ProductSaleService::activeForProduct(
+                    (int)$p['id']
+                );
+
+                $quote=ProductSaleQuoteService::quote(
+                    (string)$q['price'],
+                    [],
+                    (int)$q['go_points'],
+                    $individual
+                );
+
+                $p['price']=CreditService::formatCents(
+                    $quote['base_cents']
+                );
+
+                $p['sale_source']=$quote['source'];
+
+                if ($quote['source']==='individual') {
+                    $p['go_points']=0;
+                    $p['individual_sale_type']=
+                        $individual['discount_type'];
+                    $p['individual_sale_value']=
+                        $individual['discount_value'];
+                }
+            }
         }
         unset($p);
         return $products;
@@ -108,6 +167,15 @@ final class GrandOpeningPricingService
         }
         DB::row('select id from grand_opening_events where id=1 lock in share mode');
         DB::rows('select id from products where id in ('.$marks.') order by id for update',$ids);
+        if (self::individualSalesEnabled()) {
+            DB::rows(
+                'select product_id from product_sales
+                 where product_id in ('.$marks.')
+                 order by product_id for update',
+                $ids
+            );
+        }
+
         DB::rows('select id from product_license_types where product_id in ('.$marks.') order by product_id,id for update',$ids);
         DB::rows('select id from license_types order by id lock in share mode');
         if ($sellers) DB::rows('select id from seller_license_presets where designer_id in ('.$sm.') order by designer_id,id lock in share mode',$sellers);
@@ -330,6 +398,43 @@ final class GrandOpeningPricingService
                     )
                 :0;
 
+            if (self::individualSalesEnabled() && $licenses) {
+                $individual=ProductSaleService::activeForProduct(
+                    (int)$p['id']
+                );
+
+                $quote=ProductSaleQuoteService::quote(
+                    (string)$p['price'],
+                    $licenses,
+                    (int)$p['go_points'],
+                    $individual
+                );
+
+                $p['go_sale_source']=$quote['source'];
+                $p['go_sale_base']=$quote['base_cents'];
+
+                foreach (
+                    $p['go_sale_licenses']
+                    as $index=>&$license
+                ) {
+                    $license['price']=CreditService::formatCents(
+                        $quote['license_cents'][$index]
+                    );
+                }
+
+                unset($license);
+
+                $p['go_sale_line']=$quote['line_cents'];
+
+                if ($quote['source']==='individual') {
+                    $p['go_points']=0;
+                    $p['individual_sale_type']=
+                        $individual['discount_type'];
+                    $p['individual_sale_value']=
+                        $individual['discount_value'];
+                }
+            }
+
             $p['go_candidate_savings']=
                 CreditService::parseCents(
                     (string)$p['line_total'],
@@ -366,7 +471,7 @@ final class GrandOpeningPricingService
             if(
                 $isProduct
                 && $mode==='sale'
-                && !empty($p['go_points'])
+                && !empty($p['go_candidate_savings'])
                 && empty($p['license_invalid'])
             ){
                 $p['price']=
@@ -454,6 +559,15 @@ final class GrandOpeningPricingService
             'regular_total'=>$p['go_regular_line_total'],'paid_base'=>$p['price'],
             'paid_licenses'=>$p['go_paid_licenses'],'before_coupon'=>$p['line_total'],
             'coupon_discount_cents'=>$couponCents,
+            'individual_sale'=>(
+                !empty($p['individual_sale_type'])
+                ?[
+                    'type'=>$p['individual_sale_type'],
+                    'value'=>$p['individual_sale_value']??null,
+                    'source'=>$p['go_sale_source']??'individual'
+                ]
+                :null
+            ),
             'merchandise_cents'=>CreditService::parseCents((string)$p['line_total'],false)-$couponCents];
         $json=json_encode($value,JSON_THROW_ON_ERROR);
         $existing=DB::row('select pricing_snapshot from grand_opening_pricing_snapshots where order_item_id=? for update',[$itemId]);

@@ -590,7 +590,11 @@ class StripeService
                 'country' => $country,
                 'email' => $user['email'] ?? null,
                 'capabilities' => [
+                    'card_payments' => ['requested' => 'true'],
                     'transfers' => ['requested' => 'true']
+                ],
+                'tos_acceptance' => [
+                    'service_agreement' => 'full'
                 ],
                 'business_profile' => [
                     'name' =>

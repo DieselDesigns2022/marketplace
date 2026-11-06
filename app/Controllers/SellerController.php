@@ -398,7 +398,31 @@ class SellerController
             $link = StripeService::createAccountLink($accountId, $base . '/seller/stripe/refresh', $base . '/seller/stripe/return');
             header('Location: ' . $link['url'], true, 303); exit;
         } catch (Throwable $e) {
-            H::flash('error', 'Stripe setup could not be started: ' . $e->getMessage());
+            error_log(
+                'Stripe Connect onboarding failed for designer '.
+                (int)$d['id'].': '.$e->getMessage()
+            );
+
+            $stripeMessage = 'Stripe could not start your payout setup. Please contact Creative Moth support if this continues.';
+
+            if (
+                str_contains(
+                    strtolower($e->getMessage()),
+                    'cross-border'
+                ) ||
+                str_contains(
+                    strtolower($e->getMessage()),
+                    'not supported'
+                ) ||
+                str_contains(
+                    strtolower($e->getMessage()),
+                    'service agreement'
+                )
+            ) {
+                $stripeMessage = 'Stripe cannot complete payout setup for this country or account configuration yet. Creative Moth is reviewing international payout availability. Please contact support.';
+            }
+
+            H::flash('error', $stripeMessage);
             H::redirect('/seller/stripe');
         }
     }

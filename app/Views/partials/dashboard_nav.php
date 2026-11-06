@@ -118,6 +118,7 @@ if ($area === 'buyer') {
         'Overview' => [
             ['/seller', 'Seller Overview', ['/seller']],
             ['/seller/analytics', 'Analytics', ['/seller/analytics', '/seller/analytics.csv']],
+            ['/seller/followers', 'Followers & Favorites', ['/seller/followers']],
             [
                 '/seller/onboarding',
                 'Readiness',
