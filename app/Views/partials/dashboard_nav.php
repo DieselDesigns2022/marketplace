@@ -149,11 +149,6 @@ if ($area === 'buyer') {
                 ['/seller/collabs/find']
             ],
             [
-                '/seller/store',
-                'Store & Licenses',
-                ['/seller/store']
-            ],
-            [
                 '/seller/coupons',
                 'Coupons',
                 ['/seller/coupons']
@@ -207,6 +202,11 @@ if ($area === 'buyer') {
         ],
 
         'Business' => [
+            [
+                '/seller/store',
+                'Store & Licenses',
+                ['/seller/store']
+            ],
             [
                 '/seller/stripe',
                 'Payouts / Stripe',

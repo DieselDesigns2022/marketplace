@@ -176,3 +176,5 @@ document.querySelectorAll('[data-product-preview]').forEach(function(button) {
 });
 </script>
 <?php require __DIR__.'/../partials/license_help_modal.php'; ?>
+
+<?php $ga4DesignerId=(int)$p['designer_id']; require app_path('app/Views/partials/seller_ga4.php'); ?>

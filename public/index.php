@@ -111,6 +111,7 @@ $router->get('/seller/prize-donations/{id}/file', [PrizeDonationController::clas
  $router->get('/seller/stripe/return', [SellerController::class, 'stripeReturn']);
  $router->get('/seller/stripe/refresh', [SellerController::class, 'stripeRefresh']);
  $router->match(['GET','POST'], '/seller/store', [SellerController::class, 'storeSettings']);
+ $router->post('/seller/ga4', [\App\Controllers\SellerGa4Controller::class, 'save']);
  $router->match(['GET','POST'], '/seller/receipt-settings', [SellerController::class, 'receiptSettings']);
  $router->get('/seller/social-publishing', [SocialPublishingController::class, 'index']);
  $router->post('/seller/social/{platform}/connect', [SocialPublishingController::class, 'connect']);

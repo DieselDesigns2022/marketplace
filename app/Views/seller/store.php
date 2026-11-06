@@ -74,6 +74,70 @@
     <p class="help-text"><strong>Recommended banner size: 2400 × 800 px (3:1).</strong> Place important text and graphics in the center area because the banner is shown responsively.</p>
     <button class="btn">Save Store Settings</button>
 </form>
+<?php
+$ga4SavedId = '';
+$ga4LookupFailed = false;
+
+try {
+    $ga4SavedId = \App\Services\SellerGa4Service::forDesigner(
+        (int)($d['id'] ?? 0)
+    );
+} catch (\Throwable $e) {
+    $ga4LookupFailed = true;
+    error_log('Creative Moth GA4 settings lookup: ' . $e->getMessage());
+}
+?>
+<section class="card page-section" id="google-analytics">
+<h2>📊 Google Analytics 4</h2>
+<p class="help-text">
+Connect your own Google Analytics property to track visits
+to your public shop and product pages.
+Visitors must allow optional analytics cookies before
+Google tracking starts.
+</p>
+<form method="post" action="/seller/ga4" class="form">
+<input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+<label>GA4 Measurement ID
+<input type="text" name="ga4_measurement_id"
+ maxlength="20" autocomplete="off"
+ placeholder="G-ABC1234567"
+ value="<?=H::e($ga4SavedId)?>">
+</label>
+<p class="help-text">
+<strong>How to connect Google Analytics:</strong>
+<br>1. Visit
+<a href="https://analytics.google.com/" target="_blank"
+rel="noopener noreferrer">Google Analytics</a>
+and sign in with your Google account.
+<br>2. If you're new, create an Analytics account and
+a GA4 property.
+<br>3. Create a Web data stream using your Creative Moth
+storefront URL (shown at the top of this page).
+<br>4. Copy the Measurement ID beginning with G-.
+You can find it under Admin → Data streams → Web.
+<br>5. Paste that ID above and click Save Google Analytics Settings.
+<br><br>
+<strong>Testing your connection:</strong>
+Open your public storefront, allow analytics tracking
+when prompted, then check Reports → Realtime in Google Analytics.
+Initial data may take up to 30 minutes to appear.
+<br><br>
+Leave the Measurement ID blank and save to disconnect.
+Google Analytics reports stay in your Google account,
+separate from Creative Moth's built-in analytics.
+</p>
+<?php if ($ga4LookupFailed): ?>
+<p class="notice error">
+Google Analytics settings are temporarily unavailable.
+Please try again shortly.
+</p>
+<?php endif; ?>
+<button class="btn" type="submit" <?= $ga4LookupFailed ? 'disabled' : '' ?>>
+Save Google Analytics Settings
+</button>
+</form>
+</section>
+
 <section class="card page-section" id="shop-sections">
     <h2>Shop Sections</h2>
 
