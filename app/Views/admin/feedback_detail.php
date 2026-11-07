@@ -76,6 +76,23 @@
                     ? $submission['user_name_snapshot']:'Creative Moth Support')?></strong>
                 <small><?=H::e($reply['created_at'])?></small>
                 <p><?=nl2br(H::e($reply['body']))?></p>
+                <?php foreach(($replyAttachments[(int)$reply['id']] ?? []) as $file): ?>
+                    <p>
+                        📎 <a href="/admin/feedback/<?=(int)$submission['id']?>/messages/attachments/<?=(int)$file['id']?>">
+                            <?=H::e($file['original_name'])?>
+                        </a>
+                        <a href="/admin/feedback/<?=(int)$submission['id']?>/messages/attachments/<?=(int)$file['id']?>?preview=1"
+                           target="_blank" rel="noopener noreferrer"
+                           style="display:block;margin-top:10px;max-width:300px;">
+                            <img
+                              src="/admin/feedback/<?=(int)$submission['id']?>/messages/attachments/<?=(int)$file['id']?>?preview=1"
+                              alt="Attached screenshot preview"
+                              loading="lazy"
+                              style="display:block;max-width:100%;max-height:240px;width:auto;height:auto;object-fit:contain;border-radius:10px;border:1px solid #ddd;">
+                        </a>
+                        (<?=number_format($file['byte_size']/1024,1)?> KB)
+                    </p>
+                <?php endforeach; ?>
             </article>
         <?php endforeach; ?>
     <?php endif; ?>

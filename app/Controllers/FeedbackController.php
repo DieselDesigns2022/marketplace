@@ -277,6 +277,58 @@ final class FeedbackController
         }
     }
 
+
+    public function downloadReplyAttachment($id,$attachmentId): void
+    {
+        H::requireAdminPermission('feedback.view');
+
+        $file = DB::row(
+            'select a.*
+             from message_attachments a
+             join conversation_messages m on m.id=a.message_id
+             join message_conversations c on c.id=m.conversation_id
+             where a.id=?
+               and c.feedback_submission_id=?
+               and c.conversation_type="support"
+             limit 1',
+            [(int)$attachmentId,(int)$id]
+        );
+
+        if (!$file) H::abort(404);
+
+        $base = realpath(app_path('storage/protected_uploads/messages'));
+        $path = realpath(app_path(
+            'storage/protected_uploads/messages/'.$file['stored_name']
+        ));
+
+        if (!$base || !$path ||
+            !str_starts_with($path,$base.DIRECTORY_SEPARATOR) ||
+            !is_file($path) || !is_readable($path)) {
+            H::abort(404);
+        }
+
+        $preview = ($_GET['preview'] ?? '') === '1';
+        $allowedImages = [
+            'image/jpeg',
+            'image/png',
+            'image/webp'
+        ];
+        $inline = $preview &&
+            in_array($file['mime_type'], $allowedImages, true);
+
+        header('Content-Type: '.
+            ($inline ? $file['mime_type'] : 'application/octet-stream'));
+        header('Content-Length: '.filesize($path));
+        header("Content-Disposition: ".
+            ($inline ? 'inline' : 'attachment').
+            "; filename*=UTF-8''".
+            rawurlencode($file['original_name']));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        readfile($path);
+        exit;
+    }
+
     public function downloadAttachment($id,$attachmentId): void
     {
         H::requireAdminPermission('feedback.view');
@@ -393,6 +445,21 @@ final class FeedbackController
              from feedback_attachments where feedback_submission_id=? order by id',
             [(int)$id]
         );
-        H::view('admin/feedback_detail',compact('submission','conversation','replyMessages','attachments'));
+        $replyAttachments = [];
+        if ($conversation) {
+            $rows = DB::rows(
+                'select a.id,a.message_id,a.original_name,a.byte_size
+                 from message_attachments a
+                 join conversation_messages m on m.id=a.message_id
+                 where m.conversation_id=?
+                 order by a.id',
+                [(int)$conversation['id']]
+            );
+            foreach ($rows as $row) {
+                $replyAttachments[(int)$row['message_id']][] = $row;
+            }
+        }
+
+        H::view('admin/feedback_detail',compact('submission','conversation','replyMessages','attachments','replyAttachments'));
     }
 }

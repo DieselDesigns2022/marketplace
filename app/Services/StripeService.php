@@ -582,10 +582,7 @@ class StripeService
             );
         }
 
-        return self::request(
-            'POST',
-            '/v1/accounts',
-            [
+        $params = [
                 'type' => 'express',
                 'country' => $country,
                 'email' => $user['email'] ?? null,
@@ -606,9 +603,14 @@ class StripeService
                     'user_id' => (string)$user['id'],
                     'platform' => 'asset_moth'
                 ],
-            ],
-            'asset_moth_connect_designer_' . (int)$designer['id']
-        );
+            ];
+
+        // Same parameters reuse one key; changed parameters get a new key.
+        $key = 'creative_moth_connect_v2_' .
+            (int)$designer['id'] . '_' .
+            substr(hash('sha256',http_build_query($params)),0,24);
+
+        return self::request('POST','/v1/accounts',$params,$key);
     }
 
     public static function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): array
