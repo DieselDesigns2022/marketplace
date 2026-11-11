@@ -899,7 +899,13 @@ class SellerController
             $params = [$slug];
             $sql = 'select id from products where slug=?';
             if ($ignoreId) { $sql .= ' and id<>?'; $params[] = $ignoreId; }
-            if (!DB::row($sql . ' limit 1', $params)) return $slug;
+            if (
+                !DB::row($sql . ' limit 1', $params) &&
+                !DB::row(
+                    'select old_slug from product_slug_redirects where old_slug=?',
+                    [$slug]
+                )
+            ) return $slug;
             $suffix = '-' . $i++;
             $slug = mb_substr($base, 0, 190 - mb_strlen($suffix)) . $suffix;
         }
@@ -2764,6 +2770,11 @@ class SellerController
                 $d['id'], $source['category_id'], $copyTitle, $slug, $source['short_description'], $source['description'], $source['price'], $source['fulfillment_type'], $source['manual_delivery_instructions'], null, $source['file_types'], $source['commercial_license_enabled'], $source['commercial_license_price'], $source['pod_allowed'], $source['digital_resale_prohibited'], $source['ai_disclosure'], $source['is_hand_drawn'], $source['seo_title'], $source['seo_description'],
             ]);
             $newId = (int)DB::id();
+
+            DB::exec(
+                'update products set slug=? where id=?',
+                [$this->uniqueProductSlug('listing-'.$newId), $newId]
+            );
             DB::exec(
                 'update products set store_section_id=? where id=? and designer_id=?',
                 [$source['store_section_id']??null,$newId,(int)$d['id']]

@@ -145,5 +145,11 @@ class CsvProductImportService
     private function canonicalUrl(string $url): string{$p=parse_url(trim($url));if(!$p||empty($p['host']))return trim($url);return strtolower($p['scheme']??'https').'://'.strtolower($p['host']).(isset($p['port'])?':'.$p['port']:'').($p['path']??'/').(isset($p['query'])?'?'.$p['query']:'');}
     private function nonDigitalType(?string $type): bool{return $type!==null&&$type!==''&&(bool)preg_match('/physical|service|membership|subscription|event|food/i',$type);}
     public function categoryId(array $names): ?int{foreach($names as $name){$row=DB::row('select id from categories where is_active=1 and (lower(name)=lower(?) or slug=?) limit 1',[$name,H::slug($name)]);if($row)return(int)$row['id'];}return null;}
-    public function uniqueSlug(string $title): string{$base=mb_substr(H::slug($title)?:'imported-product',0,190);$slug=$base;$i=2;while(DB::row('select id from products where slug=?',[$slug])){$suffix='-'.$i++;$slug=mb_substr($base,0,190-mb_strlen($suffix)).$suffix;}return $slug;}
+    public function uniqueSlug(string $title): string{$base=mb_substr(H::slug($title)?:'imported-product',0,190);$slug=$base;$i=2;while(
+        DB::row('select id from products where slug=?',[$slug])
+        || DB::row(
+            'select old_slug from product_slug_redirects where old_slug=?',
+            [$slug]
+        )
+    ){$suffix='-'.$i++;$slug=mb_substr($base,0,190-mb_strlen($suffix)).$suffix;}return $slug;}
 }

@@ -696,7 +696,32 @@ class PublicController
 
     public function product($slug): void
     {
-        $p = DB::row('select p.*,d.user_id seller_user_id,d.display_name,d.store_slug,d.creator_rank,d.founder_position,d.founder_active,d.average_rating,d.review_count,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.slug=? and p.status="approved" and d.status="approved"', [$slug]) ?? H::abort(404);
+        $p = DB::row('select p.*,d.user_id seller_user_id,d.display_name,d.store_slug,d.creator_rank,d.founder_position,d.founder_active,d.average_rating,d.review_count,c.name category_name,c.slug category_slug from products p join designers d on d.id=p.designer_id left join categories c on c.id=p.category_id where p.slug=? and p.status="approved" and d.status="approved"', [$slug]);
+
+        if (!$p) {
+            $previous = DB::row(
+                'select p.slug
+                 from product_slug_redirects r
+                 join products p on p.id=r.product_id
+                 join designers d on d.id=p.designer_id
+                 where r.old_slug=?
+                   and p.status="approved"
+                   and d.status="approved"
+                 limit 1',
+                [$slug]
+            );
+
+            if ($previous) {
+                header(
+                    'Location: '.H::canonical('/product/'.$previous['slug']),
+                    true,
+                    301
+                );
+                exit;
+            }
+
+            H::abort(404);
+        }
         $p=(new OpeningPricing())->decorate([$p])[0];
         $images = DB::rows('select * from product_images where product_id=? order by sort_order,id', [$p['id']]);
         $preview = $images[0]['image_path'] ?? '';
