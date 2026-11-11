@@ -162,7 +162,49 @@
         </p>
     </form>
 
-    <div class="responsive-table"><table>
+    <style>
+.cm-product-menu {
+    width: 145px;
+    max-width: 100%;
+}
+.cm-product-menu > summary {
+    cursor: pointer;
+    list-style: none;
+    background: #261842;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: center;
+    border-radius: 10px;
+    font-weight: 600;
+}
+.cm-product-menu > summary::-webkit-details-marker {
+    display: none;
+}
+.cm-product-menu > summary:focus-visible {
+    outline: 3px solid #a855f7;
+    outline-offset: 2px;
+}
+.cm-product-menu .product-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    padding: 6px 0;
+}
+.cm-product-menu .product-actions > a,
+.cm-product-menu .product-actions > form,
+.cm-product-menu .product-actions > form > button {
+    box-sizing: border-box;
+    width: 100%;
+}
+.cm-product-menu .product-actions > a,
+.cm-product-menu .product-actions > form > button {
+    font-size: 12px;
+    padding: 7px 8px;
+    min-height: 34px;
+}
+</style>
+<div class="responsive-table"><table>
         <tr><th>Select</th><th>Thumbnail</th><th>Product Name</th><th>Status</th><th>Store Featured</th><th>Orders</th><th>Price</th><th>Category</th><th>Updated Date</th><th>Actions</th></tr>
         <?php foreach($products as $p): $safeDelete = ((int)($p['completed_order_count'] ?? 0) === 0) && in_array($p['status'], ['draft','rejected','archived','disabled','deleted'], true); ?>
            <tr>
@@ -184,7 +226,9 @@
                <td><?=H::e($p['category_name']??'Uncategorized')?></td>
                <td><?=H::e($p['updated_at'])?></td>
                <td>
-                   <div class="product-actions">
+                   <details class="cm-product-menu">
+                      <summary>Actions ▾</summary>
+                      <div class="product-actions">
                     <a class="btn" href="/seller/product/<?=$p['id']?>">Edit</a>
                     <?php if(in_array($p['status'],['approved','published','scheduled'],true)):?>
                         <form method="post"
@@ -220,9 +264,84 @@
                    <?php if($safeDelete):?>
                    <form method="post" action="/seller/product/<?=$p['id']?>/delete" onsubmit="return confirm('Permanently delete this product? This cannot be undone.');"><input type="hidden" name="_csrf" value="<?=H::csrf()?>"><button>Permanent Delete</button></form>
                    <?php else:?><small class="muted">Permanent delete unavailable; archive instead.</small><?php endif;?>
-                   </div>
+                   </details></div>
                </td>
            </tr>
         <?php endforeach;?>
     </table></div>
 <?php endif; ?>
+
+
+<style>
+.cm-native-product-actions {
+    width: 145px;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1px solid #382456;
+    border-radius: 10px;
+    background: #261842;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.cm-native-product-actions:focus-visible {
+    outline: 3px solid #a855f7;
+    outline-offset: 2px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('details.cm-product-menu').forEach(function (menu) {
+        const actions = menu.querySelector('.product-actions');
+        if (!actions) return;
+
+        const items = Array.from(actions.children).filter(function (element) {
+            return element.matches('a[href], form') &&
+                (element.matches('a') || element.querySelector('button'));
+        });
+
+        if (!items.length) return;
+
+        const select = document.createElement('select');
+        select.className = 'cm-native-product-actions';
+        select.setAttribute('aria-label', 'Product actions');
+
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Actions ▾';
+        select.appendChild(placeholder);
+
+        items.forEach(function (item, index) {
+            const control = item.matches('form')
+                ? item.querySelector('button')
+                : item;
+
+            const option = document.createElement('option');
+            option.value = String(index);
+            option.textContent = control.textContent.trim();
+            select.appendChild(option);
+        });
+
+        select.addEventListener('change', function () {
+            const index = Number(select.value);
+            if (select.value === '') return;
+
+            const item = items[index];
+            select.value = '';
+
+            if (item.matches('a')) {
+                window.location.assign(item.href);
+            } else {
+                const button = item.querySelector('button');
+                item.requestSubmit(button);
+            }
+        });
+
+        menu.parentNode.insertBefore(select, menu);
+        menu.style.display = 'none';
+    });
+});
+</script>
