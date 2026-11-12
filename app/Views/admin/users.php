@@ -17,7 +17,17 @@ $userAction='/admin/users'.($userFilterQuery!==''?'?'.$userFilterQuery:'');
 <p>Showing <?=count($users)?> of <?=$userTotal?> users. Sellers includes admins with a seller profile.</p>
 <?php if(!$users): ?><p class="card">No users match these filters.</p><?php endif; ?>
 <div class="responsive-table"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Tester</th><th>Account Created</th><th>Account actions</th></tr></thead><tbody>
-<?php foreach($users as $user): $canonical=$canonicalOwnerId!==null&&(int)$user['id']===(int)$canonicalOwnerId; $grants=array_filter(explode(',',(string)$user['permission_keys'])); ?><tr><td><?=H::e($user['name'])?></td><td><?=H::e($user['email'])?></td><td><?=H::e($user['role'])?></td><td><?=H::e($user['status'])?></td><td><?=!empty($user['is_tester'])?'<span class="badge ok">Yes</span>':'No'?></td><td><?=H::e(date('M j, Y g:i A', strtotime($user['created_at'])))?></td><td>
+<?php foreach($users as $user): $canonical=$canonicalOwnerId!==null&&(int)$user['id']===(int)$canonicalOwnerId; $grants=array_filter(explode(',',(string)$user['permission_keys'])); ?><tr><td>
+<?php if(!empty($user['public_store_slug'])): ?>
+<a href="/store/<?=rawurlencode($user['public_store_slug'])?>"
+   target="_blank" rel="noopener noreferrer"
+   title="View public storefront">
+    <?=H::e($user['name'])?> ↗
+</a>
+<?php else: ?>
+<?=H::e($user['name'])?>
+<?php endif; ?>
+</td><td><?=H::e($user['email'])?></td><td><?=H::e($user['role'])?></td><td><?=H::e($user['status'])?></td><td><?=!empty($user['is_tester'])?'<span class="badge ok">Yes</span>':'No'?></td><td><?=H::e(date('M j, Y g:i A', strtotime($user['created_at'])))?></td><td>
 <?php if($canManage): ?>
 <form method="post" action="<?=H::e($userAction)?>" style="display:inline-block;margin-bottom:.45rem;">
 <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
