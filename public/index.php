@@ -108,6 +108,7 @@ $router->get('/seller/prize-donations/{id}/file', [PrizeDonationController::clas
  $router->get('/seller/onboarding', [SellerController::class, 'onboarding']);
  $router->get('/seller/stripe', [SellerController::class, 'stripe']);
  $router->post('/seller/stripe/connect', [SellerController::class, 'stripeConnect']);
+$router->post('/seller/stripe/dashboard', [SellerController::class, 'stripeDashboard']);
  $router->get('/seller/stripe/return', [SellerController::class, 'stripeReturn']);
  $router->get('/seller/stripe/refresh', [SellerController::class, 'stripeRefresh']);
  $router->match(['GET','POST'], '/seller/store', [SellerController::class, 'storeSettings']);

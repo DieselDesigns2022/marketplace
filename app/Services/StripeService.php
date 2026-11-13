@@ -613,6 +613,17 @@ class StripeService
         return self::request('POST','/v1/accounts',$params,$key);
     }
 
+    public static function createExpressLoginLink(string $accountId): array
+    {
+        if (!self::configured()) {
+            throw new \RuntimeException('Stripe is not configured.');
+        }
+        return self::request(
+            'POST',
+            '/v1/accounts/' . rawurlencode($accountId) . '/login_links'
+        );
+    }
+
     public static function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): array
     {
         if (!self::configured()) throw new \RuntimeException('Stripe is not configured.');

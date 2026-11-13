@@ -38,6 +38,17 @@
         </form>
     <?php endif; ?>
 </section>
+<?php if(!empty($d['stripe_connect_account_id'])): ?>
+<section class="card page-section">
+    <h2>Manage Stripe Account</h2>
+    <p class="muted">Manage your connected Stripe Express account and payout details.</p>
+    <form method="post" action="/seller/stripe/dashboard">
+        <input type="hidden" name="_csrf" value="<?=H::csrf()?>">
+        <button class="btn" type="submit">Manage Stripe Account</button>
+    </form>
+</section>
+<?php endif; ?>
+
 <section class="card page-section">
     <h2>Fees and payout notes</h2>
     <p>Sellers must complete Stripe onboarding before payouts/transfers can be sent. Stripe payment processing is handled by Creative Moth and is not deducted as a separate seller fee.</p>

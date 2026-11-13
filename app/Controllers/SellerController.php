@@ -355,6 +355,46 @@ class SellerController
         H::view('seller/stripe', ['d' => $d, 'readiness' => $this->readiness($d), 'commissionPercent' => (int)round(StripeService::commissionRate() * 100)]);
     }
 
+    public function stripeDashboard(): void
+    {
+        H::verifyCsrf();
+        $d = $this->approvedDesigner();
+        $accountId = (string)($d['stripe_connect_account_id'] ?? '');
+
+        if ($accountId === '') {
+            H::flash('warning', 'Connect your Stripe account first.');
+            H::redirect('/seller/stripe');
+            return;
+        }
+
+        try {
+            $link = StripeService::createExpressLoginLink($accountId);
+            $url = (string)($link['url'] ?? '');
+            $parts = parse_url($url);
+            $host = strtolower((string)($parts['host'] ?? ''));
+
+            if (
+                ($parts['scheme'] ?? '') !== 'https' ||
+                !($host === 'stripe.com' || str_ends_with($host, '.stripe.com')) ||
+                isset($parts['user']) ||
+                isset($parts['pass']) ||
+                isset($parts['port'])
+            ) {
+                throw new \RuntimeException('Stripe returned an invalid login URL.');
+            }
+
+            header('Location: ' . $url, true, 303);
+            exit;
+        } catch (Throwable $e) {
+            error_log(
+                'Stripe dashboard link failed for designer ' .
+                (int)$d['id'] . ': ' . $e->getMessage()
+            );
+            H::flash('error', 'Unable to open Stripe account management right now.');
+            H::redirect('/seller/stripe');
+        }
+    }
+
     public function stripeConnect(): void
     {
         $d = $this->approvedDesigner();
