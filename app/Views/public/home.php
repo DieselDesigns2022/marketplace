@@ -23,6 +23,15 @@ $openingState = $openingPreview ? 'live' : \App\Services\GrandOpeningSaleService
 .opening-shop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 @media(max-width:680px){.opening-shop-grid{grid-template-columns:1fr}}
 </style>
+<?php if($openingState==='ended' && !$openingPreview): ?>
+<section class="card page-section" style="text-align:center;padding:28px 20px;border:2px solid #35dbcb">
+    <p class="eyebrow">🎉 Creative Moth Grand Opening</p>
+    <h2>Our Grand Opening Event Has Ended!</h2>
+    <p>Thank you to everyone who celebrated with us, supported our designers, and participated in the festivities!</p>
+    <p><a class="btn" href="/grand-opening-winners">🏆 Click Here to See Our Winners</a></p>
+</section>
+<?php endif; ?>
+
 <?php if(in_array($openingState,['upcoming','live'],true)): ?>
 <?php include app_path('app/Views/public/grand_opening_hero.php'); ?>
 <?php else: ?>

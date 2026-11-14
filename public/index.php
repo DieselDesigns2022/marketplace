@@ -32,6 +32,7 @@ use App\Controllers\AdminCollabController;
 use App\Controllers\AnalyticsController;
  $router = new Router();
  $router->get('/', [PublicController::class, 'home']);
+$router->get('/grand-opening-winners', [PublicController::class, 'grandOpeningWinners']);
  $router->get('/tester-home', [PublicController::class, 'home']);
  $router->get('/browse', [PublicController::class, 'browse']);
  $router->get('/sell', [PublicController::class, 'sell']);

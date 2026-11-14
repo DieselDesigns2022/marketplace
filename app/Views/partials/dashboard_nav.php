@@ -179,19 +179,6 @@ if ($area === 'buyer') {
             ],
         ],
 
-        'Grand Opening' => [
-            [
-                '/seller/grand-opening',
-                'Grand Opening Hub',
-                [
-                    '/seller/grand-opening',
-                    '/seller/grand-opening-sale',
-                    '/seller/battle-of-the-designers',
-                    '/seller/prize-donations'
-                ]
-            ],
-        ],
-
         'Promotions / Ads' => [
             [
                 '/seller/promos',

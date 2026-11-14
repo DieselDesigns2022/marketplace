@@ -56,6 +56,90 @@ class PublicController
         H::redirect('/browse' . ($qs !== '' ? '?' . $qs : ''));
     }
 
+    public function grandOpeningWinners(): void
+    {
+        $event = (new \App\Services\GrandOpeningSaleService())->event();
+        $campaign = (string)$event['campaign_key'];
+
+        $grandPrizes = DB::rows(
+            'select f.id,
+                    f.winner_label,
+                    f.prize_title,
+                    d.display_name donor_store,
+                    d.store_slug donor_slug
+             from final_giveaway_draws f
+             join prize_assignments a on a.id=f.assignment_id
+             join prize_donations p on p.id=f.prize_donation_id
+             join designers d on d.id=p.designer_id
+             where f.campaign_key=?
+               and a.status in ("awarded","fulfilled")
+             order by f.id',
+            [$campaign]
+        );
+
+        $champions = DB::rows(
+            'select b.title event_title,
+                    d.display_name winner_label,
+                    d.store_slug,
+                    b.prize_awarded_at
+             from battle_events b
+             join battle_participants p on p.id=b.champion_participant_id
+             join designers d on d.id=p.designer_id
+             where b.slug="grand-opening"
+               and b.status="completed"
+               and b.prize_awarded_at is not null
+             order by b.id'
+        );
+
+        $wheelPrizes = DB::rows(
+            'select s.id,
+                    u.name account_name,
+                    wp.title prize_title,
+                    d.display_name donor_store,
+                    d.store_slug donor_slug
+             from prize_wheel_spins s
+             join prize_wheel_rewards r on r.id=s.reward_id
+             join prize_wheel_prizes wp on wp.id=r.wheel_prize_id
+             join users u on u.id=s.user_id
+             join designers d on d.id=s.storefront_designer_id
+             where s.campaign_key=(
+                 select campaign_key
+                 from prize_wheel_settings
+                 where id=1
+             )
+               and r.reward_type not in ("spin_again","grand_opening_entry")
+               and r.fulfillment_status in ("awarded","fulfilled","consumed")
+             order by s.id'
+        );
+
+        foreach ($wheelPrizes as &$prize) {
+            $parts = preg_split('/\s+/u', trim((string)$prize['account_name']));
+            $first = (string)($parts[0] ?? '');
+            $prize['winner_label'] = $first !== ''
+                ? $first.(count($parts)>1 ? ' '.mb_substr((string)end($parts),0,1).'.' : '')
+                : 'Creative Moth Winner';
+            unset($prize['account_name']);
+        }
+        unset($prize);
+
+        H::view('public/grand_opening_winners', [
+            'grandPrizes'=>$grandPrizes,
+            'champions'=>$champions,
+            'wheelPrizes'=>$wheelPrizes,
+            'meta'=>$this->pageMeta(
+                'Grand Opening Winners',
+                'Celebrate the winners of the Creative Moth Grand Opening, including giveaways, Battle of the Designers, and Prize Wheel rewards.',
+                '/grand-opening-winners',
+                [
+                    '@context'=>'https://schema.org',
+                    '@type'=>'CollectionPage',
+                    'name'=>'Creative Moth Grand Opening Winners',
+                    'url'=>H::canonical('/grand-opening-winners')
+                ]
+            )
+        ]);
+    }
+
     public function home(): void
     {
         $cats = $this->visibleCategories(8);
